@@ -100,6 +100,31 @@ function formatBody(text: string | undefined, html: string | undefined, maxLen: 
 
 	if (!raw) return escapeMdV2('（正文为空）');
 
+	// 删除 Markdown 图片 ![alt](url)
+	raw = raw.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
+
+	// 标题 → 纯文本（去掉 # 号，保留文字）
+	raw = raw.replace(/^#{1,6}\s+(.+)$/gm, '$1');
+
+	// 水平线 → 删除
+	raw = raw.replace(/^[-*_]{3,}\s*$/gm, '');
+
+	// 表格：删除分隔行，管道符替换为空格
+	raw = raw.replace(/^\|?[\s-]*:?-+:?[\s-|]*\|?\s*$/gm, ''); // 分隔行 |---|---|
+	raw = raw.replace(/\|/g, ' '); // 管道符 → 空格
+
+	// 引用式链接定义 [ref]: url → 删除
+	raw = raw.replace(/^\[[^\]]+\]:\s+.+$/gm, '');
+
+	// HTML 实体 → 字符
+	raw = raw
+		.replace(/&nbsp;/gi, ' ')
+		.replace(/&amp;/gi, '&')
+		.replace(/&lt;/gi, '<')
+		.replace(/&gt;/gi, '>')
+		.replace(/&quot;/gi, '"')
+		.replace(/&#0?39;/gi, "'");
+
 	// 压缩多余空行
 	raw = collapseBlankLines(raw);
 
