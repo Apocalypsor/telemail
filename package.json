@@ -17,6 +17,7 @@
 		"wrangler": "^4.67.0"
 	},
 	"dependencies": {
+		"node-html-markdown": "^2.0.0",
 		"postal-mime": "^2.7.3"
 	}
 }

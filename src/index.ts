@@ -1,3 +1,4 @@
+import { NodeHtmlMarkdown } from 'node-html-markdown';
 import PostalMime from 'postal-mime';
 
 export interface Env {
@@ -28,9 +29,9 @@ export default {
 			const charLimit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 
 			const header = [
-				`<b>发件人:</b>  ${escapeHtml(fromName)} &lt;${escapeHtml(from)}&gt;`,
-				`<b>时  间:</b>  ${escapeHtml(date)}`,
-				`<b>主  题:</b>  ${escapeHtml(subject)}`,
+				`*发件人:*  ${escapeMdV2(`${fromName} <${from}>`)}`,
+				`*时  间:*  ${escapeMdV2(date)}`,
+				`*主  题:*  ${escapeMdV2(subject)}`,
 				``,
 				``,
 			].join('\n');
@@ -54,10 +55,27 @@ export default {
 	},
 };
 
-function escapeHtml(str: string): string {
+/**
+ * 转义 Telegram MarkdownV2 特殊字符。
+ * 参考: https://core.telegram.org/bots/api#markdownv2-style
+ */
+function escapeMdV2(str: string): string {
 	if (!str) return '';
-	return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+	return str.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
 }
+
+/** 将连续多个空行压缩为最多一个空行 */
+function collapseBlankLines(str: string): string {
+	return str.replace(/\n{3,}/g, '\n\n');
+}
+
+/** HTML → Markdown 转换器实例 */
+const nhm = new NodeHtmlMarkdown({
+	bulletMarker: '•',
+	codeBlockStyle: 'fenced',
+	strongDelimiter: '**',
+	emDelimiter: '_',
+});
 
 /** Telegram sendMessage 字符上限 */
 const TG_MSG_LIMIT = 4096;
@@ -65,30 +83,33 @@ const TG_MSG_LIMIT = 4096;
 const TG_CAPTION_LIMIT = 1024;
 
 /**
- * 处理邮件正文：优先纯文本，fallback 到 HTML 去标签，超长截断并提示。
+ * 处理邮件正文：优先将 HTML 转 Markdown，fallback 到纯文本，超长截断并提示。
  * @param maxLen 本次可用的最大字符数（由调用方根据其他部分占用动态计算）
  */
 function formatBody(text: string | undefined, html: string | undefined, maxLen: number): string {
-	let raw = text?.trim() ?? '';
+	let raw = '';
 
-	if (!raw && html) {
-		// 去除 HTML 标签，保留文字
-		raw = html
-			.replace(/<br\s*\/?>/gi, '\n')
-			.replace(/<\/(p|div|li|tr)>/gi, '\n')
-			.replace(/<[^>]*>/g, '')
-			.replace(/&nbsp;/g, ' ')
-			.trim();
+	if (html) {
+		// 优先使用 HTML → Markdown
+		raw = nhm.translate(html).trim();
 	}
 
-	if (!raw) return '（正文为空）';
+	if (!raw && text) {
+		raw = text.trim();
+	}
+
+	if (!raw) return escapeMdV2('（正文为空）');
+
+	// 压缩多余空行
+	raw = collapseBlankLines(raw);
 
 	const truncated = raw.length > maxLen;
 	const body = raw.substring(0, maxLen);
 
-	let result = escapeHtml(body);
+	// 对正文进行 MarkdownV2 转义
+	let result = escapeMdV2(body);
 	if (truncated) {
-		result += '\n\n<i>… 正文过长，已截断 …</i>';
+		result += '\n\n_… 正文过长，已截断 …_';
 	}
 
 	return result;
@@ -100,7 +121,7 @@ async function sendTextMessage(token: string, chatId: string, text: string): Pro
 	const resp = await fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+		body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'MarkdownV2' }),
 	});
 	if (!resp.ok) {
 		const err = (await resp.json()) as any;
@@ -132,7 +153,7 @@ async function sendWithAttachments(token: string, chatId: string, caption: strin
 			form.append('chat_id', chatId);
 			form.append('document', blob, att.filename || 'attachment');
 			form.append('caption', caption);
-			form.append('parse_mode', 'HTML');
+			form.append('parse_mode', 'MarkdownV2');
 
 			const url = `https://api.telegram.org/bot${token}/sendDocument`;
 			const resp = await fetch(url, { method: 'POST', body: form });
@@ -157,7 +178,7 @@ async function sendWithAttachments(token: string, chatId: string, caption: strin
 				// caption 只放第一个文件上
 				if (i === 0) {
 					entry.caption = caption;
-					entry.parse_mode = 'HTML';
+					entry.parse_mode = 'MarkdownV2';
 				}
 				return entry;
 			});
