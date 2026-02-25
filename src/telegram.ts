@@ -15,7 +15,7 @@ export async function sendTextMessage(token: string, chatId: string, text: strin
 	});
 	if (!resp.ok) {
 		const err = (await resp.json()) as any;
-		console.error('TG sendMessage Error:', err.description);
+		throw new Error(`TG sendMessage ${resp.status}: ${err.description}`);
 	}
 }
 
@@ -46,7 +46,7 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 			const resp = await fetch(url, { method: 'POST', body: form });
 			if (!resp.ok) {
 				const err = (await resp.json()) as any;
-				console.error('TG sendDocument Error:', err.description);
+				throw new Error(`TG sendDocument ${resp.status}: ${err.description}`);
 			}
 		} else {
 			const form = new FormData();
@@ -74,10 +74,10 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 			const resp = await fetch(url, { method: 'POST', body: form });
 			if (!resp.ok) {
 				const err = (await resp.json()) as any;
-				console.error('TG sendMediaGroup Error:', err.description);
+				throw new Error(`TG sendMediaGroup ${resp.status}: ${err.description}`);
 			}
 		}
 	} catch (e: any) {
-		console.error('发送附件消息异常:', e.message);
+		throw new Error(`发送附件消息异常: ${e.message}`);
 	}
 }
