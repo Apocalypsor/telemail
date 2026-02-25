@@ -2,7 +2,7 @@ import PostalMime from 'postal-mime';
 import { escapeMdV2, formatBody } from './format';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet, KV_HISTORY_ID, renewWatch } from './gmail';
 import { sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
-import type { Env, GmailNotification, PubSubPushBody } from './types';
+import type { Env, GmailNotification, PubSubPushBody, QueueMessage } from './types';
 
 export type { Env } from './types';
 
@@ -22,9 +22,8 @@ export default {
 			if (url.searchParams.get('secret') !== env.GMAIL_PUSH_SECRET) {
 				return new Response('Forbidden', { status: 403 });
 			}
-			// 必须在返回 Response 之前读取 body，否则请求流会关闭
 			const body = (await request.json()) as PubSubPushBody;
-			ctx.waitUntil(handlePubSubPush(body, env));
+			await enqueueNewMessages(body, env);
 			return new Response('OK');
 		}
 
@@ -41,6 +40,23 @@ export default {
 	},
 
 	/**
+	 * Queue consumer: 串行处理邮件，内置重试
+	 */
+	async queue(batch: MessageBatch<QueueMessage>, env: Env): Promise<void> {
+		const token = await getAccessToken(env);
+
+		for (const msg of batch.messages) {
+			try {
+				await processGmailMessage(token, msg.body.messageId, env);
+				msg.ack();
+			} catch (e: any) {
+				console.error(`处理消息 ${msg.body.messageId} 失败 (第 ${msg.attempts} 次):`, e.message);
+				msg.retry();
+			}
+		}
+	},
+
+	/**
 	 * Cron handler: 每 6 天自动续订 Gmail watch
 	 */
 	async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
@@ -48,57 +64,34 @@ export default {
 	},
 };
 
-// ─── Pub/Sub push 处理 ──────────────────────────────────────────────────────
+// ─── Pub/Sub → Queue 生产者 ─────────────────────────────────────────────────
 
-async function handlePubSubPush(body: PubSubPushBody, env: Env): Promise<void> {
-	try {
-		const decoded: GmailNotification = JSON.parse(atob(body.message.data));
-		console.log(`Pub/Sub notification: email=${decoded.emailAddress}, historyId=${decoded.historyId}`);
+/** 解析 Pub/Sub 通知，拉取新消息 ID，写入 Queue */
+async function enqueueNewMessages(body: PubSubPushBody, env: Env): Promise<void> {
+	const decoded: GmailNotification = JSON.parse(atob(body.message.data));
+	console.log(`Pub/Sub notification: email=${decoded.emailAddress}, historyId=${decoded.historyId}`);
 
-		const token = await getAccessToken(env);
-		const storedHistoryId = await env.EMAIL_KV.get(KV_HISTORY_ID);
+	const token = await getAccessToken(env);
+	const storedHistoryId = await env.EMAIL_KV.get(KV_HISTORY_ID);
 
-		if (!storedHistoryId) {
-			await env.EMAIL_KV.put(KV_HISTORY_ID, decoded.historyId);
-			console.log('Initialized historyId:', decoded.historyId);
-			return;
-		}
-
-		const messageIds = await fetchNewMessageIds(token, env, storedHistoryId);
-
-		if (messageIds.length === 0) {
-			console.log('无新邮件');
-			return;
-		}
-
-		console.log(`发现 ${messageIds.length} 封新邮件`);
-		for (const msgId of messageIds) {
-			const dedupeKey = `processed:${msgId}`;
-			const existing = await env.EMAIL_KV.get(dedupeKey);
-			if (existing) {
-				console.log(`消息 ${msgId} 已处理/处理中，跳过`);
-				continue;
-			}
-
-			// 立即写入"处理中"锁（TTL 5 分钟，防止 Worker 崩溃后永久锁死）
-			await env.EMAIL_KV.put(dedupeKey, 'processing', { expirationTtl: 300 });
-
-			try {
-				await processGmailMessage(token, msgId, env);
-				// 发送成功：升级为长期标记（24 小时后自动过期）
-				await env.EMAIL_KV.put(dedupeKey, 'done', { expirationTtl: 86400 });
-			} catch (e: any) {
-				// 发送失败：删除锁，允许后续重试
-				await env.EMAIL_KV.delete(dedupeKey);
-				console.error(`处理消息 ${msgId} 失败:`, e.message);
-			}
-		}
-	} catch (e: any) {
-		console.error('handlePubSubPush 异常:', e.message);
+	if (!storedHistoryId) {
+		await env.EMAIL_KV.put(KV_HISTORY_ID, decoded.historyId);
+		console.log('Initialized historyId:', decoded.historyId);
+		return;
 	}
+
+	const messageIds = await fetchNewMessageIds(token, env, storedHistoryId);
+
+	if (messageIds.length === 0) {
+		console.log('无新邮件');
+		return;
+	}
+
+	console.log(`发现 ${messageIds.length} 封新邮件，入队`);
+	await env.EMAIL_QUEUE.sendBatch(messageIds.map((id) => ({ body: { messageId: id } })));
 }
 
-// ─── 邮件处理 ────────────────────────────────────────────────────────────────
+// ─── 邮件处理（Queue consumer 调用）──────────────────────────────────────────
 
 /** 获取单封 Gmail 邮件（raw 格式），解析并发送到 Telegram */
 async function processGmailMessage(token: string, messageId: string, env: Env): Promise<void> {

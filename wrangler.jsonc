@@ -25,6 +25,27 @@
 		},
 	],
 	/**
+	 * Queue — 邮件处理队列，串行消费，内置重试
+	 * 先运行: npx wrangler queues create gmail-tg-queue
+	 */
+	"queues": {
+		"producers": [
+			{
+				"queue": "gmail-tg-queue",
+				"binding": "EMAIL_QUEUE",
+			},
+		],
+		"consumers": [
+			{
+				"queue": "gmail-tg-queue",
+				"max_batch_size": 5,
+				"max_batch_timeout": 1,
+				"max_retries": 3,
+				"max_concurrency": 1,
+			},
+		],
+	},
+	/**
 	 * Cron Trigger — 每 6 天续订 Gmail watch
 	 */
 	"triggers": {

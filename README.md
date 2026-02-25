@@ -6,13 +6,15 @@
 
 1. Gmail 检测到收件箱中有新邮件，通过 Google Cloud Pub/Sub 发送推送通知。
 2. Pub/Sub 向 Worker 的 `/gmail/push` 端点发送 HTTP POST 请求。
-3. Worker 调用 Gmail API `history.list` 获取自上次检查点以来的新消息。
-4. 每封新邮件以原始 RFC 2822 格式获取，并使用 [postal-mime](https://github.com/nickytonline/postal-mime) 解析。
-5. 格式化后的消息（发件人、时间、主题、正文）发送到 Telegram。
-6. 附件作为真实文件附在同一条 Telegram 消息中：
+3. Worker 调用 Gmail API `history.list` 获取自上次检查点以来的新消息 ID。
+4. 消息 ID 被批量投递到 **Cloudflare Queue**（`max_concurrency: 1` 保证串行处理，避免重复）。
+5. Queue Consumer 逐条拉取原始 RFC 2822 邮件，使用 [postal-mime](https://github.com/nickytonline/postal-mime) 解析。
+6. 格式化后的消息（发件人、时间、主题、正文）发送到 Telegram。
+7. 附件作为真实文件附在同一条 Telegram 消息中：
    - **1 个附件** → `sendDocument` + 标题
    - **多个附件** → `sendMediaGroup`，标题放在第一个文件上
-7. Cron Trigger 每 6 天自动续订 Gmail watch（watch 7 天后过期）。
+8. 处理失败时 Queue 自动重试（最多 3 次），成功后自动 ack。
+9. Cron Trigger 每 6 天自动续订 Gmail watch（watch 7 天后过期）。
 
 正文会自动截断以适应 Telegram 的字符限制（纯文本消息 4096 字符，附件标题 1024 字符）。
 
@@ -83,6 +85,14 @@ npx wrangler kv namespace create EMAIL_KV
 
 将返回的 `id` 填入 `wrangler.jsonc` 中 `kv_namespaces[0].id`。
 
+### 3b. 创建 Queue
+
+```sh
+npx wrangler queues create gmail-tg-queue
+```
+
+Queue 用于串行处理邮件，内置重试机制，无需手动去重。`wrangler.jsonc` 中已配置好 producer 和 consumer 绑定。
+
 ### 4. 配置 Secrets
 
 ```sh
@@ -124,14 +134,14 @@ npm run cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 
 ```text
 src/
-  index.ts        # Worker 入口 — fetch handler（Pub/Sub 推送）+ scheduled handler（watch 续订）
-  types.ts        # 类型定义：Env, PubSubPushBody, GmailNotification, Attachment
+  index.ts        # Worker 入口 — fetch（Pub/Sub → Queue 入队）+ queue consumer + scheduled（watch 续订）
+  types.ts        # 类型定义：Env, PubSubPushBody, GmailNotification, Attachment, QueueMessage
   gmail.ts        # Gmail OAuth2 + REST API + watch + history 拉取 + base64url 解码
   telegram.ts     # Telegram 发送：sendTextMessage, sendWithAttachments
   format.ts       # 邮件格式化：escapeMdV2, formatBody（HTML→Markdown 清洗）
 test/
   index.spec.ts   # 测试
-wrangler.jsonc    # Cloudflare Worker 配置（KV 绑定 + Cron 触发器）
+wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 ```
 
 ## 环境变量（Secrets）

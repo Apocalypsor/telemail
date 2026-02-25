@@ -17,6 +17,13 @@ export interface Env {
 	GMAIL_PUSH_SECRET: string;
 	/** KV 命名空间 */
 	EMAIL_KV: KVNamespace;
+	/** Queue 绑定 */
+	EMAIL_QUEUE: Queue<QueueMessage>;
+}
+
+/** 队列消息体 */
+export interface QueueMessage {
+	messageId: string;
 }
 
 /** Pub/Sub push 请求体 */
