@@ -17,11 +17,6 @@ export function escapeMdV2(str: string): string {
 	return str.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
 }
 
-/** 将连续多个空行压缩为最多一个空行 */
-function collapseBlankLines(str: string): string {
-	return str.replace(/\n{3,}/g, '\n\n');
-}
-
 /**
  * 处理邮件正文：优先将 HTML 转 Markdown，fallback 到纯文本，超长截断并提示。
  * @param maxLen 本次可用的最大字符数（由调用方根据其他部分占用动态计算）
@@ -83,13 +78,6 @@ export function formatBody(text: string | undefined, html: string | undefined, m
 
 	// 残留 HTML 标签
 	raw = raw.replace(/<[^>]*>/g, '');
-
-	// 连续空格压缩
-	raw = raw.replace(/[^\S\n]+/g, ' ');
-	// 每行首尾空白
-	raw = raw.replace(/^ +| +$/gm, '');
-	// 多余空行
-	raw = collapseBlankLines(raw);
 
 	const truncated = raw.length > maxLen;
 	const bodyStr = raw.substring(0, maxLen);
