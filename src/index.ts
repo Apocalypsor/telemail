@@ -5,6 +5,8 @@ import { sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } 
 import type { Env, GmailNotification, PubSubPushBody, QueueMessage } from './types';
 
 export type { Env } from './types';
+const KV_PROCESSED_PREFIX = 'processed_message:';
+const PROCESSED_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 // ─── Worker 入口 ─────────────────────────────────────────────────────────────
 
@@ -23,11 +25,14 @@ export default {
 				return new Response('Forbidden', { status: 403 });
 			}
 			const body = (await request.json()) as PubSubPushBody;
-			await enqueueNewMessages(body, env);
+			await enqueueSyncNotification(body, env);
 			return new Response('OK');
 		}
 
 		if (request.method === 'POST' && url.pathname === '/gmail/watch') {
+			if (url.searchParams.get('secret') !== env.GMAIL_WATCH_SECRET) {
+				return new Response('Forbidden', { status: 403 });
+			}
 			try {
 				await renewWatch(env);
 				return new Response('Watch renewed');
@@ -43,14 +48,21 @@ export default {
 	 * Queue consumer: 串行处理邮件，内置重试
 	 */
 	async queue(batch: MessageBatch<QueueMessage>, env: Env): Promise<void> {
-		const token = await getAccessToken(env);
-
 		for (const msg of batch.messages) {
 			try {
-				await processGmailMessage(token, msg.body.messageId, env);
+				if (msg.body.type === 'sync') {
+					await processSyncNotification(msg.body, env);
+				} else {
+					await processQueueMessage(msg.body.messageId, env);
+				}
 				msg.ack();
 			} catch (e: any) {
-				console.error(`处理消息 ${msg.body.messageId} 失败 (第 ${msg.attempts} 次):`, e.message);
+				console.error(`处理队列消息失败 (第 ${msg.attempts} 次):`, {
+					type: msg.body.type,
+					messageId: msg.body.type === 'message' ? msg.body.messageId : undefined,
+					pubsubMessageId: msg.body.type === 'sync' ? msg.body.pubsubMessageId : undefined,
+					error: e.message,
+				});
 				msg.retry();
 			}
 		}
@@ -66,17 +78,26 @@ export default {
 
 // ─── Pub/Sub → Queue 生产者 ─────────────────────────────────────────────────
 
-/** 解析 Pub/Sub 通知，拉取新消息 ID，写入 Queue */
-async function enqueueNewMessages(body: PubSubPushBody, env: Env): Promise<void> {
+/** 解析 Pub/Sub 通知，将同步任务入队（串行消费） */
+async function enqueueSyncNotification(body: PubSubPushBody, env: Env): Promise<void> {
 	const decoded: GmailNotification = JSON.parse(atob(body.message.data));
 	console.log(`Pub/Sub notification: email=${decoded.emailAddress}, historyId=${decoded.historyId}`);
 
+	await env.EMAIL_QUEUE.send({
+		type: 'sync',
+		pubsubMessageId: body.message.messageId,
+		historyId: decoded.historyId,
+	});
+}
+
+/** 串行处理 Gmail history 同步，并将新 message id 入队 */
+async function processSyncNotification(sync: Extract<QueueMessage, { type: 'sync' }>, env: Env): Promise<void> {
 	const token = await getAccessToken(env);
 	const storedHistoryId = await env.EMAIL_KV.get(KV_HISTORY_ID);
 
 	if (!storedHistoryId) {
-		await env.EMAIL_KV.put(KV_HISTORY_ID, decoded.historyId);
-		console.log('Initialized historyId:', decoded.historyId);
+		await env.EMAIL_KV.put(KV_HISTORY_ID, sync.historyId);
+		console.log('Initialized historyId:', sync.historyId);
 		return;
 	}
 
@@ -88,7 +109,24 @@ async function enqueueNewMessages(body: PubSubPushBody, env: Env): Promise<void>
 	}
 
 	console.log(`发现 ${messageIds.length} 封新邮件，入队`);
-	await env.EMAIL_QUEUE.sendBatch(messageIds.map((id) => ({ body: { messageId: id } })));
+	await env.EMAIL_QUEUE.sendBatch(messageIds.map((id) => ({ body: { type: 'message', messageId: id } })));
+}
+
+/** 串行消费消息 + 幂等防重 */
+async function processQueueMessage(messageId: string, env: Env): Promise<void> {
+	const dedupeKey = `${KV_PROCESSED_PREFIX}${messageId}`;
+	const processed = await env.EMAIL_KV.get(dedupeKey);
+	if (processed) {
+		console.log(`跳过重复消息: ${messageId}`);
+		return;
+	}
+
+	const token = await getAccessToken(env);
+	await processGmailMessage(token, messageId, env);
+
+	await env.EMAIL_KV.put(dedupeKey, '1', {
+		expirationTtl: PROCESSED_TTL_SECONDS,
+	});
 }
 
 // ─── 邮件处理（Queue consumer 调用）──────────────────────────────────────────

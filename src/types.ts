@@ -15,6 +15,8 @@ export interface Env {
 	GMAIL_PUBSUB_TOPIC: string;
 	/** URL 中的共享密钥，校验 Pub/Sub push 来源 */
 	GMAIL_PUSH_SECRET: string;
+	/** 手动触发 watch 的共享密钥 */
+	GMAIL_WATCH_SECRET: string;
 	/** KV 命名空间 */
 	EMAIL_KV: KVNamespace;
 	/** Queue 绑定 */
@@ -22,9 +24,16 @@ export interface Env {
 }
 
 /** 队列消息体 */
-export interface QueueMessage {
-	messageId: string;
-}
+export type QueueMessage =
+	| {
+			type: 'sync';
+			pubsubMessageId: string;
+			historyId: string;
+	  }
+	| {
+			type: 'message';
+			messageId: string;
+	  };
 
 /** Pub/Sub push 请求体 */
 export interface PubSubPushBody {

@@ -25,7 +25,7 @@
 		},
 	],
 	/**
-	 * Queue — 邮件处理队列，串行消费，内置重试
+	 * Queue — 邮件处理队列（sync + message），串行消费，内置重试
 	 * 先运行: npx wrangler queues create gmail-tg-queue
 	 */
 	"queues": {

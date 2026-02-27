@@ -7,14 +7,16 @@
 1. Gmail 检测到收件箱中有新邮件，通过 Google Cloud Pub/Sub 发送推送通知。
 2. Pub/Sub 向 Worker 的 `/gmail/push` 端点发送 HTTP POST 请求。
 3. Worker 调用 Gmail API `history.list` 获取自上次检查点以来的新消息 ID。
-4. 消息 ID 被批量投递到 **Cloudflare Queue**（`max_concurrency: 1` 保证串行处理，避免重复）。
-5. Queue Consumer 逐条拉取原始 RFC 2822 邮件，使用 [postal-mime](https://github.com/nickytonline/postal-mime) 解析。
-6. 格式化后的消息（发件人、时间、主题、正文）发送到 Telegram。
-7. 附件作为真实文件附在同一条 Telegram 消息中：
+4. Pub/Sub 通知先入 **Cloudflare Queue** 的 `sync` 消息，`max_concurrency: 1` 保证串行推进 Gmail `historyId`。
+5. `sync` 消息会拉取新消息 ID，再批量投递 `message` 消息到同一个 Queue。
+6. Queue Consumer 逐条拉取原始 RFC 2822 邮件，使用 [postal-mime](https://github.com/nickytonline/postal-mime) 解析。
+7. 格式化后的消息（发件人、时间、主题、正文）发送到 Telegram。
+8. 附件作为真实文件附在同一条 Telegram 消息中：
    - **1 个附件** → `sendDocument` + 标题
    - **多个附件** → `sendMediaGroup`，标题放在第一个文件上
-8. 处理失败时 Queue 自动重试（最多 3 次），成功后自动 ack。
-9. Cron Trigger 每 6 天自动续订 Gmail watch（watch 7 天后过期）。
+9. 消息发送前会按 `messageId` 做幂等去重，避免重复投递到 Telegram。
+10. 处理失败时 Queue 自动重试（最多 3 次）；达到上限后消息丢弃。
+11. Cron Trigger 每 6 天自动续订 Gmail watch（watch 7 天后过期）。
 
 正文会自动截断以适应 Telegram 的字符限制（纯文本消息 4096 字符，附件标题 1024 字符）。
 
@@ -91,7 +93,7 @@ npx wrangler kv namespace create EMAIL_KV
 npx wrangler queues create gmail-tg-queue
 ```
 
-Queue 用于串行处理邮件，内置重试机制，无需手动去重。`wrangler.jsonc` 中已配置好 producer 和 consumer 绑定。
+Queue 用于串行处理 Gmail history 同步和邮件发送，内置重试。`wrangler.jsonc` 中已配置好 producer 和 consumer 绑定。
 
 ### 4. 配置 Secrets
 
@@ -104,6 +106,7 @@ npx wrangler secret put GMAIL_REFRESH_TOKEN  # Google OAuth2 Refresh Token
 npx wrangler secret put GMAIL_USER_EMAIL     # 你的 Gmail 邮箱地址
 npx wrangler secret put GMAIL_PUBSUB_TOPIC   # 例如 projects/my-project/topics/gmail-push
 npx wrangler secret put GMAIL_PUSH_SECRET    # 自定义密钥，用于验证 Pub/Sub push
+npx wrangler secret put GMAIL_WATCH_SECRET   # 自定义密钥，用于保护 /gmail/watch
 ```
 
 ### 5. 部署
@@ -117,7 +120,7 @@ npm run deploy
 部署后，发送一个 POST 请求来注册 Gmail push 通知：
 
 ```sh
-curl -X POST https://YOUR_WORKER_DOMAIN/gmail/watch
+curl -X POST "https://YOUR_WORKER_DOMAIN/gmail/watch?secret=YOUR_WATCH_SECRET"
 ```
 
 之后 Cron Trigger 会每 6 天自动续订。
@@ -134,13 +137,13 @@ npm run cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 
 ```text
 src/
-  index.ts        # Worker 入口 — fetch（Pub/Sub → Queue 入队）+ queue consumer + scheduled（watch 续订）
-  types.ts        # 类型定义：Env, PubSubPushBody, GmailNotification, Attachment, QueueMessage
+  index.ts        # Worker 入口 — fetch（Pub/Sub → Queue sync 入队）+ queue consumer + scheduled（watch 续订）
+  types.ts        # 类型定义：Env, PubSubPushBody, GmailNotification, Attachment, QueueMessage(sync/message)
   gmail.ts        # Gmail OAuth2 + REST API + watch + history 拉取 + base64url 解码
   telegram.ts     # Telegram 发送：sendTextMessage, sendWithAttachments
   format.ts       # 邮件格式化：linkedom+turndown(HTML→Markdown) + telegram-markdown-v2(MarkdownV2 转换)
 test/
-  index.spec.ts   # 测试
+  gmail.spec.ts   # Gmail 辅助函数测试
 wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 ```
 
@@ -156,6 +159,7 @@ wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 | `GMAIL_USER_EMAIL`    | Gmail 邮箱地址                               |
 | `GMAIL_PUBSUB_TOPIC`  | Pub/Sub topic 全名 (projects/xxx/topics/yyy) |
 | `GMAIL_PUSH_SECRET`   | 自定义密钥，附加在 push URL 中用于验证       |
+| `GMAIL_WATCH_SECRET`  | 自定义密钥，用于保护 `/gmail/watch` 端点     |
 
 ## API 端点
 
@@ -163,7 +167,7 @@ wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 | ---- | ------------------------ | ------------------- |
 | GET  | `/`                      | 健康检查            |
 | POST | `/gmail/push?secret=XXX` | Pub/Sub push 回调   |
-| POST | `/gmail/watch`           | 手动注册/续订 watch |
+| POST | `/gmail/watch?secret=XXX` | 手动注册/续订 watch |
 
 ## Telegram 消息格式
 

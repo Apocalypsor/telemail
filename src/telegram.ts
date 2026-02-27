@@ -29,7 +29,7 @@ export async function sendTextMessage(token: string, chatId: string, text: strin
 		console.error('TG sendMessage failed payload:', {
 			chatId,
 			textLength: text.length,
-			text,
+			description: err?.description,
 		});
 		if (isEntityParseError(err?.description)) {
 			const plain = markdownV2ToPlainText(text);
@@ -77,8 +77,8 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 				console.error('TG sendDocument failed payload:', {
 					chatId,
 					captionLength: caption.length,
-					caption,
 					filename: att.filename || 'attachment',
+					description: err?.description,
 				});
 				if (isEntityParseError(err?.description)) {
 					console.warn('TG sendDocument parse_mode failed, retrying as plain caption');
@@ -122,8 +122,8 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 				console.error('TG sendMediaGroup failed payload:', {
 					chatId,
 					captionLength: caption.length,
-					caption,
 					attachments: attachments.length,
+					description: err?.description,
 				});
 				if (isEntityParseError(err?.description)) {
 					console.warn('TG sendMediaGroup parse_mode failed, retrying as plain caption');
