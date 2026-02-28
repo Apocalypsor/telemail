@@ -1,6 +1,7 @@
 import { parseHTML } from 'linkedom';
 import TurndownService from 'turndown';
 import { convert } from 'telegram-markdown-v2';
+import { escapeMdV2, findLongestValidMdV2Prefix } from './utils';
 
 /** HTML → Markdown 转换器实例（linkedom DOM + turndown） */
 const turndown = new TurndownService({
@@ -18,13 +19,9 @@ function htmlToMarkdown(html: string): string {
 	return turndown.turndown(document.body).trim();
 }
 
-/**
- * 转义 Telegram MarkdownV2 特殊字符。
- * 参考: https://core.telegram.org/bots/api#markdownv2-style
- */
-export function escapeMdV2(str: string): string {
-	if (!str) return '';
-	return str.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+/** 修复 Telegram MarkdownV2 易出错片段（例如单独一行的 "***"） */
+function sanitizeTelegramMdV2(md: string): string {
+	return md.replace(/(^|\n)\*{3,}(?=\n|$)/g, '$1\\*\\*\\*');
 }
 
 /** 标准 Markdown → Telegram MarkdownV2 */
@@ -33,36 +30,8 @@ export function toTelegramMdV2(markdown: string): string {
 	return convert(markdown).trimEnd();
 }
 
-/** 修复 Telegram MarkdownV2 易出错片段（例如单独一行的 "***"） */
-function sanitizeTelegramMdV2(md: string): string {
-	return md.replace(/(^|\n)\*{3,}(?=\n|$)/g, '$1\\*\\*\\*');
-}
-
-/** 统计未转义字符数量 */
-function countUnescapedChar(str: string, ch: string): number {
-	let count = 0;
-	let escaped = false;
-	for (const c of str) {
-		if (escaped) {
-			escaped = false;
-			continue;
-		}
-		if (c === '\\') {
-			escaped = true;
-			continue;
-		}
-		if (c === ch) count++;
-	}
-	return count;
-}
-
-/** 判断 Telegram MarkdownV2 是否存在明显未闭合实体（重点覆盖粗体/斜体/代码） */
-function hasUnclosedMdV2Entities(md: string): boolean {
-	const boldUnclosed = countUnescapedChar(md, '*') % 2 !== 0;
-	const italicUnclosed = countUnescapedChar(md, '_') % 2 !== 0;
-	const strikeUnclosed = countUnescapedChar(md, '~') % 2 !== 0;
-	const codeUnclosed = countUnescapedChar(md, '`') % 2 !== 0;
-	return boldUnclosed || italicUnclosed || strikeUnclosed || codeUnclosed;
+function convertTelegramMdV2Safe(markdown: string): string {
+	return sanitizeTelegramMdV2(toTelegramMdV2(markdown));
 }
 
 /**
@@ -87,21 +56,16 @@ export function formatBody(text: string | undefined, html: string | undefined, m
 
 	const truncated = raw.length > maxLen;
 	const truncatedHint = `\n\n${toTelegramMdV2('*… 正文过长，已截断 …*')}`;
+	const converted = convertTelegramMdV2Safe(raw);
 
 	if (!truncated) {
-		return sanitizeTelegramMdV2(toTelegramMdV2(raw));
+		const validEnd = findLongestValidMdV2Prefix(converted);
+		return validEnd === converted.length ? converted : escapeMdV2(raw);
 	}
 
-	// 从后往前回退截断点，直到 MarkdownV2 实体闭合，避免 Telegram 400。
-	let end = maxLen;
-	while (end > 0) {
-		const candidate = raw.substring(0, end);
-		const converted = sanitizeTelegramMdV2(toTelegramMdV2(candidate));
-		if (!hasUnclosedMdV2Entities(converted)) {
-			return `${converted}${truncatedHint}`;
-		}
-		end--;
-	}
+	const bounded = converted.slice(0, maxLen);
+	const validEnd = findLongestValidMdV2Prefix(bounded);
+	if (validEnd > 0) return `${bounded.slice(0, validEnd)}${truncatedHint}`;
 
 	// 极端兜底：如果回退仍不安全，降级为纯文本。
 	return `${escapeMdV2(raw.substring(0, maxLen))}${truncatedHint}`;

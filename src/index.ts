@@ -1,8 +1,9 @@
 import PostalMime from 'postal-mime';
-import { escapeMdV2, formatBody } from './format';
+import { formatBody } from './format';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet, KV_HISTORY_ID, renewWatch } from './gmail';
 import { sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 import type { Env, GmailNotification, PubSubPushBody, QueueMessage } from './types';
+import { escapeMdV2 } from './utils';
 
 export type { Env } from './types';
 const KV_PROCESSED_PREFIX = 'processed_message:';
@@ -13,8 +14,8 @@ const PROCESSED_TTL_SECONDS = 60 * 60 * 24 * 30;
 export default {
 	/**
 	 * HTTP handler:
-	 *   POST /gmail/push?secret=XXX  — 接收 Pub/Sub 推送
-	 *   POST /gmail/watch            — 手动触发 watch 注册
+	 *   POST /gmail/push?secret=XXX   — 接收 Pub/Sub 推送
+	 *   POST /gmail/watch?secret=XXX  — 手动触发 watch 注册
 	 *   GET  /                        — 健康检查
 	 */
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
