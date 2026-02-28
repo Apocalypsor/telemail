@@ -16,6 +16,26 @@ function markdownV2ToPlainText(text: string): string {
 	return out;
 }
 
+function extractTelegramDescription(payload: unknown): string {
+	if (!payload || typeof payload !== 'object' || !('description' in payload)) return 'Unknown Telegram error';
+	const desc = (payload as { description?: unknown }).description;
+	return typeof desc === 'string' ? desc : 'Unknown Telegram error';
+}
+
+/** 发送纯文本消息（不使用 parse_mode） */
+export async function sendPlainTextMessage(token: string, chatId: string, text: string): Promise<void> {
+	const url = `https://api.telegram.org/bot${token}/sendMessage`;
+	const resp = await fetch(url, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ chat_id: chatId, text }),
+	});
+	if (!resp.ok) {
+		const err = (await resp.json()) as unknown;
+		throw new Error(`TG sendMessage plain ${resp.status}: ${extractTelegramDescription(err)}`);
+	}
+}
+
 /** 发送纯文字消息 */
 export async function sendTextMessage(token: string, chatId: string, text: string): Promise<void> {
 	const url = `https://api.telegram.org/bot${token}/sendMessage`;
@@ -25,25 +45,20 @@ export async function sendTextMessage(token: string, chatId: string, text: strin
 		body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'MarkdownV2' }),
 	});
 	if (!resp.ok) {
-		const err = (await resp.json()) as any;
+		const err = (await resp.json()) as unknown;
+		const errDescription = extractTelegramDescription(err);
 		console.error('TG sendMessage failed payload:', {
 			chatId,
 			textLength: text.length,
-			description: err?.description,
+			description: errDescription,
 		});
-		if (isEntityParseError(err?.description)) {
+		if (isEntityParseError(errDescription)) {
 			const plain = markdownV2ToPlainText(text);
 			console.warn('TG sendMessage parse_mode failed, retrying as plain text');
-			const fallbackResp = await fetch(url, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ chat_id: chatId, text: plain }),
-			});
-			if (fallbackResp.ok) return;
-			const fallbackErr = (await fallbackResp.json()) as any;
-			throw new Error(`TG sendMessage fallback ${fallbackResp.status}: ${fallbackErr.description}`);
+			await sendPlainTextMessage(token, chatId, plain);
+			return;
 		}
-		throw new Error(`TG sendMessage ${resp.status}: ${err.description}`);
+		throw new Error(`TG sendMessage ${resp.status}: ${errDescription}`);
 	}
 }
 

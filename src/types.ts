@@ -1,8 +1,12 @@
+export interface SecretStoreSecretBinding {
+	get(): Promise<string>;
+}
+
 export interface Env {
 	/** Telegram Bot Token */
-	TG_TOKEN: string;
+	TG_TOKEN: SecretStoreSecretBinding;
 	/** Telegram Chat ID */
-	CHAT_ID: string;
+	CHAT_ID: SecretStoreSecretBinding;
 	/** Google OAuth2 Client ID */
 	GMAIL_CLIENT_ID: string;
 	/** Google OAuth2 Client Secret */

@@ -4,6 +4,7 @@ import { escapeMdV2 } from '../lib/markdown-v2';
 import type { Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
 import { formatBody } from './format';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet, KV_HISTORY_ID } from './gmail';
+import { getTelegramSecrets } from './secrets';
 import { sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
 /** 解析 Pub/Sub 通知，将同步任务入队 */
@@ -58,7 +59,7 @@ export async function processMessageNotification(messageId: string, env: Env): P
 
 /** 获取单封 Gmail 邮件（raw 格式），解析并发送到 Telegram */
 async function processGmailMessage(token: string, messageId: string, env: Env): Promise<void> {
-	const { TG_TOKEN, CHAT_ID } = env;
+	const { token: tgToken, chatId } = await getTelegramSecrets(env);
 
 	const msg = await gmailGet(token, `/users/me/messages/${messageId}?format=raw`);
 	const rawEmail = base64urlToArrayBuffer(msg.raw);
@@ -74,10 +75,10 @@ async function processGmailMessage(token: string, messageId: string, env: Env): 
 	const text = header + body;
 
 	if (hasAttachments) {
-		await sendWithAttachments(TG_TOKEN, CHAT_ID, text, email.attachments || []);
+		await sendWithAttachments(tgToken, chatId, text, email.attachments || []);
 		return;
 	}
-	await sendTextMessage(TG_TOKEN, CHAT_ID, text);
+	await sendTextMessage(tgToken, chatId, text);
 }
 
 function buildTelegramHeader(fromName: string, fromAddress: string, subject: string): string {

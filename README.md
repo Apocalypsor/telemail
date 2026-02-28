@@ -17,6 +17,7 @@
 9. 消息发送前会按 `messageId` 做幂等去重，避免重复投递到 Telegram。
 10. 处理失败时 Queue 自动重试（最多 3 次）；达到上限后消息丢弃。
 11. Cron Trigger 每 6 天自动续订 Gmail watch（watch 7 天后过期）。
+12. 出现处理异常时，会写结构化错误日志到 Cloudflare Observability，并发送一条 Telegram 错误告警。
 
 正文会自动截断以适应 Telegram 的字符限制（纯文本消息 4096 字符，附件标题 1024 字符）。
 
@@ -95,11 +96,28 @@ npx wrangler queues create gmail-tg-queue
 
 Queue 用于串行处理 Gmail history 同步和邮件发送，内置重试。`wrangler.jsonc` 中已配置好 producer 和 consumer 绑定。
 
-### 4. 配置 Secrets
+### 4. 配置 Secret Store + Secrets
+
+先将 Telegram 相关机密放到账号级 Secret Store（推荐）：
 
 ```sh
-npx wrangler secret put TG_TOKEN             # Telegram Bot Token
-npx wrangler secret put CHAT_ID              # Telegram Chat ID
+# 远程创建/更新（生产）
+npx wrangler secrets-store secret create 2450ac7560a346fda9b2538762a5eb07 --name TELEGRAM_TOKEN --scopes workers --remote
+npx wrangler secrets-store secret create 2450ac7560a346fda9b2538762a5eb07 --name TELEGRAM_MY_ID --scopes workers --remote
+
+# 本地开发（不加 --remote）
+npx wrangler secrets-store secret create 2450ac7560a346fda9b2538762a5eb07 --name TELEGRAM_TOKEN --scopes workers
+npx wrangler secrets-store secret create 2450ac7560a346fda9b2538762a5eb07 --name TELEGRAM_MY_ID --scopes workers
+```
+
+`wrangler.jsonc` 已将以下绑定指向 Secret Store：
+
+- `TG_TOKEN` -> `TELEGRAM_TOKEN`
+- `CHAT_ID` -> `TELEGRAM_MY_ID`
+
+其余配置继续使用 Worker Secrets：
+
+```sh
 npx wrangler secret put GMAIL_CLIENT_ID      # Google OAuth2 Client ID
 npx wrangler secret put GMAIL_CLIENT_SECRET  # Google OAuth2 Client Secret
 npx wrangler secret put GMAIL_REFRESH_TOKEN  # Google OAuth2 Refresh Token
@@ -147,6 +165,8 @@ src/
     bridge.ts          # Gmail→Telegram 业务流程编排（sync/message）
     gmail.ts           # Gmail OAuth2 + REST API + watch + history + base64url
     telegram.ts        # Telegram 发送：sendTextMessage, sendWithAttachments
+    secrets.ts         # Secret Store 读取（TG_TOKEN / CHAT_ID）
+    observability.ts   # 错误结构化日志 + Telegram 告警
     format.ts          # 邮件正文格式化：HTML→Markdown→Telegram MarkdownV2
   lib/
     markdown-v2.ts     # MarkdownV2 转义与最长合法前缀解析
@@ -156,12 +176,12 @@ test/
 wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 ```
 
-## 环境变量（Secrets）
+## 环境变量（Secrets / Secret Store）
 
 | Secret                | 说明                                         |
 | --------------------- | -------------------------------------------- |
-| `TG_TOKEN`            | Telegram Bot API Token                       |
-| `CHAT_ID`             | 接收消息的 Telegram Chat ID                  |
+| `TG_TOKEN`            | Secret Store 绑定：`TELEGRAM_TOKEN`          |
+| `CHAT_ID`             | Secret Store 绑定：`TELEGRAM_MY_ID`          |
 | `GMAIL_CLIENT_ID`     | Google OAuth2 Client ID                      |
 | `GMAIL_CLIENT_SECRET` | Google OAuth2 Client Secret                  |
 | `GMAIL_REFRESH_TOKEN` | Google OAuth2 Refresh Token                  |
