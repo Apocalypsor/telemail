@@ -137,13 +137,22 @@ npm run cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 
 ```text
 src/
-  index.ts        # Worker 入口 — fetch（Pub/Sub → Queue sync 入队）+ queue consumer + scheduled（watch 续订）
-  types.ts        # 类型定义：Env, PubSubPushBody, GmailNotification, Attachment, QueueMessage(sync/message)
-  gmail.ts        # Gmail OAuth2 + REST API + watch + history 拉取 + base64url 解码
-  telegram.ts     # Telegram 发送：sendTextMessage, sendWithAttachments
-  format.ts       # 邮件格式化：linkedom+turndown(HTML→Markdown) + telegram-markdown-v2(MarkdownV2 转换)
+  index.ts             # Worker 入口（fetch/queue/scheduled 分发）
+  constants.ts         # 路由/TTL/时间格式等常量
+  types.ts             # 类型定义：Env, PubSubPushBody, GmailNotification, Attachment, QueueMessage
+  handlers/
+    http.ts            # HTTP 路由与鉴权（/gmail/push, /gmail/watch）
+    queue.ts           # Queue consumer（重试/ack/retry）
+  services/
+    bridge.ts          # Gmail→Telegram 业务流程编排（sync/message）
+    gmail.ts           # Gmail OAuth2 + REST API + watch + history + base64url
+    telegram.ts        # Telegram 发送：sendTextMessage, sendWithAttachments
+    format.ts          # 邮件正文格式化：HTML→Markdown→Telegram MarkdownV2
+  lib/
+    markdown-v2.ts     # MarkdownV2 转义与最长合法前缀解析
 test/
-  gmail.spec.ts   # Gmail 辅助函数测试
+  gmail.spec.ts        # Gmail 辅助函数测试
+  format.spec.ts       # MarkdownV2 合法前缀解析测试
 wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 ```
 

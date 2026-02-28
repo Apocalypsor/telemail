@@ -1,4 +1,4 @@
-import type { Env } from './types';
+import type { Env } from '../types';
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const KV_HISTORY_ID = 'gmail_history_id';

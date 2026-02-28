@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { base64urlToArrayBuffer } from '../src/gmail';
+import { base64urlToArrayBuffer } from '../src/services/gmail';
 
 describe('base64urlToArrayBuffer', () => {
 	it('decodes base64url content', () => {

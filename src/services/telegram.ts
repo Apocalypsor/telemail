@@ -1,4 +1,4 @@
-import type { Attachment } from './types';
+import type { Attachment } from '../types';
 
 /** Telegram sendMessage 字符上限 */
 export const TG_MSG_LIMIT = 4096;

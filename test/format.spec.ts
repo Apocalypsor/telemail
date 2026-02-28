@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findLongestValidMdV2Prefix } from '../src/utils';
+import { findLongestValidMdV2Prefix } from '../src/lib/markdown-v2';
 
 describe('findLongestValidMdV2Prefix', () => {
 	it('returns full length for balanced entities', () => {

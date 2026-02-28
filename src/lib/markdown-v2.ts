@@ -13,8 +13,8 @@ type CodeToken = '`' | '```';
 type TokenState =
 	| { type: 'style'; token: StyleToken }
 	| { type: 'code'; token: CodeToken }
-	| { type: 'link-text'; customEmoji: boolean }
-	| { type: 'link-url'; customEmoji: boolean };
+	| { type: 'link-text' }
+	| { type: 'link-url' };
 
 function toggleStyle(stack: TokenState[], token: StyleToken): void {
 	const top = stack[stack.length - 1];
@@ -112,11 +112,10 @@ export function findLongestValidMdV2Prefix(md: string): number {
 		}
 
 		if (ch === ']' && top?.type === 'link-text') {
-			const customEmoji = top.customEmoji;
 			stack.pop();
 			i++;
 			if (md[i] === '(') {
-				stack.push({ type: 'link-url', customEmoji });
+				stack.push({ type: 'link-url' });
 				i++;
 			}
 			if (stack.length === 0) longestValidEnd = i;
@@ -124,12 +123,12 @@ export function findLongestValidMdV2Prefix(md: string): number {
 		}
 
 		if (ch === '!' && md[i + 1] === '[') {
-			stack.push({ type: 'link-text', customEmoji: true });
+			stack.push({ type: 'link-text' });
 			i += 2;
 			continue;
 		}
 		if (ch === '[') {
-			stack.push({ type: 'link-text', customEmoji: false });
+			stack.push({ type: 'link-text' });
 			i++;
 			continue;
 		}
