@@ -11,8 +11,22 @@ export async function reportErrorToObservabilityAndTelegram(
 	error: unknown,
 	context: ErrorContext = {},
 ): Promise<void> {
-	logError(env, event, error, context);
-	await notifyErrorToTelegram(env, event, error, context);
+	try {
+		logError(env, event, error, context);
+		await notifyErrorToTelegram(env, event, error, context);
+	} catch (reportError: unknown) {
+		const workerName = resolveWorkerName(env);
+		const message = reportError instanceof Error ? reportError.message : String(reportError);
+		console.error({
+			level: 'error',
+			event: 'error_reporting_failed',
+			title: `[${workerName}] error_reporting_failed`,
+			worker_name: workerName,
+			message,
+			original_event: event,
+			timestamp: new Date().toISOString(),
+		});
+	}
 }
 
 export function logError(env: Env, event: string, error: unknown, context: ErrorContext = {}): void {
@@ -36,7 +50,7 @@ async function notifyErrorToTelegram(env: Env, event: string, error: unknown, co
 	const contextText = safeJSONStringify(context);
 	const workerName = resolveWorkerName(env);
 	const text = [
-		`*${escapeMdV2(`[Bridge Error][${workerName}]`)}*`,
+		`*${escapeMdV2(`[Workers Error] ${workerName}`)}*`,
 		`*event:* ${escapeMdV2(event)}`,
 		`*time:* ${escapeMdV2(new Date().toISOString())}`,
 		`*message:* ${escapeMdV2(errorMessage)}`,

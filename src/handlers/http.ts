@@ -14,11 +14,11 @@ export async function handleHttpRequest(request: Request, env: Env): Promise<Res
 	const url = new URL(request.url);
 	try {
 		if (request.method === 'POST' && url.pathname === ROUTE_GMAIL_PUSH) {
-			return handleGmailPush(request, url, env);
+			return await handleGmailPush(request, url, env);
 		}
 
 		if (request.method === 'POST' && url.pathname === ROUTE_GMAIL_WATCH) {
-			return handleWatchRenewal(url, env);
+			return await handleWatchRenewal(url, env);
 		}
 
 		return new Response('Gmail → Telegram Bridge is running');
