@@ -15,6 +15,9 @@
 		},
 	},
 	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		"WORKER_NAME": "gmail-tg-bridge",
+	},
 	"workers_dev": true,
 	"preview_urls": true,
 	/**

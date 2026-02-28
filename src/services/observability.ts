@@ -1,6 +1,7 @@
+import { escapeMdV2 } from '../lib/markdown-v2';
 import type { Env } from '../types';
 import { getTelegramSecrets } from './secrets';
-import { sendPlainTextMessage } from './telegram';
+import { sendTextMessage } from './telegram';
 
 type ErrorContext = Record<string, unknown>;
 
@@ -10,16 +11,19 @@ export async function reportErrorToObservabilityAndTelegram(
 	error: unknown,
 	context: ErrorContext = {},
 ): Promise<void> {
-	logError(event, error, context);
+	logError(env, event, error, context);
 	await notifyErrorToTelegram(env, event, error, context);
 }
 
-export function logError(event: string, error: unknown, context: ErrorContext = {}): void {
+export function logError(env: Env, event: string, error: unknown, context: ErrorContext = {}): void {
 	const message = error instanceof Error ? error.message : String(error);
 	const stack = error instanceof Error ? error.stack : undefined;
+	const workerName = resolveWorkerName(env);
 	console.error({
 		level: 'error',
 		event,
+		title: `[${workerName}] ${event}`,
+		worker_name: workerName,
 		message,
 		stack,
 		timestamp: new Date().toISOString(),
@@ -30,12 +34,13 @@ export function logError(event: string, error: unknown, context: ErrorContext = 
 async function notifyErrorToTelegram(env: Env, event: string, error: unknown, context: ErrorContext): Promise<void> {
 	const errorMessage = error instanceof Error ? error.message : String(error);
 	const contextText = safeJSONStringify(context);
+	const workerName = resolveWorkerName(env);
 	const text = [
-		'[Bridge Error]',
-		`event: ${event}`,
-		`time: ${new Date().toISOString()}`,
-		`message: ${errorMessage}`,
-		contextText ? `context: ${contextText}` : '',
+		`*${escapeMdV2(`[Bridge Error][${workerName}]`)}*`,
+		`*event:* ${escapeMdV2(event)}`,
+		`*time:* ${escapeMdV2(new Date().toISOString())}`,
+		`*message:* ${escapeMdV2(errorMessage)}`,
+		contextText ? `*context:* ${escapeMdV2(contextText)}` : '',
 	]
 		.filter(Boolean)
 		.join('\n')
@@ -43,17 +48,23 @@ async function notifyErrorToTelegram(env: Env, event: string, error: unknown, co
 
 	try {
 		const { token, chatId } = await getTelegramSecrets(env);
-		await sendPlainTextMessage(token, chatId, text);
+		await sendTextMessage(token, chatId, text);
 	} catch (notifyError: unknown) {
 		const message = notifyError instanceof Error ? notifyError.message : String(notifyError);
 		console.error({
 			level: 'error',
 			event: 'error_notification_failed',
+			title: `[${workerName}] error_notification_failed`,
+			worker_name: workerName,
 			message,
 			original_event: event,
 			timestamp: new Date().toISOString(),
 		});
 	}
+}
+
+function resolveWorkerName(env: Env): string {
+	return env.WORKER_NAME || 'unknown-worker';
 }
 
 function safeJSONStringify(value: unknown): string {

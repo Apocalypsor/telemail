@@ -3,6 +3,8 @@ export interface SecretStoreSecretBinding {
 }
 
 export interface Env {
+	/** Worker 名称（用于日志/告警） */
+	WORKER_NAME: string;
 	/** Telegram Bot Token */
 	TG_TOKEN: SecretStoreSecretBinding;
 	/** Telegram Chat ID */
