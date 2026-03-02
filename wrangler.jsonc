@@ -34,18 +34,12 @@
 	/**
 	 * Secrets Store 绑定（账号级机密）
 	 * - TG_TOKEN  -> TELEGRAM_TOKEN
-	 * - CHAT_ID   -> TELEGRAM_MY_ID
 	 */
 	"secrets_store_secrets": [
 		{
 			"binding": "TG_TOKEN",
 			"store_id": "2450ac7560a346fda9b2538762a5eb07",
 			"secret_name": "TELEGRAM_TOKEN",
-		},
-		{
-			"binding": "CHAT_ID",
-			"store_id": "2450ac7560a346fda9b2538762a5eb07",
-			"secret_name": "TELEGRAM_MY_ID",
 		},
 	],
 	/**

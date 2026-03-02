@@ -20,8 +20,8 @@ export interface Env {
 	WORKER_NAME: string;
 	/** Telegram Bot Token */
 	TG_TOKEN: SecretStoreSecretBinding;
-	/** Telegram Chat ID */
-	CHAT_ID: SecretStoreSecretBinding;
+	/** Gmail 转发到 Telegram 的频道/群 chat id（环境变量） */
+	GMAIL_TELEGRAM_CHAT_ID?: string;
 	/** Google OAuth2 Client ID */
 	GMAIL_CLIENT_ID: string;
 	/** Google OAuth2 Client Secret */

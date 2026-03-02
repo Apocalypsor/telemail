@@ -6,6 +6,10 @@ export interface TelegramSecrets {
 }
 
 export async function getTelegramSecrets(env: Env): Promise<TelegramSecrets> {
-	const [token, chatId] = await Promise.all([env.TG_TOKEN.get(), env.CHAT_ID.get()]);
+	const token = await env.TG_TOKEN.get();
+	const chatId = env.GMAIL_TELEGRAM_CHAT_ID;
+	if (!chatId) {
+		throw new Error('GMAIL_TELEGRAM_CHAT_ID is not configured');
+	}
 	return { token, chatId };
 }
