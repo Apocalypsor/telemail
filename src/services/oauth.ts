@@ -6,6 +6,7 @@ import {
 	ROUTE_OAUTH_GOOGLE_CALLBACK,
 	ROUTE_OAUTH_GOOGLE_START,
 } from '../constants';
+import { BASE_CSS, escapeHtml, htmlResponse } from '../lib/html';
 import type { Env } from '../types';
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -32,68 +33,6 @@ function getWatchUrl(origin: string, secret: string): URL {
 	return url;
 }
 
-function htmlResponse(html: string, status = 200): Response {
-	return new Response(html, {
-		status,
-		headers: {
-			'content-type': 'text/html; charset=UTF-8',
-			'cache-control': 'no-store',
-		},
-	});
-}
-
-const BASE_CSS = `
-    :root {
-      --bg: #f6f8fb;
-      --card: #ffffff;
-      --text: #18222d;
-      --muted: #5f6b76;
-      --line: #d9e2ec;
-      --accent: #0f6ed8;
-      --accent-hover: #0b57a8;
-      --mono-bg: #f0f4f8;
-      --ok: #166534;
-      --warn: #b45309;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-      color: var(--text);
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-    }
-    .card {
-      width: min(760px, 100%);
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 12px 40px rgba(24, 34, 45, 0.08);
-    }
-    h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.2; }
-    p, li { font-size: 15px; line-height: 1.6; color: var(--muted); }
-    code {
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
-      background: var(--mono-bg);
-      padding: 2px 6px;
-      border-radius: 6px;
-      color: #0f355e;
-      word-break: break-all;
-    }
-    pre {
-      background: var(--mono-bg);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 12px;
-      overflow: auto;
-      font-size: 13px;
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
-    }
-`;
-
 export async function renderGoogleOAuthPage(request: Request, env: Env): Promise<Response> {
 	const origin = new URL(request.url).origin;
 	const startUrl = new URL(ROUTE_OAUTH_GOOGLE_START, origin);
@@ -109,7 +48,6 @@ export async function renderGoogleOAuthPage(request: Request, env: Env): Promise
   <title>Gmail OAuth Token Helper</title>
   <style>
     ${BASE_CSS}
-    body { background: radial-gradient(circle at 15% -5%, #dfefff 0%, var(--bg) 50%); }
     ol { margin: 12px 0 0 20px; padding: 0; display: grid; gap: 8px; }
     .action {
       margin-top: 18px;
@@ -173,11 +111,7 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
 	const oauthError = requestUrl.searchParams.get('error');
 
 	if (oauthError) {
-		return renderErrorPage(
-			'Google OAuth 授权失败',
-			requestUrl.searchParams.get('error_description') || oauthError,
-			400,
-		);
+		return renderErrorPage('Google OAuth 授权失败', requestUrl.searchParams.get('error_description') || oauthError, 400);
 	}
 
 	if (!code || !state) {
@@ -210,14 +144,12 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
 	let tokenData: GoogleTokenResponse = {};
 	try {
 		tokenData = JSON.parse(rawBody) as GoogleTokenResponse;
-	} catch { /* non-JSON response, tokenData stays empty */ }
+	} catch {
+		/* non-JSON response, tokenData stays empty */
+	}
 
 	if (!tokenResp.ok) {
-		return renderErrorPage(
-			'Token 交换失败',
-			rawBody || `${tokenResp.status} ${tokenResp.statusText}`,
-			tokenResp.status,
-		);
+		return renderErrorPage('Token 交换失败', rawBody || `${tokenResp.status} ${tokenResp.statusText}`, tokenResp.status);
 	}
 
 	const refreshToken = tokenData.refresh_token;
@@ -245,7 +177,6 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
   <title>${escapeHtml(title)}</title>
   <style>
     ${BASE_CSS}
-    body { background: radial-gradient(circle at 10% -10%, #e6f8ef 0%, var(--bg) 55%); }
     h1 { color: ${refreshToken ? 'var(--ok)' : 'var(--warn)'}; }
     textarea {
       width: 100%;
@@ -256,7 +187,7 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
       font-family: "IBM Plex Mono", ui-monospace, monospace;
       font-size: 13px;
       background: var(--mono-bg);
-      color: #0f355e;
+      color: var(--mono-text);
       resize: vertical;
     }
     button {
@@ -315,9 +246,8 @@ function renderErrorPage(title: string, detail: string, status = 400): Response 
   <title>${escapeHtml(title)}</title>
   <style>
     ${BASE_CSS}
-    body { background: #fff7ed; color: #7c2d12; }
-    .card { border-color: #fed7aa; }
-    pre { white-space: pre-wrap; word-break: break-word; color: #7c2d12; }
+    h1 { color: var(--danger); }
+    pre { white-space: pre-wrap; word-break: break-word; color: var(--danger); }
   </style>
 </head>
 <body>
@@ -329,13 +259,4 @@ function renderErrorPage(title: string, detail: string, status = 400): Response 
 </html>`;
 
 	return htmlResponse(html, status);
-}
-
-function escapeHtml(value: string): string {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&#39;');
 }

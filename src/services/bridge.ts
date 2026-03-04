@@ -1,8 +1,8 @@
 import PostalMime from 'postal-mime';
 import { KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
+import { formatBody } from '../lib/format';
 import { escapeMdV2 } from '../lib/markdown-v2';
 import type { Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
-import { formatBody } from './format';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet, KV_HISTORY_ID } from './gmail';
 import { getTelegramSecrets } from './secrets';
 import { sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';

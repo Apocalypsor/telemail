@@ -1,7 +1,7 @@
 import { parseHTML } from 'linkedom';
-import TurndownService from 'turndown';
 import { convert } from 'telegram-markdown-v2';
-import { escapeMdV2, findLongestValidMdV2Prefix } from '../lib/markdown-v2';
+import TurndownService from 'turndown';
+import { escapeMdV2, findLongestValidMdV2Prefix } from './markdown-v2';
 
 /** HTML → Markdown 转换器实例（linkedom DOM + turndown） */
 const turndown = new TurndownService({

@@ -5,10 +5,11 @@ import {
 	ROUTE_OAUTH_GOOGLE_CALLBACK,
 	ROUTE_OAUTH_GOOGLE_START,
 } from '../constants';
-import { renewWatch } from '../services/gmail';
 import { enqueueSyncNotification } from '../services/bridge';
-import { reportErrorToObservability } from '../services/observability';
+import { renewWatch } from '../services/gmail';
+import { handleHomeLogin, renderHomePage } from '../services/home';
 import { handleGoogleOAuthCallback, renderGoogleOAuthPage, startGoogleOAuth } from '../services/oauth';
+import { reportErrorToObservability } from '../services/observability';
 import type { Env, PubSubPushBody } from '../types';
 
 /**
@@ -43,7 +44,14 @@ export async function handleHttpRequest(request: Request, env: Env): Promise<Res
 			return await handleGoogleOAuthCallback(request, env);
 		}
 
-		return new Response('Gmail → Telegram Bridge is running');
+		if (url.pathname === '/') {
+			if (request.method === 'POST') {
+				return await handleHomeLogin(request, env);
+			}
+			return renderHomePage();
+		}
+
+		return new Response('Not Found', { status: 404 });
 	} catch (error: unknown) {
 		await reportErrorToObservability(env, 'http.unhandled_error', error, {
 			method: request.method,
