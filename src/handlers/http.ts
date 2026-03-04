@@ -1,13 +1,23 @@
-import { ROUTE_GMAIL_PUSH, ROUTE_GMAIL_WATCH } from '../constants';
+import {
+	ROUTE_GMAIL_PUSH,
+	ROUTE_GMAIL_WATCH,
+	ROUTE_OAUTH_GOOGLE,
+	ROUTE_OAUTH_GOOGLE_CALLBACK,
+	ROUTE_OAUTH_GOOGLE_START,
+} from '../constants';
 import { renewWatch } from '../services/gmail';
 import { enqueueSyncNotification } from '../services/bridge';
 import { reportErrorToObservability } from '../services/observability';
+import { handleGoogleOAuthCallback, renderGoogleOAuthPage, startGoogleOAuth } from '../services/oauth';
 import type { Env, PubSubPushBody } from '../types';
 
 /**
  * HTTP handler:
  *   POST /gmail/push?secret=XXX   — 接收 Pub/Sub 推送
  *   POST /gmail/watch?secret=XXX  — 手动触发 watch 注册
+ *   GET  /oauth/google?secret=XXX — 浏览器生成 refresh token
+ *   GET  /oauth/google/start?secret=XXX
+ *   GET  /oauth/google/callback
  *   GET  /                        — 健康检查
  */
 export async function handleHttpRequest(request: Request, env: Env): Promise<Response> {
@@ -19,6 +29,18 @@ export async function handleHttpRequest(request: Request, env: Env): Promise<Res
 
 		if (request.method === 'POST' && url.pathname === ROUTE_GMAIL_WATCH) {
 			return await handleWatchRenewal(url, env);
+		}
+
+		if (request.method === 'GET' && url.pathname === ROUTE_OAUTH_GOOGLE) {
+			return await handleOAuthHome(request, url, env);
+		}
+
+		if (request.method === 'GET' && url.pathname === ROUTE_OAUTH_GOOGLE_START) {
+			return await handleOAuthStart(request, url, env);
+		}
+
+		if (request.method === 'GET' && url.pathname === ROUTE_OAUTH_GOOGLE_CALLBACK) {
+			return await handleGoogleOAuthCallback(request, env);
 		}
 
 		return new Response('Gmail → Telegram Bridge is running');
@@ -55,6 +77,20 @@ async function handleWatchRenewal(url: URL, env: Env): Promise<Response> {
 		});
 		return new Response(`Watch failed: ${message}`, { status: 500 });
 	}
+}
+
+async function handleOAuthHome(request: Request, url: URL, env: Env): Promise<Response> {
+	if (!isSecretValid(url, env.GMAIL_WATCH_SECRET)) {
+		return new Response('Forbidden', { status: 403 });
+	}
+	return renderGoogleOAuthPage(request, env);
+}
+
+async function handleOAuthStart(request: Request, url: URL, env: Env): Promise<Response> {
+	if (!isSecretValid(url, env.GMAIL_WATCH_SECRET)) {
+		return new Response('Forbidden', { status: 403 });
+	}
+	return startGoogleOAuth(request, env);
 }
 
 function isSecretValid(url: URL, secret: string): boolean {

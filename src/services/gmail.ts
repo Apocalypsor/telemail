@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { KV_GMAIL_REFRESH_TOKEN } from '../constants';
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const KV_HISTORY_ID = 'gmail_history_id';
@@ -10,6 +11,12 @@ const KV_ACCESS_TOKEN = 'gmail_access_token';
 export async function getAccessToken(env: Env): Promise<string> {
 	const cached = await env.EMAIL_KV.get(KV_ACCESS_TOKEN);
 	if (cached) return cached;
+	const refreshToken = await env.EMAIL_KV.get(KV_GMAIL_REFRESH_TOKEN);
+	if (!refreshToken) {
+		throw new Error(
+			'Missing refresh token in KV. Open /oauth/google?secret=GMAIL_WATCH_SECRET to authorize and save one.',
+		);
+	}
 
 	const resp = await fetch('https://oauth2.googleapis.com/token', {
 		method: 'POST',
@@ -17,7 +24,7 @@ export async function getAccessToken(env: Env): Promise<string> {
 		body: new URLSearchParams({
 			client_id: env.GMAIL_CLIENT_ID,
 			client_secret: env.GMAIL_CLIENT_SECRET,
-			refresh_token: env.GMAIL_REFRESH_TOKEN,
+			refresh_token: refreshToken,
 			grant_type: 'refresh_token',
 		}),
 	});

@@ -62,6 +62,19 @@ npm install
 5. 点击 **Exchange authorization code for tokens**
 6. 记录 `Refresh Token`
 
+#### 2c（可选）. 用 Worker 内置页面生成 Refresh Token
+
+如果你不想手动使用 OAuth Playground，可以使用 Worker 提供的页面：
+
+1. 在 Google OAuth Client 的 **Authorized redirect URIs** 中新增：
+   `https://YOUR_WORKER_DOMAIN/oauth/google/callback`
+2. 部署 Worker 后，打开：
+   `https://YOUR_WORKER_DOMAIN/oauth/google?secret=YOUR_WATCH_SECRET`
+3. 点击页面上的“开始授权并生成 Refresh Token”，完成 Google 登录授权
+4. 回调页会自动把 `refresh_token` 保存到 `EMAIL_KV`（键名：`gmail_refresh_token`）
+
+> 说明：`/oauth/google` 入口使用和 `/gmail/watch` 相同的 `GMAIL_WATCH_SECRET` 做保护。
+
 #### 2d. 创建 Pub/Sub Topic 和 Subscription
 
 ```sh
@@ -120,7 +133,6 @@ npx wrangler secrets-store secret create 2450ac7560a346fda9b2538762a5eb07 --name
 ```sh
 npx wrangler secret put GMAIL_CLIENT_ID      # Google OAuth2 Client ID
 npx wrangler secret put GMAIL_CLIENT_SECRET  # Google OAuth2 Client Secret
-npx wrangler secret put GMAIL_REFRESH_TOKEN  # Google OAuth2 Refresh Token
 npx wrangler secret put GMAIL_USER_EMAIL     # 你的 Gmail 邮箱地址
 npx wrangler secret put GMAIL_PUBSUB_TOPIC   # 例如 projects/my-project/topics/gmail-push
 npx wrangler secret put GMAIL_PUSH_SECRET    # 自定义密钥，用于验证 Pub/Sub push
@@ -164,6 +176,7 @@ src/
   services/
     bridge.ts          # Gmail→Telegram 业务流程编排（sync/message）
     gmail.ts           # Gmail OAuth2 + REST API + watch + history + base64url
+    oauth.ts           # 浏览器 OAuth 授权页与回调（生成 refresh token）
     telegram.ts        # Telegram 发送：sendTextMessage, sendWithAttachments
     secrets.ts         # Secret Store 读取（TG_TOKEN / CHAT_ID）
     observability.ts   # 错误结构化日志 + Telegram 告警
@@ -184,11 +197,12 @@ wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 | `CHAT_ID`             | Secret Store 绑定：`TELEGRAM_MY_ID`          |
 | `GMAIL_CLIENT_ID`     | Google OAuth2 Client ID                      |
 | `GMAIL_CLIENT_SECRET` | Google OAuth2 Client Secret                  |
-| `GMAIL_REFRESH_TOKEN` | Google OAuth2 Refresh Token                  |
 | `GMAIL_USER_EMAIL`    | Gmail 邮箱地址                               |
 | `GMAIL_PUBSUB_TOPIC`  | Pub/Sub topic 全名 (projects/xxx/topics/yyy) |
 | `GMAIL_PUSH_SECRET`   | 自定义密钥，附加在 push URL 中用于验证       |
 | `GMAIL_WATCH_SECRET`  | 自定义密钥，用于保护 `/gmail/watch` 端点     |
+
+`refresh_token` 不再使用 Worker Secret，统一保存在 `EMAIL_KV` 的 `gmail_refresh_token` 键中。
 
 ## API 端点
 
@@ -197,6 +211,9 @@ wrangler.jsonc    # Cloudflare Worker 配置（KV + Queue + Cron）
 | GET  | `/`                      | 健康检查            |
 | POST | `/gmail/push?secret=XXX` | Pub/Sub push 回调   |
 | POST | `/gmail/watch?secret=XXX` | 手动注册/续订 watch |
+| GET  | `/oauth/google?secret=XXX` | 浏览器生成 refresh token |
+| GET  | `/oauth/google/start?secret=XXX` | 发起 Google OAuth |
+| GET  | `/oauth/google/callback` | OAuth 回调，展示 token |
 
 ## Telegram 消息格式
 
