@@ -33,6 +33,10 @@ function getWatchUrl(origin: string, secret: string): URL {
 	return url;
 }
 
+function backLink(secret: string): string {
+	return `<p style="margin-top:18px"><a href="/?secret=${encodeURIComponent(secret)}" style="color:var(--accent);text-decoration:none">&larr; 返回主页</a></p>`;
+}
+
 export async function renderGoogleOAuthPage(request: Request, env: Env): Promise<Response> {
 	const origin = new URL(request.url).origin;
 	const startUrl = new URL(ROUTE_OAUTH_GOOGLE_START, origin);
@@ -76,6 +80,7 @@ export async function renderGoogleOAuthPage(request: Request, env: Env): Promise
     </ol>
     <a class="action" href="${escapeHtml(startUrl.toString())}">开始授权并生成 Refresh Token</a>
     <p class="note">入口受 <code>?secret=...</code> 保护，使用和 <code>/gmail/watch</code> 同一个密钥。</p>
+    ${backLink(env.GMAIL_WATCH_SECRET)}
   </main>
 </body>
 </html>`;
@@ -111,17 +116,17 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
 	const oauthError = requestUrl.searchParams.get('error');
 
 	if (oauthError) {
-		return renderErrorPage('Google OAuth 授权失败', requestUrl.searchParams.get('error_description') || oauthError, 400);
+		return renderErrorPage('Google OAuth 授权失败', requestUrl.searchParams.get('error_description') || oauthError, env.GMAIL_WATCH_SECRET, 400);
 	}
 
 	if (!code || !state) {
-		return renderErrorPage('参数缺失', '回调中没有 code 或 state。', 400);
+		return renderErrorPage('参数缺失', '回调中没有 code 或 state。', env.GMAIL_WATCH_SECRET, 400);
 	}
 
 	const stateKey = `${KV_OAUTH_STATE_PREFIX}${state}`;
 	const stateExists = await env.EMAIL_KV.get(stateKey);
 	if (!stateExists) {
-		return renderErrorPage('state 无效', '授权会话已过期或不匹配，请重新发起授权。', 400);
+		return renderErrorPage('state 无效', '授权会话已过期或不匹配，请重新发起授权。', env.GMAIL_WATCH_SECRET, 400);
 	}
 
 	const redirectUri = getCallbackUrl(requestUrl.origin);
@@ -149,7 +154,7 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
 	}
 
 	if (!tokenResp.ok) {
-		return renderErrorPage('Token 交换失败', rawBody || `${tokenResp.status} ${tokenResp.statusText}`, tokenResp.status);
+		return renderErrorPage('Token 交换失败', rawBody || `${tokenResp.status} ${tokenResp.statusText}`, env.GMAIL_WATCH_SECRET, tokenResp.status);
 	}
 
 	const refreshToken = tokenData.refresh_token;
@@ -215,6 +220,7 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
     <pre>curl -X POST "${escapeHtml(watchUrl.toString())}"</pre>
     ${refreshToken ? `<p>refresh_token 已保存到 KV 键 <code>${escapeHtml(KV_GMAIL_REFRESH_TOKEN)}</code>。</p>` : ''}
     <p>返回 scope: <code>${escapeHtml(scope)}</code>${typeof expiresIn === 'number' ? `，access_token 有效期约 ${expiresIn} 秒` : ''}。</p>
+    ${backLink(env.GMAIL_WATCH_SECRET)}
   </main>
   <script>
     const btn = document.getElementById('copy');
@@ -237,7 +243,7 @@ export async function handleGoogleOAuthCallback(request: Request, env: Env): Pro
 	return htmlResponse(html);
 }
 
-function renderErrorPage(title: string, detail: string, status = 400): Response {
+function renderErrorPage(title: string, detail: string, secret: string, status = 400): Response {
 	const html = `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -254,6 +260,7 @@ function renderErrorPage(title: string, detail: string, status = 400): Response 
   <main class="card">
     <h1>${escapeHtml(title)}</h1>
     <pre>${escapeHtml(detail)}</pre>
+    ${backLink(secret)}
   </main>
 </body>
 </html>`;

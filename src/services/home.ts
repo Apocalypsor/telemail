@@ -37,7 +37,10 @@ export async function handleHomeLogin(request: Request, env: Env): Promise<Respo
 	if (typeof secret !== 'string' || secret !== env.GMAIL_WATCH_SECRET) {
 		return renderHomePage('密钥错误，请重试');
 	}
+	return renderDashboard(secret);
+}
 
+export function renderDashboard(secret: string): Response {
 	const oauthUrl = `${ROUTE_OAUTH_GOOGLE}?secret=${encodeURIComponent(secret)}`;
 	const watchUrl = `${ROUTE_GMAIL_WATCH}?secret=${encodeURIComponent(secret)}`;
 	const html = htmlPage(

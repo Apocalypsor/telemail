@@ -7,7 +7,7 @@ import {
 } from '../constants';
 import { enqueueSyncNotification } from '../services/bridge';
 import { renewWatch } from '../services/gmail';
-import { handleHomeLogin, renderHomePage } from '../services/home';
+import { handleHomeLogin, renderDashboard, renderHomePage } from '../services/home';
 import { handleGoogleOAuthCallback, renderGoogleOAuthPage, startGoogleOAuth } from '../services/oauth';
 import { reportErrorToObservability } from '../services/observability';
 import type { Env, PubSubPushBody } from '../types';
@@ -47,6 +47,9 @@ export async function handleHttpRequest(request: Request, env: Env): Promise<Res
 		if (url.pathname === '/') {
 			if (request.method === 'POST') {
 				return await handleHomeLogin(request, env);
+			}
+			if (isSecretValid(url, env.GMAIL_WATCH_SECRET)) {
+				return renderDashboard(env.GMAIL_WATCH_SECRET);
 			}
 			return renderHomePage();
 		}
