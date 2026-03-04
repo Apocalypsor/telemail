@@ -26,8 +26,6 @@ export interface Env {
 	GMAIL_CLIENT_ID: string;
 	/** Google OAuth2 Client Secret */
 	GMAIL_CLIENT_SECRET: string;
-	/** Gmail 邮箱地址 (用于日志) */
-	GMAIL_USER_EMAIL: string;
 	/** Pub/Sub topic 全名, e.g. projects/my-proj/topics/gmail-push */
 	GMAIL_PUBSUB_TOPIC: string;
 	/** URL 中的共享密钥，校验 Pub/Sub push 来源 */
