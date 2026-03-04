@@ -1,5 +1,6 @@
 import type { Env } from '../types';
-import { KV_GMAIL_REFRESH_TOKEN } from '../constants';
+import type { GoogleTokenResponse } from './oauth';
+import { GOOGLE_OAUTH_TOKEN_URL, KV_GMAIL_REFRESH_TOKEN } from '../constants';
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const KV_HISTORY_ID = 'gmail_history_id';
@@ -18,7 +19,7 @@ export async function getAccessToken(env: Env): Promise<string> {
 		);
 	}
 
-	const resp = await fetch('https://oauth2.googleapis.com/token', {
+	const resp = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: new URLSearchParams({
@@ -33,7 +34,10 @@ export async function getAccessToken(env: Env): Promise<string> {
 		throw new Error(`Token exchange failed: ${await resp.text()}`);
 	}
 
-	const data = (await resp.json()) as { access_token: string; expires_in: number };
+	const data = (await resp.json()) as GoogleTokenResponse;
+	if (!data.access_token || !data.expires_in) {
+		throw new Error('Token response missing access_token or expires_in');
+	}
 	// 缓存到 KV，TTL 比实际过期提前 120 秒
 	await env.EMAIL_KV.put(KV_ACCESS_TOKEN, data.access_token, {
 		expirationTtl: Math.max(data.expires_in - 120, 60),
