@@ -11,12 +11,20 @@ const turndown = new TurndownService({
 	strongDelimiter: '**',
 });
 
+// Strip images — Telegram can't render inline images
+turndown.addRule('stripImages', {
+	filter: 'img',
+	replacement() {
+		return '';
+	},
+});
+
 function htmlToMarkdown(html: string): string {
 	const { document } = parseHTML(html);
 	for (const node of document.querySelectorAll('head, style, script')) {
 		node.remove();
 	}
-	return turndown.turndown(document.body).trim();
+	return turndown.turndown(document.body).replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** 修复 Telegram MarkdownV2 易出错片段（例如单独一行的 "***"） */
@@ -42,7 +50,12 @@ export function formatBody(text: string | undefined, html: string | undefined, m
 	let raw = '';
 
 	if (html) {
-		raw = htmlToMarkdown(html);
+		try {
+			raw = htmlToMarkdown(html);
+		} catch {
+			// Turndown can throw on malformed URIs in links; fall through to plain text
+			raw = '';
+		}
 	}
 
 	if (!raw && text) {
