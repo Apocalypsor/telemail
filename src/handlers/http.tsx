@@ -17,10 +17,20 @@ import { convertPreview } from '../services/home';
 import { getOAuthPageProps, processOAuthCallback, startGoogleOAuth } from '../services/oauth';
 import { reportErrorToObservability } from '../services/observability';
 import type { Env, PubSubPushBody } from '../types';
+import { FAVICON_BASE64 } from '../assets/favicon';
 import type { MiddlewareHandler } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 const app = new Hono<{ Bindings: Env }>();
+
+// ─── Favicon ─────────────────────────────────────────────────────────────────
+const faviconBuf = Uint8Array.from(atob(FAVICON_BASE64), (c) => c.charCodeAt(0));
+app.get('/favicon.png', (c) => {
+	return c.body(faviconBuf, 200, {
+		'Content-Type': 'image/png',
+		'Cache-Control': 'public, max-age=604800, immutable',
+	});
+});
 
 // ─── Middleware: secret validation ──────────────────────────────────────────
 function requireSecret(secretKey: 'GMAIL_PUSH_SECRET' | 'GMAIL_WATCH_SECRET'): MiddlewareHandler<{ Bindings: Env }> {
