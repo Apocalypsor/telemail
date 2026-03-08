@@ -64,7 +64,7 @@
 				"max_batch_size": 5,
 				"max_batch_timeout": 1,
 				"max_retries": 3,
-				"max_concurrency": 1,
+				"max_concurrency": 3,
 			},
 		],
 	},
