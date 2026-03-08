@@ -1,15 +1,6 @@
 import type { Env } from '../types';
 
-export interface TelegramSecrets {
-	token: string;
-	chatId: string;
-}
-
-export async function getTelegramSecrets(env: Env): Promise<TelegramSecrets> {
-	const token = await env.TG_TOKEN.get();
-	const chatId = env.GMAIL_TELEGRAM_CHAT_ID;
-	if (!chatId) {
-		throw new Error('GMAIL_TELEGRAM_CHAT_ID is not configured');
-	}
-	return { token, chatId };
+/** 获取 Telegram Bot Token（所有账号共享同一个 bot） */
+export async function getTelegramToken(env: Env): Promise<string> {
+	return env.TG_TOKEN.get();
 }

@@ -1,12 +1,12 @@
 import {
 	GOOGLE_OAUTH_TOKEN_URL,
-	KV_GMAIL_REFRESH_TOKEN,
 	KV_OAUTH_STATE_PREFIX,
 	ROUTE_GMAIL_WATCH,
 	ROUTE_OAUTH_GOOGLE_CALLBACK,
 	ROUTE_OAUTH_GOOGLE_START,
 } from '../constants';
 import type { Env } from '../types';
+import { getAccountById, updateRefreshToken } from '../db/accounts';
 
 const GOOGLE_OAUTH_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
@@ -32,23 +32,26 @@ function getWatchUrl(origin: string, secret: string): URL {
 	return url;
 }
 
-export function getOAuthPageProps(request: Request, env: Env) {
+export function getOAuthPageProps(request: Request, env: Env, accountId: number, accountEmail: string) {
 	const origin = new URL(request.url).origin;
 	const startUrl = new URL(ROUTE_OAUTH_GOOGLE_START, origin);
 	startUrl.searchParams.set('secret', env.GMAIL_WATCH_SECRET);
+	startUrl.searchParams.set('account', String(accountId));
 
 	return {
 		startUrl: startUrl.toString(),
 		callbackUrl: getCallbackUrl(origin),
 		watchUrl: getWatchUrl(origin, env.GMAIL_WATCH_SECRET).toString(),
 		secret: env.GMAIL_WATCH_SECRET,
+		accountEmail,
 	};
 }
 
-export async function startGoogleOAuth(request: Request, env: Env): Promise<Response> {
+export async function startGoogleOAuth(request: Request, env: Env, accountId: number): Promise<Response> {
 	const requestUrl = new URL(request.url);
 	const state = crypto.randomUUID();
-	await env.EMAIL_KV.put(`${KV_OAUTH_STATE_PREFIX}${state}`, '1', {
+	// 在 state value 中存储 accountId，回调时取出
+	await env.EMAIL_KV.put(`${KV_OAUTH_STATE_PREFIX}${state}`, String(accountId), {
 		expirationTtl: OAUTH_STATE_TTL_SECONDS,
 	});
 
@@ -67,7 +70,7 @@ export async function startGoogleOAuth(request: Request, env: Env): Promise<Resp
 }
 
 export type OAuthCallbackResult =
-	| { ok: true; refreshToken: string | undefined; scope: string; expiresIn: number | undefined; watchUrl: string; secret: string }
+	| { ok: true; refreshToken: string | undefined; scope: string; expiresIn: number | undefined; watchUrl: string; secret: string; accountEmail: string }
 	| { ok: false; title: string; detail: string; secret: string; status: number };
 
 export async function processOAuthCallback(request: Request, env: Env): Promise<OAuthCallbackResult> {
@@ -97,8 +100,8 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 	}
 
 	const stateKey = `${KV_OAUTH_STATE_PREFIX}${state}`;
-	const stateExists = await env.EMAIL_KV.get(stateKey);
-	if (!stateExists) {
+	const accountIdStr = await env.EMAIL_KV.get(stateKey);
+	if (!accountIdStr) {
 		return {
 			ok: false,
 			title: 'state 无效',
@@ -107,6 +110,10 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 			status: 400,
 		};
 	}
+
+	const accountId = parseInt(accountIdStr, 10);
+	const account = await getAccountById(env.DB, accountId);
+	const accountEmail = account?.email || 'unknown';
 
 	const redirectUri = getCallbackUrl(requestUrl.origin);
 	const [, tokenResp] = await Promise.all([
@@ -143,8 +150,8 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 	}
 
 	const refreshToken = tokenData.refresh_token;
-	if (refreshToken) {
-		await env.EMAIL_KV.put(KV_GMAIL_REFRESH_TOKEN, refreshToken);
+	if (refreshToken && account) {
+		await updateRefreshToken(env.DB, account.id, refreshToken);
 	}
 
 	return {
@@ -154,5 +161,6 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 		expiresIn: tokenData.expires_in,
 		watchUrl: getWatchUrl(requestUrl.origin, env.GMAIL_WATCH_SECRET).toString(),
 		secret: env.GMAIL_WATCH_SECRET,
+		accountEmail,
 	};
 }

@@ -10,7 +10,8 @@ import {
 import { DashboardPage, HomePage, PreviewPage } from '../components/home';
 import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../components/oauth';
 import { enqueueSyncNotification } from '../services/bridge';
-import { renewWatch } from '../services/gmail';
+import { createAccount, deleteAccount, getAllAccounts, getAccountById } from '../db/accounts';
+import { renewWatch, renewWatchAll, stopWatch } from '../services/gmail';
 import { convertPreview } from '../services/home';
 import { getOAuthPageProps, processOAuthCallback, startGoogleOAuth } from '../services/oauth';
 import { reportErrorToObservability } from '../services/observability';
@@ -46,11 +47,11 @@ app.post(ROUTE_GMAIL_PUSH, requireSecret('GMAIL_PUSH_SECRET'), async (c) => {
 	return c.text('OK');
 });
 
-// ─── Gmail Watch renewal ────────────────────────────────────────────────────
+// ─── Gmail Watch renewal (all accounts) ─────────────────────────────────────
 app.post(ROUTE_GMAIL_WATCH, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
 	try {
-		await renewWatch(c.env);
-		return c.text('Watch renewed');
+		await renewWatchAll(c.env);
+		return c.text('Watch renewed for all accounts');
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
 		await reportErrorToObservability(c.env, 'http.watch_renew_failed', error, {
@@ -60,14 +61,74 @@ app.post(ROUTE_GMAIL_WATCH, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
 	}
 });
 
-// ─── Google OAuth ───────────────────────────────────────────────────────────
-app.get(ROUTE_OAUTH_GOOGLE, requireSecret('GMAIL_WATCH_SECRET'), (c) => {
-	const props = getOAuthPageProps(c.req.raw, c.env);
+// ─── Account management ─────────────────────────────────────────────────────
+app.post('/accounts', requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+	const form = await c.req.formData();
+	const email = form.get('email');
+	const chatId = form.get('chat_id');
+	const label = form.get('label');
+
+	if (typeof email !== 'string' || !email.trim() || typeof chatId !== 'string' || !chatId.trim()) {
+		const accounts = await getAllAccounts(c.env.DB);
+		return c.html(<DashboardPage secret={c.env.GMAIL_WATCH_SECRET} accounts={accounts} error="Email 和 Chat ID 不能为空" />);
+	}
+
+	try {
+		await createAccount(c.env.DB, email.trim(), chatId.trim(), typeof label === 'string' && label.trim() ? label.trim() : undefined);
+	} catch (err: any) {
+		const accounts = await getAllAccounts(c.env.DB);
+		const errorMsg = err.message?.includes('UNIQUE') ? '该 Email 已存在' : err.message;
+		return c.html(<DashboardPage secret={c.env.GMAIL_WATCH_SECRET} accounts={accounts} error={errorMsg} />);
+	}
+
+	return c.redirect(`/?secret=${encodeURIComponent(c.env.GMAIL_WATCH_SECRET)}`);
+});
+
+app.post('/accounts/:id/delete', requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+	const id = parseInt(c.req.param('id'), 10);
+	const account = await getAccountById(c.env.DB, id);
+	if (account?.refresh_token) {
+		try {
+			await stopWatch(c.env, account);
+		} catch (err) {
+			console.warn(`Failed to stop watch for ${account.email}:`, err);
+		}
+	}
+	await deleteAccount(c.env.DB, id);
+	return c.text('OK');
+});
+
+app.post('/accounts/:id/watch', requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+	const id = parseInt(c.req.param('id'), 10);
+	const account = await getAccountById(c.env.DB, id);
+	if (!account) return c.text('Account not found', 404);
+	if (!account.refresh_token) return c.text('Account not authorized', 400);
+
+	try {
+		await renewWatch(c.env, account);
+		return c.text(`Watch renewed for ${account.email}`);
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		return c.text(`Watch failed: ${message}`, 500);
+	}
+});
+
+// ─── Google OAuth (per-account) ─────────────────────────────────────────────
+app.get(ROUTE_OAUTH_GOOGLE, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+	const accountId = parseInt(c.req.query('account') || '0', 10);
+	const account = await getAccountById(c.env.DB, accountId);
+	if (!account) return c.text('Account not found', 404);
+
+	const props = getOAuthPageProps(c.req.raw, c.env, account.id, account.email);
 	return c.html(<OAuthSetupPage {...props} />);
 });
 
-app.get(ROUTE_OAUTH_GOOGLE_START, requireSecret('GMAIL_WATCH_SECRET'), (c) => {
-	return startGoogleOAuth(c.req.raw, c.env);
+app.get(ROUTE_OAUTH_GOOGLE_START, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+	const accountId = parseInt(c.req.query('account') || '0', 10);
+	const account = await getAccountById(c.env.DB, accountId);
+	if (!account) return c.text('Account not found', 404);
+
+	return startGoogleOAuth(c.req.raw, c.env, account.id);
 });
 
 app.get(ROUTE_OAUTH_GOOGLE_CALLBACK, async (c) => {
@@ -85,6 +146,7 @@ app.get(ROUTE_OAUTH_GOOGLE_CALLBACK, async (c) => {
 			expiresIn={result.expiresIn}
 			watchUrl={result.watchUrl}
 			secret={result.secret}
+			accountEmail={result.accountEmail}
 		/>,
 	);
 });
@@ -107,12 +169,14 @@ app.post('/', async (c) => {
 	if (typeof secret !== 'string' || secret !== c.env.GMAIL_WATCH_SECRET) {
 		return c.html(<HomePage error="密钥错误，请重试" />, 403);
 	}
-	return c.html(<DashboardPage secret={secret} />);
+	const accounts = await getAllAccounts(c.env.DB);
+	return c.html(<DashboardPage secret={secret} accounts={accounts} />);
 });
 
-app.get('/', (c) => {
+app.get('/', async (c) => {
 	if (c.req.query('secret') === c.env.GMAIL_WATCH_SECRET) {
-		return c.html(<DashboardPage secret={c.env.GMAIL_WATCH_SECRET} />);
+		const accounts = await getAllAccounts(c.env.DB);
+		return c.html(<DashboardPage secret={c.env.GMAIL_WATCH_SECRET} accounts={accounts} />);
 	}
 	return c.html(<HomePage />);
 });

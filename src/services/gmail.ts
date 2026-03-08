@@ -1,20 +1,25 @@
-import type { Env } from '../types';
+import { GOOGLE_OAUTH_TOKEN_URL } from '../constants';
+import type { Account, Env } from '../types';
+import { getAllAccounts, updateHistoryId } from '../db/accounts';
 import type { GoogleTokenResponse } from './oauth';
-import { GOOGLE_OAUTH_TOKEN_URL, KV_GMAIL_REFRESH_TOKEN } from '../constants';
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
-const KV_HISTORY_ID = 'gmail_history_id';
-const KV_ACCESS_TOKEN = 'gmail_access_token';
+
+/** 每个账号的 access_token KV 缓存键 */
+function kvAccessTokenKey(accountId: number): string {
+	return `access_token:${accountId}`;
+}
 
 // ─── OAuth2 ──────────────────────────────────────────────────────────────────
 
-/** 用 refresh_token 换 access_token，带 KV 缓存 */
-export async function getAccessToken(env: Env): Promise<string> {
-	const cached = await env.EMAIL_KV.get(KV_ACCESS_TOKEN);
+/** 用 refresh_token 换 access_token，带 KV 缓存（按账号隔离） */
+export async function getAccessToken(env: Env, account: Account): Promise<string> {
+	const cacheKey = kvAccessTokenKey(account.id);
+	const cached = await env.EMAIL_KV.get(cacheKey);
 	if (cached) return cached;
-	const refreshToken = await env.EMAIL_KV.get(KV_GMAIL_REFRESH_TOKEN);
-	if (!refreshToken) {
-		throw new Error('Missing refresh token in KV. Open /oauth/google?secret=GMAIL_WATCH_SECRET to authorize and save one.');
+
+	if (!account.refresh_token) {
+		throw new Error(`Account ${account.email} has no refresh token. Authorize via OAuth first.`);
 	}
 
 	const resp = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
@@ -23,13 +28,13 @@ export async function getAccessToken(env: Env): Promise<string> {
 		body: new URLSearchParams({
 			client_id: env.GMAIL_CLIENT_ID,
 			client_secret: env.GMAIL_CLIENT_SECRET,
-			refresh_token: refreshToken,
+			refresh_token: account.refresh_token,
 			grant_type: 'refresh_token',
 		}),
 	});
 
 	if (!resp.ok) {
-		throw new Error(`Token exchange failed: ${await resp.text()}`);
+		throw new Error(`Token exchange failed for ${account.email}: ${await resp.text()}`);
 	}
 
 	const data = (await resp.json()) as GoogleTokenResponse;
@@ -37,7 +42,7 @@ export async function getAccessToken(env: Env): Promise<string> {
 		throw new Error('Token response missing access_token or expires_in');
 	}
 	// 缓存到 KV，TTL 比实际过期提前 120 秒
-	await env.EMAIL_KV.put(KV_ACCESS_TOKEN, data.access_token, {
+	await env.EMAIL_KV.put(cacheKey, data.access_token, {
 		expirationTtl: Math.max(data.expires_in - 120, 60),
 	});
 
@@ -77,31 +82,53 @@ export async function gmailPost(token: string, path: string, body: Record<string
 
 // ─── Watch ───────────────────────────────────────────────────────────────────
 
-/** 注册 / 续订 Gmail push 通知 (watch) */
-export async function renewWatch(env: Env): Promise<void> {
-	const token = await getAccessToken(env);
+/** 停止单个账号的 Gmail push 通知 (watch) */
+export async function stopWatch(env: Env, account: Account): Promise<void> {
+	const token = await getAccessToken(env, account);
+	await gmailPost(token, '/users/me/stop', {});
+	console.log(`Gmail watch stopped for ${account.email}`);
+}
+
+/** 为单个账号注册 / 续订 Gmail push 通知 (watch) */
+export async function renewWatch(env: Env, account: Account): Promise<void> {
+	const token = await getAccessToken(env, account);
 	const result = await gmailPost(token, '/users/me/watch', {
 		topicName: env.GMAIL_PUBSUB_TOPIC,
 		labelIds: ['INBOX'],
 	});
-	console.log('Gmail watch renewed, historyId:', result.historyId, 'expiration:', result.expiration);
+	console.log(`Gmail watch renewed for ${account.email}, historyId:`, result.historyId, 'expiration:', result.expiration);
 
-	// 如果 KV 里还没有 historyId，用 watch 返回的初始化
-	const existing = await env.EMAIL_KV.get(KV_HISTORY_ID);
-	if (!existing) {
-		await env.EMAIL_KV.put(KV_HISTORY_ID, String(result.historyId));
+	// 如果 D1 里还没有 historyId，用 watch 返回的初始化
+	if (!account.history_id) {
+		await updateHistoryId(env.DB, account.id, String(result.historyId));
+	}
+}
+
+/** 为所有已授权的账号续订 watch */
+export async function renewWatchAll(env: Env): Promise<void> {
+	const accounts = await getAllAccounts(env.DB);
+	for (const account of accounts) {
+		if (!account.refresh_token) {
+			console.log(`Skipping watch renewal for ${account.email}: no refresh token`);
+			continue;
+		}
+		await renewWatch(env, account);
 	}
 }
 
 // ─── History / 新邮件拉取 ────────────────────────────────────────────────────
 
-/** 拉取自 storedHistoryId 以来的新 INBOX 消息 ID 列表 */
-export async function fetchNewMessageIds(token: string, env: Env, storedHistoryId: string): Promise<string[]> {
+/** 拉取自 account.history_id 以来的新 INBOX 消息 ID 列表 */
+export async function fetchNewMessageIds(token: string, env: Env, account: Account): Promise<string[]> {
+	if (!account.history_id) return [];
+
+	// D1 可能将纯数字字符串读回为 number，确保是整数字符串
+	const startHistoryId = String(parseInt(String(account.history_id), 10));
 	const messageIds = new Set<string>();
 	let pageToken: string | undefined;
 
 	do {
-		let path = `/users/me/history?startHistoryId=${storedHistoryId}&historyTypes=messageAdded&labelId=INBOX`;
+		let path = `/users/me/history?startHistoryId=${startHistoryId}&historyTypes=messageAdded&labelId=INBOX`;
 		if (pageToken) path += `&pageToken=${pageToken}`;
 
 		let history: any;
@@ -110,9 +137,9 @@ export async function fetchNewMessageIds(token: string, env: Env, storedHistoryI
 		} catch (err: any) {
 			if (err.status === 404) {
 				// historyId 过老，重新同步
-				console.warn('historyId 过期，重新同步');
+				console.warn(`historyId expired for ${account.email}, resetting`);
 				const profile = await gmailGet(token, '/users/me/profile');
-				await env.EMAIL_KV.put(KV_HISTORY_ID, String(profile.historyId));
+				await updateHistoryId(env.DB, account.id, String(profile.historyId));
 				return [];
 			}
 			throw err;
@@ -133,7 +160,7 @@ export async function fetchNewMessageIds(token: string, env: Env, storedHistoryI
 		pageToken = history.nextPageToken;
 		// 更新为最新 historyId
 		if (history.historyId) {
-			await env.EMAIL_KV.put(KV_HISTORY_ID, String(history.historyId));
+			await updateHistoryId(env.DB, account.id, String(history.historyId));
 		}
 	} while (pageToken);
 
@@ -152,5 +179,3 @@ export function base64urlToArrayBuffer(b64url: string): ArrayBuffer {
 	}
 	return bytes.buffer;
 }
-
-export { KV_HISTORY_ID };

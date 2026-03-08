@@ -15,13 +15,23 @@ export interface ObservabilityServiceBinding {
 	reportError(payload: ObservabilityErrorPayload | null | undefined): Promise<void>;
 }
 
+/** D1 accounts 表记录 */
+export interface Account {
+	id: number;
+	email: string;
+	chat_id: string;
+	refresh_token: string | null;
+	history_id: string | null;
+	label: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
 export interface Env {
 	/** Worker 名称（用于日志/告警） */
 	WORKER_NAME: string;
 	/** Telegram Bot Token */
 	TG_TOKEN: SecretStoreSecretBinding;
-	/** Gmail 转发到 Telegram 的频道/群 chat id（环境变量） */
-	GMAIL_TELEGRAM_CHAT_ID?: string;
 	/** Google OAuth2 Client ID */
 	GMAIL_CLIENT_ID: string;
 	/** Google OAuth2 Client Secret */
@@ -32,8 +42,10 @@ export interface Env {
 	GMAIL_PUSH_SECRET: string;
 	/** 手动触发 watch 的共享密钥 */
 	GMAIL_WATCH_SECRET: string;
-	/** KV 命名空间 */
+	/** KV 命名空间（access_token 缓存、消息去重、OAuth state） */
 	EMAIL_KV: KVNamespace;
+	/** D1 数据库（多账号信息） */
+	DB: D1Database;
 	/** Queue 绑定 */
 	EMAIL_QUEUE: Queue<QueueMessage>;
 	/** Observability Hub Service Binding */
@@ -50,11 +62,13 @@ export interface Env {
 export type QueueMessage =
 	| {
 			type: 'sync';
+			accountId: number;
 			pubsubMessageId: string;
 			historyId: string;
 	  }
 	| {
 			type: 'message';
+			accountId: number;
 			messageId: string;
 	  };
 

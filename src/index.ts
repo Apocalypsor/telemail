@@ -1,6 +1,6 @@
 import app from './handlers/http';
 import { handleQueueBatch } from './handlers/queue';
-import { renewWatch } from './services/gmail';
+import { renewWatchAll } from './services/gmail';
 import { reportErrorToObservability } from './services/observability';
 import type { Env, QueueMessage } from './types';
 
@@ -20,7 +20,7 @@ export default {
 
 async function handleScheduledRenewWatch(env: Env): Promise<void> {
 	try {
-		await renewWatch(env);
+		await renewWatchAll(env);
 	} catch (error: unknown) {
 		await reportErrorToObservability(env, 'scheduled.watch_renew_failed', error, {
 			schedule: '0 0 */6 * *',
