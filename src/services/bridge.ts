@@ -114,6 +114,7 @@ async function processGmailMessage(token: string, messageId: string, env: Env, w
 				}
 			} catch (err) {
 				console.error('AI 摘要生成失败:', err);
+				throw err;
 			}
 		})(),
 	);
