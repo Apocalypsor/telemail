@@ -1,10 +1,10 @@
 import PostalMime from 'postal-mime';
 import { KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
+import { getAccountByEmail, getAccountById } from '../db/accounts';
+import { getHistoryId, putHistoryId } from '../db/kv';
 import { formatBody } from '../lib/format';
 import { escapeMdV2 } from '../lib/markdown-v2';
 import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
-import { getAccountByEmail, getAccountById } from '../db/accounts';
-import { getHistoryId, putHistoryId } from '../db/kv';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
 import { summarizeEmail } from './ollama';
 import { getTelegramToken } from './secrets';
@@ -104,7 +104,8 @@ async function processGmailMessage(
 	const email = await parser.parse(rawEmail);
 
 	const subject = email.subject || '无主题';
-	const header = buildTelegramHeader(email.from?.name || '', email.from?.address || '未知', subject);
+	const recipient = account.email || `Account #${account.id}`;
+	const header = buildTelegramHeader(email.from?.name || '', email.from?.address || '未知', recipient, subject);
 	const hasAttachments = !!(email.attachments && email.attachments.length > 0);
 	const charLimit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 
@@ -156,10 +157,11 @@ async function processGmailMessage(
 	);
 }
 
-function buildTelegramHeader(fromName: string, fromAddress: string, subject: string): string {
+function buildTelegramHeader(fromName: string, fromAddress: string, recipient: string, subject: string): string {
 	const date = new Date().toLocaleString(MESSAGE_DATE_LOCALE, { timeZone: MESSAGE_DATE_TIMEZONE });
 	return [
 		`*发件人:*  ${escapeMdV2(`${fromName} <${fromAddress}>`)}`,
+		`*收件人:*  ${escapeMdV2(recipient)}`,
 		`*时  间:*  ${escapeMdV2(date)}`,
 		`*主  题:*  ${escapeMdV2(subject)}`,
 		``,
