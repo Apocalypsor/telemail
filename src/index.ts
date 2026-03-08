@@ -9,8 +9,8 @@ export type { Env } from './types';
 export default {
 	fetch: app.fetch,
 
-	async queue(batch: MessageBatch<QueueMessage>, env: Env): Promise<void> {
-		await handleQueueBatch(batch, env);
+	async queue(batch: MessageBatch<QueueMessage>, env: Env, ctx: ExecutionContext): Promise<void> {
+		await handleQueueBatch(batch, env, ctx);
 	},
 
 	async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {

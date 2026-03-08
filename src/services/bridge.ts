@@ -42,7 +42,7 @@ export async function processSyncNotification(sync: Extract<QueueMessage, { type
 }
 
 /** 串行消费消息 + 幂等防重 */
-export async function processMessageNotification(messageId: string, env: Env): Promise<void> {
+export async function processMessageNotification(messageId: string, env: Env, waitUntil: (p: Promise<unknown>) => void): Promise<void> {
 	const dedupeKey = `${KV_PROCESSED_PREFIX}${messageId}`;
 	const processed = await env.EMAIL_KV.get(dedupeKey);
 	if (processed) {
@@ -51,7 +51,7 @@ export async function processMessageNotification(messageId: string, env: Env): P
 	}
 
 	const token = await getAccessToken(env);
-	await processGmailMessage(token, messageId, env);
+	await processGmailMessage(token, messageId, env, waitUntil);
 
 	await env.EMAIL_KV.put(dedupeKey, '1', {
 		expirationTtl: PROCESSED_TTL_SECONDS,
@@ -59,7 +59,7 @@ export async function processMessageNotification(messageId: string, env: Env): P
 }
 
 /** 获取单封 Gmail 邮件（raw 格式），解析并发送到 Telegram */
-async function processGmailMessage(token: string, messageId: string, env: Env): Promise<void> {
+async function processGmailMessage(token: string, messageId: string, env: Env, waitUntil: (p: Promise<unknown>) => void): Promise<void> {
 	const { token: tgToken, chatId } = await getTelegramSecrets(env);
 
 	const msg = await gmailGet(token, `/users/me/messages/${messageId}?format=raw`);
@@ -94,23 +94,28 @@ async function processGmailMessage(token: string, messageId: string, env: Env): 
 	const rawBody = email.text || '';
 	if (!rawBody.trim()) return;
 
-	try {
-		const model = env.OLLAMA_MODEL || 'qwen3.5:latest';
-		const summary = await summarizeEmail(ollamaUrl, model, subject, rawBody);
+	// 用 waitUntil 异步执行，不阻塞队列 ack
+	waitUntil(
+		(async () => {
+			try {
+				const model = env.OLLAMA_MODEL || 'qwen3.5:latest';
+				const summary = await summarizeEmail(ollamaUrl, model, subject, rawBody);
 
-		const summaryBody = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${escapeMdV2(summary)}`;
-		const finalText = header + summaryBody;
-		const limit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
-		const capped = finalText.length <= limit ? finalText : finalText.slice(0, limit);
+				const summaryBody = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${escapeMdV2(summary)}`;
+				const finalText = header + summaryBody;
+				const limit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
+				const capped = finalText.length <= limit ? finalText : finalText.slice(0, limit);
 
-		if (hasAttachments) {
-			await editMessageCaption(tgToken, chatId, sentMessageId, capped);
-		} else {
-			await editTextMessage(tgToken, chatId, sentMessageId, capped);
-		}
-	} catch (err) {
-		console.error('AI 摘要生成失败:', err);
-	}
+				if (hasAttachments) {
+					await editMessageCaption(tgToken, chatId, sentMessageId, capped);
+				} else {
+					await editTextMessage(tgToken, chatId, sentMessageId, capped);
+				}
+			} catch (err) {
+				console.error('AI 摘要生成失败:', err);
+			}
+		})(),
+	);
 }
 
 function buildTelegramHeader(fromName: string, fromAddress: string, subject: string): string {
