@@ -4,10 +4,11 @@ import {
 	ROUTE_OAUTH_GOOGLE,
 	ROUTE_OAUTH_GOOGLE_CALLBACK,
 	ROUTE_OAUTH_GOOGLE_START,
+	ROUTE_PREVIEW,
 } from '../constants';
 import { enqueueSyncNotification } from '../services/bridge';
 import { renewWatch } from '../services/gmail';
-import { handleHomeLogin, renderDashboard, renderHomePage } from '../services/home';
+import { handleHomeLogin, handlePreviewConvert, renderDashboard, renderHomePage, renderPreviewPage } from '../services/home';
 import { handleGoogleOAuthCallback, renderGoogleOAuthPage, startGoogleOAuth } from '../services/oauth';
 import { reportErrorToObservability } from '../services/observability';
 import type { Env, PubSubPushBody } from '../types';
@@ -42,6 +43,11 @@ export async function handleHttpRequest(request: Request, env: Env): Promise<Res
 
 		if (request.method === 'GET' && url.pathname === ROUTE_OAUTH_GOOGLE_CALLBACK) {
 			return await handleGoogleOAuthCallback(request, env);
+		}
+
+		if (url.pathname === ROUTE_PREVIEW) {
+			if (request.method === 'GET') return renderPreviewPage();
+			if (request.method === 'POST') return await handlePreviewConvert(request);
 		}
 
 		if (url.pathname === '/') {

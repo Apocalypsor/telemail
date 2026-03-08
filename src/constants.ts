@@ -3,6 +3,7 @@ export const ROUTE_GMAIL_WATCH = '/gmail/watch';
 export const ROUTE_OAUTH_GOOGLE = '/oauth/google';
 export const ROUTE_OAUTH_GOOGLE_START = '/oauth/google/start';
 export const ROUTE_OAUTH_GOOGLE_CALLBACK = '/oauth/google/callback';
+export const ROUTE_PREVIEW = '/preview';
 
 export const GOOGLE_OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
