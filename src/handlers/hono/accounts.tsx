@@ -16,27 +16,27 @@ import {
 
 const accounts = new Hono<{ Bindings: Env }>();
 
-accounts.post(ROUTE_ACCOUNTS, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+accounts.post(ROUTE_ACCOUNTS, requireSecret('ADMIN_SECRET'), async (c) => {
 	const form = await c.req.formData();
 	const chatId = form.get('chat_id');
 	const label = form.get('label');
 
 	if (typeof chatId !== 'string' || !chatId.trim()) {
 		const allAccounts = await getAllAccounts(c.env.DB);
-		return c.html(<DashboardPage secret={c.env.GMAIL_WATCH_SECRET} accounts={allAccounts} error="Chat ID 不能为空" />);
+		return c.html(<DashboardPage secret={c.env.ADMIN_SECRET} accounts={allAccounts} error="Chat ID 不能为空" />);
 	}
 
 	try {
 		await createAccount(c.env.DB, chatId.trim(), typeof label === 'string' && label.trim() ? label.trim() : undefined);
 	} catch (err: any) {
 		const allAccounts = await getAllAccounts(c.env.DB);
-		return c.html(<DashboardPage secret={c.env.GMAIL_WATCH_SECRET} accounts={allAccounts} error={err.message} />);
+		return c.html(<DashboardPage secret={c.env.ADMIN_SECRET} accounts={allAccounts} error={err.message} />);
 	}
 
-	return c.redirect(`/?secret=${encodeURIComponent(c.env.GMAIL_WATCH_SECRET)}`);
+	return c.redirect(`/?secret=${encodeURIComponent(c.env.ADMIN_SECRET)}`);
 });
 
-accounts.post(ROUTE_ACCOUNTS_EDIT, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+accounts.post(ROUTE_ACCOUNTS_EDIT, requireSecret('ADMIN_SECRET'), async (c) => {
 	const id = parseInt(c.req.param('id'), 10);
 	const form = await c.req.formData();
 	const chatId = form.get('chat_id');
@@ -50,10 +50,10 @@ accounts.post(ROUTE_ACCOUNTS_EDIT, requireSecret('GMAIL_WATCH_SECRET'), async (c
 	if (!account) return c.text('Account not found', 404);
 
 	await updateAccount(c.env.DB, id, chatId.trim(), typeof label === 'string' && label.trim() ? label.trim() : null);
-	return c.redirect(`/?secret=${encodeURIComponent(c.env.GMAIL_WATCH_SECRET)}`);
+	return c.redirect(`/?secret=${encodeURIComponent(c.env.ADMIN_SECRET)}`);
 });
 
-accounts.post(ROUTE_ACCOUNTS_DELETE, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+accounts.post(ROUTE_ACCOUNTS_DELETE, requireSecret('ADMIN_SECRET'), async (c) => {
 	const id = parseInt(c.req.param('id'), 10);
 	const account = await getAccountById(c.env.DB, id);
 	if (account?.refresh_token) {
@@ -67,18 +67,18 @@ accounts.post(ROUTE_ACCOUNTS_DELETE, requireSecret('GMAIL_WATCH_SECRET'), async 
 	return c.text('OK');
 });
 
-accounts.post(ROUTE_ACCOUNTS_CLEAR_CACHE, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+accounts.post(ROUTE_ACCOUNTS_CLEAR_CACHE, requireSecret('ADMIN_SECRET'), async (c) => {
 	const id = parseInt(c.req.param('id'), 10);
 	await clearAccountCache(c.env, id);
 	return c.text(`Cache cleared for account ${id}`);
 });
 
-accounts.post(ROUTE_CLEAR_ALL_KV, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+accounts.post(ROUTE_CLEAR_ALL_KV, requireSecret('ADMIN_SECRET'), async (c) => {
 	const deleted = await clearAllKV(c.env);
 	return c.text(`Deleted ${deleted} KV keys`);
 });
 
-accounts.post(ROUTE_ACCOUNTS_WATCH, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+accounts.post(ROUTE_ACCOUNTS_WATCH, requireSecret('ADMIN_SECRET'), async (c) => {
 	const id = parseInt(c.req.param('id'), 10);
 	const account = await getAccountById(c.env.DB, id);
 	if (!account) return c.text('Account not found', 404);

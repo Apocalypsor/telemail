@@ -68,7 +68,7 @@ mail.get(ROUTE_MAIL, async (c) => {
 	if (!mapping) return c.text('Message not found', 404);
 
 	// 验证 HMAC token
-	const valid = await verifyMailToken(c.env.GMAIL_WATCH_SECRET, gmailMessageId, mapping.tg_chat_id, token);
+	const valid = await verifyMailToken(c.env.ADMIN_SECRET, gmailMessageId, mapping.tg_chat_id, token);
 	if (!valid) return c.text('Forbidden', 403);
 
 	// 尝试从 KV 缓存读取

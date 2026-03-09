@@ -9,7 +9,7 @@ import { ROUTE_OAUTH_GOOGLE, ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_STA
 
 const oauth = new Hono<{ Bindings: Env }>();
 
-oauth.get(ROUTE_OAUTH_GOOGLE, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+oauth.get(ROUTE_OAUTH_GOOGLE, requireSecret('ADMIN_SECRET'), async (c) => {
 	const accountId = parseInt(c.req.query('account') || '0', 10);
 	const account = await getAccountById(c.env.DB, accountId);
 	if (!account) return c.text('Account not found', 404);
@@ -18,7 +18,7 @@ oauth.get(ROUTE_OAUTH_GOOGLE, requireSecret('GMAIL_WATCH_SECRET'), async (c) => 
 	return c.html(<OAuthSetupPage {...props} />);
 });
 
-oauth.get(ROUTE_OAUTH_GOOGLE_START, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+oauth.get(ROUTE_OAUTH_GOOGLE_START, requireSecret('ADMIN_SECRET'), async (c) => {
 	const accountId = parseInt(c.req.query('account') || '0', 10);
 	const account = await getAccountById(c.env.DB, accountId);
 	if (!account) return c.text('Account not found', 404);

@@ -32,7 +32,7 @@ export function registerStarHandler(bot: Bot, env: Env) {
 			await updateStarred(env.DB, chatId, msg.message_id, true);
 			let keyboard = STARRED_KEYBOARD;
 			if (env.WORKER_URL) {
-				const mailToken = await generateMailToken(env.GMAIL_WATCH_SECRET, mapping.gmail_message_id, chatId);
+				const mailToken = await generateMailToken(env.ADMIN_SECRET, mapping.gmail_message_id, chatId);
 				const mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${mapping.gmail_message_id}?t=${mailToken}`;
 				keyboard = starredKeyboardWithMailUrl(mailUrl);
 			}
@@ -68,7 +68,7 @@ export function registerStarHandler(bot: Bot, env: Env) {
 			await updateStarred(env.DB, chatId, msg.message_id, false);
 			let keyboard = STAR_KEYBOARD;
 			if (env.WORKER_URL) {
-				const mailToken = await generateMailToken(env.GMAIL_WATCH_SECRET, mapping.gmail_message_id, chatId);
+				const mailToken = await generateMailToken(env.ADMIN_SECRET, mapping.gmail_message_id, chatId);
 				const mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${mapping.gmail_message_id}?t=${mailToken}`;
 				keyboard = starKeyboardWithMailUrl(mailUrl);
 			}

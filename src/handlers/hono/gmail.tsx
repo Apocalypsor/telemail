@@ -14,7 +14,7 @@ gmail.post(ROUTE_GMAIL_PUSH, requireSecret('GMAIL_PUSH_SECRET'), async (c) => {
 	return c.text('OK');
 });
 
-gmail.post(ROUTE_GMAIL_WATCH, requireSecret('GMAIL_WATCH_SECRET'), async (c) => {
+gmail.post(ROUTE_GMAIL_WATCH, requireSecret('ADMIN_SECRET'), async (c) => {
 	try {
 		await renewWatchAll(c.env);
 		return c.text('Watch renewed for all accounts');

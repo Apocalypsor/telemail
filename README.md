@@ -144,7 +144,7 @@ npx wrangler secret put GMAIL_CLIENT_ID      # Google OAuth2 Client ID
 npx wrangler secret put GMAIL_CLIENT_SECRET  # Google OAuth2 Client Secret
 npx wrangler secret put GMAIL_PUBSUB_TOPIC   # 例如 projects/my-project/topics/gmail-push
 npx wrangler secret put GMAIL_PUSH_SECRET    # 自定义密钥，用于验证 Pub/Sub push
-npx wrangler secret put GMAIL_WATCH_SECRET   # 自定义密钥，用于保护管理页面和 watch 端点
+npx wrangler secret put ADMIN_SECRET   # 自定义密钥，用于保护管理页面和 watch 端点
 npx wrangler secret put TELEGRAM_WEBHOOK_SECRET  # 自定义密钥，用于验证 Telegram webhook
 ```
 
@@ -170,7 +170,7 @@ npx wrangler secret put LLM_MODEL      # 模型名称（例如 gpt-4o-mini）
 npx wrangler secret put WORKER_URL  # Worker 对外 URL，例如 https://gmail-tg-bridge.xxx.workers.dev
 ```
 
-链接使用 HMAC-SHA256（基于 `GMAIL_WATCH_SECRET` + `messageId` + `chatId`）签名，防止未授权遍历。HTML 内容缓存在 KV 中，7 天后自动过期。
+链接使用 HMAC-SHA256（基于 `ADMIN_SECRET` + `messageId` + `chatId`）签名，防止未授权遍历。HTML 内容缓存在 KV 中，7 天后自动过期。
 
 ### 7. 部署
 
@@ -279,7 +279,7 @@ wrangler.jsonc         # Cloudflare Worker 配置（D1 + KV + Queue + Cron）
 | `GMAIL_CLIENT_SECRET`     | Google OAuth2 Client Secret（所有账号共享） |
 | `GMAIL_PUBSUB_TOPIC`      | Pub/Sub topic 全名（所有账号共享）          |
 | `GMAIL_PUSH_SECRET`       | 自定义密钥，附加在 push URL 中用于验证      |
-| `GMAIL_WATCH_SECRET`      | 自定义密钥，用于保护管理页面和 watch 端点   |
+| `ADMIN_SECRET`            | 自定义密钥，用于保护管理页面和 watch 端点   |
 | `TELEGRAM_WEBHOOK_SECRET` | 自定义密钥，用于验证 Telegram webhook       |
 | `LLM_API_URL`             | OpenAI compatible API base URL（可选）      |
 | `LLM_API_KEY`             | LLM API key（可选）                         |

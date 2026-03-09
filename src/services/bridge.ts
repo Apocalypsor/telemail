@@ -177,7 +177,7 @@ async function processGmailMessage(
 	let keyboard: unknown = STAR_KEYBOARD;
 	let mailUrl: string | undefined;
 	if (env.WORKER_URL) {
-		const token = await generateMailToken(env.GMAIL_WATCH_SECRET, messageId, chatId);
+		const token = await generateMailToken(env.ADMIN_SECRET, messageId, chatId);
 		mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${messageId}?t=${token}`;
 		keyboard = starKeyboardWithMailUrl(mailUrl);
 	}

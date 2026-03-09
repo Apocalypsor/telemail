@@ -43,7 +43,7 @@ app.route('', mail);
 app.post('/', async (c) => {
 	const form = await c.req.formData();
 	const secret = form.get('secret');
-	if (typeof secret !== 'string' || secret !== c.env.GMAIL_WATCH_SECRET) {
+	if (typeof secret !== 'string' || secret !== c.env.ADMIN_SECRET) {
 		return c.html(<HomePage error="密钥错误，请重试" />, 403);
 	}
 	const allAccounts = await getAllAccounts(c.env.DB);
@@ -51,9 +51,9 @@ app.post('/', async (c) => {
 });
 
 app.get('/', async (c) => {
-	if (c.req.query('secret') === c.env.GMAIL_WATCH_SECRET) {
+	if (c.req.query('secret') === c.env.ADMIN_SECRET) {
 		const allAccounts = await getAllAccounts(c.env.DB);
-		return c.html(<DashboardPage secret={c.env.GMAIL_WATCH_SECRET} accounts={allAccounts} />);
+		return c.html(<DashboardPage secret={c.env.ADMIN_SECRET} accounts={allAccounts} />);
 	}
 	return c.html(<HomePage />);
 });
