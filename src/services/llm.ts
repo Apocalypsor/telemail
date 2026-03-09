@@ -1,4 +1,4 @@
-/** 使用 OpenAI compatible API 对邮件正文进行 AI 摘要 */
+/** 使用 OpenAI compatible API 对邮件正文进行 AI 摘要 & 标签生成 */
 
 const MAX_BODY_CHARS = 4000;
 
@@ -11,21 +11,14 @@ function stripLinks(text: string): string {
 	return out;
 }
 
-/** 调用 OpenAI compatible /v1/chat/completions 接口，返回摘要文本 */
-export async function summarizeEmail(baseUrl: string, apiKey: string, model: string, subject: string, rawBody: string): Promise<string> {
+/** 预处理邮件正文：去链接 + 截断 */
+function prepareBody(rawBody: string): string {
 	const stripped = stripLinks(rawBody);
-	const body = stripped.length > MAX_BODY_CHARS ? stripped.slice(0, MAX_BODY_CHARS) + '...' : stripped;
-	const prompt =
-		`Extract the key points of the following email in at most 5 concise sentences, using the SAME LANGUAGE as the email.\n` +
-		`Rules:\n` +
-		`- Do not use "the user" as subject, no lead-ins like "the email says" or "you received"\n` +
-		`- State directly what happened, what the key data is, and what action is needed\n` +
-		`- If the email contains a verification code, OTP, or activation code, you MUST include the exact code prominently\n` +
-		`- You may use Markdown formatting: **bold**, _italic_, \`code\` for codes/numbers, bullet lists\n` +
-		`- Output only the summary, no prefix or explanation\n\n` +
-		`Subject: ${subject}\n\n` +
-		`Body:\n${body}`;
+	return stripped.length > MAX_BODY_CHARS ? stripped.slice(0, MAX_BODY_CHARS) + '...' : stripped;
+}
 
+/** 调用 OpenAI compatible /v1/chat/completions 接口 */
+async function callLLM(baseUrl: string, apiKey: string, model: string, prompt: string): Promise<string> {
 	const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
 	const resp = await fetch(url, {
 		method: 'POST',
@@ -48,10 +41,26 @@ export async function summarizeEmail(baseUrl: string, apiKey: string, model: str
 	return data.choices[0].message.content.trim();
 }
 
+/** 调用 LLM 生成邮件摘要 */
+export async function summarizeEmail(baseUrl: string, apiKey: string, model: string, subject: string, rawBody: string): Promise<string> {
+	const body = prepareBody(rawBody);
+	const prompt =
+		`Extract the key points of the following email in at most 5 concise sentences, using the SAME LANGUAGE as the email.\n` +
+		`Rules:\n` +
+		`- Do not use "the user" as subject, no lead-ins like "the email says" or "you received"\n` +
+		`- State directly what happened, what the key data is, and what action is needed\n` +
+		`- If the email contains a verification code, OTP, or activation code, you MUST include the exact code prominently\n` +
+		`- You may use Markdown formatting: **bold**, _italic_, \`code\` for codes/numbers, bullet lists\n` +
+		`- Output only the summary, no prefix or explanation\n\n` +
+		`Subject: ${subject}\n\n` +
+		`Body:\n${body}`;
+
+	return callLLM(baseUrl, apiKey, model, prompt);
+}
+
 /** 调用 LLM 为邮件生成 3-5 个标签 */
 export async function generateTags(baseUrl: string, apiKey: string, model: string, subject: string, rawBody: string): Promise<string[]> {
-	const stripped = stripLinks(rawBody);
-	const body = stripped.length > MAX_BODY_CHARS ? stripped.slice(0, MAX_BODY_CHARS) + '...' : stripped;
+	const body = prepareBody(rawBody);
 	const prompt =
 		`Generate 3 to 5 short tags (keywords) for the following email. ` +
 		`Rules:\n` +
@@ -62,26 +71,7 @@ export async function generateTags(baseUrl: string, apiKey: string, model: strin
 		`Subject: ${subject}\n\n` +
 		`Body:\n${body}`;
 
-	const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
-	const resp = await fetch(url, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${apiKey}`,
-		},
-		body: JSON.stringify({
-			model,
-			messages: [{ role: 'user', content: prompt }],
-			stream: false,
-		}),
-	});
-
-	if (!resp.ok) {
-		throw new Error(`LLM API ${resp.status}: ${await resp.text()}`);
-	}
-
-	const data = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
-	const raw = data.choices[0].message.content.trim();
+	const raw = await callLLM(baseUrl, apiKey, model, prompt);
 	return raw
 		.split('\n')
 		.map((t) => t.replace(/^[-•*\d.)\s#]+/, '').trim())

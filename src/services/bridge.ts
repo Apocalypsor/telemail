@@ -173,10 +173,14 @@ async function processGmailMessage(
 			try {
 				const [summary, tags] = await Promise.all([
 					summarizeEmail(llmUrl, llmKey, llmModel, subject, plainBody),
-					generateTags(llmUrl, llmKey, llmModel, subject, plainBody),
+					generateTags(llmUrl, llmKey, llmModel, subject, plainBody).catch((err) => {
+						console.error('标签生成失败:', err);
+						return [] as string[];
+					}),
 				]);
 
-				const tagsLine = tags.length > 0 ? `\n\n${tags.map((t) => escapeMdV2(`#${t.replace(/\s+/g, '_')}`)).join('  ')}` : '';
+				const tagsLine =
+					tags.length > 0 ? `\n\n${tags.map((t) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
 				const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(summary)}\n\n${escapeMdV2('✉️ 邮件正文')}\n\n`;
 				const limit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 				// 先在原始正文上截断，再包裹引用块
