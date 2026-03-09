@@ -30,6 +30,8 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 		await reportErrorToObservability(env, 'bot.handler_error', err.error);
 	});
 
+	bot.command('start', (ctx) => ctx.reply('功能尚未实现，请前往 https://gmail-tg-bridge.apocalypse.workers.dev/ 管理邮箱。'));
+
 	registerReactionHandler(bot, env);
 	registerStarHandler(bot, env);
 
