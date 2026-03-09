@@ -6,7 +6,6 @@ import { formatBody, toTelegramMdV2 } from '../lib/format';
 import { escapeMdV2, findLongestValidMdV2Prefix } from '../lib/markdown-v2';
 import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
-import { getTelegramToken } from '../db/secrets';
 import { summarizeEmail } from './llm';
 import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
@@ -125,7 +124,7 @@ async function processGmailMessage(
 	env: Env,
 	waitUntil: (p: Promise<unknown>) => void,
 ): Promise<void> {
-	const tgToken = await getTelegramToken(env);
+	const tgToken = env.TELEGRAM_TOKEN;
 	const chatId = account.chat_id;
 
 	const msg = await gmailGet(token, `/users/me/messages/${messageId}?format=raw`);

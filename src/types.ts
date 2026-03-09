@@ -1,7 +1,3 @@
-export interface SecretStoreSecretBinding {
-	get(): Promise<string>;
-}
-
 export interface ObservabilityErrorPayload {
 	source: string;
 	event: string;
@@ -29,8 +25,8 @@ export interface Account {
 export interface Env {
 	/** Worker 名称（用于日志/告警） */
 	WORKER_NAME: string;
-	/** Telegram Bot Token */
-	TG_TOKEN: SecretStoreSecretBinding;
+	/** Telegram Bot Token（环境变量 / wrangler secret） */
+	TELEGRAM_TOKEN: string;
 	/** Google OAuth2 Client ID */
 	GMAIL_CLIENT_ID: string;
 	/** Google OAuth2 Client Secret */

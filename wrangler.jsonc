@@ -42,17 +42,6 @@
 		},
 	],
 	/**
-	 * Secrets Store 绑定（账号级机密）
-	 * - TG_TOKEN  -> TELEGRAM_TOKEN
-	 */
-	"secrets_store_secrets": [
-		{
-			"binding": "TG_TOKEN",
-			"store_id": "2450ac7560a346fda9b2538762a5eb07",
-			"secret_name": "TELEGRAM_TOKEN",
-		},
-	],
-	/**
 	 * Service Binding — 统一错误上报到 Observability Hub
 	 */
 	"services": [
