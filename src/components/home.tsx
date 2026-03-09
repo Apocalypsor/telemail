@@ -4,9 +4,9 @@ import { BackLink, Card, Layout } from './layout';
 
 export function HomePage({ error }: { error?: string }) {
 	return (
-		<Layout title="Gmail → Telegram Bridge">
+		<Layout title="Telemail">
 			<Card class="max-w-md">
-				<h1 class="text-2xl font-bold text-slate-100 mb-3">Gmail → Telegram Bridge</h1>
+				<h1 class="text-2xl font-bold text-slate-100 mb-3">Telemail</h1>
 				<p class="text-sm text-slate-400">请输入密钥以继续</p>
 				{error && <p class="text-sm text-red-400 mt-3">{error}</p>}
 				<form method="post" action="/" class="mt-4 space-y-3">
@@ -133,7 +133,7 @@ export function DashboardPage({ secret, accounts, error }: { secret: string; acc
 	const esc = (s: string) => encodeURIComponent(s);
 
 	return (
-		<Layout title="Dashboard — Gmail → Telegram Bridge">
+		<Layout title="Dashboard — Telemail">
 			<Card class="max-w-4xl">
 				<h1 class="text-2xl font-bold text-slate-100 mb-1">Dashboard</h1>
 				<p class="text-sm text-slate-400 mb-4">管理 Gmail 账号和 Telegram 转发</p>
@@ -312,7 +312,7 @@ document.getElementById('convert-btn').addEventListener('click', async function 
 
 export function PreviewPage({ secret }: { secret: string }) {
 	return (
-		<Layout title="HTML Preview — Gmail → Telegram Bridge">
+		<Layout title="HTML Preview — Telemail">
 			<Card class="max-w-5xl">
 				<h1 class="text-2xl font-bold text-slate-100 mb-3">HTML → Telegram 预览</h1>
 				<p class="text-sm text-slate-400">粘贴邮件 HTML，查看处理后发送到 Telegram 的 MarkdownV2 结果</p>

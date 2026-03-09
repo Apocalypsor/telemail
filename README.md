@@ -1,4 +1,4 @@
-# gmail-tg-bridge
+# Telemail
 
 一个 Cloudflare Worker，通过 **Gmail API + Google Cloud Pub/Sub** 推送通知监控 Gmail 收件箱，并将新邮件转发到 Telegram 聊天——支持**多账号**、附件和可选的 AI 摘要。
 
@@ -250,18 +250,18 @@ wrangler.jsonc         # Cloudflare Worker 配置（D1 + KV + Queue + Cron）
 
 ## 环境变量
 
-| Secret / 变量              | 说明                                        |
-| -------------------------- | ------------------------------------------- |
-| `TG_TOKEN`                 | Secret Store 绑定：`TELEGRAM_TOKEN`         |
-| `GMAIL_CLIENT_ID`          | Google OAuth2 Client ID（所有账号共享）     |
-| `GMAIL_CLIENT_SECRET`      | Google OAuth2 Client Secret（所有账号共享） |
-| `GMAIL_PUBSUB_TOPIC`       | Pub/Sub topic 全名（所有账号共享）          |
-| `GMAIL_PUSH_SECRET`        | 自定义密钥，附加在 push URL 中用于验证      |
-| `GMAIL_WATCH_SECRET`       | 自定义密钥，用于保护管理页面和 watch 端点   |
-| `TELEGRAM_WEBHOOK_SECRET`  | 自定义密钥，用于验证 Telegram webhook       |
-| `LLM_API_URL`              | OpenAI compatible API base URL（可选）      |
-| `LLM_API_KEY`              | LLM API key（可选）                         |
-| `LLM_MODEL`                | LLM 模型名称（可选）                        |
+| Secret / 变量             | 说明                                        |
+| ------------------------- | ------------------------------------------- |
+| `TG_TOKEN`                | Secret Store 绑定：`TELEGRAM_TOKEN`         |
+| `GMAIL_CLIENT_ID`         | Google OAuth2 Client ID（所有账号共享）     |
+| `GMAIL_CLIENT_SECRET`     | Google OAuth2 Client Secret（所有账号共享） |
+| `GMAIL_PUBSUB_TOPIC`      | Pub/Sub topic 全名（所有账号共享）          |
+| `GMAIL_PUSH_SECRET`       | 自定义密钥，附加在 push URL 中用于验证      |
+| `GMAIL_WATCH_SECRET`      | 自定义密钥，用于保护管理页面和 watch 端点   |
+| `TELEGRAM_WEBHOOK_SECRET` | 自定义密钥，用于验证 Telegram webhook       |
+| `LLM_API_URL`             | OpenAI compatible API base URL（可选）      |
+| `LLM_API_KEY`             | LLM API key（可选）                         |
+| `LLM_MODEL`               | LLM 模型名称（可选）                        |
 
 每个 Gmail 账号的 `refresh_token`、`chat_id`、`history_id` 存储在 D1 数据库的 `accounts` 表中，通过 Web Dashboard 管理。
 
