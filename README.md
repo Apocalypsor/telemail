@@ -10,6 +10,7 @@
 - **UI**: Tailwind CSS (CDN)
 - **邮件解析**: [postal-mime](https://github.com/nickytonline/postal-mime)
 - **格式化**: HTML → Markdown ([turndown](https://github.com/mixmark-io/turndown)) → Telegram MarkdownV2
+- **Telegram Bot**: [grammY](https://grammy.dev) (webhook 接收 + inline keyboard + reaction)
 - **AI 摘要**: OpenAI compatible API (可选)
 
 ## 工作原理
@@ -24,10 +25,12 @@
 8. 附件作为真实文件附在同一条 Telegram 消息中：
    - **1 个附件** → `sendDocument` + 标题
    - **多个附件** → `sendMediaGroup`，标题放在第一个文件上
-9. （可选）如果配置了 LLM API，会异步生成 AI 摘要并编辑原消息替换正文为摘要。
-10. 消息发送前会按 `messageId` 做幂等去重，避免重复投递到 Telegram。
-11. 处理失败时 Queue 自动重试（最多 3 次）；达到上限后消息丢弃。
-12. Cron Trigger 每 6 天自动为**所有已授权账号**续订 Gmail watch（watch 7 天后过期）。
+9. （可选）如果配置了 LLM API，会异步生成 AI 摘要和标签，编辑原消息替换正文为摘要。
+10. 每条消息附带 ⭐ **星标按钮**（inline keyboard），点击可在 Gmail 中加/取消星标。
+11. 在频道/群组中对消息添加 **emoji reaction** 可自动将对应 Gmail 邮件标记为已读。
+12. 消息发送前会按 `messageId` 做幂等去重，避免重复投递到 Telegram。
+13. 处理失败时 Queue 自动重试（最多 3 次）；达到上限后消息丢弃。
+14. Cron Trigger 每 6 天自动为**所有已授权账号**续订 Gmail watch（watch 7 天后过期）。
 
 正文会自动截断以适应 Telegram 的字符限制（纯文本消息 4096 字符，附件标题 1024 字符）。
 
@@ -141,6 +144,7 @@ npx wrangler secret put GMAIL_CLIENT_SECRET  # Google OAuth2 Client Secret
 npx wrangler secret put GMAIL_PUBSUB_TOPIC   # 例如 projects/my-project/topics/gmail-push
 npx wrangler secret put GMAIL_PUSH_SECRET    # 自定义密钥，用于验证 Pub/Sub push
 npx wrangler secret put GMAIL_WATCH_SECRET   # 自定义密钥，用于保护管理页面和 watch 端点
+npx wrangler secret put TELEGRAM_WEBHOOK_SECRET  # 自定义密钥，用于验证 Telegram webhook
 ```
 
 ### 5. AI 摘要（可选）
@@ -163,7 +167,26 @@ npx wrangler secret put LLM_MODEL      # 模型名称（例如 gpt-4o-mini）
 npm run deploy
 ```
 
-### 7. 添加 Gmail 账号
+### 7. 设置 Telegram Webhook
+
+部署完成后，设置 Telegram Bot 的 webhook 指向 Worker：
+
+```sh
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://YOUR_WORKER_DOMAIN/telegram/webhook?secret=YOUR_TELEGRAM_WEBHOOK_SECRET",
+    "allowed_updates": ["message", "callback_query", "message_reaction", "message_reaction_count"]
+  }'
+```
+
+- `message`：接收 `/start` 等 Bot 命令
+- `callback_query`：接收星标按钮点击
+- `message_reaction` / `message_reaction_count`：接收 emoji reaction（群组/频道）
+
+> **注意**：如果邮件转发到**频道**，Bot 需要被设为频道管理员才能接收 reaction 事件。
+
+### 8. 添加 Gmail 账号
 
 1. 打开 `https://YOUR_WORKER_DOMAIN/?secret=YOUR_WATCH_SECRET` 进入 Dashboard
 2. 在 "Add Account" 表单中填写 Gmail 地址和 Telegram Chat ID，点击"添加账号"
@@ -196,40 +219,49 @@ src/
     oauth.tsx          # OAuth 授权页、回调结果页、错误页
   assets/
     favicon.ts         # Base64 编码的 favicon
+  bot/
+    index.ts           # grammY Bot 创建 + botInfo KV 缓存
+    keyboards.ts       # Inline keyboard 定义（星标/已星标）
+    handlers/
+      reaction.ts      # Emoji reaction → Gmail 标记已读
+      star.ts          # 星标/取消星标 inline button callback
   db/
     accounts.ts        # D1 数据库 CRUD（accounts 表）
     kv.ts              # KV 辅助函数（access_token 缓存、去重、history_id）
+    message-map.ts     # Telegram ↔ Gmail 消息映射（星标状态）
     secrets.ts         # Secret Store 读取（TG_TOKEN）
   services/
-    bridge.ts          # Gmail→Telegram 业务流程编排（多账号 sync/message/AI 摘要）
-    gmail.ts           # Gmail OAuth2 + REST API + watch + history（按账号隔离）
+    bridge.ts          # Gmail→Telegram 业务流程编排（多账号 sync/message/AI 摘要/标签）
+    gmail.ts           # Gmail OAuth2 + REST API + watch + history + star/read
     home.ts            # 预览页业务逻辑（HTML→MarkdownV2 转换）
-    llm.ts             # OpenAI compatible API 调用（AI 摘要）
+    llm.ts             # OpenAI compatible API 调用（AI 摘要 + 标签生成）
     oauth.ts           # OAuth 流程逻辑（按账号的 token 交换、state 管理）
-    observability.ts   # 错误结构化日志 + Telegram 告警
-    telegram.ts        # Telegram 发送/编辑：text、attachments、caption
+    observability.ts   # 错误结构化日志 + Observability Hub
+    telegram.ts        # Telegram 发送/编辑：text、attachments、caption、reply_markup
   lib/
     format.ts          # 邮件正文格式化：HTML→Markdown→Telegram MarkdownV2
     markdown-v2.ts     # MarkdownV2 转义与最长合法前缀解析
 migrations/
   0001_create_accounts.sql  # D1 数据库迁移：创建 accounts 表
   0002_email_nullable.sql   # D1 数据库迁移：email 字段改为可空
+  0003_create_message_map.sql  # D1 数据库迁移：Telegram↔Gmail 消息映射表
 wrangler.jsonc         # Cloudflare Worker 配置（D1 + KV + Queue + Cron）
 ```
 
 ## 环境变量
 
-| Secret / 变量         | 说明                                        |
-| --------------------- | ------------------------------------------- |
-| `TG_TOKEN`            | Secret Store 绑定：`TELEGRAM_TOKEN`         |
-| `GMAIL_CLIENT_ID`     | Google OAuth2 Client ID（所有账号共享）     |
-| `GMAIL_CLIENT_SECRET` | Google OAuth2 Client Secret（所有账号共享） |
-| `GMAIL_PUBSUB_TOPIC`  | Pub/Sub topic 全名（所有账号共享）          |
-| `GMAIL_PUSH_SECRET`   | 自定义密钥，附加在 push URL 中用于验证      |
-| `GMAIL_WATCH_SECRET`  | 自定义密钥，用于保护管理页面和 watch 端点   |
-| `LLM_API_URL`         | OpenAI compatible API base URL（可选）      |
-| `LLM_API_KEY`         | LLM API key（可选）                         |
-| `LLM_MODEL`           | LLM 模型名称（可选）                        |
+| Secret / 变量              | 说明                                        |
+| -------------------------- | ------------------------------------------- |
+| `TG_TOKEN`                 | Secret Store 绑定：`TELEGRAM_TOKEN`         |
+| `GMAIL_CLIENT_ID`          | Google OAuth2 Client ID（所有账号共享）     |
+| `GMAIL_CLIENT_SECRET`      | Google OAuth2 Client Secret（所有账号共享） |
+| `GMAIL_PUBSUB_TOPIC`       | Pub/Sub topic 全名（所有账号共享）          |
+| `GMAIL_PUSH_SECRET`        | 自定义密钥，附加在 push URL 中用于验证      |
+| `GMAIL_WATCH_SECRET`       | 自定义密钥，用于保护管理页面和 watch 端点   |
+| `TELEGRAM_WEBHOOK_SECRET`  | 自定义密钥，用于验证 Telegram webhook       |
+| `LLM_API_URL`              | OpenAI compatible API base URL（可选）      |
+| `LLM_API_KEY`              | LLM API key（可选）                         |
+| `LLM_MODEL`                | LLM 模型名称（可选）                        |
 
 每个 Gmail 账号的 `refresh_token`、`chat_id`、`history_id` 存储在 D1 数据库的 `accounts` 表中，通过 Web Dashboard 管理。
 
@@ -245,6 +277,7 @@ wrangler.jsonc         # Cloudflare Worker 配置（D1 + KV + Queue + Cron）
 | POST | `/accounts/:id/delete?secret=XXX`           | 删除 Gmail 账号                |
 | POST | `/accounts/:id/watch?secret=XXX`            | 为指定账号续订 watch           |
 | POST | `/accounts/:id/clear-cache?secret=XXX`      | 清除指定账号的 KV 缓存         |
+| POST | `/telegram/webhook?secret=XXX`              | Telegram Bot webhook           |
 | POST | `/gmail/push?secret=XXX`                    | Pub/Sub push 回调              |
 | POST | `/gmail/watch?secret=XXX`                   | 为所有账号续订 watch           |
 | POST | `/clear-all-kv?secret=XXX`                  | 清除所有 KV 数据               |
