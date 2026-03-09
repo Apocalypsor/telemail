@@ -73,6 +73,29 @@ export async function gmailPost(token: string, path: string, body: Record<string
 	return resp.json();
 }
 
+// ─── Message actions ─────────────────────────────────────────────────────────
+
+/** 将邮件标记为已读（移除 UNREAD 标签） */
+export async function markAsRead(token: string, messageId: string): Promise<void> {
+	await gmailPost(token, `/users/me/messages/${messageId}/modify`, {
+		removeLabelIds: ['UNREAD'],
+	});
+}
+
+/** 给邮件加星标（添加 STARRED 标签） */
+export async function addStar(token: string, messageId: string): Promise<void> {
+	await gmailPost(token, `/users/me/messages/${messageId}/modify`, {
+		addLabelIds: ['STARRED'],
+	});
+}
+
+/** 移除邮件星标 */
+export async function removeStar(token: string, messageId: string): Promise<void> {
+	await gmailPost(token, `/users/me/messages/${messageId}/modify`, {
+		removeLabelIds: ['STARRED'],
+	});
+}
+
 // ─── Watch ───────────────────────────────────────────────────────────────────
 
 /** 停止单个账号的 Gmail push 通知 (watch) */

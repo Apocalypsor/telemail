@@ -193,6 +193,20 @@ export async function editMessageCaption(token: string, chatId: string, messageI
 	}
 }
 
+/** 设置/更新消息的 inline keyboard */
+export async function setReplyMarkup(token: string, chatId: string, messageId: number, replyMarkup: unknown): Promise<void> {
+	const url = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
+	const resp = await fetch(url, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: replyMarkup }),
+	});
+	if (!resp.ok) {
+		const err = (await resp.json()) as any;
+		console.error(`TG editMessageReplyMarkup failed: ${err?.description}`);
+	}
+}
+
 async function sendMediaGroupChunk(token: string, chatId: string, caption: string, attachments: Attachment[]): Promise<number> {
 	const form = new FormData();
 	form.append('chat_id', chatId);

@@ -6,6 +6,7 @@ import {
 	ROUTE_OAUTH_GOOGLE_CALLBACK,
 	ROUTE_OAUTH_GOOGLE_START,
 	ROUTE_PREVIEW,
+	ROUTE_TELEGRAM_WEBHOOK,
 } from '../constants';
 import { DashboardPage, HomePage, PreviewPage } from '../components/home';
 import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../components/oauth';
@@ -13,6 +14,7 @@ import { enqueueSyncNotification } from '../services/bridge';
 import { createAccount, deleteAccount, getAllAccounts, getAccountById, updateAccount } from '../db/accounts';
 import { clearAccountCache, clearAllKV, deleteHistoryId } from '../db/kv';
 import { renewWatch, renewWatchAll, stopWatch } from '../services/gmail';
+import { createBot } from '../bot';
 import { convertPreview } from '../services/home';
 import { getOAuthPageProps, processOAuthCallback, startGoogleOAuth } from '../services/oauth';
 import { reportErrorToObservability } from '../services/observability';
@@ -49,6 +51,20 @@ app.onError(async (error, c) => {
 		pathname: new URL(c.req.url).pathname,
 	});
 	return c.text('Internal Server Error', 500);
+});
+
+// ─── Telegram Webhook (grammY) ───────────────────────────────────────────────
+app.post(ROUTE_TELEGRAM_WEBHOOK, async (c) => {
+	// 验证 webhook secret（URL 中的 secret query 参数）
+	const secret = c.env.TELEGRAM_WEBHOOK_SECRET;
+	if (secret && c.req.query('secret') !== secret) {
+		return c.text('Forbidden', 403);
+	}
+
+	const bot = createBot(c.env);
+	const update = await c.req.json();
+	await bot.handleUpdate(update);
+	return c.text('OK');
 });
 
 // ─── Gmail Pub/Sub push ─────────────────────────────────────────────────────

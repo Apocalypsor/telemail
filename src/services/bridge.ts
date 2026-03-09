@@ -2,13 +2,15 @@ import PostalMime from 'postal-mime';
 import { KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
 import { getAccountByEmail, getAccountById } from '../db/accounts';
 import { getHistoryId, putHistoryId } from '../db/kv';
+import { getMessageMapping, putMessageMapping } from '../db/message-map';
 import { formatBody, toTelegramMdV2 } from '../lib/format';
 import { escapeMdV2, findLongestValidMdV2Prefix } from '../lib/markdown-v2';
 import { extractVerificationCode } from '../lib/verification';
 import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
 import { generateTags, summarizeEmail } from './llm';
-import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
+import { STAR_KEYBOARD, STARRED_KEYBOARD } from '../bot';
+import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
 /** 解析 Pub/Sub 通知，根据 emailAddress 查找账号并入队 */
 export async function enqueueSyncNotification(body: PubSubPushBody, env: Env): Promise<void> {
@@ -161,6 +163,17 @@ async function processGmailMessage(
 		sentMessageId = await sendTextMessage(tgToken, chatId, text);
 	}
 
+	// 保存 Telegram ↔ Gmail 消息映射（用于 reaction 已读/星标）
+	await putMessageMapping(env.DB, {
+		tg_message_id: sentMessageId,
+		tg_chat_id: chatId,
+		gmail_message_id: messageId,
+		account_id: account.id,
+	});
+
+	// 添加星标按钮
+	await setReplyMarkup(tgToken, chatId, sentMessageId, STAR_KEYBOARD);
+
 	if (!shouldSummarize) return;
 
 	// 发送后调用 LLM 生成摘要，仅处理文字正文
@@ -203,6 +216,10 @@ async function processGmailMessage(
 				} else {
 					await editTextMessage(tgToken, chatId, sentMessageId, capped);
 				}
+				// 摘要编辑后根据实际星标状态恢复按钮（editMessage 不保留 reply_markup）
+				const mapping = await getMessageMapping(env.DB, chatId, sentMessageId);
+				const keyboard = mapping?.starred ? STARRED_KEYBOARD : STAR_KEYBOARD;
+				await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard);
 			} catch (err) {
 				console.error('AI 摘要生成失败:', err);
 				throw err;
