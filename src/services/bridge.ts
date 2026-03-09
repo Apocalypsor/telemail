@@ -7,7 +7,7 @@ import { escapeMdV2, findLongestValidMdV2Prefix } from '../lib/markdown-v2';
 import { extractVerificationCode } from '../lib/verification';
 import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
-import { summarizeEmail } from './llm';
+import { generateTags, summarizeEmail } from './llm';
 import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
 /** 解析 Pub/Sub 通知，根据 emailAddress 查找账号并入队 */
@@ -171,20 +171,28 @@ async function processGmailMessage(
 	waitUntil(
 		(async () => {
 			try {
-				const summary = await summarizeEmail(llmUrl, llmKey, llmModel, subject, plainBody);
+				const [summary, tags] = await Promise.all([
+					summarizeEmail(llmUrl, llmKey, llmModel, subject, plainBody),
+					generateTags(llmUrl, llmKey, llmModel, subject, plainBody),
+				]);
 
+				const tagsLine = tags.length > 0 ? `\n\n${tags.map((t) => escapeMdV2(`#${t.replace(/\s+/g, '_')}`)).join('  ')}` : '';
 				const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(summary)}\n\n${escapeMdV2('✉️ 邮件正文')}\n\n`;
 				const limit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 				// 先在原始正文上截断，再包裹引用块
 				const prefix = header + summarySection;
 				const truncatedHint = `\n\n${toTelegramMdV2('*… 正文过长，已截断 …*')}`;
-				const quoteBudget = Math.floor((limit - prefix.length - truncatedHint.length) * 0.9);
+				const quoteBudget = Math.floor((limit - prefix.length - truncatedHint.length - tagsLine.length) * 0.9);
 				let cappedBody = formattedBody;
-				if (prefix.length + formattedBody.length > limit) {
+				if (prefix.length + formattedBody.length + tagsLine.length > limit) {
 					const validEnd = findLongestValidMdV2Prefix(formattedBody.slice(0, quoteBudget));
 					cappedBody = formattedBody.slice(0, validEnd);
 				}
-				const capped = prefix + wrapExpandableQuote(cappedBody) + (cappedBody.length < formattedBody.length ? truncatedHint : '');
+				const capped =
+					prefix +
+					wrapExpandableQuote(cappedBody) +
+					(cappedBody.length < formattedBody.length ? truncatedHint : '') +
+					tagsLine;
 
 				if (hasAttachments) {
 					await editMessageCaption(tgToken, chatId, sentMessageId, capped);

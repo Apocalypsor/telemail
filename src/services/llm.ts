@@ -47,3 +47,44 @@ export async function summarizeEmail(baseUrl: string, apiKey: string, model: str
 	const data = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
 	return data.choices[0].message.content.trim();
 }
+
+/** 调用 LLM 为邮件生成 3-5 个标签 */
+export async function generateTags(baseUrl: string, apiKey: string, model: string, subject: string, rawBody: string): Promise<string[]> {
+	const stripped = stripLinks(rawBody);
+	const body = stripped.length > MAX_BODY_CHARS ? stripped.slice(0, MAX_BODY_CHARS) + '...' : stripped;
+	const prompt =
+		`Generate 3 to 5 short tags (keywords) for the following email. ` +
+		`Rules:\n` +
+		`- Use the SAME LANGUAGE as the email for tags\n` +
+		`- Each tag should be 1-3 words, no "#" prefix\n` +
+		`- Tags should capture: sender/service name, email category (e.g. notification, newsletter, promotion, verification), and key topic\n` +
+		`- Output ONLY the tags, one per line, no numbering or extra text\n\n` +
+		`Subject: ${subject}\n\n` +
+		`Body:\n${body}`;
+
+	const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+	const resp = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${apiKey}`,
+		},
+		body: JSON.stringify({
+			model,
+			messages: [{ role: 'user', content: prompt }],
+			stream: false,
+		}),
+	});
+
+	if (!resp.ok) {
+		throw new Error(`LLM API ${resp.status}: ${await resp.text()}`);
+	}
+
+	const data = (await resp.json()) as { choices: Array<{ message: { content: string } }> };
+	const raw = data.choices[0].message.content.trim();
+	return raw
+		.split('\n')
+		.map((t) => t.replace(/^[-•*\d.)\s#]+/, '').trim())
+		.filter((t) => t.length > 0)
+		.slice(0, 5);
+}
