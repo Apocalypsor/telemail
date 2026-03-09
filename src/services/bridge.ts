@@ -1,17 +1,25 @@
 import PostalMime from 'postal-mime';
+import { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from '../bot';
 import { KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
 import { getAccountByEmail, getAccountById } from '../db/accounts';
 import { getHistoryId, putHistoryId } from '../db/kv';
 import { getMessageMapping, putMessageMapping } from '../db/message-map';
-import { formatBody, toTelegramMdV2 } from '../utils/format';
-import { escapeMdV2, findLongestValidMdV2Prefix } from '../utils/markdown-v2';
 import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
+import { formatBody, toTelegramMdV2 } from '../utils/format';
+import { generateMailToken } from '../utils/hash';
+import { escapeMdV2 } from '../utils/markdown-v2';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
 import { extractVerificationCode, generateTags, summarizeEmail } from './llm';
-import { STAR_KEYBOARD, STARRED_KEYBOARD, starKeyboardWithMailUrl, starredKeyboardWithMailUrl } from '../bot';
-import { generateMailToken } from '../utils/hash';
 import { reportErrorToObservability } from './observability';
-import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
+import {
+	editMessageCaption,
+	editTextMessage,
+	sendTextMessage,
+	sendWithAttachments,
+	setReplyMarkup,
+	TG_CAPTION_LIMIT,
+	TG_MSG_LIMIT,
+} from './telegram';
 
 /** 解析 Pub/Sub 通知，根据 emailAddress 查找账号并入队 */
 export async function enqueueSyncNotification(body: PubSubPushBody, env: Env): Promise<void> {
@@ -197,14 +205,18 @@ async function processGmailMessage(
 
 				const mapping = await getMessageMapping(env.DB, chatId, sentMessageId);
 				const editKeyboard = mapping?.starred
-					? (mailUrl ? starredKeyboardWithMailUrl(mailUrl) : STARRED_KEYBOARD)
-					: (mailUrl ? starKeyboardWithMailUrl(mailUrl) : STAR_KEYBOARD);
+					? mailUrl
+						? starredKeyboardWithMailUrl(mailUrl)
+						: STARRED_KEYBOARD
+					: mailUrl
+						? starKeyboardWithMailUrl(mailUrl)
+						: STAR_KEYBOARD;
 
 				if (verifyCode) {
 					// 找到验证码 → 编辑消息加上验证码，不做摘要
 					const codeSection = `*🔒 验证码:*  \`${escapeMdV2(verifyCode)}\`\n\n`;
 					const capped = header + codeSection + wrapExpandableQuote(formattedBody);
-					if (hasAttachments) {
+					if (hasSingleAttachment) {
 						await editMessageCaption(tgToken, chatId, sentMessageId, capped, editKeyboard);
 					} else {
 						await editTextMessage(tgToken, chatId, sentMessageId, capped, editKeyboard);
@@ -222,8 +234,7 @@ async function processGmailMessage(
 					}),
 				]);
 
-				const tagsLine =
-					tags.length > 0 ? `\n\n${tags.map((t) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
+				const tagsLine = tags.length > 0 ? `\n\n${tags.map((t) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
 				const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(summary)}`;
 				const capped = header + summarySection + tagsLine;
 

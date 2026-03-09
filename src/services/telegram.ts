@@ -148,9 +148,9 @@ function attToBlob(att: Attachment): Blob {
 const TG_MEDIA_GROUP_LIMIT = 10;
 
 /**
- * 发送消息 + 附件合并在一条 Telegram 消息中，返回第一条消息的 message_id。
- * - 1 个附件: sendDocument + caption
- * - 多个附件: sendMediaGroup，caption 放第一个文件上
+ * 发送消息 + 附件，返回文字消息的 message_id。
+ * - 1 个附件: sendDocument + caption + reply_markup
+ * - 多个附件: 先发文字消息（带 reply_markup），再发媒体组作为回复
  * - 超过 10 个附件: 分批发送，每批最多 10 个
  */
 export async function sendWithAttachments(token: string, chatId: string, caption: string, attachments: Attachment[], replyMarkup?: unknown): Promise<number> {
