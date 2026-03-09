@@ -11,3 +11,4 @@ export const ROUTE_ACCOUNTS_DELETE = '/accounts/:id/delete';
 export const ROUTE_ACCOUNTS_CLEAR_CACHE = '/accounts/:id/clear-cache';
 export const ROUTE_ACCOUNTS_WATCH = '/accounts/:id/watch';
 export const ROUTE_CLEAR_ALL_KV = '/clear-all-kv';
+export const ROUTE_MAIL = '/mail/:id';

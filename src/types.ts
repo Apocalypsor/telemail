@@ -53,6 +53,8 @@ export interface Env {
 	LLM_MODEL?: string;
 	/** Telegram Webhook Secret（校验 webhook 来源） */
 	TELEGRAM_WEBHOOK_SECRET: string;
+	/** Worker 对外访问 URL，例如 https://gmail-tg-bridge.xxx.workers.dev（用于生成邮件查看链接） */
+	WORKER_URL?: string;
 }
 
 /** 队列消息体 */

@@ -9,7 +9,8 @@ import { extractVerificationCode } from '../utils/verification';
 import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
 import { generateTags, summarizeEmail } from './llm';
-import { STAR_KEYBOARD, STARRED_KEYBOARD } from '../bot';
+import { STAR_KEYBOARD, STARRED_KEYBOARD, starKeyboardWithMailUrl, starredKeyboardWithMailUrl } from '../bot';
+import { generateMailToken } from '../utils/hash';
 import { reportErrorToObservability } from './observability';
 import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
@@ -172,8 +173,15 @@ async function processGmailMessage(
 		account_id: account.id,
 	});
 
-	// 添加星标按钮
-	await setReplyMarkup(tgToken, chatId, sentMessageId, STAR_KEYBOARD);
+	// 生成查看原文链接并添加按钮
+	let keyboard: unknown = STAR_KEYBOARD;
+	let mailUrl: string | undefined;
+	if (env.WORKER_URL) {
+		const token = await generateMailToken(env.GMAIL_WATCH_SECRET, messageId, chatId);
+		mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${messageId}?t=${token}`;
+		keyboard = starKeyboardWithMailUrl(mailUrl);
+	}
+	await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard);
 
 	if (!shouldSummarize) return;
 
@@ -214,11 +222,13 @@ async function processGmailMessage(
 
 				// 查询当前星标状态，在 edit 时一并传入 reply_markup（避免按钮闪烁）
 				const mapping = await getMessageMapping(env.DB, chatId, sentMessageId);
-				const keyboard = mapping?.starred ? STARRED_KEYBOARD : STAR_KEYBOARD;
+				const editKeyboard = mapping?.starred
+					? (mailUrl ? starredKeyboardWithMailUrl(mailUrl) : STARRED_KEYBOARD)
+					: (mailUrl ? starKeyboardWithMailUrl(mailUrl) : STAR_KEYBOARD);
 				if (hasAttachments) {
-					await editMessageCaption(tgToken, chatId, sentMessageId, capped, keyboard);
+					await editMessageCaption(tgToken, chatId, sentMessageId, capped, editKeyboard);
 				} else {
-					await editTextMessage(tgToken, chatId, sentMessageId, capped, keyboard);
+					await editTextMessage(tgToken, chatId, sentMessageId, capped, editKeyboard);
 				}
 			} catch (err) {
 				await reportErrorToObservability(env, 'llm.summary_failed', err, { subject });

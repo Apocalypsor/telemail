@@ -6,6 +6,7 @@ import { reportErrorToObservability } from '../../services/observability';
 import type { Env } from '../../types';
 import accounts from './accounts';
 import gmail from './gmail';
+import mail from './mail';
 import oauth from './oauth';
 import preview from './preview';
 import telegram from './telegram';
@@ -36,6 +37,7 @@ app.route('', gmail);
 app.route('', accounts);
 app.route('', oauth);
 app.route('', preview);
+app.route('', mail);
 
 // ─── Home / Dashboard ───────────────────────────────────────────────────────
 app.post('/', async (c) => {
