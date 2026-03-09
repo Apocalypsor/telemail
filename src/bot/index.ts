@@ -1,12 +1,12 @@
 import { Bot } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import { BOT_INFO_TTL, KV_BOT_INFO_KEY } from '../constants';
-import type { Env } from '../types';
 import { reportErrorToObservability } from '../services/observability';
+import type { Env } from '../types';
 import { registerReactionHandler } from './handlers/reaction';
 import { registerStarHandler } from './handlers/star';
 
-export { STAR_KEYBOARD, STARRED_KEYBOARD, starKeyboardWithMailUrl, starredKeyboardWithMailUrl } from './keyboards';
+export { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from './keyboards';
 
 /** 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存 */
 export async function getBotInfo(env: Env): Promise<UserFromGetMe> {
@@ -28,7 +28,10 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 		await reportErrorToObservability(env, 'bot.handler_error', err.error);
 	});
 
-	bot.command('start', (ctx) => ctx.reply('功能尚未实现，请前往 https://gmail-tg-bridge.apocalypse.workers.dev/ 管理邮箱。'));
+	bot.command('start', (ctx) => {
+		const url = env.WORKER_URL?.replace(/\/$/, '') || '';
+		return ctx.reply(`欢迎使用 Telemail！请前往 ${url} 管理邮箱`);
+	});
 
 	registerReactionHandler(bot, env);
 	registerStarHandler(bot, env);
