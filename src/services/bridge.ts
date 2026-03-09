@@ -1,6 +1,6 @@
 import PostalMime from 'postal-mime';
 import { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from '../bot';
-import { KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
+import { DIRECT_PROCESS_THRESHOLD, KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
 import { getAccountByEmail, getAccountById } from '../db/accounts';
 import { getHistoryId, putHistoryId } from '../db/kv';
 import { getMessageMapping, putMessageMapping } from '../db/message-map';
@@ -40,9 +40,6 @@ export async function enqueueSyncNotification(body: PubSubPushBody, env: Env): P
 		historyId: decoded.historyId,
 	});
 }
-
-/** 少量邮件直接处理的阈值 */
-const DIRECT_PROCESS_THRESHOLD = 3;
 
 /** 按账号处理 Gmail history 同步，少量邮件直接处理，大批量才入队 */
 export async function processSyncNotification(

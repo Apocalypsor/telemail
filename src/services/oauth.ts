@@ -1,13 +1,9 @@
-import { GOOGLE_OAUTH_TOKEN_URL, KV_OAUTH_STATE_PREFIX } from '../constants';
+import { GMAIL_MODIFY_SCOPE, GOOGLE_OAUTH_AUTHORIZE_URL, GOOGLE_OAUTH_TOKEN_URL, KV_OAUTH_STATE_PREFIX, OAUTH_STATE_TTL_SECONDS } from '../constants';
 import { ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '../handlers/hono/routes';
 import type { Env } from '../types';
 import { getAccountById, updateAccountEmail, updateRefreshToken } from '../db/accounts';
 import { putCachedAccessToken } from '../db/kv';
 import { renewWatch } from './gmail';
-
-const GOOGLE_OAUTH_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GMAIL_MODIFY_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
-const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 
 export type GoogleTokenResponse = {
 	access_token?: string;

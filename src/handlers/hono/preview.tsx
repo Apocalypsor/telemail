@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { MAX_BODY_CHARS } from '../../constants';
 import { PreviewPage } from '../../components/home';
 import { formatBody } from '../../utils/format';
 import type { AppEnv } from '../../types';
@@ -14,7 +15,7 @@ preview.get(ROUTE_PREVIEW, requireSession(), (c) => {
 preview.post(ROUTE_PREVIEW_API, requireSession(), async (c) => {
 	const { html } = await c.req.json<{ html?: string }>();
 	if (!html) return c.json({ result: '', length: 0 });
-	const result = formatBody(undefined, html, 4000);
+	const result = formatBody(undefined, html, MAX_BODY_CHARS);
 	return c.json({ result, length: result.length });
 });
 

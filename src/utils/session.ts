@@ -1,5 +1,4 @@
-const SESSION_COOKIE = 'tg_session';
-const SESSION_TTL = 7 * 24 * 3600; // 7 days
+import { SESSION_COOKIE, SESSION_TTL } from '../constants';
 
 interface SessionPayload {
 	/** Telegram user ID */

@@ -1,9 +1,7 @@
+import { TG_CAPTION_LIMIT, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '../constants';
 import type { Attachment } from '../types';
 
-/** Telegram sendMessage 字符上限 */
-export const TG_MSG_LIMIT = 4096;
-/** Telegram caption 字符上限 (sendDocument / sendMediaGroup) */
-export const TG_CAPTION_LIMIT = 1024;
+export { TG_CAPTION_LIMIT, TG_MSG_LIMIT };
 
 function isEntityParseError(description: string | undefined): boolean {
 	return !!description && /can't parse entities/i.test(description);
@@ -143,9 +141,6 @@ function attToBlob(att: Attachment): Blob {
 		? new Blob([new TextEncoder().encode(att.content)], { type: mime })
 		: new Blob([att.content], { type: mime });
 }
-
-/** Telegram sendMediaGroup 最多 10 个文件 */
-const TG_MEDIA_GROUP_LIMIT = 10;
 
 /**
  * 发送消息 + 附件，返回文字消息的 message_id。

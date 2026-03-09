@@ -1,14 +1,12 @@
 import { Bot } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
+import { BOT_INFO_TTL, KV_BOT_INFO_KEY } from '../constants';
 import type { Env } from '../types';
 import { reportErrorToObservability } from '../services/observability';
 import { registerReactionHandler } from './handlers/reaction';
 import { registerStarHandler } from './handlers/star';
 
 export { STAR_KEYBOARD, STARRED_KEYBOARD, starKeyboardWithMailUrl, starredKeyboardWithMailUrl } from './keyboards';
-
-const KV_BOT_INFO_KEY = 'telegram:bot_info';
-const BOT_INFO_TTL = 86400 * 30; // 30 days
 
 /** 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存 */
 export async function getBotInfo(env: Env): Promise<UserFromGetMe> {

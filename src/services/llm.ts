@@ -1,14 +1,29 @@
 /** 使用 OpenAI compatible API 对邮件正文进行 AI 摘要 & 标签生成 */
 
-const MAX_BODY_CHARS = 4000;
+import { MAX_BODY_CHARS, MAX_LINKS } from '../constants';
 
-/** 从文本中提取链接（Markdown 格式 + 裸链接），返回 {label, url} 数组 */
+/** 去除裸 URL 尾部的标点，但保留平衡的括号 */
+function cleanTrailingPunctuation(url: string): string {
+	// 先去掉尾部非括号标点
+	let u = url.replace(/[.,;:!?>]+$/, '');
+	// 如果 ')' 没有对应的 '('，才移除尾部多余的 ')'
+	while (u.endsWith(')')) {
+		const opens = (u.match(/\(/g) || []).length;
+		const closes = (u.match(/\)/g) || []).length;
+		if (closes > opens) u = u.slice(0, -1);
+		else break;
+	}
+	return u;
+}
+
+/** 从文本中提取链接（Markdown 格式 + 裸链接），返回 {label, url} 数组，最多 MAX_LINKS 个 */
 export function extractLinks(text: string): { label: string; url: string }[] {
 	const links: { label: string; url: string }[] = [];
 	const seen = new Set<string>();
 
 	// Markdown [label](url)
 	for (const m of text.matchAll(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g)) {
+		if (links.length >= MAX_LINKS) break;
 		const url = m[2];
 		if (!seen.has(url)) {
 			seen.add(url);
@@ -16,9 +31,10 @@ export function extractLinks(text: string): { label: string; url: string }[] {
 		}
 	}
 
-	// 裸 URL（排除已在 Markdown 链接中的）
+	// 裸 URL（通过 seen Set 去重，不会重复 Markdown 链接中已有的）
 	for (const m of text.matchAll(/(?<!\()(https?:\/\/\S+)/g)) {
-		const url = m[1].replace(/[).,;:!?>]+$/, ''); // 去掉尾部标点
+		if (links.length >= MAX_LINKS) break;
+		const url = cleanTrailingPunctuation(m[1]);
 		if (!seen.has(url)) {
 			seen.add(url);
 			links.push({ label: url, url });
@@ -78,14 +94,15 @@ export async function summarizeEmail(
 ): Promise<string> {
 	const body = prepareBody(rawBody);
 
+	const safeLinks = links?.slice(0, MAX_LINKS);
 	const linksSection =
-		links && links.length > 0
-			? `\n\nLinks found in this email:\n${links.map((l, i) => `${i + 1}. [${l.label}](${l.url})`).join('\n')}\n`
+		safeLinks && safeLinks.length > 0
+			? `\n\nLinks found in this email:\n${safeLinks.map((l, i) => `${i + 1}. [${l.label.replace(/[\[\]]/g, '')}](${l.url})`).join('\n')}\n`
 			: '';
 
 	const linkRule =
-		links && links.length > 0
-			? `- If the email contains important actionable links (login, verification, activation, confirmation, password reset, unsubscribe, etc.), include them in the summary using Markdown link syntax [text](url). Only include genuinely actionable links, skip tracking/pixel/unsubscribe links\n`
+		safeLinks && safeLinks.length > 0
+			? `- If the email contains important actionable links (login, verification, activation, confirmation, password reset, etc.), include them in the summary using Markdown link syntax [text](url). Skip tracking/pixel/unsubscribe links\n`
 			: '';
 
 	const prompt =
