@@ -4,11 +4,11 @@ import { getCachedMailHtml, putCachedMailHtml } from '../../db/kv';
 import { getMessageMappingByGmailId } from '../../db/message-map';
 import { getAccessToken } from '../../services/gmail';
 import { fetchMailContent } from '../../services/mail-content';
-import type { Env } from '../../types';
+import type { AppEnv } from '../../types';
 import { verifyMailToken } from '../../utils/hash';
 import { ROUTE_MAIL } from './routes';
 
-const mail = new Hono<{ Bindings: Env }>();
+const mail = new Hono<AppEnv>();
 
 mail.get(ROUTE_MAIL, async (c) => {
 	const gmailMessageId = c.req.param('id');

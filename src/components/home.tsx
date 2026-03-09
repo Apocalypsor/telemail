@@ -1,6 +1,29 @@
 import { ROUTE_GMAIL_WATCH, ROUTE_OAUTH_GOOGLE } from '../handlers/hono/routes';
-import type { Account } from '../types';
+import type { Account, TelegramUser } from '../types';
 import { BackLink, Card, Layout } from './layout';
+
+function userDisplayName(u: TelegramUser): string {
+	let name = u.first_name;
+	if (u.last_name) name += ` ${u.last_name}`;
+	if (u.username) name += ` (@${u.username})`;
+	return name;
+}
+
+function UserSelect({ name, value, users, placeholder }: { name: string; value?: string | null; users: TelegramUser[]; placeholder: string }) {
+	return (
+		<select
+			name={name}
+			class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm outline-none focus:border-blue-500 transition-colors"
+		>
+			<option value="">{placeholder}</option>
+			{users.map((u) => (
+				<option value={u.telegram_id} selected={u.telegram_id === value}>
+					{userDisplayName(u)}
+				</option>
+			))}
+		</select>
+	);
+}
 
 export function HomePage({ botUsername, error }: { botUsername: string; error?: string }) {
 	return (
@@ -30,7 +53,8 @@ function showResult(text, ok) {
     : 'mt-3 p-3 rounded-lg text-sm bg-red-900/50 text-red-300';
 }
 
-document.getElementById('watch-all-btn').addEventListener('click', async function () {
+var watchAllBtn = document.getElementById('watch-all-btn');
+if (watchAllBtn) watchAllBtn.addEventListener('click', async function () {
   var btn = this;
   btn.disabled = true; btn.textContent = '请求中…';
   try {
@@ -40,7 +64,8 @@ document.getElementById('watch-all-btn').addEventListener('click', async functio
   finally { btn.disabled = false; btn.textContent = 'Renew All Watches'; }
 });
 
-document.getElementById('clear-all-kv-btn').addEventListener('click', async function () {
+var clearAllKvBtn = document.getElementById('clear-all-kv-btn');
+if (clearAllKvBtn) clearAllKvBtn.addEventListener('click', async function () {
   if (!confirm('确定要清空所有 KV 缓存吗？（access_token、history_id、消息去重、OAuth state 等全部删除）')) return;
   var btn = this;
   btn.disabled = true; btn.textContent = '清空中…';
@@ -116,7 +141,7 @@ function accountDisplayName(acc: Account): string {
 	return acc.label || `Account #${acc.id}`;
 }
 
-export function DashboardPage({ accounts, error }: { accounts: Account[]; error?: string }) {
+export function DashboardPage({ accounts, error, isAdmin, users = [] }: { accounts: Account[]; error?: string; isAdmin: boolean; users?: TelegramUser[] }) {
 	return (
 		<Layout title="Dashboard — Telemail">
 			<Card class="max-w-4xl">
@@ -145,6 +170,14 @@ export function DashboardPage({ accounts, error }: { accounts: Account[]; error?
 										<p class="text-sm text-slate-200 font-medium truncate">{accountDisplayName(acc)}</p>
 										<p class="text-xs text-slate-500">
 											Chat ID: {acc.chat_id}
+											{isAdmin && acc.telegram_user_id && (() => {
+												const owner = users.find((u) => u.telegram_id === acc.telegram_user_id);
+												return (
+													<span class="ml-2 text-slate-600">
+														Owner: {owner?.username ? `@${owner.username}` : owner?.first_name ?? acc.telegram_user_id}
+													</span>
+												);
+											})()}
 											{!acc.email && <span class="ml-2 text-amber-400">（待授权获取邮箱）</span>}
 										</p>
 									</div>
@@ -185,7 +218,7 @@ export function DashboardPage({ accounts, error }: { accounts: Account[]; error?
 									style="display:none"
 								>
 									<p class="text-xs text-slate-400">编辑 {accountDisplayName(acc)}</p>
-									<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+									<div class={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
 										<div>
 											<label class="block text-xs text-slate-400 mb-1">Telegram Chat ID *</label>
 											<input
@@ -203,6 +236,12 @@ export function DashboardPage({ accounts, error }: { accounts: Account[]; error?
 												class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-sm outline-none focus:border-blue-500 transition-colors"
 											/>
 										</div>
+										{isAdmin && (
+											<div>
+												<label class="block text-xs text-slate-400 mb-1">Owner</label>
+												<UserSelect name="telegram_user_id" value={acc.telegram_user_id} users={users} placeholder="留空取消绑定" />
+											</div>
+										)}
 									</div>
 									<div class="flex gap-2">
 										<button type="submit" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg transition-colors">
@@ -222,7 +261,7 @@ export function DashboardPage({ accounts, error }: { accounts: Account[]; error?
 				<h2 class="text-lg font-semibold text-slate-100 mt-5 mb-2">Add Account</h2>
 				<p class="text-xs text-slate-500 mb-2">添加后通过 OAuth 授权，邮箱地址将自动从 Gmail API 获取。</p>
 				<form method="post" action="/accounts" class="space-y-3">
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<div class={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
 						<div>
 							<label class="block text-xs text-slate-400 mb-1">Telegram Chat ID *</label>
 							<input
@@ -240,34 +279,44 @@ export function DashboardPage({ accounts, error }: { accounts: Account[]; error?
 								class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-sm outline-none focus:border-blue-500 transition-colors"
 							/>
 						</div>
+						{isAdmin && (
+							<div>
+								<label class="block text-xs text-slate-400 mb-1">Owner</label>
+								<UserSelect name="telegram_user_id" users={users} placeholder="留空则绑定自己" />
+							</div>
+						)}
 					</div>
 					<button type="submit" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors text-sm">
 						添加账号
 					</button>
 				</form>
 
-				{/* ── 全局操作 ─────────────────────────────────────────── */}
+				{/* ── 全局操作（管理员可见） ─────────────────────────── */}
 				<div class="border-t border-slate-700 mt-6 pt-4 flex flex-wrap gap-3">
-					<button
-						id="watch-all-btn"
-						type="button"
-						class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-lg transition-colors text-sm"
-					>
-						Renew All Watches
-					</button>
+					{isAdmin && (
+						<button
+							id="watch-all-btn"
+							type="button"
+							class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-lg transition-colors text-sm"
+						>
+							Renew All Watches
+						</button>
+					)}
 					<a
 						class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-lg text-center transition-colors text-sm"
 						href="/preview"
 					>
 						HTML → Telegram 预览
 					</a>
-					<button
-						id="clear-all-kv-btn"
-						type="button"
-						class="px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-semibold rounded-lg transition-colors text-sm"
-					>
-						清空全局 KV 缓存
-					</button>
+					{isAdmin && (
+						<button
+							id="clear-all-kv-btn"
+							type="button"
+							class="px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white font-semibold rounded-lg transition-colors text-sm"
+						>
+							清空全局 KV 缓存
+						</button>
+					)}
 				</div>
 
 				<div id="action-result" class="hidden" />

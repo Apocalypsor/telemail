@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { PreviewPage } from '../../components/home';
 import { formatBody } from '../../utils/format';
-import type { Env } from '../../types';
+import type { AppEnv } from '../../types';
 import { requireSession } from './middleware';
 import { ROUTE_PREVIEW } from './routes';
 
-const preview = new Hono<{ Bindings: Env }>();
+const preview = new Hono<AppEnv>();
 
 preview.get(ROUTE_PREVIEW, requireSession(), (c) => {
 	return c.html(<PreviewPage />);

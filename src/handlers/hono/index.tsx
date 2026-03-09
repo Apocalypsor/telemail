@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { FAVICON_BASE64 } from '../../assets/favicon';
 import { DashboardPage, HomePage } from '../../components/home';
-import { getAllAccounts } from '../../db/accounts';
+import { claimOrphanAccounts, getVisibleAccounts } from '../../db/accounts';
+import { getAllUsers, upsertUser } from '../../db/users';
 import { reportErrorToObservability } from '../../services/observability';
-import type { Env } from '../../types';
+import type { AppEnv } from '../../types';
 import { clearSessionCookieHeader, createSessionToken, getSessionTokenFromCookie, sessionCookieHeader, verifySessionToken } from '../../utils/session';
 import { parseTelegramLoginParams, verifyTelegramLogin } from '../../utils/telegram-login';
 import accounts from './accounts';
@@ -13,7 +14,7 @@ import oauth from './oauth';
 import preview from './preview';
 import telegram from './telegram';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppEnv>();
 
 // ─── Favicon ─────────────────────────────────────────────────────────────────
 const faviconBuf = Uint8Array.from(atob(FAVICON_BASE64), (c) => c.charCodeAt(0));
@@ -53,9 +54,8 @@ app.get('/auth/telegram', async (c) => {
 		return c.html(<HomePage botUsername={c.env.TELEGRAM_BOT_USERNAME} error="登录验证失败" />, 403);
 	}
 
-	if (String(data.id) !== c.env.ADMIN_TELEGRAM_ID) {
-		return c.html(<HomePage botUsername={c.env.TELEGRAM_BOT_USERNAME} error="您没有管理员权限" />, 403);
-	}
+	// 记录登录用户信息
+	await upsertUser(c.env.DB, String(data.id), data.first_name, data.last_name, data.username, data.photo_url);
 
 	const token = await createSessionToken(c.env.ADMIN_SECRET, data.id);
 	c.header('Set-Cookie', sessionCookieHeader(token));
@@ -74,8 +74,12 @@ app.get('/', async (c) => {
 	if (sessionToken) {
 		const uid = await verifySessionToken(c.env.ADMIN_SECRET, sessionToken);
 		if (uid) {
-			const allAccounts = await getAllAccounts(c.env.DB);
-			return c.html(<DashboardPage accounts={allAccounts} />);
+			const userId = String(uid);
+			const isAdmin = userId === c.env.ADMIN_TELEGRAM_ID;
+			if (isAdmin) await claimOrphanAccounts(c.env.DB, userId);
+			const visibleAccounts = await getVisibleAccounts(c.env.DB, userId, isAdmin);
+			const users = isAdmin ? await getAllUsers(c.env.DB) : [];
+			return c.html(<DashboardPage accounts={visibleAccounts} isAdmin={isAdmin} users={users} />);
 		}
 	}
 	return c.html(<HomePage botUsername={c.env.TELEGRAM_BOT_USERNAME} />);

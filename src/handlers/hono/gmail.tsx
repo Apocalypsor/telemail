@@ -2,11 +2,11 @@ import { Hono } from 'hono';
 import { enqueueSyncNotification } from '../../services/bridge';
 import { renewWatchAll } from '../../services/gmail';
 import { reportErrorToObservability } from '../../services/observability';
-import type { Env, PubSubPushBody } from '../../types';
-import { requireSecret, requireSession } from './middleware';
+import type { AppEnv, PubSubPushBody } from '../../types';
+import { requireAdmin, requireSecret, requireSession } from './middleware';
 import { ROUTE_GMAIL_PUSH, ROUTE_GMAIL_WATCH } from './routes';
 
-const gmail = new Hono<{ Bindings: Env }>();
+const gmail = new Hono<AppEnv>();
 
 gmail.post(ROUTE_GMAIL_PUSH, requireSecret('GMAIL_PUSH_SECRET'), async (c) => {
 	const body = await c.req.json<PubSubPushBody>();
@@ -14,7 +14,7 @@ gmail.post(ROUTE_GMAIL_PUSH, requireSecret('GMAIL_PUSH_SECRET'), async (c) => {
 	return c.text('OK');
 });
 
-gmail.post(ROUTE_GMAIL_WATCH, requireSession(), async (c) => {
+gmail.post(ROUTE_GMAIL_WATCH, requireSession(), requireAdmin(), async (c) => {
 	try {
 		await renewWatchAll(c.env);
 		return c.text('Watch renewed for all accounts');

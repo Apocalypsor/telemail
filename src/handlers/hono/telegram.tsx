@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { createBot, getBotInfo } from '../../bot';
-import type { Env } from '../../types';
+import type { AppEnv } from '../../types';
 import { ROUTE_TELEGRAM_WEBHOOK } from './routes';
 
-const telegram = new Hono<{ Bindings: Env }>();
+const telegram = new Hono<AppEnv>();
 
 telegram.post(ROUTE_TELEGRAM_WEBHOOK, async (c) => {
 	const secret = c.env.TELEGRAM_WEBHOOK_SECRET;

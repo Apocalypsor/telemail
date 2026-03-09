@@ -13,10 +13,32 @@ export async function getAccountByEmail(db: D1Database, email: string): Promise<
 	return db.prepare('SELECT * FROM accounts WHERE email = ?').bind(email).first<Account>();
 }
 
-export async function createAccount(db: D1Database, chatId: string, label?: string): Promise<Account> {
+/** 获取用户可见的账号：admin 看全部，普通用户看自己绑定的 */
+export async function getVisibleAccounts(db: D1Database, telegramUserId: string, isAdmin: boolean): Promise<Account[]> {
+	if (isAdmin) return getAllAccounts(db);
+	const { results } = await db.prepare('SELECT * FROM accounts WHERE telegram_user_id = ? ORDER BY id').bind(telegramUserId).all<Account>();
+	return results;
+}
+
+/** 检查用户是否有权访问指定账号，返回账号或 null */
+export async function getAuthorizedAccount(db: D1Database, id: number, userId: string, isAdmin: boolean): Promise<Account | null> {
+	const account = await getAccountById(db, id);
+	if (!account) return null;
+	if (isAdmin) return account;
+	if (account.telegram_user_id === userId) return account;
+	return null;
+}
+
+/** 将所有 telegram_user_id IS NULL 的账号分配给指定用户（用于迁移后自动认领） */
+export async function claimOrphanAccounts(db: D1Database, telegramUserId: string): Promise<number> {
+	const result = await db.prepare("UPDATE accounts SET telegram_user_id = ?, updated_at = datetime('now') WHERE telegram_user_id IS NULL").bind(telegramUserId).run();
+	return result.meta.changes ?? 0;
+}
+
+export async function createAccount(db: D1Database, chatId: string, label?: string, telegramUserId?: string): Promise<Account> {
 	const result = await db
-		.prepare('INSERT INTO accounts (chat_id, label) VALUES (?, ?) RETURNING *')
-		.bind(chatId, label ?? null)
+		.prepare('INSERT INTO accounts (chat_id, label, telegram_user_id) VALUES (?, ?, ?) RETURNING *')
+		.bind(chatId, label ?? null, telegramUserId ?? null)
 		.first<Account>();
 	if (!result) throw new Error('Failed to create account');
 	return result;
@@ -34,6 +56,13 @@ export async function updateAccountEmail(db: D1Database, id: number, email: stri
 	await db.prepare("UPDATE accounts SET email = ?, updated_at = datetime('now') WHERE id = ?").bind(email, id).run();
 }
 
-export async function updateAccount(db: D1Database, id: number, chatId: string, label: string | null): Promise<void> {
-	await db.prepare("UPDATE accounts SET chat_id = ?, label = ?, updated_at = datetime('now') WHERE id = ?").bind(chatId, label, id).run();
+export async function updateAccount(db: D1Database, id: number, chatId: string, label: string | null, telegramUserId?: string | null): Promise<void> {
+	if (telegramUserId !== undefined) {
+		await db
+			.prepare("UPDATE accounts SET chat_id = ?, label = ?, telegram_user_id = ?, updated_at = datetime('now') WHERE id = ?")
+			.bind(chatId, label, telegramUserId, id)
+			.run();
+	} else {
+		await db.prepare("UPDATE accounts SET chat_id = ?, label = ?, updated_at = datetime('now') WHERE id = ?").bind(chatId, label, id).run();
+	}
 }

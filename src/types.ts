@@ -18,9 +18,33 @@ export interface Account {
 	chat_id: string;
 	refresh_token: string | null;
 	label: string | null;
+	telegram_user_id: string | null;
 	created_at: string;
 	updated_at: string;
 }
+
+/** D1 users 表记录（登录过的 Telegram 用户） */
+export interface TelegramUser {
+	telegram_id: string;
+	first_name: string;
+	last_name: string | null;
+	username: string | null;
+	photo_url: string | null;
+	last_login_at: string;
+	created_at: string;
+}
+
+/** Hono context variables set by session middleware */
+export interface SessionVariables {
+	userId: string;
+	isAdmin: boolean;
+}
+
+/** Hono app type with session variables */
+export type AppEnv = {
+	Bindings: Env;
+	Variables: SessionVariables;
+};
 
 export interface Env {
 	/** Worker 名称（用于日志/告警） */
