@@ -104,7 +104,7 @@ npx wrangler d1 create gmail-tg-bridge
 然后执行数据库迁移：
 
 ```sh
-npx wrangler d1 migrations apply gmail-tg-bridge
+npx wrangler d1 migrations apply gmail-tg-bridge --remote
 ```
 
 ### 3b. 创建 KV 命名空间
@@ -291,27 +291,27 @@ wrangler.jsonc         # Cloudflare Worker 配置（D1 + KV + Queue + Cron）
 
 管理页面通过 **Telegram Login Widget** 登录，使用 session cookie 鉴权（标注 🔒 的路由）。
 
-| 方法 | 路径 | 鉴权 | 说明 |
-| ---- | ---- | ---- | ---- |
-| GET | `/` | - | 登录页（Telegram Login）/ Dashboard |
-| GET | `/auth/telegram` | - | Telegram Login 回调（验证+创建会话） |
-| GET | `/logout` | - | 登出（清除 session cookie） |
-| GET | `/favicon.png` | - | Favicon |
-| POST | `/accounts` | Session | 添加 Gmail 账号 |
-| POST | `/accounts/:id/edit` | Session | 编辑 Gmail 账号 |
-| POST | `/accounts/:id/delete` | Session | 删除 Gmail 账号 |
-| POST | `/accounts/:id/watch` | Session | 为指定账号续订 watch |
-| POST | `/accounts/:id/clear-cache` | Session | 清除指定账号的 KV 缓存 |
-| POST | `/telegram/webhook?secret=XXX` | Secret | Telegram Bot webhook |
-| POST | `/gmail/push?secret=XXX` | Secret | Pub/Sub push 回调 |
-| POST | `/gmail/watch` | Session | 为所有账号续订 watch |
-| POST | `/clear-all-kv` | Session | 清除所有 KV 数据 |
-| GET | `/preview` | Session | HTML→Telegram MarkdownV2 预览 |
-| POST | `/preview` | Session | 预览转换 API |
-| GET | `/mail/:id?t=HMAC_TOKEN` | HMAC | 查看邮件原文 HTML |
-| GET | `/oauth/google?account=ID` | Session | 指定账号的 OAuth 授权说明页 |
-| GET | `/oauth/google/start?account=ID` | Session | 发起指定账号的 Google OAuth |
-| GET | `/oauth/google/callback` | KV state | OAuth 回调 |
+| 方法 | 路径                             | 鉴权     | 说明                                 |
+| ---- | -------------------------------- | -------- | ------------------------------------ |
+| GET  | `/`                              | -        | 登录页（Telegram Login）/ Dashboard  |
+| GET  | `/auth/telegram`                 | -        | Telegram Login 回调（验证+创建会话） |
+| GET  | `/logout`                        | -        | 登出（清除 session cookie）          |
+| GET  | `/favicon.png`                   | -        | Favicon                              |
+| POST | `/accounts`                      | Session  | 添加 Gmail 账号                      |
+| POST | `/accounts/:id/edit`             | Session  | 编辑 Gmail 账号                      |
+| POST | `/accounts/:id/delete`           | Session  | 删除 Gmail 账号                      |
+| POST | `/accounts/:id/watch`            | Session  | 为指定账号续订 watch                 |
+| POST | `/accounts/:id/clear-cache`      | Session  | 清除指定账号的 KV 缓存               |
+| POST | `/telegram/webhook?secret=XXX`   | Secret   | Telegram Bot webhook                 |
+| POST | `/gmail/push?secret=XXX`         | Secret   | Pub/Sub push 回调                    |
+| POST | `/gmail/watch`                   | Session  | 为所有账号续订 watch                 |
+| POST | `/clear-all-kv`                  | Session  | 清除所有 KV 数据                     |
+| GET  | `/preview`                       | Session  | HTML→Telegram MarkdownV2 预览        |
+| POST | `/preview`                       | Session  | 预览转换 API                         |
+| GET  | `/mail/:id?t=HMAC_TOKEN`         | HMAC     | 查看邮件原文 HTML                    |
+| GET  | `/oauth/google?account=ID`       | Session  | 指定账号的 OAuth 授权说明页          |
+| GET  | `/oauth/google/start?account=ID` | Session  | 发起指定账号的 Google OAuth          |
+| GET  | `/oauth/google/callback`         | KV state | OAuth 回调                           |
 
 ## Telegram 消息格式
 

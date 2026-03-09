@@ -79,7 +79,7 @@ app.get('/', async (c) => {
 			if (isAdmin) await claimOrphanAccounts(c.env.DB, userId);
 			const visibleAccounts = await getVisibleAccounts(c.env.DB, userId, isAdmin);
 			const users = isAdmin ? await getAllUsers(c.env.DB) : [];
-			return c.html(<DashboardPage accounts={visibleAccounts} isAdmin={isAdmin} users={users} />);
+			return c.html(<DashboardPage accounts={visibleAccounts} isAdmin={isAdmin} users={users} userId={userId} />);
 		}
 	}
 	return c.html(<HomePage botUsername={c.env.TELEGRAM_BOT_USERNAME} />);

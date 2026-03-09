@@ -141,7 +141,7 @@ function accountDisplayName(acc: Account): string {
 	return acc.label || `Account #${acc.id}`;
 }
 
-export function DashboardPage({ accounts, error, isAdmin, users = [] }: { accounts: Account[]; error?: string; isAdmin: boolean; users?: TelegramUser[] }) {
+export function DashboardPage({ accounts, error, isAdmin, users = [], userId }: { accounts: Account[]; error?: string; isAdmin: boolean; users?: TelegramUser[]; userId: string }) {
 	return (
 		<Layout title="Dashboard — Telemail">
 			<Card class="max-w-4xl">
@@ -267,6 +267,7 @@ export function DashboardPage({ accounts, error, isAdmin, users = [] }: { accoun
 							<input
 								name="chat_id"
 								required
+								value={userId}
 								placeholder="-1001234567890"
 								class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-sm outline-none focus:border-blue-500 transition-colors"
 							/>

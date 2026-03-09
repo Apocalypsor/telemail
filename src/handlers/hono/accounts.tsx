@@ -26,7 +26,7 @@ accounts.post(ROUTE_ACCOUNTS, requireSession(), async (c) => {
 
 	if (typeof chatId !== 'string' || !chatId.trim()) {
 		const [visible, allUsers] = await Promise.all([getVisibleAccounts(c.env.DB, userId, isAdmin), isAdmin ? getAllUsers(c.env.DB) : []]);
-		return c.html(<DashboardPage accounts={visible} isAdmin={isAdmin} users={allUsers} error="Chat ID 不能为空" />);
+		return c.html(<DashboardPage accounts={visible} isAdmin={isAdmin} users={allUsers} userId={userId} error="Chat ID 不能为空" />);
 	}
 
 	// Admin 可指定 owner，普通用户自动绑定自己
@@ -42,7 +42,7 @@ accounts.post(ROUTE_ACCOUNTS, requireSession(), async (c) => {
 		await createAccount(c.env.DB, chatId.trim(), typeof label === 'string' && label.trim() ? label.trim() : undefined, ownerTelegramId);
 	} catch (err: any) {
 		const [visible, allUsers] = await Promise.all([getVisibleAccounts(c.env.DB, userId, isAdmin), isAdmin ? getAllUsers(c.env.DB) : []]);
-		return c.html(<DashboardPage accounts={visible} isAdmin={isAdmin} users={allUsers} error={err.message} />);
+		return c.html(<DashboardPage accounts={visible} isAdmin={isAdmin} users={allUsers} userId={userId} error={err.message} />);
 	}
 
 	return c.redirect('/');
