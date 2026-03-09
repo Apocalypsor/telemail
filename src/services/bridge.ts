@@ -8,7 +8,8 @@ import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } fr
 import { formatBody, toTelegramMdV2 } from '../utils/format';
 import { generateMailToken } from '../utils/hash';
 import { escapeMdV2 } from '../utils/markdown-v2';
-import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
+import { base64urlToArrayBuffer } from '../utils/base64url';
+import { fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
 import { extractVerificationCode, generateTags, summarizeEmail } from './llm';
 import { reportErrorToObservability } from './observability';
 import {
