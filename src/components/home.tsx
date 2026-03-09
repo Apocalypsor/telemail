@@ -31,6 +31,13 @@ export function HomePage({ botUsername, error }: { botUsername: string; error?: 
 			<Card class="max-w-md">
 				<h1 class="text-2xl font-bold text-slate-100 mb-3">Telemail</h1>
 				<p class="text-sm text-slate-400">请使用 Telegram 登录</p>
+				<p class="text-xs text-slate-500 mt-2">
+					登录前请先向{' '}
+					<a href={`https://t.me/${botUsername}`} target="_blank" class="text-blue-400 hover:underline">
+						@{botUsername}
+					</a>
+					{' '}发送 /start
+				</p>
 				{error && <p class="text-sm text-red-400 mt-3">{error}</p>}
 				<div
 					class="mt-4 flex justify-center"

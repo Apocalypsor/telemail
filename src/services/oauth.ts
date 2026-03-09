@@ -97,6 +97,9 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 	}
 
 	const accountId = parseInt(accountIdStr, 10);
+	if (isNaN(accountId) || accountId <= 0) {
+		return { ok: false, title: '参数无效', detail: 'Invalid account ID in state.', status: 400 };
+	}
 	const account = await getAccountById(env.DB, accountId);
 	let accountEmail = account?.email || 'unknown';
 
