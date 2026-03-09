@@ -49,7 +49,12 @@ function wrapPlainText(text: string): string {
 function decodeBase64Url(b64url: string): string {
 	let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
 	while (b64.length % 4) b64 += '=';
-	return atob(b64);
+	const bin = atob(b64);
+	const bytes = new Uint8Array(bin.length);
+	for (let i = 0; i < bin.length; i++) {
+		bytes[i] = bin.charCodeAt(i);
+	}
+	return new TextDecoder('utf-8').decode(bytes);
 }
 
 mail.get(ROUTE_MAIL, async (c) => {
