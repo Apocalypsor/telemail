@@ -173,7 +173,7 @@ async function processGmailMessage(
 			try {
 				const summary = await summarizeEmail(llmUrl, llmKey, llmModel, subject, plainBody);
 
-				const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${escapeMdV2(summary)}\n\n${escapeMdV2('✉️ 邮件正文')}\n\n`;
+				const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(summary)}\n\n${escapeMdV2('✉️ 邮件正文')}\n\n`;
 				const limit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 				// 先在原始正文上截断，再包裹引用块
 				const prefix = header + summarySection;
