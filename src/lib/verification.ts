@@ -17,6 +17,7 @@ const KEYWORDS = [
 	'confirmation code',
 	'security code',
 	'one[- ]?time (?:pass)?code',
+	'activation code',
 	'auth(?:entication)? code',
 	'login code',
 	'passcode',
@@ -26,7 +27,7 @@ const KEYWORDS = [
 
 // 关键词 + 分隔符（可选 is/为/是 + 可选 :/：/=）+ 验证码
 const SEP = `[\\s:：=]*(?:is|为|是)?[\\s:：=]+`;
-const CODE = `([A-Za-z0-9]{4,8})\\b`;
+const CODE = `([A-Za-z0-9][A-Za-z0-9\\-]{2,9}[A-Za-z0-9])\\b`;
 const PATTERN = new RegExp(`(?:${KEYWORDS.join('|')})${SEP}${CODE}`, 'i');
 
 export function extractVerificationCode(text: string): string | null {

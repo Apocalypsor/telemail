@@ -201,8 +201,11 @@ async function processGmailMessage(
 /** 将文本包裹为 Telegram 可展开引用块（expandable blockquote） */
 function wrapExpandableQuote(text: string): string {
 	if (!text) return '';
-	const lines = text.split('\n');
-	return lines.map((line, i) => (i === 0 ? `**>${line}` : `>${line}`)).join('\n') + '||';
+	// 去掉代码块围栏 ``` 和行首 >，防止与引用块语法冲突
+	const cleaned = text.replace(/^```[^\n]*$/gm, '');
+	const lines = cleaned.split('\n');
+	const escaped = lines.map((line) => (line.startsWith('>') ? `\\${line}` : line));
+	return escaped.map((line, i) => (i === 0 ? `**>${line}` : `>${line}`)).join('\n') + '||';
 }
 
 function buildTelegramHeader(fromName: string, fromAddress: string, recipient: string, subject: string): string {
