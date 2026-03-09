@@ -140,7 +140,9 @@ async function processGmailMessage(
 	const recipient = account.email || `Account #${account.id}`;
 	const header = buildTelegramHeader(email.from?.name || '', email.from?.address || '未知', recipient, subject);
 	const hasAttachments = !!(email.attachments && email.attachments.length > 0);
-	const charLimit = hasAttachments ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
+	const hasSingleAttachment = hasAttachments && email.attachments!.length === 1;
+	// 单附件用 sendDocument caption（1024 字符限制），其他用 sendMessage（4096 字符限制）
+	const charLimit = hasSingleAttachment ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 
 	const llmUrl = env.LLM_API_URL;
 	const llmKey = env.LLM_API_KEY;
@@ -152,12 +154,22 @@ async function processGmailMessage(
 	const formattedBody = formatBody(email.text, email.html, bodyBudget);
 	const text = header + wrapExpandableQuote(formattedBody);
 
+	// 生成查看原文链接并构建键盘
+	let keyboard: unknown = STAR_KEYBOARD;
+	let mailUrl: string | undefined;
+	if (env.WORKER_URL) {
+		const mailToken = await generateMailToken(env.ADMIN_SECRET, messageId, chatId);
+		mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${messageId}?t=${mailToken}`;
+		keyboard = starKeyboardWithMailUrl(mailUrl);
+	}
+
 	// 发送原始消息
 	let sentMessageId: number;
 	if (hasAttachments) {
-		sentMessageId = await sendWithAttachments(tgToken, chatId, text, email.attachments || []);
+		sentMessageId = await sendWithAttachments(tgToken, chatId, text, email.attachments || [], keyboard);
 	} else {
 		sentMessageId = await sendTextMessage(tgToken, chatId, text);
+		await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard);
 	}
 
 	// 保存 Telegram ↔ Gmail 消息映射（用于 reaction 已读/星标）
@@ -167,16 +179,6 @@ async function processGmailMessage(
 		gmail_message_id: messageId,
 		account_id: account.id,
 	});
-
-	// 生成查看原文链接并添加按钮
-	let keyboard: unknown = STAR_KEYBOARD;
-	let mailUrl: string | undefined;
-	if (env.WORKER_URL) {
-		const token = await generateMailToken(env.ADMIN_SECRET, messageId, chatId);
-		mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${messageId}?t=${token}`;
-		keyboard = starKeyboardWithMailUrl(mailUrl);
-	}
-	await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard);
 
 	if (!hasLlm) return;
 
@@ -225,7 +227,7 @@ async function processGmailMessage(
 				const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(summary)}`;
 				const capped = header + summarySection + tagsLine;
 
-				if (hasAttachments) {
+				if (hasSingleAttachment) {
 					await editMessageCaption(tgToken, chatId, sentMessageId, capped, editKeyboard);
 				} else {
 					await editTextMessage(tgToken, chatId, sentMessageId, capped, editKeyboard);

@@ -101,6 +101,42 @@ export async function editTextMessage(
 	}
 }
 
+/** 发送文字消息并附带 reply_markup，返回 message_id */
+async function sendTextMessageWithMarkup(token: string, chatId: string, text: string, replyMarkup?: unknown): Promise<number> {
+	const url = `https://api.telegram.org/bot${token}/sendMessage`;
+	const payload: Record<string, unknown> = { chat_id: chatId, text, parse_mode: 'MarkdownV2' };
+	if (replyMarkup) payload.reply_markup = replyMarkup;
+	const resp = await fetch(url, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload),
+	});
+	if (!resp.ok) {
+		const err = (await resp.json()) as unknown;
+		const errDescription = extractTelegramDescription(err);
+		if (isEntityParseError(errDescription)) {
+			console.warn('TG sendMessage parse_mode failed, retrying as plain text');
+			const plain = markdownV2ToPlainText(text);
+			const fallbackPayload: Record<string, unknown> = { chat_id: chatId, text: plain };
+			if (replyMarkup) fallbackPayload.reply_markup = replyMarkup;
+			const fallbackResp = await fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(fallbackPayload),
+			});
+			if (!fallbackResp.ok) {
+				const fallbackErr = (await fallbackResp.json()) as unknown;
+				throw new Error(`TG sendMessage fallback ${(fallbackResp).status}: ${extractTelegramDescription(fallbackErr)}`);
+			}
+			const fallbackData = (await fallbackResp.json()) as { result: { message_id: number } };
+			return fallbackData.result.message_id;
+		}
+		throw new Error(`TG sendMessage ${resp.status}: ${errDescription}`);
+	}
+	const data = (await resp.json()) as { result: { message_id: number } };
+	return data.result.message_id;
+}
+
 function attToBlob(att: Attachment): Blob {
 	const mime = att.mimeType || 'application/octet-stream';
 	return typeof att.content === 'string'
@@ -117,7 +153,7 @@ const TG_MEDIA_GROUP_LIMIT = 10;
  * - 多个附件: sendMediaGroup，caption 放第一个文件上
  * - 超过 10 个附件: 分批发送，每批最多 10 个
  */
-export async function sendWithAttachments(token: string, chatId: string, caption: string, attachments: Attachment[]): Promise<number> {
+export async function sendWithAttachments(token: string, chatId: string, caption: string, attachments: Attachment[], replyMarkup?: unknown): Promise<number> {
 	try {
 		if (attachments.length === 1) {
 			const att = attachments[0];
@@ -127,6 +163,7 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 			form.append('document', blob, att.filename || 'attachment');
 			form.append('caption', caption);
 			form.append('parse_mode', 'MarkdownV2');
+			if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup));
 
 			const url = `https://api.telegram.org/bot${token}/sendDocument`;
 			const resp = await fetch(url, { method: 'POST', body: form });
@@ -144,6 +181,7 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 					fallbackForm.append('chat_id', chatId);
 					fallbackForm.append('document', blob, att.filename || 'attachment');
 					fallbackForm.append('caption', markdownV2ToPlainText(caption));
+					if (replyMarkup) fallbackForm.append('reply_markup', JSON.stringify(replyMarkup));
 					const fallbackResp = await fetch(url, { method: 'POST', body: fallbackForm });
 					if (!fallbackResp.ok) {
 						const fallbackErr = (await fallbackResp.json()) as any;
@@ -157,19 +195,18 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 			const data = (await resp.json()) as { result: { message_id: number } };
 			return data.result.message_id;
 		} else {
-			// 分批发送，每批最多 10 个附件
+			// 多附件：先发文字消息（带键盘），再发媒体组作为回复（无 caption）
+			// 这样文字消息有完整 inline keyboard，附件也不会被 caption 拆开
+			const textMsgId = await sendTextMessageWithMarkup(token, chatId, caption, replyMarkup);
+
 			const chunks: Attachment[][] = [];
 			for (let i = 0; i < attachments.length; i += TG_MEDIA_GROUP_LIMIT) {
 				chunks.push(attachments.slice(i, i + TG_MEDIA_GROUP_LIMIT));
 			}
-
-			let firstMessageId = 0;
-			for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
-				const chunk = chunks[chunkIdx];
-				const msgId = await sendMediaGroupChunk(token, chatId, chunkIdx === 0 ? caption : '', chunk);
-				if (chunkIdx === 0) firstMessageId = msgId;
+			for (const chunk of chunks) {
+				await sendMediaGroupChunk(token, chatId, '', chunk, textMsgId);
 			}
-			return firstMessageId;
+			return textMsgId;
 		}
 	} catch (e: any) {
 		throw new Error(`发送附件消息异常: ${e.message}`);
@@ -227,9 +264,10 @@ export async function setReplyMarkup(token: string, chatId: string, messageId: n
 	}
 }
 
-async function sendMediaGroupChunk(token: string, chatId: string, caption: string, attachments: Attachment[]): Promise<number> {
+async function sendMediaGroupChunk(token: string, chatId: string, caption: string, attachments: Attachment[], replyToMessageId?: number): Promise<number> {
 	const form = new FormData();
 	form.append('chat_id', chatId);
+	if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));
 
 	const media = attachments.map((att, i) => {
 		const fieldName = `file${i}`;
