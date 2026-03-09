@@ -55,9 +55,8 @@ app.onError(async (error, c) => {
 
 // ─── Telegram Webhook (grammY) ───────────────────────────────────────────────
 app.post(ROUTE_TELEGRAM_WEBHOOK, async (c) => {
-	// 验证 webhook secret（URL 中的 secret query 参数）
 	const secret = c.env.TELEGRAM_WEBHOOK_SECRET;
-	if (secret && c.req.query('secret') !== secret) {
+	if (!secret || c.req.query('secret') !== secret) {
 		return c.text('Forbidden', 403);
 	}
 

@@ -65,12 +65,20 @@ export async function sendTextMessage(token: string, chatId: string, text: strin
 }
 
 /** 编辑已发送的文字消息 */
-export async function editTextMessage(token: string, chatId: string, messageId: number, text: string): Promise<void> {
+export async function editTextMessage(
+	token: string,
+	chatId: string,
+	messageId: number,
+	text: string,
+	replyMarkup?: unknown,
+): Promise<void> {
 	const url = `https://api.telegram.org/bot${token}/editMessageText`;
+	const payload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, text, parse_mode: 'MarkdownV2' };
+	if (replyMarkup) payload.reply_markup = replyMarkup;
 	const resp = await fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, parse_mode: 'MarkdownV2' }),
+		body: JSON.stringify(payload),
 	});
 	if (!resp.ok) {
 		const err = (await resp.json()) as unknown;
@@ -78,10 +86,12 @@ export async function editTextMessage(token: string, chatId: string, messageId: 
 		if (isEntityParseError(errDescription)) {
 			console.warn('TG editMessageText parse_mode failed, retrying as plain text');
 			const plain = markdownV2ToPlainText(text);
+			const fallbackPayload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, text: plain };
+			if (replyMarkup) fallbackPayload.reply_markup = replyMarkup;
 			const fallbackResp = await fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ chat_id: chatId, message_id: messageId, text: plain }),
+				body: JSON.stringify(fallbackPayload),
 			});
 			if (fallbackResp.ok) return;
 			const fallbackErr = (await fallbackResp.json()) as unknown;
@@ -167,12 +177,20 @@ export async function sendWithAttachments(token: string, chatId: string, caption
 }
 
 /** 编辑附件消息的 caption */
-export async function editMessageCaption(token: string, chatId: string, messageId: number, caption: string): Promise<void> {
+export async function editMessageCaption(
+	token: string,
+	chatId: string,
+	messageId: number,
+	caption: string,
+	replyMarkup?: unknown,
+): Promise<void> {
 	const url = `https://api.telegram.org/bot${token}/editMessageCaption`;
+	const payload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, caption, parse_mode: 'MarkdownV2' };
+	if (replyMarkup) payload.reply_markup = replyMarkup;
 	const resp = await fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ chat_id: chatId, message_id: messageId, caption, parse_mode: 'MarkdownV2' }),
+		body: JSON.stringify(payload),
 	});
 	if (!resp.ok) {
 		const err = (await resp.json()) as unknown;
@@ -180,10 +198,12 @@ export async function editMessageCaption(token: string, chatId: string, messageI
 		if (isEntityParseError(errDescription)) {
 			console.warn('TG editMessageCaption parse_mode failed, retrying as plain text');
 			const plain = markdownV2ToPlainText(caption);
+			const fallbackPayload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, caption: plain };
+			if (replyMarkup) fallbackPayload.reply_markup = replyMarkup;
 			const fallbackResp = await fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ chat_id: chatId, message_id: messageId, caption: plain }),
+				body: JSON.stringify(fallbackPayload),
 			});
 			if (fallbackResp.ok) return;
 			const fallbackErr = (await fallbackResp.json()) as unknown;

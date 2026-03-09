@@ -51,8 +51,8 @@ export interface Env {
 	LLM_API_KEY?: string;
 	/** LLM 模型名称 */
 	LLM_MODEL?: string;
-	/** Telegram Webhook Secret（校验 webhook 来源，可选） */
-	TELEGRAM_WEBHOOK_SECRET?: string;
+	/** Telegram Webhook Secret（校验 webhook 来源） */
+	TELEGRAM_WEBHOOK_SECRET: string;
 }
 
 /** 队列消息体 */

@@ -10,6 +10,7 @@ import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } fr
 import { base64urlToArrayBuffer, fetchNewMessageIds, getAccessToken, gmailGet } from './gmail';
 import { generateTags, summarizeEmail } from './llm';
 import { STAR_KEYBOARD, STARRED_KEYBOARD } from '../bot';
+import { reportErrorToObservability } from './observability';
 import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
 /** 解析 Pub/Sub 通知，根据 emailAddress 查找账号并入队 */
@@ -187,7 +188,7 @@ async function processGmailMessage(
 				const [summary, tags] = await Promise.all([
 					summarizeEmail(llmUrl, llmKey, llmModel, subject, plainBody),
 					generateTags(llmUrl, llmKey, llmModel, subject, plainBody).catch((err) => {
-						console.error('标签生成失败:', err);
+						reportErrorToObservability(env, 'llm.tags_failed', err, { subject });
 						return [] as string[];
 					}),
 				]);
@@ -211,18 +212,16 @@ async function processGmailMessage(
 					(cappedBody.length < formattedBody.length ? truncatedHint : '') +
 					tagsLine;
 
-				if (hasAttachments) {
-					await editMessageCaption(tgToken, chatId, sentMessageId, capped);
-				} else {
-					await editTextMessage(tgToken, chatId, sentMessageId, capped);
-				}
-				// 摘要编辑后根据实际星标状态恢复按钮（editMessage 不保留 reply_markup）
+				// 查询当前星标状态，在 edit 时一并传入 reply_markup（避免按钮闪烁）
 				const mapping = await getMessageMapping(env.DB, chatId, sentMessageId);
 				const keyboard = mapping?.starred ? STARRED_KEYBOARD : STAR_KEYBOARD;
-				await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard);
+				if (hasAttachments) {
+					await editMessageCaption(tgToken, chatId, sentMessageId, capped, keyboard);
+				} else {
+					await editTextMessage(tgToken, chatId, sentMessageId, capped, keyboard);
+				}
 			} catch (err) {
-				console.error('AI 摘要生成失败:', err);
-				throw err;
+				await reportErrorToObservability(env, 'llm.summary_failed', err, { subject });
 			}
 		})(),
 	);

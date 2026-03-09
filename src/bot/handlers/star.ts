@@ -2,6 +2,7 @@ import type { Bot } from 'grammy';
 import { getAccountById } from '../../db/accounts';
 import { getMessageMapping, updateStarred } from '../../db/message-map';
 import { addStar, getAccessToken, removeStar } from '../../services/gmail';
+import { reportErrorToObservability } from '../../services/observability';
 import { STAR_KEYBOARD, STARRED_KEYBOARD } from '../keyboards';
 import type { Env } from '../../types';
 
@@ -24,12 +25,17 @@ export function registerStarHandler(bot: Bot, env: Env) {
 			return;
 		}
 
-		const token = await getAccessToken(env, account);
-		await addStar(token, mapping.gmail_message_id);
-		await updateStarred(env.DB, chatId, msg.message_id, true);
-		await ctx.editMessageReplyMarkup({ reply_markup: STARRED_KEYBOARD });
-		await ctx.answerCallbackQuery({ text: '⭐ 已加星标' });
-		console.log(`Starred: gmail=${mapping.gmail_message_id}`);
+		try {
+			const token = await getAccessToken(env, account);
+			await addStar(token, mapping.gmail_message_id);
+			await updateStarred(env.DB, chatId, msg.message_id, true);
+			await ctx.editMessageReplyMarkup({ reply_markup: STARRED_KEYBOARD });
+			await ctx.answerCallbackQuery({ text: '⭐ 已加星标' });
+			console.log(`Starred: gmail=${mapping.gmail_message_id}`);
+		} catch (err) {
+			await reportErrorToObservability(env, 'bot.star_failed', err, { gmailMessageId: mapping.gmail_message_id });
+			await ctx.answerCallbackQuery({ text: '操作失败，请重试' });
+		}
 	});
 
 	bot.callbackQuery('unstar', async (ctx) => {
@@ -49,11 +55,16 @@ export function registerStarHandler(bot: Bot, env: Env) {
 			return;
 		}
 
-		const token = await getAccessToken(env, account);
-		await removeStar(token, mapping.gmail_message_id);
-		await updateStarred(env.DB, chatId, msg.message_id, false);
-		await ctx.editMessageReplyMarkup({ reply_markup: STAR_KEYBOARD });
-		await ctx.answerCallbackQuery({ text: '已取消星标' });
-		console.log(`Unstarred: gmail=${mapping.gmail_message_id}`);
+		try {
+			const token = await getAccessToken(env, account);
+			await removeStar(token, mapping.gmail_message_id);
+			await updateStarred(env.DB, chatId, msg.message_id, false);
+			await ctx.editMessageReplyMarkup({ reply_markup: STAR_KEYBOARD });
+			await ctx.answerCallbackQuery({ text: '已取消星标' });
+			console.log(`Unstarred: gmail=${mapping.gmail_message_id}`);
+		} catch (err) {
+			await reportErrorToObservability(env, 'bot.unstar_failed', err, { gmailMessageId: mapping.gmail_message_id });
+			await ctx.answerCallbackQuery({ text: '操作失败，请重试' });
+		}
 	});
 }
