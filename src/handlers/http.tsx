@@ -1,4 +1,10 @@
+import type { MiddlewareHandler } from 'hono';
 import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { FAVICON_BASE64 } from '../assets/favicon';
+import { createBot, getBotInfo } from '../bot';
+import { DashboardPage, HomePage, PreviewPage } from '../components/home';
+import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../components/oauth';
 import {
 	ROUTE_GMAIL_PUSH,
 	ROUTE_GMAIL_WATCH,
@@ -8,20 +14,14 @@ import {
 	ROUTE_PREVIEW,
 	ROUTE_TELEGRAM_WEBHOOK,
 } from '../constants';
-import { DashboardPage, HomePage, PreviewPage } from '../components/home';
-import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../components/oauth';
-import { enqueueSyncNotification } from '../services/bridge';
-import { createAccount, deleteAccount, getAllAccounts, getAccountById, updateAccount } from '../db/accounts';
+import { createAccount, deleteAccount, getAccountById, getAllAccounts, updateAccount } from '../db/accounts';
 import { clearAccountCache, clearAllKV, deleteHistoryId } from '../db/kv';
+import { enqueueSyncNotification } from '../services/bridge';
 import { renewWatch, renewWatchAll, stopWatch } from '../services/gmail';
-import { createBot } from '../bot';
 import { convertPreview } from '../services/home';
 import { getOAuthPageProps, processOAuthCallback, startGoogleOAuth } from '../services/oauth';
 import { reportErrorToObservability } from '../services/observability';
 import type { Env, PubSubPushBody } from '../types';
-import { FAVICON_BASE64 } from '../assets/favicon';
-import type { MiddlewareHandler } from 'hono';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -60,7 +60,8 @@ app.post(ROUTE_TELEGRAM_WEBHOOK, async (c) => {
 		return c.text('Forbidden', 403);
 	}
 
-	const bot = createBot(c.env);
+	const botInfo = await getBotInfo(c.env);
+	const bot = createBot(c.env, botInfo);
 	const update = await c.req.json();
 	await bot.handleUpdate(update);
 	return c.text('OK');
