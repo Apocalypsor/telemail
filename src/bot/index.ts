@@ -1,7 +1,7 @@
 import { Api, Bot, InlineKeyboard } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import { BOT_INFO_TTL, KV_BOT_INFO_KEY } from '../constants';
-import { getVisibleAccounts } from '../db/accounts';
+import { getOwnAccounts, getVisibleAccounts } from '../db/accounts';
 import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser, upsertUser } from '../db/users';
 import { reportErrorToObservability } from '../services/observability';
 import type { Env } from '../types';
@@ -100,9 +100,9 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 			}
 		}
 
-		const accounts = await getVisibleAccounts(env.DB, userId, admin);
-		const text = accounts.length > 0 ? `📧 账号列表 (${accounts.length})` : '📧 暂无账号';
-		return ctx.reply(text, { reply_markup: accountListKeyboard(accounts) });
+		const accounts = admin ? await getOwnAccounts(env.DB, userId) : await getVisibleAccounts(env.DB, userId, false);
+		const text = accounts.length > 0 ? `📧 我的账号 (${accounts.length})` : '📧 暂无账号';
+		return ctx.reply(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: admin }) });
 	});
 
 	// ─── /users: 快速查看用户列表（管理员） ──────────────────────────────────

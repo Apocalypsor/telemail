@@ -13,11 +13,16 @@ export async function getAccountByEmail(db: D1Database, email: string): Promise<
 	return db.prepare('SELECT * FROM accounts WHERE email = ?').bind(email).first<Account>();
 }
 
+/** 获取用户自己绑定的账号 */
+export async function getOwnAccounts(db: D1Database, telegramUserId: string): Promise<Account[]> {
+	const { results } = await db.prepare('SELECT * FROM accounts WHERE telegram_user_id = ? ORDER BY id').bind(telegramUserId).all<Account>();
+	return results;
+}
+
 /** 获取用户可见的账号：admin 看全部，普通用户看自己绑定的 */
 export async function getVisibleAccounts(db: D1Database, telegramUserId: string, isAdmin: boolean): Promise<Account[]> {
 	if (isAdmin) return getAllAccounts(db);
-	const { results } = await db.prepare('SELECT * FROM accounts WHERE telegram_user_id = ? ORDER BY id').bind(telegramUserId).all<Account>();
-	return results;
+	return getOwnAccounts(db, telegramUserId);
 }
 
 /** 检查用户是否有权访问指定账号，返回账号或 null */

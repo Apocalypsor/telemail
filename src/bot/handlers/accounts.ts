@@ -1,7 +1,7 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
 import { OAUTH_STATE_TTL_SECONDS } from '../../constants';
-import { createAccount, deleteAccount, getAuthorizedAccount, getVisibleAccounts, updateAccount } from '../../db/accounts';
+import { createAccount, deleteAccount, getAllAccounts, getAuthorizedAccount, getOwnAccounts, getVisibleAccounts, updateAccount } from '../../db/accounts';
 import { getAllUsers } from '../../db/users';
 import { clearAccountCache, deleteHistoryId } from '../../db/kv';
 import { renewWatch, stopWatch } from '../../services/gmail';
@@ -20,7 +20,7 @@ async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
 	return { userId, accountId, admin, account };
 }
 
-export function accountListKeyboard(accounts: Account[]): InlineKeyboard {
+export function accountListKeyboard(accounts: Account[], options?: { isAdmin?: boolean; showAll?: boolean }): InlineKeyboard {
 	const kb = new InlineKeyboard();
 	for (const acc of accounts) {
 		const status = acc.refresh_token ? '✅' : '❌';
@@ -28,20 +28,35 @@ export function accountListKeyboard(accounts: Account[]): InlineKeyboard {
 		kb.text(`${status} ${display}`, `acc:${acc.id}`).row();
 	}
 	kb.text('➕ 添加账号', 'add').row();
+	if (options?.isAdmin) {
+		kb.text(options.showAll ? '🔽 收起' : '👀 查看所有账号', options.showAll ? 'accs' : 'accs:all').row();
+	}
 	kb.text('« 返回', 'menu');
 	return kb;
 }
 
 export function registerAccountHandlers(bot: Bot, env: Env) {
-	// Account list
+	// Account list (default: own accounts only)
 	bot.callbackQuery('accs', async (ctx) => {
 		const userId = String(ctx.from.id);
 		await clearBotState(env, userId);
 		const admin = isAdmin(userId, env);
-		const accounts = await getVisibleAccounts(env.DB, userId, admin);
+		const accounts = admin ? await getOwnAccounts(env.DB, userId) : await getVisibleAccounts(env.DB, userId, false);
 
-		const text = accounts.length > 0 ? `📧 账号列表 (${accounts.length})` : '📧 暂无账号';
-		await ctx.editMessageText(text, { reply_markup: accountListKeyboard(accounts) });
+		const text = accounts.length > 0 ? `📧 我的账号 (${accounts.length})` : '📧 暂无账号';
+		await ctx.editMessageText(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: admin }) });
+		await ctx.answerCallbackQuery();
+	});
+
+	// Account list (admin: show all accounts)
+	bot.callbackQuery('accs:all', async (ctx) => {
+		const userId = String(ctx.from.id);
+		await clearBotState(env, userId);
+		if (!isAdmin(userId, env)) return ctx.answerCallbackQuery({ text: '无权操作' });
+
+		const accounts = await getAllAccounts(env.DB);
+		const text = `📧 所有账号 (${accounts.length})`;
+		await ctx.editMessageText(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: true, showAll: true }) });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -139,10 +154,10 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		}
 		await Promise.all([deleteAccount(env.DB, accountId), deleteHistoryId(env, accountId)]);
 
-		// Show updated account list
-		const accounts = await getVisibleAccounts(env.DB, userId, admin);
-		await ctx.editMessageText(`✅ 账号 #${accountId} 已删除\n\n📧 账号列表 (${accounts.length})`, {
-			reply_markup: accountListKeyboard(accounts),
+		// Show updated account list (own accounts)
+		const accounts = admin ? await getOwnAccounts(env.DB, userId) : await getVisibleAccounts(env.DB, userId, false);
+		await ctx.editMessageText(`✅ 账号 #${accountId} 已删除\n\n📧 我的账号 (${accounts.length})`, {
+			reply_markup: accountListKeyboard(accounts, { isAdmin: admin }),
 		});
 		await ctx.answerCallbackQuery({ text: '✅ 已删除' });
 	});
