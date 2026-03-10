@@ -31,15 +31,14 @@ export function getOAuthPageProps(request: Request, accountId: number, accountEm
 	};
 }
 
-export async function startGoogleOAuth(request: Request, env: Env, accountId: number): Promise<Response> {
-	const requestUrl = new URL(request.url);
+/** 生成 Google OAuth 授权 URL（可用于 web 重定向或 bot 内联按钮） */
+export async function generateOAuthUrl(env: Env, accountId: number, origin: string): Promise<string> {
 	const state = crypto.randomUUID();
-	// 在 state value 中存储 accountId，回调时取出
 	await env.EMAIL_KV.put(`${KV_OAUTH_STATE_PREFIX}${state}`, String(accountId), {
 		expirationTtl: OAUTH_STATE_TTL_SECONDS,
 	});
 
-	const redirectUri = getCallbackUrl(requestUrl.origin);
+	const redirectUri = getCallbackUrl(origin);
 	const authUrl = new URL(GOOGLE_OAUTH_AUTHORIZE_URL);
 	authUrl.searchParams.set('client_id', env.GMAIL_CLIENT_ID);
 	authUrl.searchParams.set('redirect_uri', redirectUri);
@@ -50,11 +49,17 @@ export async function startGoogleOAuth(request: Request, env: Env, accountId: nu
 	authUrl.searchParams.set('include_granted_scopes', 'true');
 	authUrl.searchParams.set('state', state);
 
-	return Response.redirect(authUrl.toString(), 302);
+	return authUrl.toString();
+}
+
+export async function startGoogleOAuth(request: Request, env: Env, accountId: number): Promise<Response> {
+	const requestUrl = new URL(request.url);
+	const url = await generateOAuthUrl(env, accountId, requestUrl.origin);
+	return Response.redirect(url, 302);
 }
 
 export type OAuthCallbackResult =
-	| { ok: true; refreshToken: string | undefined; scope: string; expiresIn: number | undefined; accountEmail: string }
+	| { ok: true; refreshToken: string | undefined; scope: string; expiresIn: number | undefined; accountEmail: string; accountId: number; ownerTelegramId: string | null }
 	| { ok: false; title: string; detail: string; status: number };
 
 export async function processOAuthCallback(request: Request, env: Env): Promise<OAuthCallbackResult> {
@@ -180,5 +185,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 		scope: tokenData.scope || GMAIL_MODIFY_SCOPE,
 		expiresIn: tokenData.expires_in,
 		accountEmail,
+		accountId,
+		ownerTelegramId: account?.telegram_user_id ?? null,
 	};
 }
