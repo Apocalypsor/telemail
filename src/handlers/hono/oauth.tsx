@@ -2,28 +2,27 @@ import { Api, InlineKeyboard } from 'grammy';
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../../components/oauth';
-import { getAccountById, getAuthorizedAccount } from '../../db/accounts';
+import { getAccountById } from '../../db/accounts';
 import { getOAuthPageProps, processOAuthCallback, startGoogleOAuth } from '../../services/oauth';
 import type { AppEnv } from '../../types';
-import { requireSession } from './middleware';
 import { ROUTE_OAUTH_GOOGLE, ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from './routes';
 
 const oauth = new Hono<AppEnv>();
 
-oauth.get(ROUTE_OAUTH_GOOGLE, requireSession(), async (c) => {
+oauth.get(ROUTE_OAUTH_GOOGLE, async (c) => {
 	const accountId = parseInt(c.req.query('account') || '0', 10);
 	if (isNaN(accountId) || accountId <= 0) return c.text('Invalid account ID', 400);
-	const account = await getAuthorizedAccount(c.env.DB, accountId, c.get('userId'), c.get('isAdmin'));
+	const account = await getAccountById(c.env.DB, accountId);
 	if (!account) return c.text('Account not found', 404);
 
 	const props = getOAuthPageProps(c.req.raw, account.id, account.email || `Account #${account.id}`);
 	return c.html(<OAuthSetupPage {...props} />);
 });
 
-oauth.get(ROUTE_OAUTH_GOOGLE_START, requireSession(), async (c) => {
+oauth.get(ROUTE_OAUTH_GOOGLE_START, async (c) => {
 	const accountId = parseInt(c.req.query('account') || '0', 10);
 	if (isNaN(accountId) || accountId <= 0) return c.text('Invalid account ID', 400);
-	const account = await getAuthorizedAccount(c.env.DB, accountId, c.get('userId'), c.get('isAdmin'));
+	const account = await getAccountById(c.env.DB, accountId);
 	if (!account) return c.text('Account not found', 404);
 
 	return startGoogleOAuth(c.req.raw, c.env, account.id);

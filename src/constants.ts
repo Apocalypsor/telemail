@@ -13,7 +13,7 @@ export const KV_BOT_INFO_KEY = 'telegram:bot_info';
 export const PROCESSED_TTL_SECONDS = 60 * 60 * 24; // 1 天
 export const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
-export const SESSION_TTL = 7 * 24 * 3600; // 7 天
+
 export const BOT_INFO_TTL = 86400 * 30; // 30 天
 
 // ── Telegram limits ──────────────────────────────────────────────────────────
@@ -26,8 +26,6 @@ export const MAX_BODY_CHARS = 4000;
 export const MAX_LINKS = 20;
 export const DIRECT_PROCESS_THRESHOLD = 3;
 
-// ── Session ──────────────────────────────────────────────────────────────────
-export const SESSION_COOKIE = 'tg_session';
 
 // ── Display ──────────────────────────────────────────────────────────────────
 export const MESSAGE_DATE_LOCALE = 'zh-CN';

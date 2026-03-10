@@ -39,13 +39,17 @@ function userListKeyboard(users: TelegramUser[]): InlineKeyboard {
 	return kb;
 }
 
-function adminMenuKeyboard(): InlineKeyboard {
-	return new InlineKeyboard()
+function adminMenuKeyboard(env: Env): InlineKeyboard {
+	const kb = new InlineKeyboard()
 		.text('🔄 续订所有 Watch', 'walla')
 		.row()
 		.text('🗑 清空全局 KV 缓存', 'clrkv')
-		.row()
-		.text('« 返回', 'menu');
+		.row();
+	if (env.WORKER_URL) {
+		kb.url('🔍 HTML 预览工具', `${env.WORKER_URL.replace(/\/$/, '')}/preview`).row();
+	}
+	kb.text('« 返回', 'menu');
+	return kb;
 }
 
 export function registerAdminHandlers(bot: Bot, env: Env) {
@@ -56,7 +60,7 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 			return ctx.answerCallbackQuery({ text: '无权操作' });
 		}
 		await clearBotState(env, userId);
-		await ctx.editMessageText('⚙️ 全局操作', { reply_markup: adminMenuKeyboard() });
+		await ctx.editMessageText('⚙️ 全局操作', { reply_markup: adminMenuKeyboard(env) });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -134,10 +138,10 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		await ctx.answerCallbackQuery({ text: '⏳ 正在续订...' });
 		try {
 			await renewWatchAll(env);
-			await ctx.editMessageText('⚙️ 全局操作\n\n✅ 所有 Watch 已续订', { reply_markup: adminMenuKeyboard() });
+			await ctx.editMessageText('⚙️ 全局操作\n\n✅ 所有 Watch 已续订', { reply_markup: adminMenuKeyboard(env) });
 		} catch (err) {
 			await reportErrorToObservability(env, 'bot.watch_all_failed', err);
-			await ctx.editMessageText('⚙️ 全局操作\n\n❌ Watch 续订失败', { reply_markup: adminMenuKeyboard() });
+			await ctx.editMessageText('⚙️ 全局操作\n\n❌ Watch 续订失败', { reply_markup: adminMenuKeyboard(env) });
 		}
 	});
 
@@ -151,10 +155,10 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		await ctx.answerCallbackQuery({ text: '⏳ 正在清理...' });
 		try {
 			const deleted = await clearAllKV(env);
-			await ctx.editMessageText(`⚙️ 全局操作\n\n✅ 已清除 ${deleted} 个 KV 键`, { reply_markup: adminMenuKeyboard() });
+			await ctx.editMessageText(`⚙️ 全局操作\n\n✅ 已清除 ${deleted} 个 KV 键`, { reply_markup: adminMenuKeyboard(env) });
 		} catch (err) {
 			await reportErrorToObservability(env, 'bot.clear_kv_failed', err);
-			await ctx.editMessageText('⚙️ 全局操作\n\n❌ 清理失败', { reply_markup: adminMenuKeyboard() });
+			await ctx.editMessageText('⚙️ 全局操作\n\n❌ 清理失败', { reply_markup: adminMenuKeyboard(env) });
 		}
 	});
 }

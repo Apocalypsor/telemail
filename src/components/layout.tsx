@@ -16,16 +16,6 @@ export function Layout({ title, children }: { title: string; children: Child }) 
 	);
 }
 
-export function BackLink() {
-	return (
-		<p class="mt-5">
-			<a href="/" class="text-blue-400 hover:text-blue-300 text-sm">
-				&larr; 返回主页
-			</a>
-		</p>
-	);
-}
-
 export function Card({ children, class: className }: { children: Child; class?: string }) {
 	return <main class={`w-full my-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl ${className ?? ''}`}>{children}</main>;
 }

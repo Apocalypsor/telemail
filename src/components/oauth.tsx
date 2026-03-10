@@ -1,4 +1,4 @@
-import { BackLink, Card, Layout } from './layout';
+import { Card, Layout } from './layout';
 
 export function OAuthSetupPage({
 	startUrl,
@@ -39,7 +39,7 @@ export function OAuthSetupPage({
 				>
 					开始授权
 				</a>
-				<BackLink />
+	
 			</Card>
 		</Layout>
 	);
@@ -104,7 +104,7 @@ export function OAuthCallbackPage({
 					返回 scope: <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">{scope}</code>
 					{typeof expiresIn === 'number' && `，access_token 有效期约 ${expiresIn} 秒`}。
 				</p>
-				<BackLink />
+	
 			</Card>
 			<script dangerouslySetInnerHTML={{ __html: copyScript }} />
 		</Layout>
@@ -119,7 +119,7 @@ export function OAuthErrorPage({ title, detail }: { title: string; detail: strin
 				<pre class="p-3 bg-slate-900 border border-slate-700 rounded-lg font-mono text-xs text-red-400 whitespace-pre-wrap break-words overflow-auto">
 					{detail}
 				</pre>
-				<BackLink />
+	
 			</Card>
 		</Layout>
 	);
