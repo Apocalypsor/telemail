@@ -118,7 +118,7 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 			return ctx.reply('⛔ 仅管理员可用');
 		}
 
-		const users = await getAllUsers(env.DB);
+		const users = (await getAllUsers(env.DB)).filter((u) => u.telegram_id !== env.ADMIN_TELEGRAM_ID);
 		if (users.length === 0) {
 			return ctx.reply('👥 暂无用户');
 		}

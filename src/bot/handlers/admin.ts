@@ -67,7 +67,7 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 			return ctx.answerCallbackQuery({ text: '无权操作' });
 		}
 		await clearBotState(env, userId);
-		const users = await getAllUsers(env.DB);
+		const users = (await getAllUsers(env.DB)).filter((u) => u.telegram_id !== env.ADMIN_TELEGRAM_ID);
 		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users) });
 		await ctx.answerCallbackQuery();
 	});
@@ -97,7 +97,7 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		}
 
 		// Refresh user list
-		const users = await getAllUsers(env.DB);
+		const users = (await getAllUsers(env.DB)).filter((u) => u.telegram_id !== env.ADMIN_TELEGRAM_ID);
 		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users) });
 		await ctx.answerCallbackQuery({ text: '✅ 已批准' });
 	});
@@ -119,7 +119,7 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		}
 
 		// Refresh user list
-		const users = await getAllUsers(env.DB);
+		const users = (await getAllUsers(env.DB)).filter((u) => u.telegram_id !== env.ADMIN_TELEGRAM_ID);
 		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users) });
 		await ctx.answerCallbackQuery({ text: '已处理' });
 	});
