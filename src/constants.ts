@@ -20,6 +20,7 @@ export const BOT_INFO_TTL = 86400 * 30; // 30 天
 export const TG_MSG_LIMIT = 4096;
 export const TG_CAPTION_LIMIT = 1024;
 export const TG_MEDIA_GROUP_LIMIT = 10;
+export const TG_MAX_RETRY_AFTER_SECS = 60;
 
 // ── LLM / 邮件处理 ──────────────────────────────────────────────────────────
 export const MAX_BODY_CHARS = 4000;
