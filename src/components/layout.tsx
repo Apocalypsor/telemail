@@ -11,7 +11,7 @@ export function Layout({ title, children }: { title: string; children: Child }) 
 				<link rel="icon" type="image/png" href="/favicon.png" />
 				<style dangerouslySetInnerHTML={{ __html: TAILWIND_CSS }} />
 			</head>
-			<body class="min-h-screen bg-slate-900 text-slate-200 flex items-center justify-center p-6 font-sans">{children}</body>
+			<body class="min-h-screen bg-slate-900 text-slate-200 flex justify-center p-6 font-sans">{children}</body>
 		</html>
 	);
 }
@@ -27,5 +27,5 @@ export function BackLink() {
 }
 
 export function Card({ children, class: className }: { children: Child; class?: string }) {
-	return <main class={`w-full bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl ${className ?? ''}`}>{children}</main>;
+	return <main class={`w-full my-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl ${className ?? ''}`}>{children}</main>;
 }
