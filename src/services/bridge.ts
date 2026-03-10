@@ -2,6 +2,7 @@ import PostalMime from 'postal-mime';
 import { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from '../bot';
 import { DIRECT_PROCESS_THRESHOLD, KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
 import { getAccountByEmail, getAccountById } from '../db/accounts';
+import { deleteFailedEmail, getAllFailedEmails, putFailedEmail, type FailedEmail } from '../db/failed-emails';
 import { getHistoryId, putHistoryId } from '../db/kv';
 import { getMessageMapping, putMessageMapping } from '../db/message-map';
 import type { Account, Env, GmailNotification, PubSubPushBody, QueueMessage } from '../types';
@@ -238,6 +239,15 @@ async function processGmailMessage(
 				await editSentMessage(header + summarySection + tagsLine);
 			} catch (err) {
 				await reportErrorToObservability(env, 'llm.summary_failed', err, { subject });
+				await putFailedEmail(env.DB, {
+					account_id: account.id,
+					gmail_message_id: messageId,
+					tg_chat_id: chatId,
+					tg_message_id: sentMessageId,
+					is_caption: hasSingleAttachment ? 1 : 0,
+					subject,
+					error_message: err instanceof Error ? err.message : String(err),
+				}).catch((e) => console.error('Failed to save failed email record:', e));
 			}
 		})(),
 	);
@@ -271,4 +281,88 @@ function buildTelegramHeader(fromName: string, fromAddress: string, recipient: s
 		``,
 		``,
 	].join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// 失败邮件重试
+// ---------------------------------------------------------------------------
+
+/** 重试单封失败邮件的 LLM 摘要处理，成功后自动删除失败记录 */
+export async function retryFailedEmail(failed: FailedEmail, env: Env): Promise<void> {
+	const account = await getAccountById(env.DB, failed.account_id);
+	if (!account) throw new Error(`Account ${failed.account_id} not found`);
+
+	const tgToken = env.TELEGRAM_BOT_TOKEN;
+	const chatId = failed.tg_chat_id;
+	const llmUrl = env.LLM_API_URL;
+	const llmKey = env.LLM_API_KEY;
+	const llmModel = env.LLM_MODEL;
+	if (!llmUrl || !llmKey || !llmModel) throw new Error('LLM not configured');
+
+	// 重新从 Gmail 获取邮件
+	const token = await getAccessToken(env, account);
+	const msg = await gmailGet(token, `/users/me/messages/${failed.gmail_message_id}?format=raw`);
+	const rawEmail = base64urlToArrayBuffer(msg.raw);
+	const parser = new PostalMime();
+	const email = await parser.parse(rawEmail);
+
+	const subject = email.subject || '无主题';
+	const plainBody = email.text || '';
+	if (!plainBody.trim()) {
+		await deleteFailedEmail(env.DB, failed.id);
+		return;
+	}
+
+	const recipient = account.email || `Account #${account.id}`;
+	const header = buildTelegramHeader(email.from?.name || '', email.from?.address || '未知', recipient, subject);
+
+	// 构建 keyboard
+	const mapping = await getMessageMapping(env.DB, chatId, failed.tg_message_id);
+	let keyboard: unknown = STAR_KEYBOARD;
+	let mailUrl: string | undefined;
+	if (env.WORKER_URL) {
+		const mailToken = await generateMailToken(env.ADMIN_SECRET, failed.gmail_message_id, chatId);
+		mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${failed.gmail_message_id}?t=${mailToken}`;
+		keyboard = mapping?.starred
+			? starredKeyboardWithMailUrl(mailUrl)
+			: starKeyboardWithMailUrl(mailUrl);
+	} else if (mapping?.starred) {
+		keyboard = STARRED_KEYBOARD;
+	}
+
+	const editSentMessage = (newText: string) =>
+		failed.is_caption
+			? editMessageCaption(tgToken, chatId, failed.tg_message_id, newText, keyboard)
+			: editTextMessage(tgToken, chatId, failed.tg_message_id, newText, keyboard);
+
+	// LLM 处理
+	const links = extractLinks(plainBody);
+	const [summary, tags] = await Promise.all([
+		summarizeEmail(llmUrl, llmKey, llmModel, subject, plainBody, links),
+		generateTags(llmUrl, llmKey, llmModel, subject, plainBody).catch(() => [] as string[]),
+	]);
+
+	const tagsLine = tags.length > 0 ? `\n\n${tags.map((t) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
+	const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(summary)}`;
+	await editSentMessage(header + summarySection + tagsLine);
+
+	// 成功 → 删除失败记录
+	await deleteFailedEmail(env.DB, failed.id);
+}
+
+/** 重试所有失败邮件，返回 { success, failed } 计数 */
+export async function retryAllFailedEmails(env: Env): Promise<{ success: number; failed: number }> {
+	const items = await getAllFailedEmails(env.DB);
+	let success = 0;
+	let failed = 0;
+	for (const item of items) {
+		try {
+			await retryFailedEmail(item, env);
+			success++;
+		} catch (err) {
+			console.error(`Retry failed for id=${item.id}:`, err);
+			failed++;
+		}
+	}
+	return { success, failed };
 }
