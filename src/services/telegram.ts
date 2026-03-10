@@ -20,48 +20,47 @@ function extractTelegramDescription(payload: unknown): string {
 	return typeof desc === 'string' ? desc : 'Unknown Telegram error';
 }
 
-/** 发送纯文本消息（不使用 parse_mode），返回 message_id */
-export async function sendPlainTextMessage(token: string, chatId: string, text: string, replyMarkup?: unknown): Promise<number> {
-	const url = `https://api.telegram.org/bot${token}/sendMessage`;
-	const body: Record<string, unknown> = { chat_id: chatId, text };
-	if (replyMarkup) body.reply_markup = replyMarkup;
+/**
+ * 通用 Telegram JSON API 请求，带 MarkdownV2 parse error 自动回退。
+ * 当 parse_mode 存在且返回 entity parse error 时，自动去掉 parse_mode 并将 text/caption 转为纯文本重试。
+ */
+async function tgPost<T = unknown>(url: string, payload: Record<string, unknown>, label: string): Promise<T> {
 	const resp = await fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body),
+		body: JSON.stringify(payload),
 	});
-	const data = (await resp.json()) as { ok: boolean; result?: { message_id: number }; description?: string };
-	if (!resp.ok) {
-		throw new Error(`TG sendMessage plain ${resp.status}: ${data.description || 'Unknown error'}`);
+	if (resp.ok) return ((await resp.json()) as { result: T }).result;
+
+	const err = (await resp.json()) as unknown;
+	const errDescription = extractTelegramDescription(err);
+
+	if (payload.parse_mode && isEntityParseError(errDescription)) {
+		const textKey = 'text' in payload ? 'text' : 'caption';
+		const textValue = payload[textKey];
+		if (typeof textValue === 'string') {
+			console.warn(`TG ${label} parse_mode failed, retrying as plain text`);
+			const { parse_mode: _, ...rest } = payload;
+			rest[textKey] = markdownV2ToPlainText(textValue);
+			const fallbackResp = await fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(rest),
+			});
+			if (fallbackResp.ok) return ((await fallbackResp.json()) as { result: T }).result;
+			const fallbackErr = (await fallbackResp.json()) as unknown;
+			throw new Error(`TG ${label} fallback ${fallbackResp.status}: ${extractTelegramDescription(fallbackErr)}`);
+		}
 	}
-	return data.result!.message_id;
+
+	throw new Error(`TG ${label} ${resp.status}: ${errDescription}`);
 }
 
 /** 发送纯文字消息，返回 message_id */
 export async function sendTextMessage(token: string, chatId: string, text: string): Promise<number> {
 	const url = `https://api.telegram.org/bot${token}/sendMessage`;
-	const resp = await fetch(url, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'MarkdownV2' }),
-	});
-	if (!resp.ok) {
-		const err = (await resp.json()) as unknown;
-		const errDescription = extractTelegramDescription(err);
-		console.error('TG sendMessage failed payload:', {
-			chatId,
-			textLength: text.length,
-			description: errDescription,
-		});
-		if (isEntityParseError(errDescription)) {
-			const plain = markdownV2ToPlainText(text);
-			console.warn('TG sendMessage parse_mode failed, retrying as plain text');
-			return sendPlainTextMessage(token, chatId, plain);
-		}
-		throw new Error(`TG sendMessage ${resp.status}: ${errDescription}`);
-	}
-	const data = (await resp.json()) as { result: { message_id: number } };
-	return data.result.message_id;
+	const data = await tgPost<{ message_id: number }>(url, { chat_id: chatId, text, parse_mode: 'MarkdownV2' }, 'sendMessage');
+	return data.message_id;
 }
 
 /** 编辑已发送的文字消息 */
@@ -75,30 +74,7 @@ export async function editTextMessage(
 	const url = `https://api.telegram.org/bot${token}/editMessageText`;
 	const payload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, text, parse_mode: 'MarkdownV2' };
 	if (replyMarkup) payload.reply_markup = replyMarkup;
-	const resp = await fetch(url, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(payload),
-	});
-	if (!resp.ok) {
-		const err = (await resp.json()) as unknown;
-		const errDescription = extractTelegramDescription(err);
-		if (isEntityParseError(errDescription)) {
-			console.warn('TG editMessageText parse_mode failed, retrying as plain text');
-			const plain = markdownV2ToPlainText(text);
-			const fallbackPayload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, text: plain };
-			if (replyMarkup) fallbackPayload.reply_markup = replyMarkup;
-			const fallbackResp = await fetch(url, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(fallbackPayload),
-			});
-			if (fallbackResp.ok) return;
-			const fallbackErr = (await fallbackResp.json()) as unknown;
-			throw new Error(`TG editMessageText fallback ${fallbackResp.status}: ${extractTelegramDescription(fallbackErr)}`);
-		}
-		throw new Error(`TG editMessageText ${resp.status}: ${errDescription}`);
-	}
+	await tgPost(url, payload, 'editMessageText');
 }
 
 /** 发送文字消息并附带 reply_markup，返回 message_id */
@@ -106,35 +82,8 @@ async function sendTextMessageWithMarkup(token: string, chatId: string, text: st
 	const url = `https://api.telegram.org/bot${token}/sendMessage`;
 	const payload: Record<string, unknown> = { chat_id: chatId, text, parse_mode: 'MarkdownV2' };
 	if (replyMarkup) payload.reply_markup = replyMarkup;
-	const resp = await fetch(url, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(payload),
-	});
-	if (!resp.ok) {
-		const err = (await resp.json()) as unknown;
-		const errDescription = extractTelegramDescription(err);
-		if (isEntityParseError(errDescription)) {
-			console.warn('TG sendMessage parse_mode failed, retrying as plain text');
-			const plain = markdownV2ToPlainText(text);
-			const fallbackPayload: Record<string, unknown> = { chat_id: chatId, text: plain };
-			if (replyMarkup) fallbackPayload.reply_markup = replyMarkup;
-			const fallbackResp = await fetch(url, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(fallbackPayload),
-			});
-			if (!fallbackResp.ok) {
-				const fallbackErr = (await fallbackResp.json()) as unknown;
-				throw new Error(`TG sendMessage fallback ${(fallbackResp).status}: ${extractTelegramDescription(fallbackErr)}`);
-			}
-			const fallbackData = (await fallbackResp.json()) as { result: { message_id: number } };
-			return fallbackData.result.message_id;
-		}
-		throw new Error(`TG sendMessage ${resp.status}: ${errDescription}`);
-	}
-	const data = (await resp.json()) as { result: { message_id: number } };
-	return data.result.message_id;
+	const data = await tgPost<{ message_id: number }>(url, payload, 'sendMessage');
+	return data.message_id;
 }
 
 function attToBlob(att: Attachment): Blob {
@@ -221,30 +170,7 @@ export async function editMessageCaption(
 	const url = `https://api.telegram.org/bot${token}/editMessageCaption`;
 	const payload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, caption, parse_mode: 'MarkdownV2' };
 	if (replyMarkup) payload.reply_markup = replyMarkup;
-	const resp = await fetch(url, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(payload),
-	});
-	if (!resp.ok) {
-		const err = (await resp.json()) as unknown;
-		const errDescription = extractTelegramDescription(err);
-		if (isEntityParseError(errDescription)) {
-			console.warn('TG editMessageCaption parse_mode failed, retrying as plain text');
-			const plain = markdownV2ToPlainText(caption);
-			const fallbackPayload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, caption: plain };
-			if (replyMarkup) fallbackPayload.reply_markup = replyMarkup;
-			const fallbackResp = await fetch(url, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(fallbackPayload),
-			});
-			if (fallbackResp.ok) return;
-			const fallbackErr = (await fallbackResp.json()) as unknown;
-			throw new Error(`TG editMessageCaption fallback ${fallbackResp.status}: ${extractTelegramDescription(fallbackErr)}`);
-		}
-		throw new Error(`TG editMessageCaption ${resp.status}: ${errDescription}`);
-	}
+	await tgPost(url, payload, 'editMessageCaption');
 }
 
 /** 设置/更新消息的 inline keyboard */

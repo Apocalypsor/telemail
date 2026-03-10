@@ -1,13 +1,12 @@
-import { Bot, InlineKeyboard } from 'grammy';
+import { Api, Bot, InlineKeyboard } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import { BOT_INFO_TTL, KV_BOT_INFO_KEY } from '../constants';
 import { getVisibleAccounts } from '../db/accounts';
 import { approveUser, getAllUsers, getUserByTelegramId, rejectUser, upsertUser } from '../db/users';
 import { reportErrorToObservability } from '../services/observability';
-import { sendPlainTextMessage } from '../services/telegram';
 import type { Env } from '../types';
 import { isAdmin } from './auth';
-import { formatUserName } from './formatters';
+import { formatUserName, userListText } from './formatters';
 import { accountListKeyboard, registerAccountHandlers } from './handlers/accounts';
 import { registerAdminHandlers } from './handlers/admin';
 import { registerInputHandler } from './handlers/input';
@@ -21,11 +20,10 @@ export async function getBotInfo(env: Env): Promise<UserFromGetMe> {
 	const cached = await env.EMAIL_KV.get(KV_BOT_INFO_KEY);
 	if (cached) return JSON.parse(cached);
 
-	const resp = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`);
-	if (!resp.ok) throw new Error(`getMe failed: ${resp.status} ${await resp.text()}`);
-	const data = (await resp.json()) as { result: UserFromGetMe };
-	await env.EMAIL_KV.put(KV_BOT_INFO_KEY, JSON.stringify(data.result), { expirationTtl: BOT_INFO_TTL });
-	return data.result;
+	const api = new Api(env.TELEGRAM_BOT_TOKEN);
+	const botInfo = await api.getMe();
+	await env.EMAIL_KV.put(KV_BOT_INFO_KEY, JSON.stringify(botInfo), { expirationTtl: BOT_INFO_TTL });
+	return botInfo;
 }
 
 function mainMenuKeyboard(admin: boolean): InlineKeyboard {
@@ -68,18 +66,13 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 				const displayName = formatUserName({ first_name: ctx.from?.first_name || 'Unknown', last_name: ctx.from?.last_name });
 				const username = ctx.from?.username ? ` (@${ctx.from.username})` : '';
 				try {
-					await sendPlainTextMessage(
-						env.TELEGRAM_BOT_TOKEN,
+					const kb = new InlineKeyboard()
+						.text('✅ 批准', `approve:${telegramId}`)
+						.text('❌ 拒绝', `reject:${telegramId}`);
+					await ctx.api.sendMessage(
 						env.ADMIN_TELEGRAM_ID,
 						`🆕 新用户注册: ${displayName}${username}\nTelegram ID: ${telegramId}`,
-						{
-							inline_keyboard: [
-								[
-									{ text: '✅ 批准', callback_data: `approve:${telegramId}` },
-									{ text: '❌ 拒绝', callback_data: `reject:${telegramId}` },
-								],
-							],
-						},
+						{ reply_markup: kb },
 					);
 				} catch (err) {
 					console.error('Failed to notify admin of new registration:', err);
@@ -120,18 +113,7 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 		}
 
 		const users = (await getAllUsers(env.DB)).filter((u) => u.telegram_id !== env.ADMIN_TELEGRAM_ID);
-		if (users.length === 0) {
-			return ctx.reply('👥 暂无用户');
-		}
-
-		let text = `👥 用户列表 (${users.length})\n\n`;
-		for (const u of users) {
-			const status = u.approved === 1 ? '✅' : '⏳';
-			const name = formatUserName(u);
-			const username = u.username ? ` @${u.username}` : '';
-			text += `${status} ${name}${username}\n   ID: ${u.telegram_id}\n`;
-		}
-		return ctx.reply(text);
+		return ctx.reply(userListText(users));
 	});
 
 	// ─── Main menu callback ────────────────────────────────────────────────

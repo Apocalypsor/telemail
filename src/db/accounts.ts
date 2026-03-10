@@ -29,12 +29,6 @@ export async function getAuthorizedAccount(db: D1Database, id: number, userId: s
 	return null;
 }
 
-/** 将所有 telegram_user_id IS NULL 的账号分配给指定用户（用于迁移后自动认领） */
-export async function claimOrphanAccounts(db: D1Database, telegramUserId: string): Promise<number> {
-	const result = await db.prepare("UPDATE accounts SET telegram_user_id = ?, updated_at = datetime('now') WHERE telegram_user_id IS NULL").bind(telegramUserId).run();
-	return result.meta.changes ?? 0;
-}
-
 export async function createAccount(db: D1Database, chatId: string, label?: string, telegramUserId?: string): Promise<Account> {
 	const result = await db
 		.prepare('INSERT INTO accounts (chat_id, label, telegram_user_id) VALUES (?, ?, ?) RETURNING *')

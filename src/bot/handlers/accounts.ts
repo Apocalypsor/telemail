@@ -12,6 +12,14 @@ import { isAdmin } from '../auth';
 import { accountDetailKeyboard, accountDetailText, formatUserName } from '../formatters';
 import { clearBotState, getBotState, setBotState } from '../state';
 
+async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
+	const userId = String(fromId);
+	const accountId = parseInt(accountIdStr, 10);
+	const admin = isAdmin(userId, env);
+	const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
+	return { userId, accountId, admin, account };
+}
+
 export function accountListKeyboard(accounts: Account[]): InlineKeyboard {
 	const kb = new InlineKeyboard();
 	for (const acc of accounts) {
@@ -39,29 +47,18 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Account detail
 	bot.callbackQuery(/^acc:(\d+)$/, async (ctx) => {
-		const userId = String(ctx.from.id);
+		const { userId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
 		await clearBotState(env, userId);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
+		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
-		if (!account) {
-			return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-		}
 		await ctx.editMessageText(accountDetailText(account), { reply_markup: accountDetailKeyboard(account) });
 		await ctx.answerCallbackQuery();
 	});
 
 	// OAuth authorization - generate URL and show as button
 	bot.callbackQuery(/^acc:(\d+):auth$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
-
-		if (!account) {
-			return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-		}
+		const { accountId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
+		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
 		try {
 			const origin = env.WORKER_URL?.replace(/\/$/, '') || '';
@@ -91,14 +88,8 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Renew watch
 	bot.callbackQuery(/^acc:(\d+):w$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
-
-		if (!account) {
-			return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-		}
+		const { account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
+		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 		if (!account.refresh_token) {
 			return ctx.answerCallbackQuery({ text: '账号未授权' });
 		}
@@ -114,28 +105,17 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Clear cache
 	bot.callbackQuery(/^acc:(\d+):cc$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
+		const { accountId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
+		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
-		if (!account) {
-			return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-		}
 		await clearAccountCache(env, accountId);
 		await ctx.answerCallbackQuery({ text: `✅ 缓存已清除: #${accountId}` });
 	});
 
 	// Delete confirmation prompt
 	bot.callbackQuery(/^acc:(\d+):del$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
-
-		if (!account) {
-			return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-		}
+		const { accountId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
+		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
 		const kb = new InlineKeyboard().text('⚠️ 确认删除', `acc:${accountId}:dy`).text('取消', `acc:${accountId}`);
 		await ctx.editMessageText(
@@ -147,14 +127,8 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Confirm delete
 	bot.callbackQuery(/^acc:(\d+):dy$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
-
-		if (!account) {
-			return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-		}
+		const { userId, accountId, admin, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
+		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
 		if (account.refresh_token) {
 			try {
@@ -175,15 +149,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Edit menu
 	bot.callbackQuery(/^acc:(\d+):edit$/, async (ctx) => {
-		const userId = String(ctx.from.id);
+		const { userId, accountId, admin, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
 		await clearBotState(env, userId);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
-
-		if (!account) {
-			return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-		}
+		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
 		const kb = new InlineKeyboard()
 			.text('✏️ 编辑 Chat ID', `acc:${accountId}:eci`)
@@ -204,10 +172,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Edit Chat ID
 	bot.callbackQuery(/^acc:(\d+):eci$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
+		const { userId, accountId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
 		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
 		await setBotState(env, userId, { action: 'edit_chatid', accountId });
@@ -218,10 +183,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Edit Label
 	bot.callbackQuery(/^acc:(\d+):elb$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
+		const { userId, accountId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
 		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
 		await setBotState(env, userId, { action: 'edit_label', accountId });
@@ -232,10 +194,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 	// Clear label
 	bot.callbackQuery(/^acc:(\d+):elbc$/, async (ctx) => {
-		const userId = String(ctx.from.id);
-		const accountId = parseInt(ctx.match![1], 10);
-		const admin = isAdmin(userId, env);
-		const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
+		const { userId, accountId, admin, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
 		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
 		await clearBotState(env, userId);

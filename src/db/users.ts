@@ -36,12 +36,6 @@ export async function getAllUsers(db: D1Database): Promise<TelegramUser[]> {
 	return results;
 }
 
-/** 获取待审批用户 */
-export async function getPendingUsers(db: D1Database): Promise<TelegramUser[]> {
-	const { results } = await db.prepare('SELECT * FROM users WHERE approved = 0 ORDER BY created_at DESC').all<TelegramUser>();
-	return results;
-}
-
 /** 批准用户 */
 export async function approveUser(db: D1Database, telegramId: string): Promise<void> {
 	await db.prepare('UPDATE users SET approved = 1 WHERE telegram_id = ?').bind(telegramId).run();

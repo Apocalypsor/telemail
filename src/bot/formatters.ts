@@ -1,5 +1,5 @@
 import { InlineKeyboard } from 'grammy';
-import type { Account } from '../types';
+import type { Account, TelegramUser } from '../types';
 
 export function accountDetailText(account: Account): string {
 	const status = account.refresh_token ? '✅ 已授权' : '❌ 未授权';
@@ -30,4 +30,17 @@ export function accountDetailKeyboard(account: Account): InlineKeyboard {
 
 export function formatUserName(user: { first_name: string; last_name?: string | null }): string {
 	return user.first_name + (user.last_name ? ` ${user.last_name}` : '');
+}
+
+export function userListText(users: TelegramUser[]): string {
+	if (users.length === 0) return '👥 暂无用户';
+
+	let text = `👥 用户列表 (${users.length})\n\n`;
+	for (const u of users) {
+		const status = u.approved === 1 ? '✅' : '⏳';
+		const name = formatUserName(u);
+		const username = u.username ? ` @${u.username}` : '';
+		text += `${status} ${name}${username}\n   ID: ${u.telegram_id}\n`;
+	}
+	return text;
 }

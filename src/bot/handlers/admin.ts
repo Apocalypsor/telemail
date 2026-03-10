@@ -6,21 +6,8 @@ import { renewWatchAll } from '../../services/gmail';
 import { reportErrorToObservability } from '../../services/observability';
 import type { Env, TelegramUser } from '../../types';
 import { isAdmin } from '../auth';
-import { formatUserName } from '../formatters';
+import { formatUserName, userListText } from '../formatters';
 import { clearBotState } from '../state';
-
-function userListText(users: TelegramUser[]): string {
-	if (users.length === 0) return '👥 暂无用户';
-
-	let text = `👥 用户列表 (${users.length})\n\n`;
-	for (const u of users) {
-		const status = u.approved === 1 ? '✅' : '⏳';
-		const name = formatUserName(u);
-		const username = u.username ? ` @${u.username}` : '';
-		text += `${status} ${name}${username}\n   ID: ${u.telegram_id}\n`;
-	}
-	return text;
-}
 
 function userListKeyboard(users: TelegramUser[]): InlineKeyboard {
 	const kb = new InlineKeyboard();
