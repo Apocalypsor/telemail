@@ -149,11 +149,11 @@ export async function extractVerificationCode(
 	return null;
 }
 
-/** 调用 LLM 为邮件生成 3-5 个标签 */
+/** 调用 LLM 为邮件生成 1-3 个标签 */
 export async function generateTags(baseUrl: string, apiKey: string, model: string, subject: string, rawBody: string): Promise<string[]> {
 	const body = prepareBody(rawBody);
 	const prompt =
-		`Generate 2 to 4 short tags (keywords) for the following email. ` +
+		`Generate 1 to 3 short tags (keywords) for the following email. ` +
 		`Rules:\n` +
 		`- Use the SAME LANGUAGE as the email for tags\n` +
 		`- Each tag should be 1-3 words, no "#" prefix\n` +
