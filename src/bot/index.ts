@@ -75,7 +75,7 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 						{ reply_markup: kb },
 					);
 				} catch (err) {
-					console.error('Failed to notify admin of new registration:', err);
+					await reportErrorToObservability(env, 'bot.notify_admin_failed', err);
 				}
 			}
 		}

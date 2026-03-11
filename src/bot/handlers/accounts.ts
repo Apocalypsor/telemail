@@ -149,7 +149,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 			try {
 				await stopWatch(env, account);
 			} catch (err) {
-				console.warn(`Failed to stop watch for ${account.email}:`, err);
+				await reportErrorToObservability(env, 'bot.stop_watch_failed', err, { accountEmail: account.email });
 			}
 		}
 		await Promise.all([deleteAccount(env.DB, accountId), deleteHistoryId(env, accountId)]);

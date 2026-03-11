@@ -4,6 +4,7 @@ import type { Env } from '../types';
 import { getAccountById, updateAccountEmail, updateRefreshToken } from '../db/accounts';
 import { putCachedAccessToken } from '../db/kv';
 import { renewWatch } from './gmail';
+import { reportErrorToObservability } from './observability';
 
 export type GoogleTokenResponse = {
 	access_token?: string;
@@ -174,7 +175,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 				await renewWatch(env, freshAccount);
 				console.log(`Auto-watch activated for ${accountEmail}`);
 			} catch (err) {
-				console.warn(`Auto-watch failed for ${accountEmail}:`, err);
+				await reportErrorToObservability(env, 'oauth.auto_watch_failed', err, { accountEmail });
 			}
 		}
 	}

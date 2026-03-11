@@ -83,7 +83,7 @@ export async function processSyncNotification(
 			try {
 				await processMessageNotification({ type: 'message', accountId: account.id, messageId: id }, env, waitUntil);
 			} catch (err) {
-				console.error(`Direct processing failed for message ${id}:`, err);
+				await reportErrorToObservability(env, 'bridge.direct_process_failed', err, { messageId: id });
 				failed.push(id);
 			}
 		}
@@ -312,7 +312,7 @@ async function processGmailMessage(
 					is_caption: hasSingleAttachment ? 1 : 0,
 					subject,
 					error_message: err instanceof Error ? err.message : String(err),
-				}).catch((e) => console.error('Failed to save failed email record:', e));
+				}).catch((e) => reportErrorToObservability(env, 'bridge.save_failed_email_record_error', e));
 			}
 		})(),
 	);
@@ -402,7 +402,7 @@ export async function retryAllFailedEmails(env: Env): Promise<{ success: number;
 			await retryFailedEmail(item, env);
 			success++;
 		} catch (err) {
-			console.error(`Retry failed for id=${item.id}:`, err);
+			await reportErrorToObservability(env, 'bridge.retry_failed', err, { failedEmailId: item.id });
 			failed++;
 		}
 	}

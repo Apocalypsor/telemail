@@ -153,7 +153,7 @@ export async function extractVerificationCode(
 export async function generateTags(baseUrl: string, apiKey: string, model: string, subject: string, rawBody: string): Promise<string[]> {
 	const body = prepareBody(rawBody);
 	const prompt =
-		`Generate 3 to 5 short tags (keywords) for the following email. ` +
+		`Generate 2 to 4 short tags (keywords) for the following email. ` +
 		`Rules:\n` +
 		`- Use the SAME LANGUAGE as the email for tags\n` +
 		`- Each tag should be 1-3 words, no "#" prefix\n` +
