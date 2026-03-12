@@ -23,7 +23,6 @@ export interface Account {
 	email: string | null;
 	chat_id: string;
 	refresh_token: string | null;
-	label: string | null;
 	telegram_user_id: string | null;
 	/** IMAP only */
 	imap_host: string | null;

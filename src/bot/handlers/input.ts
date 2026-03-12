@@ -28,12 +28,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
 					await ctx.reply('❌ Chat ID 必须为数字，请重新发送：');
 					return;
 				}
-				await setBotState(env, userId, { action: 'add', step: 'label', chatId: text });
-				const kb = new InlineKeyboard().text('⏭ 跳过', 'skiplabel');
-				await ctx.reply('请发送标签，或点击跳过：', { reply_markup: kb });
-			} else if (state.step === 'label') {
-				const label = text === '-' ? undefined : text;
-				await setBotState(env, userId, { action: 'add', step: 'type', chatId: state.chatId, label });
+				await setBotState(env, userId, { action: 'add', step: 'type', chatId: text });
 				const kb = new InlineKeyboard()
 					.text('📨 Gmail (OAuth)', 'addtype:gmail')
 					.row()
@@ -83,7 +78,6 @@ export function registerInputHandler(bot: Bot, env: Env) {
 				try {
 					const account = await createImapAccount(env.DB, {
 						chatId: state.chatId,
-						label: state.label,
 						telegramUserId: userId,
 						email: state.imapUser,
 						imapHost: state.imapHost,
@@ -103,7 +97,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
 
 					const kb = new InlineKeyboard().text('查看账号', `acc:${account.id}`).text('账号列表', 'accs');
 					await ctx.reply(
-						`✅ IMAP 账号已创建 #${account.id}\n\n邮箱: ${state.imapUser}\nChat ID: ${state.chatId}${state.label ? `\n标签: ${state.label}` : ''}`,
+						`✅ IMAP 账号已创建 #${account.id}\n\n邮箱: ${state.imapUser}\nChat ID: ${state.chatId}`,
 						{ reply_markup: kb },
 					);
 				} catch (err) {
@@ -127,7 +121,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
 			}
 
 			try {
-				await updateAccount(env.DB, state.accountId, text, account.label);
+				await updateAccount(env.DB, state.accountId, text);
 				await clearBotState(env, userId);
 				const kb = new InlineKeyboard().text('查看账号', `acc:${state.accountId}`).text('账号列表', 'accs');
 				await ctx.reply(`✅ Chat ID 已更新为 ${text}`, { reply_markup: kb });
@@ -137,24 +131,5 @@ export function registerInputHandler(bot: Bot, env: Env) {
 			}
 		}
 
-		// ─── 编辑标签 ─────────────────────────────────────────────────
-		else if (state.action === 'edit_label') {
-			const account = await getAuthorizedAccount(env.DB, state.accountId, userId, admin);
-			if (!account) {
-				await clearBotState(env, userId);
-				await ctx.reply('❌ 账号不存在或无权访问');
-				return;
-			}
-
-			try {
-				await updateAccount(env.DB, state.accountId, account.chat_id, text);
-				await clearBotState(env, userId);
-				const kb = new InlineKeyboard().text('查看账号', `acc:${state.accountId}`).text('账号列表', 'accs');
-				await ctx.reply(`✅ 标签已更新为「${text}」`, { reply_markup: kb });
-			} catch (err) {
-				await clearBotState(env, userId);
-				await ctx.reply(`❌ 更新失败: ${err instanceof Error ? err.message : String(err)}`);
-			}
-		}
 	});
 }

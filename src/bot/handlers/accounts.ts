@@ -27,7 +27,7 @@ export function accountListKeyboard(accounts: Account[], options?: { isAdmin?: b
 	const kb = new InlineKeyboard();
 	for (const acc of accounts) {
 		const status = acc.type === AccountType.Imap ? '📬' : acc.refresh_token ? '✅' : '❌';
-		const display = acc.label || acc.email || `#${acc.id}`;
+		const display = acc.email || `#${acc.id}`;
 		kb.text(`${status} ${display}`, `acc:${acc.id}`).row();
 	}
 	kb.text('➕ 添加账号', 'add').row();
@@ -180,8 +180,6 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 		const kb = new InlineKeyboard()
 			.text('✏️ 编辑 Chat ID', `acc:${accountId}:eci`)
-			.row()
-			.text('✏️ 编辑标签', `acc:${accountId}:elb`)
 			.row();
 		if (admin) {
 			kb.text('👤 分配所有者', `acc:${accountId}:own`).row();
@@ -204,30 +202,6 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		const kb = new InlineKeyboard().text('❌ 取消', `acc:${accountId}:edit`);
 		await ctx.editMessageText(`✏️ 编辑 Chat ID\n\n当前值: ${account.chat_id}\n\n请发送新的 Chat ID：`, { reply_markup: kb });
 		await ctx.answerCallbackQuery();
-	});
-
-	// Edit Label
-	bot.callbackQuery(/^acc:(\d+):elb$/, async (ctx) => {
-		const { userId, accountId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
-		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-
-		await setBotState(env, userId, { action: 'edit_label', accountId });
-		const kb = new InlineKeyboard().text('🗑 清空标签', `acc:${accountId}:elbc`).row().text('❌ 取消', `acc:${accountId}:edit`);
-		await ctx.editMessageText(`✏️ 编辑标签\n\n当前值: ${account.label || '(无)'}\n\n请发送新标签：`, { reply_markup: kb });
-		await ctx.answerCallbackQuery();
-	});
-
-	// Clear label
-	bot.callbackQuery(/^acc:(\d+):elbc$/, async (ctx) => {
-		const { userId, accountId, admin, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
-		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-
-		await clearBotState(env, userId);
-		await updateAccount(env.DB, accountId, account.chat_id, null);
-		const updated = await getAuthorizedAccount(env.DB, accountId, userId, admin);
-		if (!updated) return ctx.answerCallbackQuery({ text: '账号不存在' });
-		await ctx.editMessageText(accountDetailText(updated), { reply_markup: accountDetailKeyboard(updated) });
-		await ctx.answerCallbackQuery({ text: '✅ 标签已清空' });
 	});
 
 	// Owner selection (admin)
@@ -264,7 +238,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		const account = await getAuthorizedAccount(env.DB, accountId, userId, true);
 		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在' });
 
-		await updateAccount(env.DB, accountId, account.chat_id, account.label, newOwner);
+		await updateAccount(env.DB, accountId, account.chat_id, newOwner);
 		const updated = await getAuthorizedAccount(env.DB, accountId, userId, true);
 		if (!updated) return ctx.answerCallbackQuery({ text: '账号不存在' });
 		await ctx.editMessageText(accountDetailText(updated), { reply_markup: accountDetailKeyboard(updated) });
@@ -284,29 +258,15 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 	// Add with own chat ID shortcut
 	bot.callbackQuery('addme', async (ctx) => {
 		const userId = String(ctx.from.id);
-		await setBotState(env, userId, { action: 'add', step: 'label', chatId: userId });
+		await setBotState(env, userId, { action: 'add', step: 'type', chatId: userId });
 
-		const kb = new InlineKeyboard().text('⏭ 跳过', 'skiplabel').row().text('❌ 取消', 'accs');
-		await ctx.editMessageText(`➕ 添加账号\n\nChat ID: ${userId}\n\n请发送标签，或点击跳过：`, { reply_markup: kb });
-		await ctx.answerCallbackQuery();
-	});
-
-	// Skip label → show type selection
-	bot.callbackQuery('skiplabel', async (ctx) => {
-		const userId = String(ctx.from.id);
-		const state = await getBotState(env, userId);
-		if (!state || state.action !== 'add' || state.step !== 'label') {
-			return ctx.answerCallbackQuery({ text: '操作已过期' });
-		}
-
-		await setBotState(env, userId, { action: 'add', step: 'type', chatId: state.chatId });
 		const kb = new InlineKeyboard()
 			.text('📨 Gmail (OAuth)', 'addtype:gmail')
 			.row()
 			.text('📬 IMAP', 'addtype:imap')
 			.row()
 			.text('❌ 取消', 'accs');
-		await ctx.editMessageText(`➕ 添加账号\n\nChat ID: ${state.chatId}\n\n选择账号类型：`, { reply_markup: kb });
+		await ctx.editMessageText(`➕ 添加账号\n\nChat ID: ${userId}\n\n选择账号类型：`, { reply_markup: kb });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -319,12 +279,12 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		}
 
 		try {
-			const account = await createAccount(env.DB, state.chatId, state.label, userId);
+			const account = await createAccount(env.DB, state.chatId, userId);
 			await clearBotState(env, userId);
 
 			const kb = new InlineKeyboard().text('查看账号', `acc:${account.id}`).text('账号列表', 'accs');
 			await ctx.editMessageText(
-				`✅ Gmail 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}${state.label ? `\n标签: ${state.label}` : ''}\n\n请点击「查看账号」完成 Google OAuth 授权。`,
+				`✅ Gmail 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}\n\n请点击「查看账号」完成 Google OAuth 授权。`,
 				{ reply_markup: kb },
 			);
 		} catch (err) {
@@ -346,7 +306,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 			return ctx.answerCallbackQuery({ text: '❌ IMAP 中间件未配置，请联系管理员' });
 		}
 
-		await setBotState(env, userId, { action: 'add_imap', step: 'host', chatId: state.chatId, label: state.label });
+		await setBotState(env, userId, { action: 'add_imap', step: 'host', chatId: state.chatId });
 		const kb = new InlineKeyboard().text('❌ 取消', 'accs');
 		await ctx.editMessageText(
 			`📬 添加 IMAP 账号\n\nChat ID: ${state.chatId}\n\n请发送 IMAP 服务器地址（如 imap.gmail.com）：`,
