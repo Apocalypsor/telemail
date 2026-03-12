@@ -8,7 +8,6 @@ export function accountDetailText(account: Account): string {
 		text += `类型: 📬 IMAP\n`;
 		text += `邮箱: ${account.email || '(未设置)'}\n`;
 		text += `Chat ID: ${account.chat_id}\n`;
-		text += `标签: ${account.label || '(无)'}\n`;
 		text += `服务器: ${account.imap_host}:${account.imap_port}${account.imap_secure ? ' (TLS)' : ''}\n`;
 		text += `用户名: ${account.imap_user}`;
 	} else {
@@ -16,7 +15,6 @@ export function accountDetailText(account: Account): string {
 		text += `类型: 📨 Gmail\n`;
 		text += `邮箱: ${account.email || '(未设置)'}\n`;
 		text += `Chat ID: ${account.chat_id}\n`;
-		text += `标签: ${account.label || '(无)'}\n`;
 		text += `状态: ${status}`;
 	}
 	return text;

@@ -34,10 +34,10 @@ export async function getAuthorizedAccount(db: D1Database, id: number, userId: s
 	return null;
 }
 
-export async function createAccount(db: D1Database, chatId: string, label?: string, telegramUserId?: string): Promise<Account> {
+export async function createAccount(db: D1Database, chatId: string, telegramUserId?: string): Promise<Account> {
 	const result = await db
-		.prepare('INSERT INTO accounts (chat_id, label, telegram_user_id) VALUES (?, ?, ?) RETURNING *')
-		.bind(chatId, label ?? null, telegramUserId ?? null)
+		.prepare('INSERT INTO accounts (chat_id, telegram_user_id) VALUES (?, ?) RETURNING *')
+		.bind(chatId, telegramUserId ?? null)
 		.first<Account>();
 	if (!result) throw new Error('Failed to create account');
 	return result;
@@ -55,14 +55,14 @@ export async function updateAccountEmail(db: D1Database, id: number, email: stri
 	await db.prepare("UPDATE accounts SET email = ?, updated_at = datetime('now') WHERE id = ?").bind(email, id).run();
 }
 
-export async function updateAccount(db: D1Database, id: number, chatId: string, label: string | null, telegramUserId?: string | null): Promise<void> {
+export async function updateAccount(db: D1Database, id: number, chatId: string, telegramUserId?: string | null): Promise<void> {
 	if (telegramUserId !== undefined) {
 		await db
-			.prepare("UPDATE accounts SET chat_id = ?, label = ?, telegram_user_id = ?, updated_at = datetime('now') WHERE id = ?")
-			.bind(chatId, label, telegramUserId, id)
+			.prepare("UPDATE accounts SET chat_id = ?, telegram_user_id = ?, updated_at = datetime('now') WHERE id = ?")
+			.bind(chatId, telegramUserId, id)
 			.run();
 	} else {
-		await db.prepare("UPDATE accounts SET chat_id = ?, label = ?, updated_at = datetime('now') WHERE id = ?").bind(chatId, label, id).run();
+		await db.prepare("UPDATE accounts SET chat_id = ?, updated_at = datetime('now') WHERE id = ?").bind(chatId, id).run();
 	}
 }
 
@@ -77,7 +77,6 @@ export async function createImapAccount(
 	db: D1Database,
 	params: {
 		chatId: string;
-		label?: string;
 		telegramUserId?: string;
 		email: string;
 		imapHost: string;
@@ -89,11 +88,10 @@ export async function createImapAccount(
 ): Promise<Account> {
 	const result = await db
 		.prepare(
-			"INSERT INTO accounts (type, chat_id, label, telegram_user_id, email, imap_host, imap_port, imap_secure, imap_user, imap_pass) VALUES ('imap', ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+			"INSERT INTO accounts (type, chat_id, telegram_user_id, email, imap_host, imap_port, imap_secure, imap_user, imap_pass) VALUES ('imap', ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
 		)
 		.bind(
 			params.chatId,
-			params.label ?? null,
 			params.telegramUserId ?? null,
 			params.email,
 			params.imapHost,

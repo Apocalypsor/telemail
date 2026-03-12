@@ -8,15 +8,13 @@ function botStateKey(userId: string): string {
 
 export type BotInputState =
 	| { action: 'add'; step: 'chat_id' }
-	| { action: 'add'; step: 'label'; chatId: string }
-	| { action: 'add'; step: 'type'; chatId: string; label?: string }
-	| { action: 'add_imap'; step: 'host'; chatId: string; label?: string }
-	| { action: 'add_imap'; step: 'port'; chatId: string; label?: string; imapHost: string }
-	| { action: 'add_imap'; step: 'secure'; chatId: string; label?: string; imapHost: string; imapPort: number }
-	| { action: 'add_imap'; step: 'user'; chatId: string; label?: string; imapHost: string; imapPort: number; imapSecure: boolean }
-	| { action: 'add_imap'; step: 'pass'; chatId: string; label?: string; imapHost: string; imapPort: number; imapSecure: boolean; imapUser: string }
-	| { action: 'edit_chatid'; accountId: number }
-	| { action: 'edit_label'; accountId: number };
+	| { action: 'add'; step: 'type'; chatId: string }
+	| { action: 'add_imap'; step: 'host'; chatId: string }
+	| { action: 'add_imap'; step: 'port'; chatId: string; imapHost: string }
+	| { action: 'add_imap'; step: 'secure'; chatId: string; imapHost: string; imapPort: number }
+	| { action: 'add_imap'; step: 'user'; chatId: string; imapHost: string; imapPort: number; imapSecure: boolean }
+	| { action: 'add_imap'; step: 'pass'; chatId: string; imapHost: string; imapPort: number; imapSecure: boolean; imapUser: string }
+	| { action: 'edit_chatid'; accountId: number };
 
 export async function getBotState(env: Env, userId: string): Promise<BotInputState | null> {
 	const raw = await env.EMAIL_KV.get(botStateKey(userId));
