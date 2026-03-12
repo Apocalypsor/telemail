@@ -4,6 +4,7 @@ import { getAccountByEmail } from '../../db/accounts';
 import { getCachedMailHtml, putCachedMailHtml } from '../../db/kv';
 import { getAccessToken } from '../../services/email/gmail';
 import { fetchImapRawEmail } from '../../services/email/imap/bridge';
+import { fetchRawMime, getAccessToken as msGetAccessToken } from '../../services/email/outlook';
 import { fetchMailContent, wrapPlainText } from '../../services/mail-content';
 import { AccountType, type AppEnv } from '../../types';
 import { base64ToArrayBuffer } from '../../utils/base64url';
@@ -35,6 +36,12 @@ mail.get(ROUTE_MAIL, async (c) => {
 	if (account.type === AccountType.Imap) {
 		const base64 = await fetchImapRawEmail(c.env, account.id, messageId);
 		const email = await new PostalMime().parse(base64ToArrayBuffer(base64));
+		html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
+	} else if (account.type === AccountType.Outlook) {
+		if (!account.refresh_token) return c.text('Account not authorized', 403);
+		const accessToken = await msGetAccessToken(c.env, account);
+		const raw = await fetchRawMime(accessToken, messageId);
+		const email = await new PostalMime().parse(raw);
 		html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
 	} else {
 		if (!account.refresh_token) return c.text('Account not authorized', 403);
