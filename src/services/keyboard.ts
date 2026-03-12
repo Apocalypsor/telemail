@@ -8,13 +8,13 @@ import { generateMailToken } from '../utils/hash';
 export async function buildEmailKeyboard(
 	env: Env,
 	emailMessageId: string,
-	accountId: number,
+	accountEmail: string | null,
 	chatId: string,
 	starred: boolean,
 ): Promise<InlineKeyboard> {
-	if (env.WORKER_URL) {
-		const mailToken = await generateMailToken(env.ADMIN_SECRET, emailMessageId, accountId, chatId);
-		const mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${emailMessageId}?accountId=${accountId}&chatId=${encodeURIComponent(chatId)}&t=${mailToken}`;
+	if (env.WORKER_URL && accountEmail) {
+		const mailToken = await generateMailToken(env.ADMIN_SECRET, emailMessageId, accountEmail, chatId);
+		const mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${emailMessageId}?email=${encodeURIComponent(accountEmail)}&chatId=${encodeURIComponent(chatId)}&t=${mailToken}`;
 		return starred ? starredKeyboardWithMailUrl(mailUrl) : starKeyboardWithMailUrl(mailUrl);
 	}
 	return starred ? STARRED_KEYBOARD : STAR_KEYBOARD;
@@ -26,8 +26,8 @@ export async function resolveStarredKeyboard(
 	chatId: string,
 	tgMessageId: number,
 	emailMessageId: string,
-	accountId: number,
+	accountEmail: string | null,
 ): Promise<InlineKeyboard> {
 	const mapping = await getMessageMapping(env.DB, chatId, tgMessageId);
-	return buildEmailKeyboard(env, emailMessageId, accountId, chatId, !!mapping?.starred);
+	return buildEmailKeyboard(env, emailMessageId, accountEmail, chatId, !!mapping?.starred);
 }
