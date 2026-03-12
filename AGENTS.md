@@ -19,6 +19,7 @@ For all limits and quotas, retrieve from the product's `/platform/limits/` page.
 | `npm test`           | Run tests (vitest)                             |
 | `npx wrangler types` | Generate TypeScript types from wrangler.jsonc  |
 
+Run `npx prettier --write <file>` after editing any source file to ensure consistent formatting.
 Run `wrangler types` after changing bindings in wrangler.jsonc.
 Run `npm run build:css` after changing Tailwind classes in components (auto-runs with dev/deploy).
 
