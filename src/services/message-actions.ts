@@ -26,7 +26,7 @@ export async function toggleStar(env: Env, chatId: string, messageId: number, st
 	}
 	await updateStarred(env.DB, chatId, messageId, starred);
 
-	const keyboard = await buildEmailKeyboard(env, mapping.email_message_id, mapping.account_id, chatId, starred);
+	const keyboard = await buildEmailKeyboard(env, mapping.email_message_id, account.email, chatId, starred);
 	return { ok: true, keyboard, emailMessageId: mapping.email_message_id };
 }
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
-import { getAccountById } from '../../db/accounts';
+import { getAccountByEmail } from '../../db/accounts';
 import { getCachedMailHtml, putCachedMailHtml } from '../../db/kv';
 import { getAccessToken } from '../../services/email/gmail';
 import { fetchImapRawEmail } from '../../services/email/imap/bridge';
@@ -16,22 +16,19 @@ mail.get(ROUTE_MAIL, async (c) => {
 	const messageId = c.req.param('id');
 	const token = c.req.query('t');
 	const chatId = c.req.query('chatId');
-	const accountIdStr = c.req.query('accountId');
+	const accountEmail = c.req.query('email');
 
-	if (!token || !chatId || !accountIdStr) return c.text('Missing params', 400);
+	if (!token || !chatId || !accountEmail) return c.text('Missing params', 400);
 
-	const accountId = parseInt(accountIdStr, 10);
-	if (isNaN(accountId)) return c.text('Invalid accountId', 400);
-
-	const valid = await verifyMailToken(c.env.ADMIN_SECRET, messageId, accountId, chatId, token);
+	const valid = await verifyMailToken(c.env.ADMIN_SECRET, messageId, accountEmail, chatId, token);
 	if (!valid) return c.text('Forbidden', 403);
 
 	// KV 缓存（Gmail 和 IMAP 共用）
 	const cached = await getCachedMailHtml(c.env, messageId);
 	if (cached) return c.html(cached);
 
-	const account = await getAccountById(c.env.DB, accountId);
-	if (!account) return c.text('Account not found', 404);
+	const account = await getAccountByEmail(c.env.DB, accountEmail);
+	if (!account || account.chat_id !== chatId) return c.text('Account not found', 404);
 
 	let html: string | null = null;
 

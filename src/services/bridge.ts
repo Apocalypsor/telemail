@@ -79,7 +79,7 @@ export async function deliverEmailToTelegram(
 	const formattedBody = formatBody(email.text, email.html, bodyBudget);
 	const text = header + wrapExpandableQuote(formattedBody);
 
-	const keyboard = await buildEmailKeyboard(env, messageId, account.id, chatId, false);
+	const keyboard = await buildEmailKeyboard(env, messageId, account.email, chatId, false);
 
 	let sentMessageId: number;
 	if (hasAttachments) {
@@ -104,7 +104,7 @@ export async function deliverEmailToTelegram(
 	waitUntil(
 		(async () => {
 			try {
-				const editKeyboard = await resolveStarredKeyboard(env, chatId, sentMessageId, messageId, account.id);
+				const editKeyboard = await resolveStarredKeyboard(env, chatId, sentMessageId, messageId, account.email);
 				await runLlmProcessing({
 					env,
 					tgToken,
@@ -208,7 +208,7 @@ export async function retryFailedEmail(failed: FailedEmail, env: Env): Promise<v
 	const charLimit = failed.is_caption ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 	const bodyBudget = Math.max(Math.floor((charLimit - header.length) * 0.9), 100);
 	const formattedBody = formatBody(email.text, email.html, bodyBudget);
-	const keyboard = await resolveStarredKeyboard(env, failed.tg_chat_id, failed.tg_message_id, failed.email_message_id, account.id);
+	const keyboard = await resolveStarredKeyboard(env, failed.tg_chat_id, failed.tg_message_id, failed.email_message_id, account.email);
 
 	await runLlmProcessing({
 		env,
