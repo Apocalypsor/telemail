@@ -197,7 +197,9 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		try {
 			const result = await retryAllFailedEmails(env);
 			const msg = `✅ ${result.success} 封成功` + (result.failed > 0 ? `，❌ ${result.failed} 封仍失败` : '');
-			await ctx.editMessageText(`📋 失败邮件\n\n${msg}`, { reply_markup: new InlineKeyboard().text('📋 刷新列表', 'failed').text('« 返回', 'admin') });
+			await ctx.editMessageText(`📋 失败邮件\n\n${msg}`, {
+				reply_markup: new InlineKeyboard().text('📋 刷新列表', 'failed').text('« 返回', 'admin'),
+			});
 		} catch (err) {
 			await reportErrorToObservability(env, 'bot.retry_all_failed', err);
 			await ctx.editMessageText('📋 失败邮件\n\n❌ 重试出错', { reply_markup: new InlineKeyboard().text('« 返回', 'failed') });

@@ -122,7 +122,13 @@ function attToBlob(att: Attachment): Blob {
  * - 多个附件: 先发文字消息（带 reply_markup），再发媒体组作为回复
  * - 超过 10 个附件: 分批发送，每批最多 10 个
  */
-export async function sendWithAttachments(token: string, chatId: string, caption: string, attachments: Attachment[], replyMarkup?: unknown): Promise<number> {
+export async function sendWithAttachments(
+	token: string,
+	chatId: string,
+	caption: string,
+	attachments: Attachment[],
+	replyMarkup?: unknown,
+): Promise<number> {
 	try {
 		if (attachments.length === 1) {
 			const att = attachments[0];
@@ -206,7 +212,13 @@ export async function setReplyMarkup(token: string, chatId: string, messageId: n
 	await tgPost(url, { chat_id: chatId, message_id: messageId, reply_markup: replyMarkup }, 'editMessageReplyMarkup');
 }
 
-async function sendMediaGroupChunk(token: string, chatId: string, caption: string, attachments: Attachment[], replyToMessageId?: number): Promise<number> {
+async function sendMediaGroupChunk(
+	token: string,
+	chatId: string,
+	caption: string,
+	attachments: Attachment[],
+	replyToMessageId?: number,
+): Promise<number> {
 	const form = new FormData();
 	form.append('chat_id', chatId);
 	if (replyToMessageId) form.append('reply_to_message_id', String(replyToMessageId));

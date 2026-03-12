@@ -33,14 +33,10 @@ async function handleScheduled(event: ScheduledEvent, env: Env): Promise<void> {
 					});
 				}
 			})
-			.catch((error: unknown) =>
-				reportErrorToObservability(env, 'scheduled.imap_bridge_health_check_failed', error),
-			),
+			.catch((error: unknown) => reportErrorToObservability(env, 'scheduled.imap_bridge_health_check_failed', error)),
 		// 仅凌晨：续订 Gmail watch
 		isMidnight
-			? renewWatchAll(env).catch((error: unknown) =>
-					reportErrorToObservability(env, 'scheduled.watch_renew_failed', error),
-				)
+			? renewWatchAll(env).catch((error: unknown) => reportErrorToObservability(env, 'scheduled.watch_renew_failed', error))
 			: Promise.resolve(),
 	]);
 }

@@ -13,10 +13,7 @@ export interface FailedEmail {
 }
 
 /** 保存失败邮件记录（UPSERT：相同 email_message_id + tg_message_id 则更新） */
-export async function putFailedEmail(
-	db: D1Database,
-	data: Omit<FailedEmail, 'id' | 'created_at'>,
-): Promise<void> {
+export async function putFailedEmail(db: D1Database, data: Omit<FailedEmail, 'id' | 'created_at'>): Promise<void> {
 	await db
 		.prepare(
 			`INSERT INTO failed_emails (account_id, email_message_id, tg_chat_id, tg_message_id, is_caption, subject, error_message)
@@ -25,7 +22,15 @@ export async function putFailedEmail(
 			   error_message = excluded.error_message,
 			   created_at = datetime('now')`,
 		)
-		.bind(data.account_id, data.email_message_id, data.tg_chat_id, data.tg_message_id, data.is_caption, data.subject ?? null, data.error_message ?? null)
+		.bind(
+			data.account_id,
+			data.email_message_id,
+			data.tg_chat_id,
+			data.tg_message_id,
+			data.is_caption,
+			data.subject ?? null,
+			data.error_message ?? null,
+		)
 		.run();
 }
 

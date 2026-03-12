@@ -66,14 +66,10 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 				const displayName = formatUserName({ first_name: ctx.from?.first_name || 'Unknown', last_name: ctx.from?.last_name });
 				const username = ctx.from?.username ? ` (@${ctx.from.username})` : '';
 				try {
-					const kb = new InlineKeyboard()
-						.text('✅ 批准', `approve:${telegramId}`)
-						.text('❌ 拒绝', `reject:${telegramId}`);
-					await ctx.api.sendMessage(
-						env.ADMIN_TELEGRAM_ID,
-						`🆕 新用户注册: ${displayName}${username}\nTelegram ID: ${telegramId}`,
-						{ reply_markup: kb },
-					);
+					const kb = new InlineKeyboard().text('✅ 批准', `approve:${telegramId}`).text('❌ 拒绝', `reject:${telegramId}`);
+					await ctx.api.sendMessage(env.ADMIN_TELEGRAM_ID, `🆕 新用户注册: ${displayName}${username}\nTelegram ID: ${telegramId}`, {
+						reply_markup: kb,
+					});
 				} catch (err) {
 					await reportErrorToObservability(env, 'bot.notify_admin_failed', err);
 				}

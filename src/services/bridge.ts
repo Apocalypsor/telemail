@@ -12,13 +12,7 @@ import { fetchImapRawEmail } from './email/imap/bridge';
 import { buildEmailKeyboard, resolveStarredKeyboard } from './keyboard';
 import { runLlmProcessing, wrapExpandableQuote } from './llm-processing';
 import { reportErrorToObservability } from './observability';
-import {
-	sendTextMessage,
-	sendWithAttachments,
-	setReplyMarkup,
-	TG_CAPTION_LIMIT,
-	TG_MSG_LIMIT,
-} from './telegram';
+import { sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
 // ---------------------------------------------------------------------------
 // 私有 helper
@@ -138,11 +132,7 @@ export async function deliverEmailToTelegram(
 // ---------------------------------------------------------------------------
 
 /** 按账号类型拉取原始邮件并投递到 Telegram，支持去重 */
-export async function processEmailMessage(
-	msg: QueueMessage,
-	env: Env,
-	waitUntil: (p: Promise<unknown>) => void,
-): Promise<void> {
+export async function processEmailMessage(msg: QueueMessage, env: Env, waitUntil: (p: Promise<unknown>) => void): Promise<void> {
 	const dedupeKey = `${KV_PROCESSED_PREFIX}${msg.accountId}:${msg.messageId}`;
 	const processed = await env.EMAIL_KV.get(dedupeKey);
 	if (processed) {

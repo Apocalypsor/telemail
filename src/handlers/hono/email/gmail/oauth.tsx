@@ -32,10 +32,7 @@ gmailOauth.get(ROUTE_OAUTH_GOOGLE_START, async (c) => {
 gmailOauth.get(ROUTE_OAUTH_GOOGLE_CALLBACK, async (c) => {
 	const result = await processOAuthCallback(c.req.raw, c.env);
 	if (!result.ok) {
-		return c.html(
-			<OAuthErrorPage title={result.title} detail={result.detail} />,
-			result.status as ContentfulStatusCode,
-		);
+		return c.html(<OAuthErrorPage title={result.title} detail={result.detail} />, result.status as ContentfulStatusCode);
 	}
 
 	// 尝试更新 bot 中的授权消息

@@ -6,9 +6,7 @@ import { getEmailProvider } from './email/provider';
 import { buildEmailKeyboard } from './keyboard';
 import { reportErrorToObservability } from './observability';
 
-type ToggleStarResult =
-	| { ok: true; keyboard: InlineKeyboard; emailMessageId: string }
-	| { ok: false; reason: string };
+type ToggleStarResult = { ok: true; keyboard: InlineKeyboard; emailMessageId: string } | { ok: false; reason: string };
 
 /** 切换星标并返回新的 keyboard */
 export async function toggleStar(env: Env, chatId: string, messageId: number, starred: boolean): Promise<ToggleStarResult> {

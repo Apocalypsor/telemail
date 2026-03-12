@@ -38,7 +38,7 @@ imap.post(ROUTE_IMAP_PUSH, requireBearer('IMAP_BRIDGE_SECRET'), async (c) => {
 		messageId: string;
 	}>();
 
-	if (!accountId || !messageId) {
+	if (typeof accountId !== 'number' || accountId <= 0 || !messageId) {
 		return c.json({ error: 'Missing required fields: accountId, messageId' }, 400);
 	}
 

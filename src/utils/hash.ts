@@ -13,9 +13,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
 
 /** 生成邮件查看链接的 HMAC-SHA256 token */
 export async function generateMailToken(secret: string, messageId: string, accountEmail: string, chatId: string): Promise<string> {
-	const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, [
-		'sign',
-	]);
+	const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 	const data = new TextEncoder().encode(`${messageId}:${accountEmail}:${chatId}`);
 	const sig = await crypto.subtle.sign('HMAC', key, data);
 	return Array.from(new Uint8Array(sig))

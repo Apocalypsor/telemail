@@ -18,7 +18,7 @@ mail.get(ROUTE_MAIL, async (c) => {
 	const chatId = c.req.query('chatId');
 	const accountEmail = c.req.query('email');
 
-	if (!token || !chatId || !accountEmail) return c.text('Missing params', 400);
+	if (!messageId || !token || !chatId || !accountEmail) return c.text('Missing params', 400);
 
 	const valid = await verifyMailToken(c.env.ADMIN_SECRET, messageId, accountEmail, chatId, token);
 	if (!valid) return c.text('Forbidden', 403);

@@ -1,10 +1,16 @@
-import { GMAIL_MODIFY_SCOPE, GOOGLE_OAUTH_AUTHORIZE_URL, GOOGLE_OAUTH_TOKEN_URL, KV_OAUTH_STATE_PREFIX, OAUTH_STATE_TTL_SECONDS } from '../../../constants';
-import { ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '../../../handlers/hono/routes';
-import type { Env } from '../../../types';
+import {
+	GMAIL_MODIFY_SCOPE,
+	GOOGLE_OAUTH_AUTHORIZE_URL,
+	GOOGLE_OAUTH_TOKEN_URL,
+	KV_OAUTH_STATE_PREFIX,
+	OAUTH_STATE_TTL_SECONDS,
+} from '../../../constants';
 import { getAccountById, updateAccountEmail, updateRefreshToken } from '../../../db/accounts';
 import { putCachedAccessToken } from '../../../db/kv';
-import { renewWatch } from './index';
+import { ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '../../../handlers/hono/routes';
+import type { Env } from '../../../types';
 import { reportErrorToObservability } from '../../observability';
+import { renewWatch } from './index';
 
 export type GoogleTokenResponse = {
 	access_token?: string;
@@ -60,7 +66,15 @@ export async function startGoogleOAuth(request: Request, env: Env, accountId: nu
 }
 
 type OAuthCallbackResult =
-	| { ok: true; refreshToken: string | undefined; scope: string; expiresIn: number | undefined; accountEmail: string; accountId: number; ownerTelegramId: string | null }
+	| {
+			ok: true;
+			refreshToken: string | undefined;
+			scope: string;
+			expiresIn: number | undefined;
+			accountEmail: string;
+			accountId: number;
+			ownerTelegramId: string | null;
+	  }
 	| { ok: false; title: string; detail: string; status: number };
 
 export async function processOAuthCallback(request: Request, env: Env): Promise<OAuthCallbackResult> {
@@ -106,20 +120,17 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 	let accountEmail = account?.email || 'unknown';
 
 	const redirectUri = getCallbackUrl(requestUrl.origin);
-	const [, tokenResp] = await Promise.all([
-		env.EMAIL_KV.delete(stateKey),
-		fetch(GOOGLE_OAUTH_TOKEN_URL, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: new URLSearchParams({
-				code,
-				client_id: env.GMAIL_CLIENT_ID,
-				client_secret: env.GMAIL_CLIENT_SECRET,
-				redirect_uri: redirectUri,
-				grant_type: 'authorization_code',
-			}),
+	const tokenResp = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+		body: new URLSearchParams({
+			code,
+			client_id: env.GMAIL_CLIENT_ID,
+			client_secret: env.GMAIL_CLIENT_SECRET,
+			redirect_uri: redirectUri,
+			grant_type: 'authorization_code',
 		}),
-	]);
+	});
 
 	const rawBody = await tokenResp.text();
 	let tokenData: GoogleTokenResponse = {};
@@ -130,6 +141,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 	}
 
 	if (!tokenResp.ok) {
+		// Token exchange failed — don't delete state so the user can retry
 		return {
 			ok: false,
 			title: 'Token 交换失败',
@@ -137,6 +149,9 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 			status: tokenResp.status,
 		};
 	}
+
+	// Token exchange succeeded — now safe to delete the one-time state
+	await env.EMAIL_KV.delete(stateKey);
 
 	const refreshToken = tokenData.refresh_token;
 	if (account) {
@@ -171,7 +186,11 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 		// 授权完成后自动 watch，用户无需手动点击
 		if (refreshToken || account.refresh_token) {
 			try {
-				const freshAccount = { ...account, refresh_token: (refreshToken || account.refresh_token)!, email: accountEmail !== 'unknown' ? accountEmail : account.email };
+				const freshAccount = {
+					...account,
+					refresh_token: (refreshToken || account.refresh_token)!,
+					email: accountEmail !== 'unknown' ? accountEmail : account.email,
+				};
 				await renewWatch(env, freshAccount);
 				console.log(`Auto-watch activated for ${accountEmail}`);
 			} catch (err) {

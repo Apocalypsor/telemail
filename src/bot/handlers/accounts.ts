@@ -1,13 +1,20 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import { Api } from 'grammy';
 import { OAUTH_STATE_TTL_SECONDS } from '../../constants';
-import { createAccount, deleteAccount, getAllAccounts, getAuthorizedAccount, getOwnAccounts, getVisibleAccounts, updateAccount } from '../../db/accounts';
-import { getAllUsers } from '../../db/users';
+import {
+	createAccount,
+	deleteAccount,
+	getAllAccounts,
+	getAuthorizedAccount,
+	getOwnAccounts,
+	getVisibleAccounts,
+	updateAccount,
+} from '../../db/accounts';
 import { clearAccountCache, deleteHistoryId } from '../../db/kv';
+import { getAllUsers } from '../../db/users';
 import { renewWatch, stopWatch } from '../../services/email/gmail';
-import { syncAccounts } from '../../services/email/imap/bridge';
 import { generateOAuthUrl } from '../../services/email/gmail/oauth';
+import { syncAccounts } from '../../services/email/imap/bridge';
 import { reportErrorToObservability } from '../../services/observability';
 import type { Account, Env } from '../../types';
 import { AccountType } from '../../types';
@@ -84,18 +91,15 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 			const oauthUrl = await generateOAuthUrl(env, accountId, origin);
 
 			const kb = new InlineKeyboard().url('🔗 点击授权', oauthUrl).row().text('« 返回', `acc:${accountId}`);
-			await ctx.editMessageText(
-				`🔑 Google OAuth 授权\n\n账号: ${account.email || `#${account.id}`}\n\n请点击下方按钮完成 Google 授权：`,
-				{ reply_markup: kb },
-			);
+			await ctx.editMessageText(`🔑 Google OAuth 授权\n\n账号: ${account.email || `#${account.id}`}\n\n请点击下方按钮完成 Google 授权：`, {
+				reply_markup: kb,
+			});
 
 			const msg = ctx.callbackQuery.message;
 			if (msg) {
-				await env.EMAIL_KV.put(
-					`oauth_bot_msg:${accountId}`,
-					JSON.stringify({ chatId: String(msg.chat.id), messageId: msg.message_id }),
-					{ expirationTtl: OAUTH_STATE_TTL_SECONDS },
-				);
+				await env.EMAIL_KV.put(`oauth_bot_msg:${accountId}`, JSON.stringify({ chatId: String(msg.chat.id), messageId: msg.message_id }), {
+					expirationTtl: OAUTH_STATE_TTL_SECONDS,
+				});
 			}
 		} catch (err) {
 			await reportErrorToObservability(env, 'bot.oauth_url_gen_failed', err);
@@ -178,18 +182,13 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		await clearBotState(env, userId);
 		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
-		const kb = new InlineKeyboard()
-			.text('✏️ 编辑 Chat ID', `acc:${accountId}:eci`)
-			.row();
+		const kb = new InlineKeyboard().text('✏️ 编辑 Chat ID', `acc:${accountId}:eci`).row();
 		if (admin) {
 			kb.text('👤 分配所有者', `acc:${accountId}:own`).row();
 		}
 		kb.text('« 返回', `acc:${accountId}`);
 
-		await ctx.editMessageText(
-			`✏️ 编辑账号 #${accountId}\n\n${accountDetailText(account)}\n\n选择要编辑的项目：`,
-			{ reply_markup: kb },
-		);
+		await ctx.editMessageText(`✏️ 编辑账号 #${accountId}\n\n${accountDetailText(account)}\n\n选择要编辑的项目：`, { reply_markup: kb });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -222,9 +221,12 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		}
 		kb.text('« 返回', `acc:${accountId}:edit`);
 
-		await ctx.editMessageText(`👤 分配所有者\n\n账号 #${accountId}\n当前所有者: ${account.telegram_user_id || '(无)'}\n\n选择新的所有者：`, {
-			reply_markup: kb,
-		});
+		await ctx.editMessageText(
+			`👤 分配所有者\n\n账号 #${accountId}\n当前所有者: ${account.telegram_user_id || '(无)'}\n\n选择新的所有者：`,
+			{
+				reply_markup: kb,
+			},
+		);
 		await ctx.answerCallbackQuery();
 	});
 
@@ -289,7 +291,8 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 			);
 		} catch (err) {
 			await clearBotState(env, userId);
-			await ctx.editMessageText(`❌ 创建失败: ${err instanceof Error ? err.message : String(err)}`);
+			await reportErrorToObservability(env, 'bot.create_account_failed', err);
+			await ctx.editMessageText('❌ 创建失败，请稍后重试');
 		}
 		await ctx.answerCallbackQuery();
 	});
@@ -308,10 +311,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 		await setBotState(env, userId, { action: 'add_imap', step: 'host', chatId: state.chatId });
 		const kb = new InlineKeyboard().text('❌ 取消', 'accs');
-		await ctx.editMessageText(
-			`📬 添加 IMAP 账号\n\nChat ID: ${state.chatId}\n\n请发送 IMAP 服务器地址（如 imap.gmail.com）：`,
-			{ reply_markup: kb },
-		);
+		await ctx.editMessageText(`📬 添加 IMAP 账号\n\nChat ID: ${state.chatId}\n\n请发送 IMAP 服务器地址（如 imap.gmail.com）：`, {
+			reply_markup: kb,
+		});
 		await ctx.answerCallbackQuery();
 	});
 

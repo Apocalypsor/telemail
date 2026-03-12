@@ -75,7 +75,7 @@ export interface Env {
 	ADMIN_SECRET: string;
 	/** Telegram 管理员 user ID，用于 Telegram Login 鉴权 */
 	ADMIN_TELEGRAM_ID: string;
-/** KV 命名空间（access_token 缓存、消息去重、OAuth state） */
+	/** KV 命名空间（access_token 缓存、消息去重、OAuth state） */
 	EMAIL_KV: KVNamespace;
 	/** D1 数据库（多账号信息） */
 	DB: D1Database;

@@ -96,10 +96,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
 					}
 
 					const kb = new InlineKeyboard().text('查看账号', `acc:${account.id}`).text('账号列表', 'accs');
-					await ctx.reply(
-						`✅ IMAP 账号已创建 #${account.id}\n\n邮箱: ${state.imapUser}\nChat ID: ${state.chatId}`,
-						{ reply_markup: kb },
-					);
+					await ctx.reply(`✅ IMAP 账号已创建 #${account.id}\n\n邮箱: ${state.imapUser}\nChat ID: ${state.chatId}`, { reply_markup: kb });
 				} catch (err) {
 					await clearBotState(env, userId);
 					await ctx.reply(`❌ 创建失败: ${err instanceof Error ? err.message : String(err)}`);
@@ -130,6 +127,5 @@ export function registerInputHandler(bot: Bot, env: Env) {
 				await ctx.reply(`❌ 更新失败: ${err instanceof Error ? err.message : String(err)}`);
 			}
 		}
-
 	});
 }

@@ -1,22 +1,13 @@
 import { Card, Layout } from './layout';
 
-export function OAuthSetupPage({
-	startUrl,
-	callbackUrl,
-	accountEmail,
-}: {
-	startUrl: string;
-	callbackUrl: string;
-	accountEmail: string;
-}) {
+export function OAuthSetupPage({ startUrl, callbackUrl, accountEmail }: { startUrl: string; callbackUrl: string; accountEmail: string }) {
 	return (
 		<Layout title="Gmail OAuth 授权">
 			<Card class="max-w-3xl">
 				<h1 class="text-2xl font-bold text-slate-100 mb-3">Gmail OAuth 授权</h1>
 				<p class="text-sm text-slate-400 leading-relaxed">
-					为账号 <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">{accountEmail}</code> 授权 Gmail 访问权限。
-					使用当前 Worker 的{' '}
-					<code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">GMAIL_CLIENT_ID</code> 和{' '}
+					为账号 <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">{accountEmail}</code> 授权 Gmail 访问权限。 使用当前
+					Worker 的 <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">GMAIL_CLIENT_ID</code> 和{' '}
 					<code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">GMAIL_CLIENT_SECRET</code> 发起 OAuth，然后把{' '}
 					<code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">refresh_token</code> 保存到 D1 数据库。
 				</p>
@@ -39,7 +30,6 @@ export function OAuthSetupPage({
 				>
 					开始授权
 				</a>
-	
 			</Card>
 		</Layout>
 	);
@@ -104,7 +94,6 @@ export function OAuthCallbackPage({
 					返回 scope: <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">{scope}</code>
 					{typeof expiresIn === 'number' && `，access_token 有效期约 ${expiresIn} 秒`}。
 				</p>
-	
 			</Card>
 			<script dangerouslySetInnerHTML={{ __html: copyScript }} />
 		</Layout>
@@ -119,7 +108,6 @@ export function OAuthErrorPage({ title, detail }: { title: string; detail: strin
 				<pre class="p-3 bg-slate-900 border border-slate-700 rounded-lg font-mono text-xs text-red-400 whitespace-pre-wrap break-words overflow-auto">
 					{detail}
 				</pre>
-	
 			</Card>
 		</Layout>
 	);

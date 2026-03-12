@@ -57,7 +57,7 @@ export async function runLlmProcessing(ctx: LlmEditContext): Promise<void> {
 	if (verifyCode && ctx.formattedBody) {
 		const codeSection = `*🔒 验证码:*  \`${escapeMdV2(verifyCode)}\`\n\n`;
 		await editMessage(ctx.header + codeSection + wrapExpandableQuote(ctx.formattedBody));
-		console.log(`Verification code extracted: ${verifyCode}`);
+		console.log('Verification code extracted');
 		return;
 	}
 
