@@ -17,10 +17,10 @@ For all limits and quotas, retrieve from the product's `/platform/limits/` page.
 | `npm run deploy`     | Build CSS + deploy to Cloudflare               |
 | `npm run build:css`  | Generate Tailwind CSS (src/assets/tailwind.ts) |
 | `npm test`           | Run tests (vitest)                             |
-| `npx wrangler types` | Generate TypeScript types from wrangler.jsonc  |
+| `npm run cf-typegen` | Generate TypeScript types from wrangler.jsonc  |
 
 Run `npx prettier --write <file>` after editing any source file to ensure consistent formatting.
-Run `wrangler types` after changing bindings in wrangler.jsonc.
+Run `npm run cf-typegen` after changing bindings in wrangler.jsonc.
 Run `npm run build:css` after changing Tailwind classes in components (auto-runs with dev/deploy).
 
 ## Node.js Compatibility
@@ -37,6 +37,25 @@ https://developers.cloudflare.com/workers/runtime-apis/nodejs/
 Retrieve API references and limits from:
 `/kv/` · `/r2/` · `/d1/` · `/durable-objects/` · `/queues/` · `/vectorize/` · `/workers-ai/` · `/agents/`
 
+## Architecture Overview
+
+Telemail is a Cloudflare Worker that forwards emails (Gmail / Outlook / IMAP) to Telegram.
+
+**Entry point**: `src/index.ts` — exports `fetch` (Hono app), `queue` (email processing), `scheduled` (cron).
+
+**Key bindings** (defined in `wrangler.jsonc`):
+- **D1** (`DB`): accounts, users, message_map, failed_emails tables
+- **KV** (`EMAIL_KV`): access_token cache, dedup, OAuth state, mail HTML cache, bot info
+- **Queue** (`EMAIL_QUEUE`): email processing with retry (max 3, batch 5, concurrency 3)
+- **Service Binding** (`OBS_SERVICE`): observability error reporting
+- **Cron** (`0 * * * *`): hourly IMAP health check; midnight-only Gmail watch + Outlook subscription renewal
+
+**Auth middleware** (`src/handlers/hono/middleware.ts`):
+- `requireSecret('GMAIL_PUSH_SECRET')` — query param secret for Pub/Sub push
+- `requireBearer('IMAP_BRIDGE_SECRET')` — Authorization header for IMAP bridge
+
+**Email provider abstraction**: `src/services/email/provider.ts` — unified `markAsRead` / `addStar` / `removeStar` dispatching across Gmail, Outlook, and IMAP account types.
+
 ## Constants
 
 All shared constants live in `src/constants.ts`. This includes:
@@ -44,7 +63,9 @@ All shared constants live in `src/constants.ts`. This includes:
 - **API URLs**: `GMAIL_API`, `MS_GRAPH_API`, `TG_API_BASE`, OAuth token/authorize URLs
 - **KV key prefixes**: `KV_OAUTH_STATE_PREFIX`, `KV_OAUTH_BOT_MSG_PREFIX`, `KV_MS_SUB_ACCOUNT_PREFIX`, `KV_MS_SUBSCRIPTION_PREFIX`, `KV_BOT_INFO_KEY`
 - **TTLs**: `MAIL_HTML_CACHE_TTL`, `OAUTH_STATE_TTL_SECONDS`, `BOT_INFO_TTL`
-- **Telegram limits**: `TG_MSG_LIMIT`, `TG_CAPTION_LIMIT`, `TG_MEDIA_GROUP_LIMIT`
+- **Telegram limits**: `TG_MSG_LIMIT`, `TG_CAPTION_LIMIT`, `TG_MEDIA_GROUP_LIMIT`, `TG_MAX_RETRY_AFTER_SECS`
+- **LLM / mail processing**: `MAX_BODY_CHARS`, `MAX_LINKS`
+- **IMAP flags**: `IMAP_FLAG_SEEN`, `IMAP_FLAG_FLAGGED`
 - **Display settings**: `MESSAGE_DATE_LOCALE`, `MESSAGE_DATE_TIMEZONE`
 
 When adding new KV keys used across multiple files, add a `KV_` prefixed constant here rather than hardcoding strings.
@@ -58,4 +79,4 @@ Use `reportErrorToObservability()` from `src/services/observability.ts` instead 
 After making significant changes (new features, architectural refactors, route changes, dependency changes), update:
 
 1. **AGENTS.md** — Keep commands, conventions, and project-specific notes current.
-2. **README.md** — Update project description, setup instructions, route documentation, and tech stack as needed. Create it if it doesn't exist.
+2. **README.md** — Update project description, setup instructions, route documentation, and tech stack as needed.
