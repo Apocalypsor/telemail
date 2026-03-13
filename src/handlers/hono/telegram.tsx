@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { createBot, getBotInfo } from '../../bot';
+import { createBot, getBotInfo, syncBotCommands } from '../../bot';
 import type { AppEnv } from '../../types';
 import { timingSafeEqual } from '../../utils/hash';
 import { ROUTE_TELEGRAM_WEBHOOK } from './routes';
@@ -12,6 +12,9 @@ telegram.post(ROUTE_TELEGRAM_WEBHOOK, async (c) => {
 	if (!secret || !provided || !timingSafeEqual(provided, secret)) {
 		return c.text('Forbidden', 403);
 	}
+
+	// 异步同步 Bot 命令菜单（KV 版本号未变时跳过，开销仅一次 KV read）
+	c.executionCtx.waitUntil(syncBotCommands(c.env).catch(() => {}));
 
 	const botInfo = await getBotInfo(c.env);
 	const bot = createBot(c.env, botInfo);

@@ -227,6 +227,17 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 
 Cron Trigger 每小时检查 IMAP 中间件健康；每天凌晨（UTC 0 点）自动为所有已授权的 Gmail 账号续订 watch、Outlook 账号续订 Graph subscription。
 
+## Bot 命令
+
+| 命令        | 说明                   |
+| ----------- | ---------------------- |
+| `/start`    | 打开管理面板           |
+| `/help`     | 查看帮助信息           |
+| `/accounts` | 查看我的邮箱账号       |
+| `/users`    | 查看用户列表（管理员） |
+
+命令菜单通过 `setMyCommands` API 自动注册到 Telegram，在 webhook 收到消息时异步触发（KV 版本号未变时跳过）。命令列表定义在 `src/bot/index.ts` 的 `BOT_COMMANDS` 数组中，修改后递增 `BOT_COMMANDS_VERSION` 即可，部署后发任意消息给 Bot 即生效。
+
 ## 开发
 
 ```sh

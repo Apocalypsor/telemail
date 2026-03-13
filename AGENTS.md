@@ -61,7 +61,7 @@ Telemail is a Cloudflare Worker that forwards emails (Gmail / Outlook / IMAP) to
 All shared constants live in `src/constants.ts`. This includes:
 
 - **API URLs**: `GMAIL_API`, `MS_GRAPH_API`, `TG_API_BASE`, OAuth token/authorize URLs
-- **KV key prefixes**: `KV_OAUTH_STATE_PREFIX`, `KV_OAUTH_BOT_MSG_PREFIX`, `KV_MS_SUB_ACCOUNT_PREFIX`, `KV_MS_SUBSCRIPTION_PREFIX`, `KV_BOT_INFO_KEY`
+- **KV key prefixes**: `KV_OAUTH_STATE_PREFIX`, `KV_OAUTH_BOT_MSG_PREFIX`, `KV_MS_SUB_ACCOUNT_PREFIX`, `KV_MS_SUBSCRIPTION_PREFIX`, `KV_BOT_INFO_KEY`, `KV_BOT_COMMANDS_VERSION_KEY`
 - **TTLs**: `MAIL_HTML_CACHE_TTL`, `OAUTH_STATE_TTL_SECONDS`, `BOT_INFO_TTL`
 - **Telegram limits**: `TG_MSG_LIMIT`, `TG_CAPTION_LIMIT`, `TG_MEDIA_GROUP_LIMIT`, `TG_MAX_RETRY_AFTER_SECS`
 - **LLM / mail processing**: `MAX_BODY_CHARS`, `MAX_LINKS`
@@ -69,6 +69,10 @@ All shared constants live in `src/constants.ts`. This includes:
 - **Display settings**: `MESSAGE_DATE_LOCALE`, `MESSAGE_DATE_TIMEZONE`
 
 When adding new KV keys used across multiple files, add a `KV_` prefixed constant here rather than hardcoding strings.
+
+## Bot Commands
+
+Bot commands are defined in `src/bot/index.ts` (`BOT_COMMANDS` array) and auto-synced to Telegram via `setMyCommands` on each webhook request (gated by KV-stored `BOT_COMMANDS_VERSION` — only calls the API when the version changes). Increment `BOT_COMMANDS_VERSION` after modifying the command list; deploy and send any message to the Bot to trigger sync.
 
 ## Error Reporting
 
