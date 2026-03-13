@@ -17,8 +17,8 @@ export function OAuthSetupPage({
 				<h1 class="text-2xl font-bold text-slate-100 mb-3">{provider} OAuth 授权</h1>
 				<p class="text-sm text-slate-400 leading-relaxed">
 					为账号 <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">{accountEmail}</code> 授权 {provider}{' '}
-					访问权限。回调成功后 <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">refresh_token</code>{' '}
-					会自动保存到 D1 数据库。
+					访问权限。回调成功后 <code class="px-1.5 py-0.5 bg-slate-900 rounded text-blue-300 text-xs">refresh_token</code> 会自动保存到 D1
+					数据库。
 				</p>
 				<ol class="mt-3 ml-5 space-y-2 list-decimal text-sm text-slate-400 leading-relaxed">
 					<li>

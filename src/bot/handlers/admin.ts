@@ -30,11 +30,7 @@ function userListKeyboard(users: TelegramUser[]): InlineKeyboard {
 async function adminMenuKeyboard(env: Env): Promise<InlineKeyboard> {
 	const failedCount = await countFailedEmails(env.DB);
 	const failedLabel = failedCount > 0 ? `📋 失败邮件 (${failedCount})` : '📋 失败邮件';
-	const kb = new InlineKeyboard()
-		.text(failedLabel, 'failed')
-		.row()
-		.text('🔄 续订所有 Watch', 'walla')
-		.row();
+	const kb = new InlineKeyboard().text(failedLabel, 'failed').row().text('🔄 续订所有 Watch', 'walla').row();
 	if (env.WORKER_URL) {
 		kb.url('🔍 HTML 预览工具', `${env.WORKER_URL.replace(/\/$/, '')}/preview`).row();
 	}

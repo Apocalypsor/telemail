@@ -37,6 +37,18 @@ https://developers.cloudflare.com/workers/runtime-apis/nodejs/
 Retrieve API references and limits from:
 `/kv/` · `/r2/` · `/d1/` · `/durable-objects/` · `/queues/` · `/vectorize/` · `/workers-ai/` · `/agents/`
 
+## Constants
+
+All shared constants live in `src/constants.ts`. This includes:
+
+- **API URLs**: `GMAIL_API`, `MS_GRAPH_API`, `TG_API_BASE`, OAuth token/authorize URLs
+- **KV key prefixes**: `KV_OAUTH_STATE_PREFIX`, `KV_OAUTH_BOT_MSG_PREFIX`, `KV_MS_SUB_ACCOUNT_PREFIX`, `KV_MS_SUBSCRIPTION_PREFIX`, `KV_BOT_INFO_KEY`
+- **TTLs**: `MAIL_HTML_CACHE_TTL`, `OAUTH_STATE_TTL_SECONDS`, `BOT_INFO_TTL`
+- **Telegram limits**: `TG_MSG_LIMIT`, `TG_CAPTION_LIMIT`, `TG_MEDIA_GROUP_LIMIT`
+- **Display settings**: `MESSAGE_DATE_LOCALE`, `MESSAGE_DATE_TIMEZONE`
+
+When adding new KV keys used across multiple files, add a `KV_` prefixed constant here rather than hardcoding strings.
+
 ## Error Reporting
 
 Use `reportErrorToObservability()` from `src/services/observability.ts` instead of `console.error` / `console.warn` for all error handling. The observability service forwards errors to the monitoring system; `console.error` output may not be visible in production. The only exceptions are inside `observability.ts` itself and in utility functions that don't have access to `env` (e.g., `telegram.ts`).

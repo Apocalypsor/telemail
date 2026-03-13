@@ -52,4 +52,3 @@ export async function putCachedMailHtml(env: Env, gmailMessageId: string, html: 
 		expirationTtl: MAIL_HTML_CACHE_TTL,
 	});
 }
-

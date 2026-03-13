@@ -233,7 +233,7 @@ npm run cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 ```text
 src/
   index.ts             # Worker 入口（fetch/queue/scheduled 分发）
-  constants.ts         # TTL/时间格式等常量
+  constants.ts         # 常量：API URL、KV key 前缀、TTL、Telegram 限制等
   types.ts             # 类型定义：Env, Account, QueueMessage, etc.
   styles.css           # Tailwind CSS v4 入口
   handlers/
@@ -241,8 +241,8 @@ src/
       index.tsx        # Hono app 入口：error handler、favicon、挂载子路由
       routes.ts        # 路由路径常量
       telegram.tsx     # Telegram webhook 路由
-      preview.tsx      # HTML 预览路由
-      mail.tsx         # 邮件原文查看路由（HMAC 验证 + KV 缓存）
+      preview.tsx      # HTML 预览 + 邮件原文查看路由（HMAC 验证 + KV 缓存）
+      middleware.ts    # Secret/Bearer token 验证中间件
       email/
         gmail/         # Gmail push + OAuth 路由
         outlook/       # Outlook push + OAuth 路由
@@ -250,47 +250,52 @@ src/
     queue.ts           # Queue consumer（重试/ack/retry）
   components/
     layout.tsx         # 共享 Layout、Card、BackLink 组件 (Tailwind CSS inline)
-    home.tsx           # 登录页（Telegram Login Widget）、Dashboard（账号管理）、HTML 预览页
     oauth.tsx          # OAuth 授权页、回调结果页、错误页
+    preview.tsx        # HTML 预览页组件
   assets/
     favicon.ts         # Base64 编码的 favicon
     tailwind.ts        # [生成] Tailwind CSS 常量（npm run build:css 生成，已 gitignore）
   bot/
-    index.ts           # grammY Bot 创建 + botInfo KV 缓存
-    keyboards.ts       # Inline keyboard 定义（星标/已星标）
+    index.ts           # grammY Bot 创建 + botInfo KV 缓存 + 用户注册/审批流程
+    auth.ts            # 管理员身份检查
+    keyboards.ts       # Inline keyboard 定义（主菜单）
+    formatters.ts      # 账号详情/用户列表文本格式化
+    state.ts           # Bot 输入状态管理（KV 存储，5 分钟 TTL）
     handlers/
-      reaction.ts      # Emoji reaction → Gmail 标记已读
+      accounts.ts      # 账号 CRUD + 所有者分配（admin）
+      admin.ts         # 用户管理 + 失败邮件管理
+      input.ts         # 文本输入处理（Chat ID、IMAP 配置）
+      reaction.ts      # Emoji reaction → 标记已读
       star.ts          # 星标/取消星标 inline button callback
   db/
     accounts.ts        # D1 数据库 CRUD（accounts 表）
-    kv.ts              # KV 辅助函数（access_token 缓存、去重、history_id）
-    message-map.ts     # Telegram ↔ Gmail 消息映射（星标状态）
+    users.ts           # 用户管理（upsert、审批、查询）
+    kv.ts              # KV 辅助函数（access_token 缓存、history_id、邮件 HTML 缓存）
+    message-map.ts     # Telegram ↔ Email 消息映射（星标状态）
+    failed-emails.ts   # LLM 失败邮件记录
   services/
-    bridge.ts          # 邮件→Telegram 业务流程编排（多账号 sync/message/AI 摘要/标签）
+    bridge.ts          # 邮件→Telegram 投递编排（拉取/解析/发送/LLM 摘要）
     email/
       gmail/           # Gmail OAuth2 + REST API + watch + history
       outlook/         # Outlook OAuth2 + Graph API + subscription
       imap/            # IMAP Bridge 通信
       provider.ts      # EmailProvider 接口（markAsRead/addStar/removeStar 多类型分发）
-    llm-processing.ts  # OpenAI compatible API 调用（AI 摘要 + 标签生成）
-    mail-content.ts    # 邮件内容获取与 HTML 缓存
-    message-actions.ts # 消息操作（星标、已读等）
+    keyboard.ts        # 邮件操作 inline keyboard 构建
+    llm.ts             # OpenAI compatible API 调用（摘要/标签/验证码提取）
+    llm-processing.ts  # LLM 处理编排（验证码 → 摘要 → 编辑 Telegram 消息）
+    mail-content.ts    # 邮件内容获取（Gmail API 格式）
+    message-actions.ts # 消息操作（星标切换、标记已读）
     observability.ts   # 错误结构化日志 + Observability Hub
-    telegram.ts        # Telegram 发送/编辑：text、attachments、caption、reply_markup
+    telegram.ts        # Telegram API 封装（发送/编辑/附件/速率限制/MarkdownV2 回退）
   utils/
+    async.ts           # delay 工具函数
     base64url.ts       # Base64url 编解码
     format.ts          # 邮件正文格式化：HTML→Markdown→Telegram MarkdownV2
     hash.ts            # HMAC-SHA256 token 生成/验证（邮件原文链接）
     markdown-v2.ts     # MarkdownV2 转义与最长合法前缀解析
-    session.ts         # Session cookie 创建/验证（HMAC-SHA256 签名）
-    telegram-login.ts  # Telegram Login Widget 数据解析与 HMAC 验证
-    verification.ts    # 验证码提取
 scripts/
   build-css.mjs        # Tailwind CSS 构建脚本（生成 src/assets/tailwind.ts）
-migrations/
-  0001_create_accounts.sql     # D1 数据库迁移：创建 accounts 表
-  0002_email_nullable.sql      # D1 数据库迁移：email 字段改为可空
-  0003_create_message_map.sql  # D1 数据库迁移：Telegram↔Gmail 消息映射表
+migrations/            # D1 数据库迁移（11 个文件）
 wrangler.jsonc         # Cloudflare Worker 配置（D1 + KV + Queue + Cron）
 ```
 
