@@ -1,4 +1,4 @@
-import { TG_CAPTION_LIMIT, TG_MAX_RETRY_AFTER_SECS, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '../constants';
+import { TG_API_BASE, TG_CAPTION_LIMIT, TG_MAX_RETRY_AFTER_SECS, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '../constants';
 import type { Attachment } from '../types';
 import { delay } from '../utils/async';
 
@@ -88,7 +88,7 @@ async function tgPost<T = unknown>(url: string, payload: Record<string, unknown>
 
 /** 发送纯文字消息，返回 message_id */
 export async function sendTextMessage(token: string, chatId: string, text: string, replyMarkup?: unknown): Promise<number> {
-	const url = `https://api.telegram.org/bot${token}/sendMessage`;
+	const url = `${TG_API_BASE}${token}/sendMessage`;
 	const payload: Record<string, unknown> = { chat_id: chatId, text, parse_mode: 'MarkdownV2' };
 	if (replyMarkup) payload.reply_markup = replyMarkup;
 	const data = await tgPost<{ message_id: number }>(url, payload, 'sendMessage');
@@ -103,7 +103,7 @@ export async function editTextMessage(
 	text: string,
 	replyMarkup?: unknown,
 ): Promise<void> {
-	const url = `https://api.telegram.org/bot${token}/editMessageText`;
+	const url = `${TG_API_BASE}${token}/editMessageText`;
 	const payload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, text, parse_mode: 'MarkdownV2' };
 	if (replyMarkup) payload.reply_markup = replyMarkup;
 	await tgPost(url, payload, 'editMessageText');
@@ -140,7 +140,7 @@ export async function sendWithAttachments(
 			form.append('parse_mode', 'MarkdownV2');
 			if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup));
 
-			const url = `https://api.telegram.org/bot${token}/sendDocument`;
+			const url = `${TG_API_BASE}${token}/sendDocument`;
 			let resp = await fetch(url, { method: 'POST', body: form });
 			if (resp.status === 429) {
 				await waitForRateLimit(resp, 'sendDocument');
@@ -200,7 +200,7 @@ export async function editMessageCaption(
 	caption: string,
 	replyMarkup?: unknown,
 ): Promise<void> {
-	const url = `https://api.telegram.org/bot${token}/editMessageCaption`;
+	const url = `${TG_API_BASE}${token}/editMessageCaption`;
 	const payload: Record<string, unknown> = { chat_id: chatId, message_id: messageId, caption, parse_mode: 'MarkdownV2' };
 	if (replyMarkup) payload.reply_markup = replyMarkup;
 	await tgPost(url, payload, 'editMessageCaption');
@@ -208,7 +208,7 @@ export async function editMessageCaption(
 
 /** 设置/更新消息的 inline keyboard */
 export async function setReplyMarkup(token: string, chatId: string, messageId: number, replyMarkup: unknown): Promise<void> {
-	const url = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
+	const url = `${TG_API_BASE}${token}/editMessageReplyMarkup`;
 	await tgPost(url, { chat_id: chatId, message_id: messageId, reply_markup: replyMarkup }, 'editMessageReplyMarkup');
 }
 
@@ -241,7 +241,7 @@ async function sendMediaGroupChunk(
 
 	form.append('media', JSON.stringify(media));
 
-	const url = `https://api.telegram.org/bot${token}/sendMediaGroup`;
+	const url = `${TG_API_BASE}${token}/sendMediaGroup`;
 	let resp = await fetch(url, { method: 'POST', body: form });
 	if (resp.status === 429) {
 		await waitForRateLimit(resp, 'sendMediaGroup');

@@ -1,7 +1,7 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import { createAccount, createImapAccount, getAuthorizedAccount, updateAccount } from '../../db/accounts';
-import { syncAccounts } from '../../services/email/imap/bridge';
+import { createImapAccount, getAuthorizedAccount, updateAccount } from '../../db/accounts';
+import { syncAccounts } from '../../services/email/imap';
 import { reportErrorToObservability } from '../../services/observability';
 import type { Env } from '../../types';
 import { isAdmin } from '../auth';

@@ -1,7 +1,7 @@
 import app from './handlers/hono';
 import { handleQueueBatch } from './handlers/queue';
 import { renewWatchAll } from './services/email/gmail';
-import { checkImapBridgeHealth } from './services/email/imap/bridge';
+import { checkImapBridgeHealth } from './services/email/imap';
 import { renewSubscriptionAll } from './services/email/outlook';
 import { reportErrorToObservability } from './services/observability';
 import type { Env, QueueMessage } from './types';

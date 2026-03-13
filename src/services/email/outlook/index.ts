@@ -1,4 +1,11 @@
-import { MS_GRAPH_API, MS_MAIL_SCOPE, MS_OAUTH_TOKEN_URL, MS_SUBSCRIPTION_LIFETIME_MINUTES } from '../../../constants';
+import {
+	KV_MS_SUB_ACCOUNT_PREFIX,
+	KV_MS_SUBSCRIPTION_PREFIX,
+	MS_GRAPH_API,
+	MS_MAIL_SCOPE,
+	MS_OAUTH_TOKEN_URL,
+	MS_SUBSCRIPTION_LIFETIME_MINUTES,
+} from '../../../constants';
 import { getAllAccounts } from '../../../db/accounts';
 import { getCachedAccessToken, putCachedAccessToken } from '../../../db/kv';
 import { AccountType, type Account, type Env } from '../../../types';
@@ -113,7 +120,7 @@ export async function renewSubscription(env: Env, account: Account): Promise<voi
 	const expiration = new Date(Date.now() + MS_SUBSCRIPTION_LIFETIME_MINUTES * 60 * 1000).toISOString();
 
 	// 先尝试查找已有 subscription
-	const existingKey = `ms_subscription:${account.id}`;
+	const existingKey = `${KV_MS_SUBSCRIPTION_PREFIX}${account.id}`;
 	const existingSubId = await env.EMAIL_KV.get(existingKey);
 
 	if (existingSubId) {
@@ -129,7 +136,7 @@ export async function renewSubscription(env: Env, account: Account): Promise<voi
 			});
 			if (resp.ok) {
 				// 续订成功，刷新反向映射 TTL
-				await env.EMAIL_KV.put(`ms_sub_account:${existingSubId}`, String(account.id), {
+				await env.EMAIL_KV.put(`${KV_MS_SUB_ACCOUNT_PREFIX}${existingSubId}`, String(account.id), {
 					expirationTtl: MS_SUBSCRIPTION_LIFETIME_MINUTES * 60,
 				});
 				console.log(`Outlook subscription renewed for ${account.email}`);
@@ -166,7 +173,7 @@ export async function renewSubscription(env: Env, account: Account): Promise<voi
 	const ttl = MS_SUBSCRIPTION_LIFETIME_MINUTES * 60;
 	await Promise.all([
 		env.EMAIL_KV.put(existingKey, sub.id, { expirationTtl: ttl }),
-		env.EMAIL_KV.put(`ms_sub_account:${sub.id}`, String(account.id), { expirationTtl: ttl }),
+		env.EMAIL_KV.put(`${KV_MS_SUB_ACCOUNT_PREFIX}${sub.id}`, String(account.id), { expirationTtl: ttl }),
 	]);
 	console.log(`Outlook subscription created for ${account.email}, id=${sub.id}`);
 }
@@ -174,7 +181,7 @@ export async function renewSubscription(env: Env, account: Account): Promise<voi
 /** 停止 subscription */
 export async function stopSubscription(env: Env, account: Account): Promise<void> {
 	const token = await getAccessToken(env, account);
-	const existingKey = `ms_subscription:${account.id}`;
+	const existingKey = `${KV_MS_SUBSCRIPTION_PREFIX}${account.id}`;
 	const subId = await env.EMAIL_KV.get(existingKey);
 	if (!subId) return;
 

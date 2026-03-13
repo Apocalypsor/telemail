@@ -1,6 +1,6 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import { OAUTH_STATE_TTL_SECONDS } from '../../constants';
+import { KV_OAUTH_BOT_MSG_PREFIX, OAUTH_STATE_TTL_SECONDS } from '../../constants';
 import {
 	createAccount,
 	deleteAccount,
@@ -14,7 +14,7 @@ import { deleteHistoryId } from '../../db/kv';
 import { getAllUsers, getUserByTelegramId } from '../../db/users';
 import { renewWatch, stopWatch } from '../../services/email/gmail';
 import { generateOAuthUrl } from '../../services/email/gmail/oauth';
-import { syncAccounts } from '../../services/email/imap/bridge';
+import { syncAccounts } from '../../services/email/imap';
 import { renewSubscription, stopSubscription } from '../../services/email/outlook';
 import { generateOAuthUrl as generateMsOAuthUrl } from '../../services/email/outlook/oauth';
 import { reportErrorToObservability } from '../../services/observability';
@@ -109,9 +109,13 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 			const msg = ctx.callbackQuery.message;
 			if (msg) {
-				await env.EMAIL_KV.put(`oauth_bot_msg:${accountId}`, JSON.stringify({ chatId: String(msg.chat.id), messageId: msg.message_id }), {
-					expirationTtl: OAUTH_STATE_TTL_SECONDS,
-				});
+				await env.EMAIL_KV.put(
+					`${KV_OAUTH_BOT_MSG_PREFIX}${accountId}`,
+					JSON.stringify({ chatId: String(msg.chat.id), messageId: msg.message_id }),
+					{
+						expirationTtl: OAUTH_STATE_TTL_SECONDS,
+					},
+				);
 			}
 		} catch (err) {
 			await reportErrorToObservability(env, 'bot.oauth_url_gen_failed', err);

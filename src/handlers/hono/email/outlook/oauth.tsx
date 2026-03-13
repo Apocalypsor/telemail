@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { accountDetailKeyboard, accountDetailText } from '../../../../bot/formatters';
 import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../../../../components/oauth';
+import { KV_OAUTH_BOT_MSG_PREFIX } from '../../../../constants';
 import { getAccountById } from '../../../../db/accounts';
 import { getOAuthPageProps, processOAuthCallback, startMicrosoftOAuth } from '../../../../services/email/outlook/oauth';
 import type { AppEnv } from '../../../../types';
@@ -36,7 +37,7 @@ msOauth.get(ROUTE_OAUTH_MICROSOFT_CALLBACK, async (c) => {
 	}
 
 	// 尝试更新 bot 中的授权消息
-	const botMsgKey = `oauth_bot_msg:${result.accountId}`;
+	const botMsgKey = `${KV_OAUTH_BOT_MSG_PREFIX}${result.accountId}`;
 	const botMsgRaw = await c.env.EMAIL_KV.get(botMsgKey);
 	if (botMsgRaw) {
 		try {

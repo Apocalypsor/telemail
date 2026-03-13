@@ -8,7 +8,7 @@ import { base64ToArrayBuffer, base64urlToArrayBuffer } from '../utils/base64url'
 import { formatBody, htmlToMarkdown } from '../utils/format';
 import { escapeMdV2 } from '../utils/markdown-v2';
 import { getAccessToken, gmailGet } from './email/gmail';
-import { fetchImapRawEmail } from './email/imap/bridge';
+import { fetchImapRawEmail } from './email/imap';
 import { fetchRawMime, getAccessToken as msGetAccessToken } from './email/outlook';
 import { buildEmailKeyboard, resolveStarredKeyboard } from './keyboard';
 import { runLlmProcessing, wrapExpandableQuote } from './llm-processing';
@@ -33,19 +33,11 @@ function getEmailPlainBody(email: { text?: string; html?: string }): string {
 
 function buildTelegramHeader(fromName: string, fromAddress: string, recipient: string, subject: string, accountEmail?: string): string {
 	const date = new Date().toLocaleString(MESSAGE_DATE_LOCALE, { timeZone: MESSAGE_DATE_TIMEZONE });
-	const lines = [
-		`*发件人:*  ${escapeMdV2(`${fromName} <${fromAddress}>`)}`,
-		`*收件人:*  ${escapeMdV2(recipient)}`,
-	];
+	const lines = [`*发件人:*  ${escapeMdV2(`${fromName} <${fromAddress}>`)}`, `*收件人:*  ${escapeMdV2(recipient)}`];
 	if (accountEmail && accountEmail.toLowerCase() !== recipient.toLowerCase()) {
 		lines.push(`*账  号:*  ${escapeMdV2(accountEmail)}`);
 	}
-	lines.push(
-		`*时  间:*  ${escapeMdV2(date)}`,
-		`*主  题:*  ${escapeMdV2(subject)}`,
-		``,
-		``,
-	);
+	lines.push(`*时  间:*  ${escapeMdV2(date)}`, `*主  题:*  ${escapeMdV2(subject)}`, ``, ``);
 	return lines.join('\n');
 }
 

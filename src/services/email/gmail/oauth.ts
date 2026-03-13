@@ -1,4 +1,5 @@
 import {
+	GMAIL_API,
 	GMAIL_MODIFY_SCOPE,
 	GOOGLE_OAUTH_AUTHORIZE_URL,
 	GOOGLE_OAUTH_TOKEN_URL,
@@ -162,7 +163,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 		// 用 access_token 从 Gmail API 获取真实邮箱地址
 		if (tokenData.access_token) {
 			try {
-				const profileResp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+				const profileResp = await fetch(`${GMAIL_API}/users/me/profile`, {
 					headers: { Authorization: `Bearer ${tokenData.access_token}` },
 				});
 				if (profileResp.ok) {

@@ -14,7 +14,13 @@ export const MS_SUBSCRIPTION_LIFETIME_MINUTES = 2 * 24 * 60;
 
 // ── KV keys & prefixes ──────────────────────────────────────────────────────
 export const KV_OAUTH_STATE_PREFIX = 'oauth_state:';
+export const KV_OAUTH_BOT_MSG_PREFIX = 'oauth_bot_msg:';
+export const KV_MS_SUB_ACCOUNT_PREFIX = 'ms_sub_account:';
+export const KV_MS_SUBSCRIPTION_PREFIX = 'ms_subscription:';
 export const KV_BOT_INFO_KEY = 'telegram:bot_info';
+
+// ── Telegram API ────────────────────────────────────────────────────────────
+export const TG_API_BASE = 'https://api.telegram.org/bot';
 
 // ── TTL (seconds) ────────────────────────────────────────────────────────────
 export const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天

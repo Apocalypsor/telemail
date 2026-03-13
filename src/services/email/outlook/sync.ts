@@ -1,5 +1,6 @@
-import type { Env } from '../../../types';
+import { KV_MS_SUB_ACCOUNT_PREFIX } from '../../../constants';
 import { getAccountById } from '../../../db/accounts';
+import type { Env } from '../../../types';
 
 /** Microsoft Graph change notification payload */
 export interface GraphNotification {
@@ -41,7 +42,7 @@ export async function enqueueOutlookNotification(body: GraphNotification, env: E
 		// 从 KV 中根据 subscriptionId 找到 accountId
 		// 我们在 KV 中存的是 ms_subscription:{accountId} -> subscriptionId
 		// 需要反向查找，所以我们也存一个反向映射
-		const accountIdStr = await env.EMAIL_KV.get(`ms_sub_account:${notification.subscriptionId}`);
+		const accountIdStr = await env.EMAIL_KV.get(`${KV_MS_SUB_ACCOUNT_PREFIX}${notification.subscriptionId}`);
 		if (!accountIdStr) {
 			console.log(`Outlook push: unknown subscriptionId ${notification.subscriptionId}`);
 			continue;

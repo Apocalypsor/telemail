@@ -2,7 +2,7 @@ import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from '../../constants';
 import type { Account, Env } from '../../types';
 import { AccountType } from '../../types';
 import { addStar, getAccessToken, markAsRead, removeStar } from './gmail/index';
-import { setImapFlag } from './imap/bridge';
+import { setImapFlag } from './imap';
 import {
 	addStar as msAddStar,
 	getAccessToken as msGetAccessToken,
