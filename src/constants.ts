@@ -18,6 +18,7 @@ export const KV_OAUTH_BOT_MSG_PREFIX = 'oauth_bot_msg:';
 export const KV_MS_SUB_ACCOUNT_PREFIX = 'ms_sub_account:';
 export const KV_MS_SUBSCRIPTION_PREFIX = 'ms_subscription:';
 export const KV_BOT_INFO_KEY = 'telegram:bot_info';
+export const KV_BOT_COMMANDS_VERSION_KEY = 'telegram:bot_commands_version';
 
 // ── Telegram API ────────────────────────────────────────────────────────────
 export const TG_API_BASE = 'https://api.telegram.org/bot';

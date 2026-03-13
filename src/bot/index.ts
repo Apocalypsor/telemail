@@ -1,6 +1,6 @@
 import { Api, Bot, InlineKeyboard } from 'grammy';
-import type { UserFromGetMe } from 'grammy/types';
-import { BOT_INFO_TTL, KV_BOT_INFO_KEY } from '../constants';
+import type { BotCommand, UserFromGetMe } from 'grammy/types';
+import { BOT_INFO_TTL, KV_BOT_COMMANDS_VERSION_KEY, KV_BOT_INFO_KEY } from '../constants';
 import { getOwnAccounts, getVisibleAccounts } from '../db/accounts';
 import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser, upsertUser } from '../db/users';
 import { reportErrorToObservability } from '../services/observability';
@@ -14,6 +14,44 @@ import { registerReactionHandler } from './handlers/reaction';
 import { registerStarHandler } from './handlers/star';
 
 export { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from './keyboards';
+
+// ─── Bot 命令定义 ───────────────────────────────────────────────────────────
+// 修改此列表后更新 BOT_COMMANDS_VERSION，cron 会自动同步到 Telegram
+const BOT_COMMANDS_VERSION = 1;
+
+const BOT_COMMANDS: BotCommand[] = [
+	{ command: 'start', description: '打开管理面板' },
+	{ command: 'help', description: '查看帮助信息' },
+	{ command: 'accounts', description: '查看我的邮箱账号' },
+	{ command: 'users', description: '查看用户列表（管理员）' },
+];
+
+const HELP_TEXT = `📬 *Telemail 帮助*
+
+*命令列表*
+/start \\- 打开管理面板
+/help \\- 查看帮助信息
+/accounts \\- 查看我的邮箱账号
+/users \\- 查看用户列表（管理员）
+
+*功能说明*
+• 支持 Gmail / Outlook / IMAP 邮箱转发到 Telegram
+• 点击 ⭐ 按钮可星标/取消星标邮件
+• 对消息添加 emoji reaction 可标记邮件为已读
+• 配置 LLM 后自动生成 AI 摘要`;
+
+/**
+ * 同步 Bot 命令菜单到 Telegram。
+ * 使用 KV 存储版本号，仅在 BOT_COMMANDS_VERSION 变化时调用 setMyCommands。
+ */
+export async function syncBotCommands(env: Env): Promise<void> {
+	const cached = await env.EMAIL_KV.get(KV_BOT_COMMANDS_VERSION_KEY);
+	if (cached === String(BOT_COMMANDS_VERSION)) return;
+
+	const api = new Api(env.TELEGRAM_BOT_TOKEN);
+	await api.setMyCommands(BOT_COMMANDS);
+	await env.EMAIL_KV.put(KV_BOT_COMMANDS_VERSION_KEY, String(BOT_COMMANDS_VERSION));
+}
 
 /** 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存 */
 export async function getBotInfo(env: Env): Promise<UserFromGetMe> {
@@ -90,6 +128,11 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 		}
 
 		return ctx.reply('📬 Telemail 管理面板', { reply_markup: mainMenuKeyboard(admin) });
+	});
+
+	// ─── /help: 帮助信息 ────────────────────────────────────────────────────
+	bot.command('help', async (ctx) => {
+		return ctx.reply(HELP_TEXT, { parse_mode: 'MarkdownV2' });
 	});
 
 	// ─── /accounts: 快速查看账号列表 ────────────────────────────────────────

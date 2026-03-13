@@ -1,3 +1,4 @@
+import { syncBotCommands } from './bot';
 import app from './handlers/hono';
 import { handleQueueBatch } from './handlers/queue';
 import { renewWatchAll } from './services/email/gmail';
@@ -24,7 +25,8 @@ async function handleScheduled(event: ScheduledEvent, env: Env): Promise<void> {
 	const isMidnight = new Date(event.scheduledTime).getUTCHours() === 0;
 
 	await Promise.allSettled([
-		// 每小时：检查 IMAP 中间件健康
+		// 每小时：同步 Bot 命令菜单（KV 版本号未变时跳过）+ 检查 IMAP 中间件健康
+		syncBotCommands(env).catch((error: unknown) => reportErrorToObservability(env, 'scheduled.sync_bot_commands_failed', error)),
 		checkImapBridgeHealth(env)
 			.then((health) => {
 				if (health !== null && !health.ok) {
