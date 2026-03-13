@@ -13,12 +13,10 @@ export const MS_MAIL_SCOPE = 'offline_access Mail.ReadWrite User.Read';
 export const MS_SUBSCRIPTION_LIFETIME_MINUTES = 2 * 24 * 60;
 
 // ── KV keys & prefixes ──────────────────────────────────────────────────────
-export const KV_PROCESSED_PREFIX = 'processed_message:';
 export const KV_OAUTH_STATE_PREFIX = 'oauth_state:';
 export const KV_BOT_INFO_KEY = 'telegram:bot_info';
 
 // ── TTL (seconds) ────────────────────────────────────────────────────────────
-export const PROCESSED_TTL_SECONDS = 60 * 60 * 24; // 1 天
 export const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
 

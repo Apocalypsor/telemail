@@ -1,7 +1,7 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
 import { countFailedEmails, deleteAllFailedEmails, deleteFailedEmail, getAllFailedEmails, getFailedEmail } from '../../db/failed-emails';
-import { clearAllKV } from '../../db/kv';
+
 import { approveUser, getNonAdminUsers, rejectUser } from '../../db/users';
 import { retryAllFailedEmails, retryFailedEmail } from '../../services/bridge';
 import { renewWatchAll } from '../../services/email/gmail';
@@ -34,8 +34,6 @@ async function adminMenuKeyboard(env: Env): Promise<InlineKeyboard> {
 		.text(failedLabel, 'failed')
 		.row()
 		.text('🔄 续订所有 Watch', 'walla')
-		.row()
-		.text('🗑 清空全局 KV 缓存', 'clrkv')
 		.row();
 	if (env.WORKER_URL) {
 		kb.url('🔍 HTML 预览工具', `${env.WORKER_URL.replace(/\/$/, '')}/preview`).row();
@@ -155,23 +153,6 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		}
 	});
 
-	// Clear all KV
-	bot.callbackQuery('clrkv', async (ctx) => {
-		const userId = String(ctx.from.id);
-		if (!isAdmin(userId, env)) {
-			return ctx.answerCallbackQuery({ text: '无权操作' });
-		}
-
-		await ctx.answerCallbackQuery({ text: '⏳ 正在清理...' });
-		try {
-			const deleted = await clearAllKV(env);
-			await ctx.editMessageText(`⚙️ 全局操作\n\n✅ 已清除 ${deleted} 个 KV 键`, { reply_markup: await adminMenuKeyboard(env) });
-		} catch (err) {
-			await reportErrorToObservability(env, 'bot.clear_kv_failed', err);
-			await ctx.editMessageText('⚙️ 全局操作\n\n❌ 清理失败', { reply_markup: await adminMenuKeyboard(env) });
-		}
-	});
-
 	// ─── Failed emails management ─────────────────────────────────────────
 
 	// List failed emails
@@ -215,26 +196,27 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		}
 
 		const id = parseInt(ctx.match![1]);
-		await ctx.answerCallbackQuery({ text: '⏳ 正在重试...' });
-
 		const item = await getFailedEmail(env.DB, id);
 		if (!item) {
-			await ctx.answerCallbackQuery({ text: '记录不存在' });
-			return;
+			return ctx.answerCallbackQuery({ text: '记录不存在' });
 		}
+
+		await ctx.answerCallbackQuery({ text: '⏳ 正在重试...' });
 
 		try {
 			await retryFailedEmail(item, env);
-			await ctx.answerCallbackQuery({ text: '✅ 重试成功' });
 		} catch (err) {
 			await reportErrorToObservability(env, 'bot.retry_single_failed', err, { failedEmailId: id });
-			await ctx.answerCallbackQuery({ text: '❌ 重试失败' });
 		}
 
 		// Refresh list
 		const items = await getAllFailedEmails(env.DB);
 		const { text, keyboard } = failedEmailListMessage(items);
-		await ctx.editMessageText(text, { reply_markup: keyboard });
+		try {
+			await ctx.editMessageText(text, { reply_markup: keyboard });
+		} catch {
+			// 消息可能已被删除
+		}
 	});
 
 	// Delete single failed email

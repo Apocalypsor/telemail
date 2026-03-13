@@ -1,5 +1,5 @@
 import PostalMime from 'postal-mime';
-import { KV_PROCESSED_PREFIX, MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE, PROCESSED_TTL_SECONDS } from '../constants';
+import { MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE } from '../constants';
 import { getAccountById } from '../db/accounts';
 import { deleteFailedEmail, getAllFailedEmails, putFailedEmail, type FailedEmail } from '../db/failed-emails';
 import { putMessageMapping } from '../db/message-map';
@@ -154,15 +154,8 @@ export async function deliverEmailToTelegram(
 // 队列消费：统一处理 Gmail + IMAP 邮件消息
 // ---------------------------------------------------------------------------
 
-/** 按账号类型拉取原始邮件并投递到 Telegram，支持去重 */
+/** 按账号类型拉取原始邮件并投递到 Telegram */
 export async function processEmailMessage(msg: QueueMessage, env: Env, waitUntil: (p: Promise<unknown>) => void): Promise<void> {
-	const dedupeKey = `${KV_PROCESSED_PREFIX}${msg.accountId}:${msg.messageId}`;
-	const processed = await env.EMAIL_KV.get(dedupeKey);
-	if (processed) {
-		console.log(`跳过重复消息: account=${msg.accountId}, messageId=${msg.messageId}`);
-		return;
-	}
-
 	const account = await getAccountById(env.DB, msg.accountId);
 	if (!account) {
 		console.log(`Account ${msg.accountId} not found, skipping message ${msg.messageId}`);
@@ -172,8 +165,6 @@ export async function processEmailMessage(msg: QueueMessage, env: Env, waitUntil
 	const rawEmail = await fetchRawEmailByType(account, msg.messageId, env);
 
 	await deliverEmailToTelegram(rawEmail, msg.messageId, account, env, waitUntil);
-
-	await env.EMAIL_KV.put(dedupeKey, '1', { expirationTtl: PROCESSED_TTL_SECONDS });
 }
 
 // ---------------------------------------------------------------------------

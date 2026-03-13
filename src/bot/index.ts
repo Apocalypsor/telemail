@@ -39,7 +39,15 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 	const bot = new Bot(env.TELEGRAM_BOT_TOKEN, { botInfo });
 
 	bot.catch(async (err) => {
-		await reportErrorToObservability(env, 'bot.handler_error', err.error);
+		await reportErrorToObservability(env, 'bot.handler_error', err.error).catch(() => {});
+		// 尝试通知用户操作失败
+		try {
+			if (err.ctx.callbackQuery) {
+				await err.ctx.answerCallbackQuery({ text: '❌ 操作失败，请重试' }).catch(() => {});
+			}
+		} catch {
+			// ignore
+		}
 	});
 
 	// ─── /start: 主入口，自动注册用户 ────────────────────────────────────────

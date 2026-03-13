@@ -53,25 +53,3 @@ export async function putCachedMailHtml(env: Env, gmailMessageId: string, html: 
 	});
 }
 
-// ─── Clear Cache ────────────────────────────────────────────────────────────
-
-/** 清除指定账号的 KV 缓存（history_id），access_token 有 TTL 自然过期 */
-export async function clearAccountCache(env: Env, accountId: number): Promise<void> {
-	await deleteHistoryId(env, accountId);
-}
-
-/** 清空 KV 中所有 key（全局），跳过 access_token（有 TTL 自然过期） */
-export async function clearAllKV(env: Env): Promise<number> {
-	let deleted = 0;
-	let cursor: string | undefined;
-	do {
-		const list = await env.EMAIL_KV.list({ cursor, limit: 1000 });
-		const toDelete = list.keys.filter((k) => !k.name.startsWith('access_token:'));
-		if (toDelete.length > 0) {
-			await Promise.all(toDelete.map((k) => env.EMAIL_KV.delete(k.name)));
-			deleted += toDelete.length;
-		}
-		cursor = list.list_complete ? undefined : list.cursor;
-	} while (cursor);
-	return deleted;
-}

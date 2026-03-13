@@ -10,7 +10,7 @@ import {
 	getVisibleAccounts,
 	updateAccount,
 } from '../../db/accounts';
-import { clearAccountCache, deleteHistoryId } from '../../db/kv';
+import { deleteHistoryId } from '../../db/kv';
 import { getAllUsers } from '../../db/users';
 import { renewWatch, stopWatch } from '../../services/email/gmail';
 import { generateOAuthUrl } from '../../services/email/gmail/oauth';
@@ -130,15 +130,6 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 			await reportErrorToObservability(env, 'bot.watch_renew_failed', err);
 			await ctx.answerCallbackQuery({ text: '❌ Watch 续订失败' });
 		}
-	});
-
-	// Clear cache
-	bot.callbackQuery(/^acc:(\d+):cc$/, async (ctx) => {
-		const { accountId, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
-		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
-
-		await clearAccountCache(env, accountId);
-		await ctx.answerCallbackQuery({ text: `✅ 缓存已清除: #${accountId}` });
 	});
 
 	// Delete confirmation prompt

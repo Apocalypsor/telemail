@@ -35,7 +35,6 @@ export function accountDetailKeyboard(account: Account): InlineKeyboard {
 		}
 		kb.row();
 		kb.text('✏️ 编辑', `acc:${account.id}:edit`);
-		kb.text('🗑 清除缓存', `acc:${account.id}:cc`);
 		kb.row();
 		kb.text('❌ 删除', `acc:${account.id}:del`);
 		kb.row();

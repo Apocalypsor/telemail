@@ -145,6 +145,7 @@ export async function fetchNewMessageIds(token: string, env: Env, account: Accou
 
 	const messageIds = new Set<string>();
 	let pageToken: string | undefined;
+	let latestHistoryId: string | undefined;
 
 	do {
 		let path = `/users/me/history?startHistoryId=${storedHistoryId}&historyTypes=messageAdded&labelId=INBOX`;
@@ -177,11 +178,15 @@ export async function fetchNewMessageIds(token: string, env: Env, account: Accou
 		}
 
 		pageToken = history.nextPageToken;
-		// 更新为最新 historyId
 		if (history.historyId) {
-			await putHistoryId(env, account.id, String(history.historyId));
+			latestHistoryId = String(history.historyId);
 		}
 	} while (pageToken);
+
+	// 分页结束后一次性更新 historyId
+	if (latestHistoryId) {
+		await putHistoryId(env, account.id, latestHistoryId);
+	}
 
 	return [...messageIds];
 }

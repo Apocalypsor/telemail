@@ -16,7 +16,11 @@ telegram.post(ROUTE_TELEGRAM_WEBHOOK, async (c) => {
 	const botInfo = await getBotInfo(c.env);
 	const bot = createBot(c.env, botInfo);
 	const update = await c.req.json();
-	await bot.handleUpdate(update);
+	try {
+		await bot.handleUpdate(update);
+	} catch {
+		// 始终返回 200，避免 Telegram 无限重试失败的 webhook
+	}
 	return c.text('OK');
 });
 
