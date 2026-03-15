@@ -34,7 +34,7 @@
 3. 附件作为真实文件附在同一条 Telegram 消息中：
    - **1 个附件** → `sendDocument` + 标题
    - **多个附件** → `sendMediaGroup`，标题放在第一个文件上
-4. （可选）如果配置了 LLM API，会异步生成 AI 摘要和标签，编辑原消息替换正文为摘要。
+4. （可选）如果配置了 LLM API，会异步生成 AI 摘要和标签（单词、首字母大写），编辑原消息替换正文为摘要，标签以 `#Tag` 形式附在末尾。
 5. 每条消息附带 ⭐ **星标按钮**（inline keyboard），点击可在邮箱中加/取消星标。
 6. （可选）配置 `WORKER_URL` 后，每条消息附带 📧 **查看原文**按钮，点击可在浏览器中查看邮件原始 HTML。链接使用 HMAC-SHA256 签名防遍历，HTML 内容缓存 7 天。
 7. 在频道/群组中对消息添加 **emoji reaction** 可自动将对应邮件标记为已读。
@@ -247,6 +247,23 @@ npm test           # 运行测试
 npm run cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 ```
 
+### Path Aliases
+
+所有跨目录导入使用 TypeScript path alias，避免 `../../` 相对路径：
+
+| Alias           | 对应目录           |
+| --------------- | ------------------ |
+| `@/*`           | `src/*`            |
+| `@utils/*`      | `src/utils/*`      |
+| `@services/*`   | `src/services/*`   |
+| `@bot/*`        | `src/bot/*`        |
+| `@db/*`         | `src/db/*`         |
+| `@handlers/*`   | `src/handlers/*`   |
+| `@components/*` | `src/components/*` |
+| `@assets/*`     | `src/assets/*`     |
+
+由 `tsconfig.json` 定义，Wrangler 构建时自动解析。
+
 ## 项目结构
 
 ```text
@@ -303,7 +320,6 @@ src/
     keyboard.ts        # 邮件操作 inline keyboard 构建
     llm.ts             # LLM 邮件分析（验证码 + 摘要 + 标签，纯数据返回）
     message-actions.ts # 消息操作（星标切换、标记已读）
-    observability.ts   # 错误结构化日志 + Observability Hub
     telegram.ts        # Telegram API 封装（发送/编辑/附件/速率限制/MarkdownV2 回退）
   utils/
     async.ts           # delay 工具函数
@@ -311,6 +327,7 @@ src/
     format.ts          # 邮件正文格式化：HTML→Markdown→Telegram MarkdownV2
     hash.ts            # HMAC-SHA256 token 生成/验证（邮件原文链接）
     markdown-v2.ts     # MarkdownV2 转义与最长合法前缀解析
+    observability.ts   # 错误结构化日志 + Observability Hub
 scripts/
   build-css.mjs        # Tailwind CSS 构建脚本（生成 src/assets/tailwind.ts）
 migrations/            # D1 数据库迁移（10 个文件）
@@ -388,7 +405,11 @@ wrangler.jsonc         # Cloudflare Worker 配置（D1 + KV + Queue + Cron）
 🤖 AI 摘要
 
 （AI 生成的摘要内容）
+
+#Github  #Verification  #Security
 ```
+
+标签为单词、首字母大写，最多 3 个，与邮件语言一致。
 
 附件会作为可下载文件附在同一条消息中。
 

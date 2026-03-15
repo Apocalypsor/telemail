@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { enqueueSyncNotification } from '../../../../services/email/gmail/sync';
-import type { AppEnv, PubSubPushBody } from '../../../../types';
-import { requireSecret } from '../../middleware';
-import { ROUTE_GMAIL_PUSH } from '../../routes';
+import { enqueueSyncNotification } from '@services/email/gmail/sync';
+import type { AppEnv, PubSubPushBody } from '@/types';
+import { requireSecret } from '@handlers/hono/middleware';
+import { ROUTE_GMAIL_PUSH } from '@handlers/hono/routes';
 
 const gmailPush = new Hono<AppEnv>();
 

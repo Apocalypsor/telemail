@@ -1,5 +1,5 @@
-import { ROUTE_PREVIEW_API } from '../handlers/hono/routes';
-import { Card, Layout } from './layout';
+import { ROUTE_PREVIEW_API } from '@handlers/hono/routes';
+import { Card, Layout } from '@components/layout';
 
 function previewScript() {
 	return `

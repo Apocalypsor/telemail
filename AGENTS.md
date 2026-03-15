@@ -44,6 +44,7 @@ Telemail is a Cloudflare Worker that forwards emails (Gmail / Outlook / IMAP) to
 **Entry point**: `src/index.ts` — exports `fetch` (Hono app), `queue` (email processing), `scheduled` (cron).
 
 **Key bindings** (defined in `wrangler.jsonc`):
+
 - **D1** (`DB`): accounts, users, message_map, failed_emails tables
 - **KV** (`EMAIL_KV`): access_token cache, dedup, OAuth state, mail HTML cache, bot info
 - **Queue** (`EMAIL_QUEUE`): email processing with retry (max 3, batch 5, concurrency 3)
@@ -51,6 +52,7 @@ Telemail is a Cloudflare Worker that forwards emails (Gmail / Outlook / IMAP) to
 - **Cron** (`0 * * * *`): hourly IMAP health check; midnight-only Gmail watch + Outlook subscription renewal
 
 **Auth middleware** (`src/handlers/hono/middleware.ts`):
+
 - `requireSecret('GMAIL_PUSH_SECRET')` — query param secret for Pub/Sub push
 - `requireBearer('IMAP_BRIDGE_SECRET')` — Authorization header for IMAP bridge
 
@@ -70,13 +72,38 @@ All shared constants live in `src/constants.ts`. This includes:
 
 When adding new KV keys used across multiple files, add a `KV_` prefixed constant here rather than hardcoding strings.
 
+## Path Aliases
+
+TypeScript path aliases are configured in `tsconfig.json` and resolved by Wrangler at build time. Use aliases instead of relative paths in all imports:
+
+| Alias           | Resolves to        |
+| --------------- | ------------------ |
+| `@/*`           | `src/*`            |
+| `@utils/*`      | `src/utils/*`      |
+| `@services/*`   | `src/services/*`   |
+| `@bot/*`        | `src/bot/*`        |
+| `@db/*`         | `src/db/*`         |
+| `@handlers/*`   | `src/handlers/*`   |
+| `@components/*` | `src/components/*` |
+| `@assets/*`     | `src/assets/*`     |
+
+Examples: `import { Env } from '@/types'`, `import { analyzeEmail } from '@services/llm'`, `import { reportErrorToObservability } from '@utils/observability'`.
+
+## LLM Analysis
+
+`analyzeEmail()` in `src/services/llm.ts` performs a single LLM call returning:
+
+- `verificationCode`: extracted OTP/passcode, or `null`
+- `summary`: bullet-point summary (skipped when a verification code is found)
+- `tags`: 1–3 single-word tags, first letter capitalized, same language as the email (e.g. `Github`, `Verification`, `Password_Reset`)
+
 ## Bot Commands
 
 Bot commands are defined in `src/bot/index.ts` (`BOT_COMMANDS` array) and auto-synced to Telegram via `setMyCommands` on each webhook request (gated by KV-stored `BOT_COMMANDS_VERSION` — only calls the API when the version changes). Increment `BOT_COMMANDS_VERSION` after modifying the command list; deploy and send any message to the Bot to trigger sync.
 
 ## Error Reporting
 
-Use `reportErrorToObservability()` from `src/services/observability.ts` instead of `console.error` / `console.warn` for all error handling. The observability service forwards errors to the monitoring system; `console.error` output may not be visible in production. The only exceptions are inside `observability.ts` itself and in utility functions that don't have access to `env` (e.g., `telegram.ts`).
+Use `reportErrorToObservability()` from `src/utils/observability.ts` instead of `console.error` / `console.warn` for all error handling. The observability service forwards errors to the monitoring system; `console.error` output may not be visible in production. The only exceptions are inside `observability.ts` itself and in utility functions that don't have access to `env` (e.g., `telegram.ts`).
 
 ## Documentation Maintenance
 

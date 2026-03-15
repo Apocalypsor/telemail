@@ -1,4 +1,4 @@
-import type { Env } from '../../../types';
+import type { Env } from '@/types';
 
 async function callBridge(env: Env, method: string, path: string, body?: unknown): Promise<Response> {
 	if (!env.IMAP_BRIDGE_URL || !env.IMAP_BRIDGE_SECRET) {

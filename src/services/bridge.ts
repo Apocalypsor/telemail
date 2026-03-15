@@ -1,19 +1,27 @@
 import PostalMime from 'postal-mime';
-import { MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE } from '../constants';
-import { getAccountById } from '../db/accounts';
-import { deleteFailedEmail, getAllFailedEmails, putFailedEmail, type FailedEmail } from '../db/failed-emails';
-import { putMessageMapping } from '../db/message-map';
-import { AccountType, type Account, type Env, type QueueMessage } from '../types';
-import { base64ToArrayBuffer, base64urlToArrayBuffer } from '../utils/base64url';
-import { formatBody, htmlToMarkdown, toTelegramMdV2 } from '../utils/format';
-import { escapeMdV2 } from '../utils/markdown-v2';
-import { getAccessToken, gmailGet } from './email/gmail';
-import { fetchImapRawEmail } from './email/imap';
-import { fetchRawMime, getAccessToken as msGetAccessToken } from './email/outlook';
-import { buildEmailKeyboard, resolveStarredKeyboard } from './keyboard';
-import { analyzeEmail } from './llm';
-import { reportErrorToObservability } from './observability';
-import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
+import { MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE } from '@/constants';
+import { getAccountById } from '@db/accounts';
+import { deleteFailedEmail, getAllFailedEmails, putFailedEmail, type FailedEmail } from '@db/failed-emails';
+import { putMessageMapping } from '@db/message-map';
+import { AccountType, type Account, type Env, type QueueMessage } from '@/types';
+import { base64ToArrayBuffer, base64urlToArrayBuffer } from '@utils/base64url';
+import { formatBody, htmlToMarkdown, toTelegramMdV2 } from '@utils/format';
+import { escapeMdV2 } from '@utils/markdown-v2';
+import { getAccessToken, gmailGet } from '@services/email/gmail';
+import { fetchImapRawEmail } from '@services/email/imap';
+import { fetchRawMime, getAccessToken as msGetAccessToken } from '@services/email/outlook';
+import { buildEmailKeyboard, resolveStarredKeyboard } from '@services/keyboard';
+import { analyzeEmail } from '@services/llm';
+import { reportErrorToObservability } from '@utils/observability';
+import {
+	editMessageCaption,
+	editTextMessage,
+	sendTextMessage,
+	sendWithAttachments,
+	setReplyMarkup,
+	TG_CAPTION_LIMIT,
+	TG_MSG_LIMIT,
+} from '@services/telegram';
 
 // ---------------------------------------------------------------------------
 // 私有 helper
@@ -170,7 +178,18 @@ export async function deliverEmailToTelegram(
 		(async () => {
 			try {
 				const editKeyboard = await resolveStarredKeyboard(env, chatId, sentMessageId, messageId, account.email);
-				await editMessageWithAnalysis(env, tgToken, chatId, sentMessageId, hasSingleAttachment, header, subject, plainBody, formattedBody, editKeyboard);
+				await editMessageWithAnalysis(
+					env,
+					tgToken,
+					chatId,
+					sentMessageId,
+					hasSingleAttachment,
+					header,
+					subject,
+					plainBody,
+					formattedBody,
+					editKeyboard,
+				);
 			} catch (err) {
 				await reportErrorToObservability(env, 'llm.summary_failed', err, { subject });
 				await putFailedEmail(env.DB, {
@@ -234,7 +253,18 @@ export async function retryFailedEmail(failed: FailedEmail, env: Env): Promise<v
 	const formattedBody = formatBody(email.text, email.html, bodyBudget);
 	const keyboard = await resolveStarredKeyboard(env, failed.tg_chat_id, failed.tg_message_id, failed.email_message_id, account.email);
 
-	await editMessageWithAnalysis(env, env.TELEGRAM_BOT_TOKEN, failed.tg_chat_id, failed.tg_message_id, !!failed.is_caption, header, subject, plainBody, formattedBody, keyboard);
+	await editMessageWithAnalysis(
+		env,
+		env.TELEGRAM_BOT_TOKEN,
+		failed.tg_chat_id,
+		failed.tg_message_id,
+		!!failed.is_caption,
+		header,
+		subject,
+		plainBody,
+		formattedBody,
+		keyboard,
+	);
 
 	await deleteFailedEmail(env.DB, failed.id);
 }

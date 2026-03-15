@@ -1,5 +1,5 @@
 import type { Child } from 'hono/jsx';
-import { TAILWIND_CSS } from '../assets/tailwind';
+import { TAILWIND_CSS } from '@assets/tailwind';
 
 export function Layout({ title, children }: { title: string; children: Child }) {
 	return (

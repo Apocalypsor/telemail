@@ -1,4 +1,4 @@
-import type { Env, ObservabilityErrorPayload } from '../types';
+import type { Env, ObservabilityErrorPayload } from '@/types';
 
 type ErrorContext = Record<string, unknown>;
 

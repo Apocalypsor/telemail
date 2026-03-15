@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { createBot, getBotInfo, syncBotCommands } from '../../bot';
-import type { AppEnv } from '../../types';
-import { timingSafeEqual } from '../../utils/hash';
-import { ROUTE_TELEGRAM_WEBHOOK } from './routes';
+import { createBot, getBotInfo, syncBotCommands } from '@bot/index';
+import type { AppEnv } from '@/types';
+import { timingSafeEqual } from '@utils/hash';
+import { ROUTE_TELEGRAM_WEBHOOK } from '@handlers/hono/routes';
 
 const telegram = new Hono<AppEnv>();
 

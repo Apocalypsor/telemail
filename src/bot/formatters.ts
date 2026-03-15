@@ -1,6 +1,6 @@
 import { InlineKeyboard } from 'grammy';
-import type { Account, TelegramUser } from '../types';
-import { AccountType } from '../types';
+import type { Account, TelegramUser } from '@/types';
+import { AccountType } from '@/types';
 
 export function accountDetailText(account: Account, ownerName?: string): string {
 	let text = `📧 账号详情 #${account.id}\n\n`;

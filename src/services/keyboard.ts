@@ -1,8 +1,8 @@
 import { InlineKeyboard } from 'grammy';
-import { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from '../bot';
-import { getMessageMapping } from '../db/message-map';
-import type { Env } from '../types';
-import { generateMailToken } from '../utils/hash';
+import { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from '@bot/index';
+import { getMessageMapping } from '@db/message-map';
+import type { Env } from '@/types';
+import { generateMailToken } from '@utils/hash';
 
 /** 根据星标状态构建邮件消息键盘 */
 export async function buildEmailKeyboard(

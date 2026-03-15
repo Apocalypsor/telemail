@@ -1,4 +1,4 @@
-import { AccountType, type Account } from '../types';
+import { AccountType, type Account } from '@/types';
 
 export async function getAllAccounts(db: D1Database): Promise<Account[]> {
 	const { results } = await db.prepare('SELECT * FROM accounts ORDER BY id').all<Account>();

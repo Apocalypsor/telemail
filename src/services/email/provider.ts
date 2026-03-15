@@ -1,14 +1,14 @@
-import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from '../../constants';
-import type { Account, Env } from '../../types';
-import { AccountType } from '../../types';
-import { addStar, getAccessToken, markAsRead, removeStar } from './gmail/index';
-import { setImapFlag } from './imap';
+import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from '@/constants';
+import type { Account, Env } from '@/types';
+import { AccountType } from '@/types';
+import { addStar, getAccessToken, markAsRead, removeStar } from '@services/email/gmail/index';
+import { setImapFlag } from '@services/email/imap';
 import {
 	addStar as msAddStar,
 	getAccessToken as msGetAccessToken,
 	markAsRead as msMarkAsRead,
 	removeStar as msRemoveStar,
-} from './outlook/index';
+} from '@services/email/outlook/index';
 
 export interface EmailProvider {
 	markAsRead(messageId: string): Promise<void>;

@@ -1,6 +1,6 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import { KV_OAUTH_BOT_MSG_PREFIX, OAUTH_STATE_TTL_SECONDS } from '../../constants';
+import { KV_OAUTH_BOT_MSG_PREFIX, OAUTH_STATE_TTL_SECONDS } from '@/constants';
 import {
 	createAccount,
 	deleteAccount,
@@ -9,20 +9,20 @@ import {
 	getOwnAccounts,
 	getVisibleAccounts,
 	updateAccount,
-} from '../../db/accounts';
-import { deleteHistoryId } from '../../db/kv';
-import { getAllUsers, getUserByTelegramId } from '../../db/users';
-import { renewWatch, stopWatch } from '../../services/email/gmail';
-import { generateOAuthUrl } from '../../services/email/gmail/oauth';
-import { syncAccounts } from '../../services/email/imap';
-import { renewSubscription, stopSubscription } from '../../services/email/outlook';
-import { generateOAuthUrl as generateMsOAuthUrl } from '../../services/email/outlook/oauth';
-import { reportErrorToObservability } from '../../services/observability';
-import type { Account, Env } from '../../types';
-import { AccountType } from '../../types';
-import { isAdmin } from '../auth';
-import { accountDetailKeyboard, accountDetailText, formatUserName } from '../formatters';
-import { clearBotState, getBotState, setBotState } from '../state';
+} from '@db/accounts';
+import { deleteHistoryId } from '@db/kv';
+import { getAllUsers, getUserByTelegramId } from '@db/users';
+import { renewWatch, stopWatch } from '@services/email/gmail';
+import { generateOAuthUrl } from '@services/email/gmail/oauth';
+import { syncAccounts } from '@services/email/imap';
+import { renewSubscription, stopSubscription } from '@services/email/outlook';
+import { generateOAuthUrl as generateMsOAuthUrl } from '@services/email/outlook/oauth';
+import { reportErrorToObservability } from '@utils/observability';
+import type { Account, Env } from '@/types';
+import { AccountType } from '@/types';
+import { isAdmin } from '@bot/auth';
+import { accountDetailKeyboard, accountDetailText, formatUserName } from '@bot/formatters';
+import { clearBotState, getBotState, setBotState } from '@bot/state';
 
 async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
 	const userId = String(fromId);

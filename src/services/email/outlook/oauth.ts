@@ -5,13 +5,13 @@ import {
 	MS_OAUTH_AUTHORIZE_URL,
 	MS_OAUTH_TOKEN_URL,
 	OAUTH_STATE_TTL_SECONDS,
-} from '../../../constants';
-import { getAccountById, updateAccountEmail, updateRefreshToken } from '../../../db/accounts';
-import { putCachedAccessToken } from '../../../db/kv';
-import { ROUTE_OAUTH_MICROSOFT_CALLBACK, ROUTE_OAUTH_MICROSOFT_START } from '../../../handlers/hono/routes';
-import type { Env } from '../../../types';
-import { reportErrorToObservability } from '../../observability';
-import { renewSubscription } from './index';
+} from '@/constants';
+import { getAccountById, updateAccountEmail, updateRefreshToken } from '@db/accounts';
+import { putCachedAccessToken } from '@db/kv';
+import { ROUTE_OAUTH_MICROSOFT_CALLBACK, ROUTE_OAUTH_MICROSOFT_START } from '@handlers/hono/routes';
+import type { Env } from '@/types';
+import { reportErrorToObservability } from '@utils/observability';
+import { renewSubscription } from '@services/email/outlook/index';
 
 export type MsTokenResponse = {
 	access_token?: string;

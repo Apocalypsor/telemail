@@ -5,13 +5,13 @@ import {
 	GOOGLE_OAUTH_TOKEN_URL,
 	KV_OAUTH_STATE_PREFIX,
 	OAUTH_STATE_TTL_SECONDS,
-} from '../../../constants';
-import { getAccountById, updateAccountEmail, updateRefreshToken } from '../../../db/accounts';
-import { putCachedAccessToken } from '../../../db/kv';
-import { ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '../../../handlers/hono/routes';
-import type { Env } from '../../../types';
-import { reportErrorToObservability } from '../../observability';
-import { renewWatch } from './index';
+} from '@/constants';
+import { getAccountById, updateAccountEmail, updateRefreshToken } from '@db/accounts';
+import { putCachedAccessToken } from '@db/kv';
+import { ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '@handlers/hono/routes';
+import type { Env } from '@/types';
+import { reportErrorToObservability } from '@utils/observability';
+import { renewWatch } from '@services/email/gmail/index';
 
 export type GoogleTokenResponse = {
 	access_token?: string;

@@ -40,7 +40,18 @@
 		"types": [
 			"./worker-configuration.d.ts",
 			"node"
-		]
+		],
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["./src/*"],
+			"@utils/*": ["./src/utils/*"],
+			"@services/*": ["./src/services/*"],
+			"@bot/*": ["./src/bot/*"],
+			"@db/*": ["./src/db/*"],
+			"@handlers/*": ["./src/handlers/*"],
+			"@components/*": ["./src/components/*"],
+			"@assets/*": ["./src/assets/*"]
+		}
 	},
 	"exclude": ["test"],
 	"include": ["worker-configuration.d.ts", "src/**/*.ts", "src/**/*.tsx"]

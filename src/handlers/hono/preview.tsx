@@ -1,16 +1,16 @@
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
-import { MAX_BODY_CHARS } from '../../constants';
-import { PreviewPage } from '../../components/preview';
-import { getAccountByEmail } from '../../db/accounts';
-import { getCachedMailHtml, putCachedMailHtml } from '../../db/kv';
-import { fetchRawEmailByType } from '../../services/bridge';
-import { getAccessToken } from '../../services/email/gmail';
-import { fetchMailContent, wrapPlainText } from '../../services/email/mail-content';
-import { AccountType, type AppEnv } from '../../types';
-import { formatBody } from '../../utils/format';
-import { verifyMailToken } from '../../utils/hash';
-import { ROUTE_MAIL, ROUTE_PREVIEW, ROUTE_PREVIEW_API } from './routes';
+import { MAX_BODY_CHARS } from '@/constants';
+import { PreviewPage } from '@components/preview';
+import { getAccountByEmail } from '@db/accounts';
+import { getCachedMailHtml, putCachedMailHtml } from '@db/kv';
+import { fetchRawEmailByType } from '@services/bridge';
+import { getAccessToken } from '@services/email/gmail';
+import { fetchMailContent, wrapPlainText } from '@services/email/mail-content';
+import { AccountType, type AppEnv } from '@/types';
+import { formatBody } from '@utils/format';
+import { verifyMailToken } from '@utils/hash';
+import { ROUTE_MAIL, ROUTE_PREVIEW, ROUTE_PREVIEW_API } from '@handlers/hono/routes';
 
 const preview = new Hono<AppEnv>();
 

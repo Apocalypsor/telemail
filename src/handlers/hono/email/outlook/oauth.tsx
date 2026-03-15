@@ -1,13 +1,13 @@
 import { Api } from 'grammy';
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { accountDetailKeyboard, accountDetailText } from '../../../../bot/formatters';
-import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../../../../components/oauth';
-import { KV_OAUTH_BOT_MSG_PREFIX } from '../../../../constants';
-import { getAccountById } from '../../../../db/accounts';
-import { getOAuthPageProps, processOAuthCallback, startMicrosoftOAuth } from '../../../../services/email/outlook/oauth';
-import type { AppEnv } from '../../../../types';
-import { ROUTE_OAUTH_MICROSOFT, ROUTE_OAUTH_MICROSOFT_CALLBACK, ROUTE_OAUTH_MICROSOFT_START } from '../../routes';
+import { accountDetailKeyboard, accountDetailText } from '@bot/formatters';
+import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '@components/oauth';
+import { KV_OAUTH_BOT_MSG_PREFIX } from '@/constants';
+import { getAccountById } from '@db/accounts';
+import { getOAuthPageProps, processOAuthCallback, startMicrosoftOAuth } from '@services/email/outlook/oauth';
+import type { AppEnv } from '@/types';
+import { ROUTE_OAUTH_MICROSOFT, ROUTE_OAUTH_MICROSOFT_CALLBACK, ROUTE_OAUTH_MICROSOFT_START } from '@handlers/hono/routes';
 
 const msOauth = new Hono<AppEnv>();
 

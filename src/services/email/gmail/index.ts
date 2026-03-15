@@ -1,9 +1,9 @@
-import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from '../../../constants';
-import type { Account, Env } from '../../../types';
-import { AccountType } from '../../../types';
-import { getAllAccounts } from '../../../db/accounts';
-import { getCachedAccessToken, getHistoryId, putCachedAccessToken, putHistoryId } from '../../../db/kv';
-import type { GoogleTokenResponse } from './oauth';
+import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from '@/constants';
+import type { Account, Env } from '@/types';
+import { AccountType } from '@/types';
+import { getAllAccounts } from '@db/accounts';
+import { getCachedAccessToken, getHistoryId, putCachedAccessToken, putHistoryId } from '@db/kv';
+import type { GoogleTokenResponse } from '@services/email/gmail/oauth';
 
 // ─── OAuth2 ──────────────────────────────────────────────────────────────────
 

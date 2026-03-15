@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { enqueueOutlookNotification, type GraphNotification } from '../../../../services/email/outlook/sync';
-import type { AppEnv } from '../../../../types';
-import { timingSafeEqual } from '../../../../utils/hash';
-import { ROUTE_OUTLOOK_PUSH } from '../../routes';
+import { enqueueOutlookNotification, type GraphNotification } from '@services/email/outlook/sync';
+import type { AppEnv } from '@/types';
+import { timingSafeEqual } from '@utils/hash';
+import { ROUTE_OUTLOOK_PUSH } from '@handlers/hono/routes';
 
 const outlookPush = new Hono<AppEnv>();
 

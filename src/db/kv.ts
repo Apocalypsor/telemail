@@ -1,5 +1,5 @@
-import { MAIL_HTML_CACHE_TTL } from '../constants';
-import type { Env } from '../types';
+import { MAIL_HTML_CACHE_TTL } from '@/constants';
+import type { Env } from '@/types';
 
 // ─── Key helpers ────────────────────────────────────────────────────────────
 

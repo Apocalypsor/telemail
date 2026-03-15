@@ -1,7 +1,7 @@
-import { getAccountByEmail } from '../../../db/accounts';
-import { getHistoryId, putHistoryId } from '../../../db/kv';
-import type { Env, GmailNotification, PubSubPushBody } from '../../../types';
-import { fetchNewMessageIds, getAccessToken } from './index';
+import { getAccountByEmail } from '@db/accounts';
+import { getHistoryId, putHistoryId } from '@db/kv';
+import type { Env, GmailNotification, PubSubPushBody } from '@/types';
+import { fetchNewMessageIds, getAccessToken } from '@services/email/gmail/index';
 
 /** 解析 Pub/Sub 通知，获取新邮件列表并直接入队 */
 export async function enqueueSyncNotification(body: PubSubPushBody, env: Env): Promise<void> {

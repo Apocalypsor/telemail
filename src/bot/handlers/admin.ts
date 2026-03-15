@@ -1,16 +1,16 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import { countFailedEmails, deleteAllFailedEmails, deleteFailedEmail, getAllFailedEmails, getFailedEmail } from '../../db/failed-emails';
+import { countFailedEmails, deleteAllFailedEmails, deleteFailedEmail, getAllFailedEmails, getFailedEmail } from '@db/failed-emails';
 
-import { approveUser, getNonAdminUsers, rejectUser } from '../../db/users';
-import { retryAllFailedEmails, retryFailedEmail } from '../../services/bridge';
-import { renewWatchAll } from '../../services/email/gmail';
-import { renewSubscriptionAll } from '../../services/email/outlook';
-import { reportErrorToObservability } from '../../services/observability';
-import type { Env, TelegramUser } from '../../types';
-import { isAdmin } from '../auth';
-import { formatUserName, userListText } from '../formatters';
-import { clearBotState } from '../state';
+import { approveUser, getNonAdminUsers, rejectUser } from '@db/users';
+import { retryAllFailedEmails, retryFailedEmail } from '@services/bridge';
+import { renewWatchAll } from '@services/email/gmail';
+import { renewSubscriptionAll } from '@services/email/outlook';
+import { reportErrorToObservability } from '@utils/observability';
+import type { Env, TelegramUser } from '@/types';
+import { isAdmin } from '@bot/auth';
+import { formatUserName, userListText } from '@bot/formatters';
+import { clearBotState } from '@bot/state';
 
 function userListKeyboard(users: TelegramUser[]): InlineKeyboard {
 	const kb = new InlineKeyboard();
@@ -38,7 +38,7 @@ async function adminMenuKeyboard(env: Env): Promise<InlineKeyboard> {
 	return kb;
 }
 
-function failedEmailListMessage(items: import('../../db/failed-emails').FailedEmail[]): { text: string; keyboard: InlineKeyboard } {
+function failedEmailListMessage(items: import('@db/failed-emails').FailedEmail[]): { text: string; keyboard: InlineKeyboard } {
 	if (items.length === 0) {
 		return { text: '📋 失败邮件\n\n暂无记录', keyboard: new InlineKeyboard().text('« 返回', 'admin') };
 	}

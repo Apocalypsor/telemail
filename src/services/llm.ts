@@ -1,7 +1,7 @@
 /** 使用 OpenAI compatible API 对邮件正文进行 AI 分析（验证码 + 摘要 + 标签） */
 
-import { MAX_LINKS } from '../constants';
-import { extractLinks, prepareBody } from '../utils/format';
+import { MAX_LINKS } from '@/constants';
+import { extractLinks, prepareBody } from '@utils/format';
 
 /** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode */
 async function callLLM(baseUrl: string, apiKey: string, model: string, prompt: string, json?: boolean): Promise<string> {
@@ -73,13 +73,14 @@ export async function analyzeEmail(
 		`   - State directly what happened, what the key data is, and what action is needed\n` +
 		linkRule +
 		`   - You may use Markdown formatting: **bold**, _italic_, \`code\`\n\n` +
-		`3. "tags": An array of 1-3 short keyword tags for this email.\n` +
+		`3. "tags": An array of 1-3 single-word tags for this email.\n` +
 		`   Rules:\n` +
 		`   - Use the SAME LANGUAGE as the email\n` +
-		`   - Each tag 1-3 words, no "#" prefix\n` +
+		`   - Each tag must be a SINGLE word with no spaces (use underscore to join if needed, e.g. "Password_Reset"), no "#" prefix\n` +
+		`   - Capitalize the first letter of each tag (e.g. "Github", "Verification", "Password_Reset")\n` +
 		`   - Capture: sender/service name, category (notification, newsletter, promotion, verification), key topic\n\n` +
 		`Output ONLY valid JSON, no other text. Example:\n` +
-		`{"verification_code": null, "summary": "• ...", "tags": ["tag1", "tag2"]}\n\n` +
+		`{"verification_code": null, "summary": "• ...", "tags": ["Github", "Verification", "Security"]}\n\n` +
 		`Subject: ${subject}\n\n` +
 		`Body:\n${body}` +
 		linksSection;

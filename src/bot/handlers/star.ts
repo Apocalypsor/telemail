@@ -1,9 +1,9 @@
 import type { Bot } from 'grammy';
 import type { MessageEntity } from 'grammy/types';
-import { toggleStar } from '../../services/message-actions';
-import { reportErrorToObservability } from '../../services/observability';
-import { STAR_TAG } from '../../constants';
-import type { Env } from '../../types';
+import { toggleStar } from '@services/message-actions';
+import { reportErrorToObservability } from '@utils/observability';
+import { STAR_TAG } from '@/constants';
+import type { Env } from '@/types';
 
 /** 在消息文本末尾追加 #星标 标签 */
 function appendStarTag(text: string, entities: MessageEntity[]): { text: string; entities: MessageEntity[] } {

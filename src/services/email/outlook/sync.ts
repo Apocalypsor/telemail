@@ -1,6 +1,6 @@
-import { KV_MS_SUB_ACCOUNT_PREFIX } from '../../../constants';
-import { getAccountById } from '../../../db/accounts';
-import type { Env } from '../../../types';
+import { KV_MS_SUB_ACCOUNT_PREFIX } from '@/constants';
+import { getAccountById } from '@db/accounts';
+import type { Env } from '@/types';
 
 /** Microsoft Graph change notification payload */
 export interface GraphNotification {

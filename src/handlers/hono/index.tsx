@@ -1,14 +1,14 @@
 import { Hono } from 'hono';
-import { FAVICON_BASE64 } from '../../assets/favicon';
-import { reportErrorToObservability } from '../../services/observability';
-import type { AppEnv } from '../../types';
-import gmailOauth from './email/gmail/oauth';
-import gmailPush from './email/gmail/push';
-import imapRoutes from './email/imap/index';
-import msOauth from './email/outlook/oauth';
-import outlookPush from './email/outlook/push';
-import preview from './preview';
-import telegram from './telegram';
+import { FAVICON_BASE64 } from '@assets/favicon';
+import { reportErrorToObservability } from '@utils/observability';
+import type { AppEnv } from '@/types';
+import gmailOauth from '@handlers/hono/email/gmail/oauth';
+import gmailPush from '@handlers/hono/email/gmail/push';
+import imapRoutes from '@handlers/hono/email/imap/index';
+import msOauth from '@handlers/hono/email/outlook/oauth';
+import outlookPush from '@handlers/hono/email/outlook/push';
+import preview from '@handlers/hono/preview';
+import telegram from '@handlers/hono/telegram';
 
 const app = new Hono<AppEnv>();
 

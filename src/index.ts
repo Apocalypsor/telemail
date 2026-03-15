@@ -1,13 +1,13 @@
-import app from './handlers/hono';
-import { handleQueueBatch } from './handlers/queue';
-import { retryAllFailedEmails } from './services/bridge';
-import { renewWatchAll } from './services/email/gmail';
-import { checkImapBridgeHealth } from './services/email/imap';
-import { renewSubscriptionAll } from './services/email/outlook';
-import { reportErrorToObservability } from './services/observability';
-import type { Env, QueueMessage } from './types';
+import app from '@handlers/hono';
+import { handleQueueBatch } from '@handlers/queue';
+import { retryAllFailedEmails } from '@services/bridge';
+import { renewWatchAll } from '@services/email/gmail';
+import { checkImapBridgeHealth } from '@services/email/imap';
+import { renewSubscriptionAll } from '@services/email/outlook';
+import { reportErrorToObservability } from '@utils/observability';
+import type { Env, QueueMessage } from '@/types';
 
-export type { Env } from './types';
+export type { Env } from '@/types';
 
 export default {
 	fetch: app.fetch,

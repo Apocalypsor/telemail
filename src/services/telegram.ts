@@ -1,6 +1,6 @@
-import { TG_API_BASE, TG_CAPTION_LIMIT, TG_MAX_RETRY_AFTER_SECS, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '../constants';
-import type { Attachment } from '../types';
-import { delay } from '../utils/async';
+import { TG_API_BASE, TG_CAPTION_LIMIT, TG_MAX_RETRY_AFTER_SECS, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '@/constants';
+import type { Attachment } from '@/types';
+import { delay } from '@utils/async';
 
 export { TG_CAPTION_LIMIT, TG_MSG_LIMIT };
 

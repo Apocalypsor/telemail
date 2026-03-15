@@ -1,11 +1,11 @@
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import { createImapAccount, getAuthorizedAccount, updateAccount } from '../../db/accounts';
-import { syncAccounts } from '../../services/email/imap';
-import { reportErrorToObservability } from '../../services/observability';
-import type { Env } from '../../types';
-import { isAdmin } from '../auth';
-import { clearBotState, getBotState, setBotState } from '../state';
+import { createImapAccount, getAuthorizedAccount, updateAccount } from '@db/accounts';
+import { syncAccounts } from '@services/email/imap';
+import { reportErrorToObservability } from '@utils/observability';
+import type { Env } from '@/types';
+import { isAdmin } from '@bot/auth';
+import { clearBotState, getBotState, setBotState } from '@bot/state';
 
 /**
  * 处理文本消息输入（用于添加/编辑账号的多步骤交互）。

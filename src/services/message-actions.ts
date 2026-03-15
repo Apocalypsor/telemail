@@ -1,10 +1,10 @@
 import { InlineKeyboard } from 'grammy';
-import { getAccountById } from '../db/accounts';
-import { getMessageMapping, updateStarred } from '../db/message-map';
-import type { Env } from '../types';
-import { getEmailProvider } from './email/provider';
-import { buildEmailKeyboard } from './keyboard';
-import { reportErrorToObservability } from './observability';
+import { getAccountById } from '@db/accounts';
+import { getMessageMapping, updateStarred } from '@db/message-map';
+import type { Env } from '@/types';
+import { getEmailProvider } from '@services/email/provider';
+import { buildEmailKeyboard } from '@services/keyboard';
+import { reportErrorToObservability } from '@utils/observability';
 
 type ToggleStarResult = { ok: true; keyboard: InlineKeyboard; emailMessageId: string } | { ok: false; reason: string };
 

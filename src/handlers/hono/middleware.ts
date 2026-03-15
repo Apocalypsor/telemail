@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
-import type { AppEnv } from '../../types';
-import { timingSafeEqual } from '../../utils/hash';
+import type { AppEnv } from '@/types';
+import { timingSafeEqual } from '@utils/hash';
 
 /** 校验 query param 中的共享密钥（用于 GMAIL_PUSH_SECRET） */
 export function requireSecret(secretKey: 'GMAIL_PUSH_SECRET'): MiddlewareHandler<AppEnv> {

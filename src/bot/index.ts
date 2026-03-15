@@ -1,19 +1,19 @@
 import { Api, Bot, InlineKeyboard } from 'grammy';
 import type { BotCommand, UserFromGetMe } from 'grammy/types';
-import { BOT_INFO_TTL, KV_BOT_COMMANDS_VERSION_KEY, KV_BOT_INFO_KEY } from '../constants';
-import { getOwnAccounts, getVisibleAccounts } from '../db/accounts';
-import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser, upsertUser } from '../db/users';
-import { reportErrorToObservability } from '../services/observability';
-import type { Env } from '../types';
-import { isAdmin } from './auth';
-import { formatUserName, userListText } from './formatters';
-import { accountListKeyboard, registerAccountHandlers } from './handlers/accounts';
-import { registerAdminHandlers } from './handlers/admin';
-import { registerInputHandler } from './handlers/input';
-import { registerReactionHandler } from './handlers/reaction';
-import { registerStarHandler } from './handlers/star';
+import { BOT_INFO_TTL, KV_BOT_COMMANDS_VERSION_KEY, KV_BOT_INFO_KEY } from '@/constants';
+import { getOwnAccounts, getVisibleAccounts } from '@db/accounts';
+import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser, upsertUser } from '@db/users';
+import { reportErrorToObservability } from '@utils/observability';
+import type { Env } from '@/types';
+import { isAdmin } from '@bot/auth';
+import { formatUserName, userListText } from '@bot/formatters';
+import { accountListKeyboard, registerAccountHandlers } from '@bot/handlers/accounts';
+import { registerAdminHandlers } from '@bot/handlers/admin';
+import { registerInputHandler } from '@bot/handlers/input';
+import { registerReactionHandler } from '@bot/handlers/reaction';
+import { registerStarHandler } from '@bot/handlers/star';
 
-export { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from './keyboards';
+export { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from '@bot/keyboards';
 
 // ─── Bot 命令定义 ───────────────────────────────────────────────────────────
 // 修改此列表后更新 BOT_COMMANDS_VERSION，cron 会自动同步到 Telegram

@@ -1,7 +1,7 @@
 import { parseHTML } from 'linkedom';
 import TurndownService from 'turndown';
-import { MAX_BODY_CHARS, MAX_LINKS } from '../constants';
-import { escapeMdV2, findLongestValidMdV2Prefix, markdownToMdV2 } from './markdown-v2';
+import { MAX_BODY_CHARS, MAX_LINKS } from '@/constants';
+import { escapeMdV2, findLongestValidMdV2Prefix, markdownToMdV2 } from '@utils/markdown-v2';
 
 /** HTML → Markdown 转换器实例（linkedom DOM + turndown） */
 const turndown = new TurndownService({
@@ -136,6 +136,8 @@ function stripLinks(text: string): string {
 
 /** 预处理邮件正文：去首尾空行 + 去链接 + 截断 */
 export function prepareBody(rawBody: string): string {
-	const stripped = stripLinks(rawBody).replace(/^\s*\n+/, '').replace(/\n+\s*$/, '');
+	const stripped = stripLinks(rawBody)
+		.replace(/^\s*\n+/, '')
+		.replace(/\n+\s*$/, '');
 	return stripped.length > MAX_BODY_CHARS ? stripped.slice(0, MAX_BODY_CHARS) + '...' : stripped;
 }

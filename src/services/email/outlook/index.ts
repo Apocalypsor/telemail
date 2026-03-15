@@ -5,11 +5,11 @@ import {
 	MS_MAIL_SCOPE,
 	MS_OAUTH_TOKEN_URL,
 	MS_SUBSCRIPTION_LIFETIME_MINUTES,
-} from '../../../constants';
-import { getAllAccounts } from '../../../db/accounts';
-import { getCachedAccessToken, putCachedAccessToken } from '../../../db/kv';
-import { AccountType, type Account, type Env } from '../../../types';
-import type { MsTokenResponse } from './oauth';
+} from '@/constants';
+import { getAllAccounts } from '@db/accounts';
+import { getCachedAccessToken, putCachedAccessToken } from '@db/kv';
+import { AccountType, type Account, type Env } from '@/types';
+import type { MsTokenResponse } from '@services/email/outlook/oauth';
 
 // ─── OAuth2 ──────────────────────────────────────────────────────────────────
 

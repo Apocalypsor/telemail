@@ -1,4 +1,4 @@
-import { Card, Layout } from './layout';
+import { Card, Layout } from '@components/layout';
 
 export function OAuthSetupPage({
 	startUrl,

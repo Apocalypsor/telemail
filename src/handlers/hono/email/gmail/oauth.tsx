@@ -1,13 +1,13 @@
 import { Api } from 'grammy';
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { accountDetailKeyboard, accountDetailText } from '../../../../bot/formatters';
-import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '../../../../components/oauth';
-import { KV_OAUTH_BOT_MSG_PREFIX } from '../../../../constants';
-import { getAccountById } from '../../../../db/accounts';
-import { getOAuthPageProps, processOAuthCallback, startGoogleOAuth } from '../../../../services/email/gmail/oauth';
-import type { AppEnv } from '../../../../types';
-import { ROUTE_OAUTH_GOOGLE, ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '../../routes';
+import { accountDetailKeyboard, accountDetailText } from '@bot/formatters';
+import { OAuthCallbackPage, OAuthErrorPage, OAuthSetupPage } from '@components/oauth';
+import { KV_OAUTH_BOT_MSG_PREFIX } from '@/constants';
+import { getAccountById } from '@db/accounts';
+import { getOAuthPageProps, processOAuthCallback, startGoogleOAuth } from '@services/email/gmail/oauth';
+import type { AppEnv } from '@/types';
+import { ROUTE_OAUTH_GOOGLE, ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '@handlers/hono/routes';
 
 const gmailOauth = new Hono<AppEnv>();
 

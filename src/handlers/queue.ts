@@ -1,6 +1,6 @@
-import { processEmailMessage } from '../services/bridge';
-import { reportErrorToObservability } from '../services/observability';
-import type { Env, QueueMessage } from '../types';
+import { processEmailMessage } from '@services/bridge';
+import { reportErrorToObservability } from '@utils/observability';
+import type { Env, QueueMessage } from '@/types';
 
 /** Queue consumer: 处理邮件，内置重试 */
 export async function handleQueueBatch(batch: MessageBatch<QueueMessage>, env: Env, ctx: ExecutionContext): Promise<void> {

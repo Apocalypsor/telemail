@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { getImapAccounts } from '../../../../db/accounts';
-import type { AppEnv } from '../../../../types';
-import { requireBearer } from '../../middleware';
-import { ROUTE_IMAP_ACCOUNTS, ROUTE_IMAP_PUSH } from '../../routes';
+import { getImapAccounts } from '@db/accounts';
+import type { AppEnv } from '@/types';
+import { requireBearer } from '@handlers/hono/middleware';
+import { ROUTE_IMAP_ACCOUNTS, ROUTE_IMAP_PUSH } from '@handlers/hono/routes';
 
 const imap = new Hono<AppEnv>();
 
