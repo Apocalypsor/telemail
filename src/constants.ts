@@ -43,6 +43,9 @@ export const MAX_LINKS = 20;
 export const IMAP_FLAG_SEEN = '\\Seen' as const;
 export const IMAP_FLAG_FLAGGED = '\\Flagged' as const;
 
+// ── Tags ─────────────────────────────────────────────────────────────────────
+export const STAR_TAG = ' #星标';
+
 // ── Display ──────────────────────────────────────────────────────────────────
 export const MESSAGE_DATE_LOCALE = 'zh-CN';
 export const MESSAGE_DATE_TIMEZONE = 'America/New_York';
