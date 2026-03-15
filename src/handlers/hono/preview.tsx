@@ -6,7 +6,7 @@ import { getAccountByEmail } from '../../db/accounts';
 import { getCachedMailHtml, putCachedMailHtml } from '../../db/kv';
 import { fetchRawEmailByType } from '../../services/bridge';
 import { getAccessToken } from '../../services/email/gmail';
-import { fetchMailContent, wrapPlainText } from '../../services/mail-content';
+import { fetchMailContent, wrapPlainText } from '../../services/email/mail-content';
 import { AccountType, type AppEnv } from '../../types';
 import { formatBody } from '../../utils/format';
 import { verifyMailToken } from '../../utils/hash';

@@ -299,10 +299,9 @@ src/
       outlook/         # Outlook OAuth2 + Graph API + subscription
       imap/            # IMAP Bridge 通信
       provider.ts      # EmailProvider 接口（markAsRead/addStar/removeStar 多类型分发）
+      mail-content.ts  # 邮件内容获取（Gmail API 格式）
     keyboard.ts        # 邮件操作 inline keyboard 构建
-    llm.ts             # OpenAI compatible API 调用（摘要/标签/验证码提取）
-    llm-processing.ts  # LLM 处理编排（验证码 → 摘要 → 编辑 Telegram 消息）
-    mail-content.ts    # 邮件内容获取（Gmail API 格式）
+    llm.ts             # LLM 邮件分析（验证码 + 摘要 + 标签，纯数据返回）
     message-actions.ts # 消息操作（星标切换、标记已读）
     observability.ts   # 错误结构化日志 + Observability Hub
     telegram.ts        # Telegram API 封装（发送/编辑/附件/速率限制/MarkdownV2 回退）

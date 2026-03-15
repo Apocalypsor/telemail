@@ -1,66 +1,10 @@
-/** 使用 OpenAI compatible API 对邮件正文进行 AI 摘要 & 标签生成 */
+/** 使用 OpenAI compatible API 对邮件正文进行 AI 分析（验证码 + 摘要 + 标签） */
 
-import { MAX_BODY_CHARS, MAX_LINKS } from '../constants';
+import { MAX_LINKS } from '../constants';
+import { extractLinks, prepareBody } from '../utils/format';
 
-/** 去除裸 URL 尾部的标点，但保留平衡的括号 */
-function cleanTrailingPunctuation(url: string): string {
-	// 先去掉尾部非括号标点
-	let u = url.replace(/[.,;:!?>]+$/, '');
-	// 如果 ')' 没有对应的 '('，才移除尾部多余的 ')'
-	while (u.endsWith(')')) {
-		const opens = (u.match(/\(/g) || []).length;
-		const closes = (u.match(/\)/g) || []).length;
-		if (closes > opens) u = u.slice(0, -1);
-		else break;
-	}
-	return u;
-}
-
-/** 从文本中提取链接（Markdown 格式 + 裸链接），返回 {label, url} 数组，最多 MAX_LINKS 个 */
-export function extractLinks(text: string): { label: string; url: string }[] {
-	const links: { label: string; url: string }[] = [];
-	const seen = new Set<string>();
-
-	// Markdown [label](url)
-	for (const m of text.matchAll(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g)) {
-		if (links.length >= MAX_LINKS) break;
-		const url = m[2];
-		if (!seen.has(url)) {
-			seen.add(url);
-			links.push({ label: m[1] || url, url });
-		}
-	}
-
-	// 裸 URL（通过 seen Set 去重，不会重复 Markdown 链接中已有的）
-	for (const m of text.matchAll(/(?<!\()(https?:\/\/\S+)/g)) {
-		if (links.length >= MAX_LINKS) break;
-		const url = cleanTrailingPunctuation(m[1]);
-		if (!seen.has(url)) {
-			seen.add(url);
-			links.push({ label: url, url });
-		}
-	}
-
-	return links;
-}
-
-/** 去除文本中的所有超链接（Markdown 链接保留文字，裸链接直接删除） */
-function stripLinks(text: string): string {
-	// [文字](url) → 文字
-	let out = text.replace(/\[([^\]]*)\]\(https?:\/\/[^)]*\)/g, '$1');
-	// 裸 http/https URL
-	out = out.replace(/https?:\/\/\S+/g, '');
-	return out;
-}
-
-/** 预处理邮件正文：去链接 + 截断 */
-function prepareBody(rawBody: string): string {
-	const stripped = stripLinks(rawBody);
-	return stripped.length > MAX_BODY_CHARS ? stripped.slice(0, MAX_BODY_CHARS) + '...' : stripped;
-}
-
-/** 调用 OpenAI compatible /v1/chat/completions 接口 */
-async function callLLM(baseUrl: string, apiKey: string, model: string, prompt: string): Promise<string> {
+/** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode */
+async function callLLM(baseUrl: string, apiKey: string, model: string, prompt: string, json?: boolean): Promise<string> {
 	const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
 	const resp = await fetch(url, {
 		method: 'POST',
@@ -72,6 +16,7 @@ async function callLLM(baseUrl: string, apiKey: string, model: string, prompt: s
 			model,
 			messages: [{ role: 'user', content: prompt }],
 			stream: false,
+			...(json && { response_format: { type: 'json_object' } }),
 		}),
 	});
 
@@ -85,87 +30,73 @@ async function callLLM(baseUrl: string, apiKey: string, model: string, prompt: s
 	return content.trim();
 }
 
-/** 调用 LLM 生成邮件摘要 */
-export async function summarizeEmail(
+/** LLM 一次调用返回结果 */
+export interface EmailAnalysis {
+	/** 验证码（如有） */
+	verificationCode: string | null;
+	/** 摘要（bullet list） */
+	summary: string;
+	/** 标签 */
+	tags: string[];
+}
+
+/** 一次 LLM 调用完成邮件分析：验证码提取 + 摘要 + 标签 */
+export async function analyzeEmail(
 	baseUrl: string,
 	apiKey: string,
 	model: string,
 	subject: string,
 	rawBody: string,
-	links?: { label: string; url: string }[],
-): Promise<string> {
+): Promise<EmailAnalysis> {
 	const body = prepareBody(rawBody);
+	const links = extractLinks(rawBody);
 
-	const safeLinks = links?.slice(0, MAX_LINKS);
+	const safeLinks = links.slice(0, MAX_LINKS);
 	const linksSection =
-		safeLinks && safeLinks.length > 0
+		safeLinks.length > 0
 			? `\n\nLinks found in this email:\n${safeLinks.map((l, i) => `${i + 1}. [${l.label.replace(/[\[\]]/g, '')}](${l.url})`).join('\n')}\n`
 			: '';
 
 	const linkRule =
-		safeLinks && safeLinks.length > 0
+		safeLinks.length > 0
 			? `- If the email contains important actionable links (login, verification, activation, confirmation, password reset, etc.), include them in the summary using Markdown link syntax [text](url). Skip tracking/pixel/unsubscribe links\n`
 			: '';
 
 	const prompt =
-		`Summarize the following email as a bullet-point list (3-6 bullets), using the SAME LANGUAGE as the email.\n` +
-		`Rules:\n` +
-		`- Each bullet starts with "• " and covers one key point\n` +
-		`- Do not use "the user" as subject, no lead-ins like "the email says" or "you received"\n` +
-		`- State directly what happened, what the key data is, and what action is needed\n` +
-		`- If the email contains a verification code, OTP, or activation code, you MUST include the exact code prominently\n` +
+		`Analyze the following email and return a JSON object with these fields:\n\n` +
+		`1. "verification_code": If the email contains a verification code, OTP, passcode, security code, or similar one-time code, extract the exact code (digits/letters only). Otherwise set to null.\n\n` +
+		`2. "summary": A bullet-point summary of the email (3-6 bullets), using the SAME LANGUAGE as the email.\n` +
+		`   Rules:\n` +
+		`   - Each bullet starts with "• "\n` +
+		`   - Do not use "the user" as subject, no lead-ins like "the email says"\n` +
+		`   - State directly what happened, what the key data is, and what action is needed\n` +
 		linkRule +
-		`- You may use Markdown formatting: **bold**, _italic_, \`code\` for codes/numbers\n` +
-		`- Output only the bullet list, no prefix or explanation\n\n` +
+		`   - You may use Markdown formatting: **bold**, _italic_, \`code\`\n\n` +
+		`3. "tags": An array of 1-3 short keyword tags for this email.\n` +
+		`   Rules:\n` +
+		`   - Use the SAME LANGUAGE as the email\n` +
+		`   - Each tag 1-3 words, no "#" prefix\n` +
+		`   - Capture: sender/service name, category (notification, newsletter, promotion, verification), key topic\n\n` +
+		`Output ONLY valid JSON, no other text. Example:\n` +
+		`{"verification_code": null, "summary": "• ...", "tags": ["tag1", "tag2"]}\n\n` +
 		`Subject: ${subject}\n\n` +
 		`Body:\n${body}` +
 		linksSection;
 
-	return callLLM(baseUrl, apiKey, model, prompt);
-}
+	const raw = await callLLM(baseUrl, apiKey, model, prompt, true);
 
-/** 调用 LLM 提取验证码，返回纯验证码字符串或 null */
-export async function extractVerificationCode(
-	baseUrl: string,
-	apiKey: string,
-	model: string,
-	subject: string,
-	rawBody: string,
-): Promise<string | null> {
-	const body = prepareBody(rawBody);
-	const prompt =
-		`Does the following email contain a verification code, OTP, passcode, identification code, security code, or similar one-time code?\n` +
-		`Rules:\n` +
-		`- If yes, output ONLY the code itself (digits/letters), nothing else\n` +
-		`- If no, output exactly: NONE\n` +
-		`- Do not include any explanation, prefix, or extra text\n\n` +
-		`Subject: ${subject}\n\n` +
-		`Body:\n${body}`;
-
-	const result = await callLLM(baseUrl, apiKey, model, prompt);
-	const cleaned = result.replace(/[`\s]/g, '');
-	if (!cleaned || cleaned.toUpperCase() === 'NONE') return null;
-	if (/^[A-Za-z0-9\-]{4,12}$/.test(cleaned)) return cleaned;
-	return null;
-}
-
-/** 调用 LLM 为邮件生成 1-3 个标签 */
-export async function generateTags(baseUrl: string, apiKey: string, model: string, subject: string, rawBody: string): Promise<string[]> {
-	const body = prepareBody(rawBody);
-	const prompt =
-		`Generate 1 to 3 short tags (keywords) for the following email. ` +
-		`Rules:\n` +
-		`- Use the SAME LANGUAGE as the email for tags\n` +
-		`- Each tag should be 1-3 words, no "#" prefix\n` +
-		`- Tags should capture: sender/service name, email category (e.g. notification, newsletter, promotion, verification), and key topic\n` +
-		`- Output ONLY the tags, one per line, no numbering or extra text\n\n` +
-		`Subject: ${subject}\n\n` +
-		`Body:\n${body}`;
-
-	const raw = await callLLM(baseUrl, apiKey, model, prompt);
-	return raw
-		.split('\n')
-		.map((t) => t.replace(/^[-•*\d.)\s#]+/, '').trim())
-		.filter((t) => t.length > 0)
-		.slice(0, 5);
+	// 解析 JSON，容忍 markdown code fence 包裹
+	const jsonStr = raw.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+	try {
+		const parsed = JSON.parse(jsonStr) as { verification_code?: string | null; summary?: string; tags?: string[] };
+		const code = parsed.verification_code ?? null;
+		return {
+			verificationCode: code && /^[A-Za-z0-9\-]{4,12}$/.test(code) ? code : null,
+			summary: parsed.summary ?? '',
+			tags: (parsed.tags ?? []).slice(0, 5),
+		};
+	} catch {
+		// JSON 解析失败时，把整个输出当摘要
+		return { verificationCode: null, summary: raw, tags: [] };
+	}
 }

@@ -5,15 +5,15 @@ import { deleteFailedEmail, getAllFailedEmails, putFailedEmail, type FailedEmail
 import { putMessageMapping } from '../db/message-map';
 import { AccountType, type Account, type Env, type QueueMessage } from '../types';
 import { base64ToArrayBuffer, base64urlToArrayBuffer } from '../utils/base64url';
-import { formatBody, htmlToMarkdown } from '../utils/format';
+import { formatBody, htmlToMarkdown, toTelegramMdV2 } from '../utils/format';
 import { escapeMdV2 } from '../utils/markdown-v2';
 import { getAccessToken, gmailGet } from './email/gmail';
 import { fetchImapRawEmail } from './email/imap';
 import { fetchRawMime, getAccessToken as msGetAccessToken } from './email/outlook';
 import { buildEmailKeyboard, resolveStarredKeyboard } from './keyboard';
-import { runLlmProcessing, wrapExpandableQuote } from './llm-processing';
+import { analyzeEmail } from './llm';
 import { reportErrorToObservability } from './observability';
-import { sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
+import { editMessageCaption, editTextMessage, sendTextMessage, sendWithAttachments, setReplyMarkup, TG_CAPTION_LIMIT, TG_MSG_LIMIT } from './telegram';
 
 // ---------------------------------------------------------------------------
 // 私有 helper
@@ -31,6 +31,23 @@ function getEmailPlainBody(email: { text?: string; html?: string }): string {
 	return '';
 }
 
+/** 将文本包裹为 Telegram 可展开引用块（expandable blockquote） */
+export function wrapExpandableQuote(text: string): string {
+	if (!text) return '';
+	let inCode = false;
+	const processed: string[] = [];
+	for (const line of text.split('\n')) {
+		if (/^```/.test(line)) {
+			inCode = !inCode;
+			continue;
+		}
+		let out = inCode ? escapeMdV2(line) : line;
+		if (out.startsWith('>')) out = `\\${out}`;
+		processed.push(out);
+	}
+	return processed.map((line, i) => (i === 0 ? `**>${line}` : `>${line}`)).join('\n') + '||';
+}
+
 function buildTelegramHeader(fromName: string, fromAddress: string, recipient: string, subject: string, accountEmail?: string): string {
 	const date = new Date().toLocaleString(MESSAGE_DATE_LOCALE, { timeZone: MESSAGE_DATE_TIMEZONE });
 	const lines = [`*发件人:*  ${escapeMdV2(`${fromName} <${fromAddress}>`)}`, `*收件人:*  ${escapeMdV2(recipient)}`];
@@ -39,6 +56,44 @@ function buildTelegramHeader(fromName: string, fromAddress: string, recipient: s
 	}
 	lines.push(`*时  间:*  ${escapeMdV2(date)}`, `*主  题:*  ${escapeMdV2(subject)}`, ``, ``);
 	return lines.join('\n');
+}
+
+/** 调用 LLM 分析邮件并编辑 Telegram 消息（验证码 / 摘要 + 标签） */
+async function editMessageWithAnalysis(
+	env: Env,
+	tgToken: string,
+	chatId: string,
+	tgMessageId: number,
+	isCaption: boolean,
+	header: string,
+	subject: string,
+	plainBody: string,
+	formattedBody: string,
+	keyboard: unknown,
+): Promise<void> {
+	const editMsg = (newText: string) =>
+		isCaption
+			? editMessageCaption(tgToken, chatId, tgMessageId, newText, keyboard)
+			: editTextMessage(tgToken, chatId, tgMessageId, newText, keyboard);
+
+	const result = await analyzeEmail(env.LLM_API_URL!, env.LLM_API_KEY!, env.LLM_MODEL!, subject, plainBody).catch((err) => {
+		reportErrorToObservability(env, 'llm.analyze_failed', err, { subject });
+		return null;
+	});
+
+	if (!result) return;
+
+	if (result.verificationCode && formattedBody) {
+		const codeSection = `*🔒 验证码:*  \`${escapeMdV2(result.verificationCode)}\`\n\n`;
+		await editMsg(header + codeSection + wrapExpandableQuote(formattedBody));
+		console.log('Verification code extracted');
+		return;
+	}
+
+	const tagsLine =
+		result.tags.length > 0 ? `\n\n${result.tags.map((t: string) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
+	const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(result.summary)}`;
+	await editMsg(header + summarySection + tagsLine);
 }
 
 /** 按账号类型拉取原始邮件 */
@@ -114,18 +169,7 @@ export async function deliverEmailToTelegram(
 		(async () => {
 			try {
 				const editKeyboard = await resolveStarredKeyboard(env, chatId, sentMessageId, messageId, account.email);
-				await runLlmProcessing({
-					env,
-					tgToken,
-					chatId,
-					tgMessageId: sentMessageId,
-					isCaption: hasSingleAttachment,
-					header,
-					subject,
-					plainBody,
-					formattedBody,
-					keyboard: editKeyboard,
-				});
+				await editMessageWithAnalysis(env, tgToken, chatId, sentMessageId, hasSingleAttachment, header, subject, plainBody, formattedBody, editKeyboard);
 			} catch (err) {
 				await reportErrorToObservability(env, 'llm.summary_failed', err, { subject });
 				await putFailedEmail(env.DB, {
@@ -189,18 +233,7 @@ export async function retryFailedEmail(failed: FailedEmail, env: Env): Promise<v
 	const formattedBody = formatBody(email.text, email.html, bodyBudget);
 	const keyboard = await resolveStarredKeyboard(env, failed.tg_chat_id, failed.tg_message_id, failed.email_message_id, account.email);
 
-	await runLlmProcessing({
-		env,
-		tgToken: env.TELEGRAM_BOT_TOKEN,
-		chatId: failed.tg_chat_id,
-		tgMessageId: failed.tg_message_id,
-		isCaption: !!failed.is_caption,
-		header,
-		subject,
-		plainBody,
-		formattedBody,
-		keyboard,
-	});
+	await editMessageWithAnalysis(env, env.TELEGRAM_BOT_TOKEN, failed.tg_chat_id, failed.tg_message_id, !!failed.is_caption, header, subject, plainBody, formattedBody, keyboard);
 
 	await deleteFailedEmail(env.DB, failed.id);
 }
