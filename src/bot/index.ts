@@ -1,9 +1,4 @@
-import { Api, Bot, InlineKeyboard } from 'grammy';
-import type { BotCommand, UserFromGetMe } from 'grammy/types';
 import { BOT_INFO_TTL, KV_BOT_COMMANDS_VERSION_KEY, KV_BOT_INFO_KEY } from '@/constants';
-import { getOwnAccounts, getVisibleAccounts } from '@db/accounts';
-import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser, upsertUser } from '@db/users';
-import { reportErrorToObservability } from '@utils/observability';
 import type { Env } from '@/types';
 import { isAdmin } from '@bot/auth';
 import { formatUserName, userListText } from '@bot/formatters';
@@ -12,11 +7,16 @@ import { registerAdminHandlers } from '@bot/handlers/admin';
 import { registerInputHandler } from '@bot/handlers/input';
 import { registerReactionHandler } from '@bot/handlers/reaction';
 import { registerStarHandler } from '@bot/handlers/star';
+import { getOwnAccounts, getVisibleAccounts } from '@db/accounts';
+import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser, upsertUser } from '@db/users';
+import { reportErrorToObservability } from '@utils/observability';
+import { Api, Bot, InlineKeyboard } from 'grammy';
+import type { BotCommand, UserFromGetMe } from 'grammy/types';
 
 export { STAR_KEYBOARD, starKeyboardWithMailUrl, STARRED_KEYBOARD, starredKeyboardWithMailUrl } from '@bot/keyboards';
 
 // ─── Bot 命令定义 ───────────────────────────────────────────────────────────
-// 修改此列表后更新 BOT_COMMANDS_VERSION，cron 会自动同步到 Telegram
+// 修改此列表后更新 BOT_COMMANDS_VERSION，会自动同步到 Telegram
 const BOT_COMMANDS_VERSION = 1;
 
 const BOT_COMMANDS: BotCommand[] = [
