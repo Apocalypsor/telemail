@@ -83,15 +83,16 @@ async function editMessageWithAnalysis(
 
 	if (!result) return;
 
+	const tagsLine =
+		result.tags.length > 0 ? `\n\n${result.tags.map((t: string) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
+
 	if (result.verificationCode && formattedBody) {
 		const codeSection = `*🔒 验证码:*  \`${escapeMdV2(result.verificationCode)}\`\n\n`;
-		await editMsg(header + codeSection + wrapExpandableQuote(formattedBody));
+		await editMsg(header + codeSection + wrapExpandableQuote(formattedBody) + tagsLine);
 		console.log('Verification code extracted');
 		return;
 	}
 
-	const tagsLine =
-		result.tags.length > 0 ? `\n\n${result.tags.map((t: string) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
 	const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(result.summary)}`;
 	await editMsg(header + summarySection + tagsLine);
 }
