@@ -106,11 +106,11 @@ export async function removeStar(token: string, messageId: string): Promise<void
 	await graphPatch(token, `/me/messages/${messageId}`, { flag: { flagStatus: 'notFlagged' } });
 }
 
-/** 列出未读邮件 ID（最多 top 条） */
-export async function listUnreadMessageIds(token: string, top: number = 20): Promise<string[]> {
-	const data = await graphGet(token, `/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$select=id&$top=${top}`);
+/** 列出未读邮件（最多 top 条），含标题 */
+export async function listUnreadMessages(token: string, top: number = 20): Promise<{ id: string; subject?: string }[]> {
+	const data = await graphGet(token, `/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$select=id,subject&$top=${top}`);
 	if (!data.value) return [];
-	return (data.value as { id: string }[]).map((m) => m.id);
+	return (data.value as { id: string; subject?: string }[]).map((m) => ({ id: m.id, subject: m.subject }));
 }
 
 // ─── Subscription (webhook) ──────────────────────────────────────────────────

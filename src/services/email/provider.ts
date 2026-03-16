@@ -1,21 +1,26 @@
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from '@/constants';
 import type { Account, Env } from '@/types';
 import { AccountType } from '@/types';
-import { addStar, getAccessToken, listUnreadMessageIds, markAsRead, removeStar } from '@services/email/gmail/index';
+import { addStar, getAccessToken, listUnreadMessages, markAsRead, removeStar } from '@services/email/gmail/index';
 import { listImapUnread, setImapFlag } from '@services/email/imap';
 import {
 	addStar as msAddStar,
 	getAccessToken as msGetAccessToken,
-	listUnreadMessageIds as msListUnreadMessageIds,
+	listUnreadMessages as msListUnreadMessages,
 	markAsRead as msMarkAsRead,
 	removeStar as msRemoveStar,
 } from '@services/email/outlook/index';
+
+export interface UnreadMessage {
+	id: string;
+	subject?: string;
+}
 
 export interface EmailProvider {
 	markAsRead(messageId: string): Promise<void>;
 	addStar(messageId: string): Promise<void>;
 	removeStar(messageId: string): Promise<void>;
-	listUnread(maxResults?: number): Promise<string[]>;
+	listUnread(maxResults?: number): Promise<UnreadMessage[]>;
 }
 
 export function getEmailProvider(account: Account, env: Env): EmailProvider {
@@ -44,7 +49,7 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
 			},
 			listUnread: async (maxResults) => {
 				const token = await msGetAccessToken(env, account);
-				return msListUnreadMessageIds(token, maxResults);
+				return msListUnreadMessages(token, maxResults);
 			},
 		};
 	}
@@ -65,7 +70,7 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
 		},
 		listUnread: async (maxResults) => {
 			const token = await getAccessToken(env, account);
-			return listUnreadMessageIds(token, maxResults);
+			return listUnreadMessages(token, maxResults);
 		},
 	};
 }

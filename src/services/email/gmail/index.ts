@@ -96,11 +96,25 @@ export async function removeStar(token: string, messageId: string): Promise<void
 	});
 }
 
-/** 列出未读邮件 ID（最多 maxResults 条） */
-export async function listUnreadMessageIds(token: string, maxResults: number = 20): Promise<string[]> {
+/** 列出未读邮件（最多 maxResults 条），含标题 */
+export async function listUnreadMessages(token: string, maxResults: number = 20): Promise<{ id: string; subject?: string }[]> {
 	const data = await gmailGet(token, `/users/me/messages?q=is:unread&maxResults=${maxResults}`);
 	if (!data.messages) return [];
-	return (data.messages as { id: string }[]).map((m) => m.id);
+	const ids = (data.messages as { id: string }[]).map((m) => m.id);
+	const details = await Promise.all(
+		ids.map(async (id) => {
+			try {
+				const msg = await gmailGet(token, `/users/me/messages/${id}?format=METADATA&metadataHeaders=Subject`);
+				const subjectHeader = (msg.payload?.headers as { name: string; value: string }[])?.find(
+					(h: { name: string }) => h.name.toLowerCase() === 'subject',
+				);
+				return { id, subject: subjectHeader?.value };
+			} catch {
+				return { id };
+			}
+		}),
+	);
+	return details;
 }
 
 // ─── Watch ───────────────────────────────────────────────────────────────────

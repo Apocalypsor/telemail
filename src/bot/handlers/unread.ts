@@ -1,7 +1,7 @@
 import type { Bot } from 'grammy';
 import { getVisibleAccounts } from '@db/accounts';
 import { getMappingsByEmailIds } from '@db/message-map';
-import { getEmailProvider } from '@services/email/provider';
+import { getEmailProvider, type UnreadMessage } from '@services/email/provider';
 import { reportErrorToObservability } from '@utils/observability';
 import type { Account, Env } from '@/types';
 import { isAdmin } from '@bot/auth';
@@ -15,23 +15,39 @@ function buildMessageLink(chatId: string, messageId: number): string {
 	return `https://t.me/c/${numericId}/${messageId}`;
 }
 
+interface UnreadResult {
+	account: Account;
+	items: { subject?: string; link?: string }[];
+	total: number;
+	error?: string;
+}
+
 /** 查询单个账号的未读邮件并匹配 Telegram 消息 */
-async function getUnreadForAccount(
-	env: Env,
-	account: Account,
-): Promise<{ account: Account; links: string[]; total: number; error?: string }> {
+async function getUnreadForAccount(env: Env, account: Account): Promise<UnreadResult> {
 	try {
 		const provider = getEmailProvider(account, env);
-		const unreadIds = await provider.listUnread(MAX_UNREAD_PER_ACCOUNT);
-		if (unreadIds.length === 0) return { account, links: [], total: 0 };
+		const unreadMsgs = await provider.listUnread(MAX_UNREAD_PER_ACCOUNT);
+		if (unreadMsgs.length === 0) return { account, items: [], total: 0 };
 
-		const mappings = await getMappingsByEmailIds(env.DB, account.id, unreadIds);
-		const links = mappings.map((m) => buildMessageLink(m.tg_chat_id, m.tg_message_id));
+		const mappings = await getMappingsByEmailIds(
+			env.DB,
+			account.id,
+			unreadMsgs.map((m) => m.id),
+		);
+		const mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
 
-		return { account, links, total: unreadIds.length };
+		const items = unreadMsgs.map((msg) => {
+			const mapping = mappingMap.get(msg.id);
+			return {
+				subject: msg.subject,
+				link: mapping ? buildMessageLink(mapping.tg_chat_id, mapping.tg_message_id) : undefined,
+			};
+		});
+
+		return { account, items, total: unreadMsgs.length };
 	} catch (err) {
 		await reportErrorToObservability(env, 'bot.unread_query_failed', err, { accountId: account.id });
-		return { account, links: [], total: 0, error: err instanceof Error ? err.message : String(err) };
+		return { account, items: [], total: 0, error: err instanceof Error ? err.message : String(err) };
 	}
 }
 
@@ -56,12 +72,13 @@ async function buildUnreadText(env: Env, userId: string, admin: boolean): Promis
 
 		totalUnread += r.total;
 		lines.push(`\n📧 ${label} (${r.total} 封未读)`);
-		if (r.links.length > 0) {
-			r.links.forEach((link, i) => lines.push(`  ${i + 1}. ${link}`));
-		}
-		const unmapped = r.total - r.links.length;
-		if (unmapped > 0) {
-			lines.push(`  … 另有 ${unmapped} 封未在 Telegram 中找到`);
+		for (const [i, item] of r.items.entries()) {
+			const title = item.subject || '(无主题)';
+			if (item.link) {
+				lines.push(`  ${i + 1}. ${title}\n     ${item.link}`);
+			} else {
+				lines.push(`  ${i + 1}. ${title}`);
+			}
 		}
 	}
 

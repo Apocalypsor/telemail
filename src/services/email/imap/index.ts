@@ -40,12 +40,12 @@ export async function setImapFlag(
 }
 
 /**
- * 列出未读邮件 ID（需中间件实现 POST /api/unread → { messages: string[] }）。
- * 中间件内部执行 IMAP SEARCH UNSEEN 命令。
+ * 列出未读邮件（需中间件实现 POST /api/unread → { messages: { id, subject? }[] }）。
+ * 中间件内部执行 IMAP SEARCH UNSEEN + FETCH ENVELOPE。
  */
-export async function listImapUnread(env: Env, accountId: number, maxResults: number = 20): Promise<string[]> {
+export async function listImapUnread(env: Env, accountId: number, maxResults: number = 20): Promise<{ id: string; subject?: string }[]> {
 	const resp = await callBridge(env, 'POST', '/api/unread', { accountId, maxResults });
-	const { messages } = await resp.json<{ messages: string[] }>();
+	const { messages } = await resp.json<{ messages: { id: string; subject?: string }[] }>();
 	return messages ?? [];
 }
 
