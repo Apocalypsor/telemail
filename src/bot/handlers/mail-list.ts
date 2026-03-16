@@ -1,6 +1,6 @@
 import type { Bot } from 'grammy';
 import { getVisibleAccounts } from '@db/accounts';
-import { getMappingsByEmailIds } from '@db/message-map';
+import { getMappingsByEmailIds, updateStarred } from '@db/message-map';
 import { getEmailProvider, type EmailListItem, type EmailProvider } from '@services/email/provider';
 import { reportErrorToObservability } from '@utils/observability';
 import type { Account, Env } from '@/types';
@@ -27,6 +27,7 @@ async function queryAccount(
 	account: Account,
 	fetcher: (provider: EmailProvider) => Promise<EmailListItem[]>,
 	errorEvent: string,
+	syncStarred?: boolean,
 ): Promise<ListResult> {
 	try {
 		const provider = getEmailProvider(account, env);
@@ -39,6 +40,12 @@ async function queryAccount(
 			msgs.map((m) => m.id),
 		);
 		const mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
+
+		// 同步星标状态：邮件源有星标但本地 message_map 没有的，更新本地
+		if (syncStarred) {
+			const toSync = mappings.filter((m) => !m.starred);
+			await Promise.all(toSync.map((m) => updateStarred(env.DB, m.tg_chat_id, m.tg_message_id, true)));
+		}
 
 		const items = msgs.map((msg) => {
 			const mapping = mappingMap.get(msg.id);
@@ -61,12 +68,12 @@ async function buildListText(
 	userId: string,
 	admin: boolean,
 	fetcher: (provider: EmailProvider) => Promise<EmailListItem[]>,
-	config: { icon: string; label: string; emptyText: string; errorEvent: string },
+	config: { icon: string; label: string; emptyText: string; errorEvent: string; syncStarred?: boolean },
 ): Promise<string> {
 	const accounts = await getVisibleAccounts(env.DB, userId, admin);
 	if (accounts.length === 0) return '📭 暂无绑定的邮箱账号';
 
-	const results = await Promise.all(accounts.map((acc) => queryAccount(env, acc, fetcher, config.errorEvent)));
+	const results = await Promise.all(accounts.map((acc) => queryAccount(env, acc, fetcher, config.errorEvent, config.syncStarred)));
 
 	const lines: string[] = [];
 	let total = 0;
@@ -108,6 +115,7 @@ const starredConfig = {
 	label: '星标',
 	emptyText: '✅ 没有星标邮件',
 	errorEvent: 'bot.starred_query_failed',
+	syncStarred: true,
 };
 
 export function registerMailListHandlers(bot: Bot, env: Env) {
