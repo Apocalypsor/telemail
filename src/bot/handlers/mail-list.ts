@@ -124,7 +124,11 @@ async function buildStarredListText(env: Env, userId: string): Promise<{ text: s
 				const msgs = await provider.listStarred(MAX_PER_ACCOUNT);
 				if (msgs.length === 0) return { account, items: [] as { subject?: string; link?: string }[], total: 0 };
 
-				const mappings = await getMappingsByEmailIds(env.DB, account.id, msgs.map((m) => m.id));
+				const mappings = await getMappingsByEmailIds(
+					env.DB,
+					account.id,
+					msgs.map((m) => m.id),
+				);
 				const mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
 
 				// 同步星标按钮状态
@@ -134,7 +138,11 @@ async function buildStarredListText(env: Env, userId: string): Promise<{ text: s
 							const keyboard = await buildEmailKeyboard(env, m.email_message_id, account.email, m.tg_chat_id, true);
 							await setReplyMarkup(env.TELEGRAM_BOT_TOKEN, m.tg_chat_id, m.tg_message_id, keyboard);
 						} catch (err) {
-							await reportErrorToObservability(env, 'bot.sync_star_button_failed', err, { chatId: m.tg_chat_id, messageId: m.tg_message_id });
+							if (err instanceof Error && err.message.includes('message is not modified')) return;
+							await reportErrorToObservability(env, 'bot.sync_star_button_failed', err, {
+								chatId: m.tg_chat_id,
+								messageId: m.tg_message_id,
+							});
 						}
 					}),
 				);
@@ -150,7 +158,12 @@ async function buildStarredListText(env: Env, userId: string): Promise<{ text: s
 				return { account, items, total: msgs.length };
 			} catch (err) {
 				await reportErrorToObservability(env, starredConfig.errorEvent, err, { accountId: account.id });
-				return { account, items: [] as { subject?: string; link?: string }[], total: 0, error: err instanceof Error ? err.message : String(err) };
+				return {
+					account,
+					items: [] as { subject?: string; link?: string }[],
+					total: 0,
+					error: err instanceof Error ? err.message : String(err),
+				};
 			}
 		}),
 	);

@@ -38,4 +38,3 @@ export async function getMappingsByEmailIds(db: D1Database, accountId: number, e
 export async function deleteMappingsByAccountId(db: D1Database, accountId: number): Promise<void> {
 	await db.prepare('DELETE FROM message_map WHERE account_id = ?').bind(accountId).run();
 }
-

@@ -1,7 +1,15 @@
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from '@/constants';
 import type { Account, Env } from '@/types';
 import { AccountType } from '@/types';
-import { addStar, getAccessToken, isStarred as gmailIsStarred, listStarredMessages, listUnreadMessages, markAsRead, removeStar } from '@services/email/gmail/index';
+import {
+	addStar,
+	getAccessToken,
+	isStarred as gmailIsStarred,
+	listStarredMessages,
+	listUnreadMessages,
+	markAsRead,
+	removeStar,
+} from '@services/email/gmail/index';
 import { isImapStarred, listImapStarred, listImapUnread, setImapFlag } from '@services/email/imap';
 import {
 	addStar as msAddStar,
