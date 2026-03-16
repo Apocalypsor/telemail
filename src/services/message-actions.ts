@@ -1,5 +1,5 @@
 import { InlineKeyboard } from 'grammy';
-import { getAccountById } from '@db/accounts';
+import { getAccountById, getOwnAccounts } from '@db/accounts';
 import { getMessageMapping, updateStarred } from '@db/message-map';
 import type { Env } from '@/types';
 import { getEmailProvider } from '@services/email/provider';
@@ -46,4 +46,33 @@ export async function markAsReadByMessage(env: Env, chatId: string, messageId: n
 	} catch (err) {
 		await reportErrorToObservability(env, 'bot.mark_read_failed', err, { messageId: mapping.email_message_id });
 	}
+}
+
+/** 标记用户所有账号的未读邮件为已读 */
+export async function markAllAsRead(env: Env, userId: string, maxPerAccount: number = 20): Promise<{ success: number; failed: number }> {
+	const accounts = await getOwnAccounts(env.DB, userId);
+	let success = 0;
+	let failed = 0;
+
+	for (const account of accounts) {
+		try {
+			const provider = getEmailProvider(account, env);
+			const unread = await provider.listUnread(maxPerAccount);
+			await Promise.all(
+				unread.map(async (msg) => {
+					try {
+						await provider.markAsRead(msg.id);
+						success++;
+					} catch {
+						failed++;
+					}
+				}),
+			);
+		} catch (err) {
+			await reportErrorToObservability(env, 'bot.mark_all_read_failed', err, { accountId: account.id });
+			failed++;
+		}
+	}
+
+	return { success, failed };
 }

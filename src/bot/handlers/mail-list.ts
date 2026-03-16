@@ -1,11 +1,14 @@
 import type { Account, Env } from '@/types';
-import { getVisibleAccounts } from '@db/accounts';
+import { buildEmailKeyboard } from '@bot/keyboards';
+import { getOwnAccounts } from '@db/accounts';
+
 import { getMappingsByEmailIds, updateStarred } from '@db/message-map';
 import { getEmailProvider, type EmailListItem, type EmailProvider } from '@services/email/provider';
-import { buildEmailKeyboard } from '@bot/keyboards';
+import { markAllAsRead } from '@services/message-actions';
 import { setReplyMarkup } from '@services/telegram';
 import { reportErrorToObservability } from '@utils/observability';
 import type { Bot } from 'grammy';
+import { InlineKeyboard } from 'grammy';
 
 const MAX_PER_ACCOUNT = 20;
 
@@ -80,12 +83,11 @@ async function queryAccount(
 async function buildListText(
 	env: Env,
 	userId: string,
-	admin: boolean,
 	fetcher: (provider: EmailProvider) => Promise<EmailListItem[]>,
 	config: { icon: string; label: string; emptyText: string; errorEvent: string; syncStarred?: boolean },
-): Promise<string> {
-	const accounts = await getVisibleAccounts(env.DB, userId, admin);
-	if (accounts.length === 0) return '📭 暂无绑定的邮箱账号';
+): Promise<{ text: string; hasItems: boolean }> {
+	const accounts = await getOwnAccounts(env.DB, userId);
+	if (accounts.length === 0) return { text: '📭 暂无绑定的邮箱账号', hasItems: false };
 
 	const results = await Promise.all(accounts.map((acc) => queryAccount(env, acc, fetcher, config.errorEvent, config.syncStarred)));
 
@@ -112,9 +114,9 @@ async function buildListText(
 		}
 	}
 
-	if (total === 0) return config.emptyText;
+	if (total === 0) return { text: config.emptyText, hasItems: false };
 
-	return `${config.icon} 共 ${total} 封${config.label}\n${lines.join('\n')}`;
+	return { text: `${config.icon} 共 ${total} 封${config.label}\n${lines.join('\n')}`, hasItems: true };
 }
 
 const unreadConfig = {
@@ -132,32 +134,50 @@ const starredConfig = {
 	syncStarred: true,
 };
 
+const MARK_ALL_READ_KB = new InlineKeyboard().text('✉️ 标记全部已读', 'mark_all_read');
+
 export function registerMailListHandlers(bot: Bot, env: Env) {
 	bot.command('unread', async (ctx) => {
 		const userId = String(ctx.from?.id);
 		const msg = await ctx.reply('🔍 正在查询未读邮件…');
-		const text = await buildListText(env, userId, false, (p) => p.listUnread(MAX_PER_ACCOUNT), unreadConfig);
-		await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, { link_preview_options: { is_disabled: true } });
+		const { text, hasItems } = await buildListText(env, userId, (p) => p.listUnread(MAX_PER_ACCOUNT), unreadConfig);
+		await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
+			link_preview_options: { is_disabled: true },
+			...(hasItems ? { reply_markup: MARK_ALL_READ_KB } : {}),
+		});
 	});
 
 	bot.callbackQuery('unread', async (ctx) => {
 		const userId = String(ctx.from.id);
 		await ctx.answerCallbackQuery({ text: '正在查询…' });
-		const text = await buildListText(env, userId, false, (p) => p.listUnread(MAX_PER_ACCOUNT), unreadConfig);
-		await ctx.reply(text, { link_preview_options: { is_disabled: true } });
+		const { text, hasItems } = await buildListText(env, userId, (p) => p.listUnread(MAX_PER_ACCOUNT), unreadConfig);
+		await ctx.reply(text, {
+			link_preview_options: { is_disabled: true },
+			...(hasItems ? { reply_markup: MARK_ALL_READ_KB } : {}),
+		});
+	});
+
+	bot.callbackQuery('mark_all_read', async (ctx) => {
+		const userId = String(ctx.from.id);
+		await ctx.answerCallbackQuery({ text: '正在标记…' });
+
+		const { success, failed } = await markAllAsRead(env, userId);
+		const resultText = failed > 0 ? `✅ 已标记 ${success} 封已读，${failed} 封失败` : `✅ 已标记 ${success} 封已读`;
+
+		await ctx.editMessageText(resultText);
 	});
 
 	bot.command('starred', async (ctx) => {
 		const userId = String(ctx.from?.id);
 		const msg = await ctx.reply('🔍 正在查询星标邮件…');
-		const text = await buildListText(env, userId, false, (p) => p.listStarred(MAX_PER_ACCOUNT), starredConfig);
+		const { text } = await buildListText(env, userId, (p) => p.listStarred(MAX_PER_ACCOUNT), starredConfig);
 		await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, { link_preview_options: { is_disabled: true } });
 	});
 
 	bot.callbackQuery('starred', async (ctx) => {
 		const userId = String(ctx.from.id);
 		await ctx.answerCallbackQuery({ text: '正在查询…' });
-		const text = await buildListText(env, userId, false, (p) => p.listStarred(MAX_PER_ACCOUNT), starredConfig);
+		const { text } = await buildListText(env, userId, (p) => p.listStarred(MAX_PER_ACCOUNT), starredConfig);
 		await ctx.reply(text, { link_preview_options: { is_disabled: true } });
 	});
 }
