@@ -14,6 +14,7 @@ import { buildEmailKeyboard, resolveStarredKeyboard } from '@bot/keyboards';
 import { analyzeEmail } from '@services/llm';
 import { reportErrorToObservability } from '@utils/observability';
 import {
+	deleteMessage,
 	editMessageCaption,
 	editTextMessage,
 	sendTextMessage,
@@ -162,12 +163,19 @@ export async function deliverEmailToTelegram(
 		await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard);
 	}
 
-	await putMessageMapping(env.DB, {
+	const inserted = await putMessageMapping(env.DB, {
 		tg_message_id: sentMessageId,
 		tg_chat_id: chatId,
 		email_message_id: messageId,
 		account_id: account.id,
 	});
+
+	// 唯一索引冲突 → 说明另一个并发请求已经投递过，撤回本次重复消息
+	if (!inserted) {
+		console.log(`Duplicate delivery detected for ${messageId}, deleting duplicate Telegram message`);
+		await deleteMessage(tgToken, chatId, sentMessageId).catch(() => {});
+		return;
+	}
 
 	if (!hasLlm) return;
 

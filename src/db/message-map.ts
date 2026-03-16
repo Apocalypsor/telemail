@@ -8,12 +8,13 @@ export interface MessageMapping {
 	starred: number; // 0 = 未星标, 1 = 已星标
 }
 
-/** 保存 Telegram → 邮件消息映射 */
-export async function putMessageMapping(db: D1Database, mapping: Omit<MessageMapping, 'starred'>): Promise<void> {
-	await db
+/** 保存 Telegram → 邮件消息映射，返回是否实际插入（false = 重复，被 IGNORE） */
+export async function putMessageMapping(db: D1Database, mapping: Omit<MessageMapping, 'starred'>): Promise<boolean> {
+	const result = await db
 		.prepare('INSERT OR IGNORE INTO message_map (tg_message_id, tg_chat_id, email_message_id, account_id) VALUES (?, ?, ?, ?)')
 		.bind(mapping.tg_message_id, mapping.tg_chat_id, mapping.email_message_id, mapping.account_id)
 		.run();
+	return (result.meta.changes ?? 0) > 0;
 }
 
 /** 根据 Telegram 消息查找对应的邮件消息 */

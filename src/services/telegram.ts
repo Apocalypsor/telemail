@@ -212,6 +212,12 @@ export async function setReplyMarkup(token: string, chatId: string, messageId: n
 	await tgPost(url, { chat_id: chatId, message_id: messageId, reply_markup: replyMarkup }, 'editMessageReplyMarkup');
 }
 
+/** 删除消息（用于去重时撤回重复消息） */
+export async function deleteMessage(token: string, chatId: string, messageId: number): Promise<void> {
+	const url = `${TG_API_BASE}${token}/deleteMessage`;
+	await tgPost(url, { chat_id: chatId, message_id: messageId }, 'deleteMessage');
+}
+
 async function sendMediaGroupChunk(
 	token: string,
 	chatId: string,
