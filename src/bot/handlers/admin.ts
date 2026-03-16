@@ -2,7 +2,8 @@ import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
 import { countFailedEmails, deleteAllFailedEmails, deleteFailedEmail, getAllFailedEmails, getFailedEmail } from '@db/failed-emails';
 
-import { approveUser, deleteUser, getNonAdminUsers, rejectUser } from '@db/users';
+import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser } from '@db/users';
+import { deleteUserWithAccounts } from '@services/account';
 import { retryAllFailedEmails, retryFailedEmail } from '@services/bridge';
 import { renewWatchAll } from '@services/email/gmail';
 import { renewSubscriptionAll } from '@services/email/outlook';
@@ -12,7 +13,7 @@ import { isAdmin } from '@bot/auth';
 import { formatUserName, userListText } from '@bot/formatters';
 import { clearBotState } from '@bot/state';
 
-function userListKeyboard(users: TelegramUser[]): InlineKeyboard {
+export function userListKeyboard(users: TelegramUser[], opts?: { showBack?: boolean }): InlineKeyboard {
 	const kb = new InlineKeyboard();
 	for (const u of users) {
 		const name = formatUserName(u);
@@ -23,7 +24,7 @@ function userListKeyboard(users: TelegramUser[]): InlineKeyboard {
 		}
 		kb.row();
 	}
-	kb.text('« 返回', 'menu');
+	if (opts?.showBack) kb.text('« 返回', 'menu');
 	return kb;
 }
 
@@ -76,7 +77,7 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		}
 		await clearBotState(env, userId);
 		const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
-		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users) });
+		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users, { showBack: true }) });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -106,7 +107,7 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 
 		// Refresh user list
 		const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
-		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users) });
+		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users, { showBack: true }) });
 		await ctx.answerCallbackQuery({ text: '✅ 已批准' });
 	});
 
@@ -128,7 +129,7 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 
 		// Refresh user list
 		const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
-		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users) });
+		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users, { showBack: true }) });
 		await ctx.answerCallbackQuery({ text: '已处理' });
 	});
 
@@ -140,8 +141,10 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		}
 
 		const targetId = ctx.match![1];
+		const user = await getUserByTelegramId(env.DB, targetId);
+		const displayName = user?.username ? `@${user.username}` : user ? formatUserName(user) : targetId;
 		const kb = new InlineKeyboard().text('⚠️ 确认删除', `u:${targetId}:dy`).text('取消', 'users');
-		await ctx.editMessageText(`确定要删除用户 ${targetId} 吗？\n\n该用户关联的账号绑定将被解除。`, { reply_markup: kb });
+		await ctx.editMessageText(`确定要删除用户 ${displayName} 吗？\n\n该用户关联的账号绑定将被解除。`, { reply_markup: kb });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -153,10 +156,10 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 		}
 
 		const targetId = ctx.match![1];
-		await deleteUser(env.DB, targetId);
+		await deleteUserWithAccounts(env, targetId);
 
 		const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
-		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users) });
+		await ctx.editMessageText(userListText(users), { reply_markup: userListKeyboard(users, { showBack: true }) });
 		await ctx.answerCallbackQuery({ text: '🗑 已删除' });
 	});
 

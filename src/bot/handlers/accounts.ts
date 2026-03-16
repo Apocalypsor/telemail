@@ -3,19 +3,17 @@ import { InlineKeyboard } from 'grammy';
 import { KV_OAUTH_BOT_MSG_PREFIX, OAUTH_STATE_TTL_SECONDS } from '@/constants';
 import {
 	createAccount,
-	deleteAccount,
 	getAllAccounts,
 	getAuthorizedAccount,
 	getOwnAccounts,
 	getVisibleAccounts,
 	updateAccount,
 } from '@db/accounts';
-import { deleteHistoryId } from '@db/kv';
 import { getAllUsers, getUserByTelegramId } from '@db/users';
-import { renewWatch, stopWatch } from '@services/email/gmail';
+import { cleanupAndDeleteAccount } from '@services/account';
+import { renewWatch } from '@services/email/gmail';
 import { generateOAuthUrl } from '@services/email/gmail/oauth';
-import { syncAccounts } from '@services/email/imap';
-import { renewSubscription, stopSubscription } from '@services/email/outlook';
+import { renewSubscription } from '@services/email/outlook';
 import { generateOAuthUrl as generateMsOAuthUrl } from '@services/email/outlook/oauth';
 import { reportErrorToObservability } from '@utils/observability';
 import type { Account, Env } from '@/types';
@@ -32,7 +30,7 @@ async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
 	return { userId, accountId, admin, account };
 }
 
-export function accountListKeyboard(accounts: Account[], options?: { isAdmin?: boolean; showAll?: boolean }): InlineKeyboard {
+export function accountListKeyboard(accounts: Account[], options?: { isAdmin?: boolean; showAll?: boolean; showBack?: boolean }): InlineKeyboard {
 	const kb = new InlineKeyboard();
 	for (const acc of accounts) {
 		const status = acc.type === AccountType.Imap ? '📬' : acc.refresh_token ? '✅' : '❌';
@@ -43,7 +41,7 @@ export function accountListKeyboard(accounts: Account[], options?: { isAdmin?: b
 	if (options?.isAdmin) {
 		kb.text(options.showAll ? '🔽 收起' : '👀 查看所有账号', options.showAll ? 'accs' : 'accs:all').row();
 	}
-	kb.text('« 返回', 'menu');
+	if (options?.showBack) kb.text('« 返回', 'menu');
 	return kb;
 }
 
@@ -56,7 +54,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		const accounts = admin ? await getOwnAccounts(env.DB, userId) : await getVisibleAccounts(env.DB, userId, false);
 
 		const text = accounts.length > 0 ? `📧 我的账号 (${accounts.length})` : '📧 暂无账号';
-		await ctx.editMessageText(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: admin }) });
+		await ctx.editMessageText(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: admin, showBack: true }) });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -68,7 +66,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 
 		const accounts = await getAllAccounts(env.DB);
 		const text = `📧 所有账号 (${accounts.length})`;
-		await ctx.editMessageText(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: true, showAll: true }) });
+		await ctx.editMessageText(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: true, showAll: true, showBack: true }) });
 		await ctx.answerCallbackQuery();
 	});
 
@@ -161,37 +159,11 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 		const { userId, accountId, admin, account } = await resolveAccount(env, ctx.from.id, ctx.match![1]);
 		if (!account) return ctx.answerCallbackQuery({ text: '账号不存在或无权访问' });
 
-		if (account.type === AccountType.Imap) {
-			await deleteAccount(env.DB, accountId);
-			// 通知中间件更新连接列表
-			if (env.IMAP_BRIDGE_URL && env.IMAP_BRIDGE_SECRET) {
-				await syncAccounts(env).catch((err) => {
-					reportErrorToObservability(env, 'imap.sync_after_delete_failed', err, { accountId });
-				});
-			}
-		} else if (account.type === AccountType.Outlook) {
-			if (account.refresh_token) {
-				try {
-					await stopSubscription(env, account);
-				} catch (err) {
-					await reportErrorToObservability(env, 'bot.stop_subscription_failed', err, { accountEmail: account.email });
-				}
-			}
-			await deleteAccount(env.DB, accountId);
-		} else {
-			if (account.refresh_token) {
-				try {
-					await stopWatch(env, account);
-				} catch (err) {
-					await reportErrorToObservability(env, 'bot.stop_watch_failed', err, { accountEmail: account.email });
-				}
-			}
-			await Promise.all([deleteAccount(env.DB, accountId), deleteHistoryId(env, accountId)]);
-		}
+		await cleanupAndDeleteAccount(env, account);
 
 		const accounts = admin ? await getOwnAccounts(env.DB, userId) : await getVisibleAccounts(env.DB, userId, false);
 		await ctx.editMessageText(`✅ 账号 #${accountId} 已删除\n\n📧 我的账号 (${accounts.length})`, {
-			reply_markup: accountListKeyboard(accounts, { isAdmin: admin }),
+			reply_markup: accountListKeyboard(accounts, { isAdmin: admin, showBack: true }),
 		});
 		await ctx.answerCallbackQuery({ text: '✅ 已删除' });
 	});

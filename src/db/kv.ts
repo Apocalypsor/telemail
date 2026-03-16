@@ -37,6 +37,10 @@ export async function putCachedAccessToken(env: Env, accountId: number, token: s
 	});
 }
 
+export async function deleteCachedAccessToken(env: Env, accountId: number): Promise<void> {
+	await env.EMAIL_KV.delete(kvAccessTokenKey(accountId));
+}
+
 // ─── Mail HTML Cache ────────────────────────────────────────────────────────
 
 function kvMailHtmlKey(gmailMessageId: string): string {

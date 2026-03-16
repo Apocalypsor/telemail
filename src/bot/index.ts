@@ -3,7 +3,7 @@ import type { Env } from '@/types';
 import { isAdmin } from '@bot/auth';
 import { formatUserName, userListText } from '@bot/formatters';
 import { accountListKeyboard, registerAccountHandlers } from '@bot/handlers/accounts';
-import { registerAdminHandlers } from '@bot/handlers/admin';
+import { registerAdminHandlers, userListKeyboard } from '@bot/handlers/admin';
 import { registerInputHandler } from '@bot/handlers/input';
 import { registerReactionHandler } from '@bot/handlers/reaction';
 import { registerStarHandler } from '@bot/handlers/star';
@@ -164,7 +164,7 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
 		}
 
 		const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
-		return ctx.reply(userListText(users));
+		return ctx.reply(userListText(users), { reply_markup: userListKeyboard(users) });
 	});
 
 	// ─── Main menu callback ────────────────────────────────────────────────

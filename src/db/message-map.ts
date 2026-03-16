@@ -39,6 +39,11 @@ export async function getMappingsByEmailIds(
 	return results;
 }
 
+/** 删除指定账号的所有消息映射 */
+export async function deleteMappingsByAccountId(db: D1Database, accountId: number): Promise<void> {
+	await db.prepare('DELETE FROM message_map WHERE account_id = ?').bind(accountId).run();
+}
+
 /** 更新星标状态 */
 export async function updateStarred(db: D1Database, chatId: string, tgMessageId: number, starred: boolean): Promise<void> {
 	await db

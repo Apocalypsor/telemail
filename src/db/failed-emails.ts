@@ -55,6 +55,11 @@ export async function deleteAllFailedEmails(db: D1Database): Promise<void> {
 	await db.prepare('DELETE FROM failed_emails').run();
 }
 
+/** 删除指定账号的所有失败邮件记录 */
+export async function deleteFailedEmailsByAccountId(db: D1Database, accountId: number): Promise<void> {
+	await db.prepare('DELETE FROM failed_emails WHERE account_id = ?').bind(accountId).run();
+}
+
 /** 统计失败邮件数量 */
 export async function countFailedEmails(db: D1Database): Promise<number> {
 	const row = await db.prepare('SELECT COUNT(*) as cnt FROM failed_emails').first<{ cnt: number }>();
