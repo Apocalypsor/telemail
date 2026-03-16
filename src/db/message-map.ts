@@ -5,11 +5,10 @@ export interface MessageMapping {
 	tg_chat_id: string;
 	email_message_id: string;
 	account_id: number;
-	starred: number; // 0 = 未星标, 1 = 已星标
 }
 
 /** 保存 Telegram → 邮件消息映射 */
-export async function putMessageMapping(db: D1Database, mapping: Omit<MessageMapping, 'starred'>): Promise<void> {
+export async function putMessageMapping(db: D1Database, mapping: MessageMapping): Promise<void> {
 	await db
 		.prepare('INSERT OR IGNORE INTO message_map (tg_message_id, tg_chat_id, email_message_id, account_id) VALUES (?, ?, ?, ?)')
 		.bind(mapping.tg_message_id, mapping.tg_chat_id, mapping.email_message_id, mapping.account_id)
@@ -40,10 +39,3 @@ export async function deleteMappingsByAccountId(db: D1Database, accountId: numbe
 	await db.prepare('DELETE FROM message_map WHERE account_id = ?').bind(accountId).run();
 }
 
-/** 更新星标状态 */
-export async function updateStarred(db: D1Database, chatId: string, tgMessageId: number, starred: boolean): Promise<void> {
-	await db
-		.prepare('UPDATE message_map SET starred = ? WHERE tg_chat_id = ? AND tg_message_id = ?')
-		.bind(starred ? 1 : 0, chatId, tgMessageId)
-		.run();
-}
