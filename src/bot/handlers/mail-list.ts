@@ -2,7 +2,7 @@ import type { Account, Env } from '@/types';
 import { getVisibleAccounts } from '@db/accounts';
 import { getMappingsByEmailIds, updateStarred } from '@db/message-map';
 import { getEmailProvider, type EmailListItem, type EmailProvider } from '@services/email/provider';
-import { buildEmailKeyboard } from '@services/keyboard';
+import { buildEmailKeyboard } from '@bot/keyboards';
 import { setReplyMarkup } from '@services/telegram';
 import { reportErrorToObservability } from '@utils/observability';
 import type { Bot } from 'grammy';

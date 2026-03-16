@@ -1,14 +1,10 @@
-import type { Bot } from 'grammy';
-import { InlineKeyboard } from 'grammy';
 import { KV_OAUTH_BOT_MSG_PREFIX, OAUTH_STATE_TTL_SECONDS } from '@/constants';
-import {
-	createAccount,
-	getAllAccounts,
-	getAuthorizedAccount,
-	getOwnAccounts,
-	getVisibleAccounts,
-	updateAccount,
-} from '@db/accounts';
+import type { Account, Env } from '@/types';
+import { AccountType } from '@/types';
+import { isAdmin } from '@bot/auth';
+import { accountDetailKeyboard, accountDetailText, formatUserName } from '@bot/formatters';
+import { clearBotState, getBotState, setBotState } from '@bot/state';
+import { createAccount, getAllAccounts, getAuthorizedAccount, getOwnAccounts, getVisibleAccounts, updateAccount } from '@db/accounts';
 import { getAllUsers, getUserByTelegramId } from '@db/users';
 import { cleanupAndDeleteAccount } from '@services/account';
 import { renewWatch } from '@services/email/gmail';
@@ -16,11 +12,8 @@ import { generateOAuthUrl } from '@services/email/gmail/oauth';
 import { renewSubscription } from '@services/email/outlook';
 import { generateOAuthUrl as generateMsOAuthUrl } from '@services/email/outlook/oauth';
 import { reportErrorToObservability } from '@utils/observability';
-import type { Account, Env } from '@/types';
-import { AccountType } from '@/types';
-import { isAdmin } from '@bot/auth';
-import { accountDetailKeyboard, accountDetailText, formatUserName } from '@bot/formatters';
-import { clearBotState, getBotState, setBotState } from '@bot/state';
+import type { Bot } from 'grammy';
+import { InlineKeyboard } from 'grammy';
 
 async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
 	const userId = String(fromId);
@@ -30,7 +23,10 @@ async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
 	return { userId, accountId, admin, account };
 }
 
-export function accountListKeyboard(accounts: Account[], options?: { isAdmin?: boolean; showAll?: boolean; showBack?: boolean }): InlineKeyboard {
+export function accountListKeyboard(
+	accounts: Account[],
+	options?: { isAdmin?: boolean; showAll?: boolean; showBack?: boolean },
+): InlineKeyboard {
 	const kb = new InlineKeyboard();
 	for (const acc of accounts) {
 		const status = acc.type === AccountType.Imap ? '📬' : acc.refresh_token ? '✅' : '❌';
@@ -47,6 +43,23 @@ export function accountListKeyboard(accounts: Account[], options?: { isAdmin?: b
 }
 
 export function registerAccountHandlers(bot: Bot, env: Env) {
+	// ─── /accounts: 快速查看账号列表 ────────────────────────────────────────
+	bot.command('accounts', async (ctx) => {
+		const userId = String(ctx.from?.id);
+		const admin = isAdmin(userId, env);
+
+		if (!admin) {
+			const user = await getUserByTelegramId(env.DB, userId);
+			if (!user || user.approved !== 1) {
+				return ctx.reply('您的账号正在等待管理员审批。');
+			}
+		}
+
+		const accounts = admin ? await getOwnAccounts(env.DB, userId) : await getVisibleAccounts(env.DB, userId, false);
+		const text = accounts.length > 0 ? `📧 我的账号 (${accounts.length})` : '📧 暂无账号';
+		return ctx.reply(text, { reply_markup: accountListKeyboard(accounts, { isAdmin: admin }) });
+	});
+
 	// Account list (default: own accounts only)
 	bot.callbackQuery('accs', async (ctx) => {
 		const userId = String(ctx.from.id);

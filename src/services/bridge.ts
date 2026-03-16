@@ -10,7 +10,7 @@ import { escapeMdV2 } from '@utils/markdown-v2';
 import { getAccessToken, gmailGet } from '@services/email/gmail';
 import { fetchImapRawEmail } from '@services/email/imap';
 import { fetchRawMime, getAccessToken as msGetAccessToken } from '@services/email/outlook';
-import { buildEmailKeyboard, resolveStarredKeyboard } from '@services/keyboard';
+import { buildEmailKeyboard, resolveStarredKeyboard } from '@bot/keyboards';
 import { analyzeEmail } from '@services/llm';
 import { reportErrorToObservability } from '@utils/observability';
 import {

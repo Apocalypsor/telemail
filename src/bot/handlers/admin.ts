@@ -58,6 +58,17 @@ function failedEmailListMessage(items: import('@db/failed-emails').FailedEmail[]
 }
 
 export function registerAdminHandlers(bot: Bot, env: Env) {
+	// ─── /users: 快速查看用户列表（管理员） ──────────────────────────────────
+	bot.command('users', async (ctx) => {
+		const userId = String(ctx.from?.id);
+		if (!isAdmin(userId, env)) {
+			return ctx.reply('⛔ 仅管理员可用');
+		}
+
+		const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
+		return ctx.reply(userListText(users), { reply_markup: userListKeyboard(users) });
+	});
+
 	// Admin operations menu
 	bot.callbackQuery('admin', async (ctx) => {
 		const userId = String(ctx.from.id);
