@@ -67,7 +67,9 @@ export function buildCidMapFromAttachments(attachments: Attachment[]): CidMap {
 		if (att.contentId && att.mimeType.startsWith('image/')) {
 			const cid = att.contentId.replace(/^<|>$/g, '');
 			const bytes = new Uint8Array(att.content as ArrayBuffer);
-			const b64 = btoa(String.fromCharCode(...bytes));
+			let binary = '';
+			for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+			const b64 = btoa(binary);
 			cidMap.set(cid, `data:${att.mimeType};base64,${b64}`);
 		}
 	}

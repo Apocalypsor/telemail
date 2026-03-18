@@ -19,7 +19,6 @@ import {
 	editTextMessage,
 	sendTextMessage,
 	sendWithAttachments,
-	setReplyMarkup,
 	TG_CAPTION_LIMIT,
 	TG_MSG_LIMIT,
 } from '@services/telegram';
@@ -159,8 +158,7 @@ export async function deliverEmailToTelegram(
 	if (hasAttachments) {
 		sentMessageId = await sendWithAttachments(tgToken, chatId, text, email.attachments || [], keyboard);
 	} else {
-		sentMessageId = await sendTextMessage(tgToken, chatId, text);
-		await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard);
+		sentMessageId = await sendTextMessage(tgToken, chatId, text, keyboard);
 	}
 
 	const inserted = await putMessageMapping(env.DB, {
@@ -185,7 +183,7 @@ export async function deliverEmailToTelegram(
 	waitUntil(
 		(async () => {
 			try {
-				const editKeyboard = await resolveStarredKeyboard(env, chatId, sentMessageId, messageId, account.email);
+				const editKeyboard = await buildEmailKeyboard(env, messageId, account.email, chatId, false);
 				await editMessageWithAnalysis(
 					env,
 					tgToken,
