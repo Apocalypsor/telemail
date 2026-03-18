@@ -35,6 +35,7 @@ export async function getAccessToken(env: Env, account: Account): Promise<string
 					grant_type: 'refresh_token',
 					scope: MS_MAIL_SCOPE,
 				}),
+				retry: 2,
 			})
 			.json()) as MsTokenResponse;
 	} catch (err) {
@@ -58,6 +59,7 @@ export async function graphGet(token: string, path: string): Promise<any> {
 	return http
 		.get(`${MS_GRAPH_API}${path}`, {
 			headers: { Authorization: `Bearer ${token}` },
+			retry: 2,
 		})
 		.json();
 }
@@ -67,6 +69,7 @@ export async function graphPatch(token: string, path: string, body: Record<strin
 	await http.patch(`${MS_GRAPH_API}${path}`, {
 		headers: { Authorization: `Bearer ${token}` },
 		json: body,
+		retry: 2,
 	});
 }
 
@@ -75,6 +78,7 @@ export async function fetchRawMime(token: string, messageId: string): Promise<Ar
 	return http
 		.get(`${MS_GRAPH_API}/me/messages/${messageId}/$value`, {
 			headers: { Authorization: `Bearer ${token}` },
+			retry: 2,
 		})
 		.arrayBuffer();
 }
