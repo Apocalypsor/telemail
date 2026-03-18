@@ -1,16 +1,67 @@
 import { base64urlToString } from '@utils/base64url';
+import type { CidMap } from '@utils/html';
 import { gmailGet } from '@services/email/gmail';
 
 /** 从 Gmail API 获取邮件正文 HTML，优先 HTML，fallback 到纯文本 */
-export async function fetchMailContent(accessToken: string, gmailMessageId: string): Promise<string | null> {
+export async function fetchMailContent(accessToken: string, gmailMessageId: string): Promise<{ html: string; cidMap: CidMap } | null> {
 	const msg = await gmailGet(accessToken, `/users/me/messages/${gmailMessageId}?format=full`);
 	const html = extractPartByMime(msg.payload, 'text/html');
-	if (html) return html;
+
+	const cidMap: CidMap = new Map();
+	collectInlineParts(msg.payload, cidMap);
+
+	// 需要通过附件 API 获取的内联图片
+	const pending: { cid: string; mimeType: string; attachmentId: string }[] = [];
+	collectInlineAttachmentIds(msg.payload, pending);
+	if (pending.length > 0) {
+		await Promise.all(
+			pending.map(async ({ cid, mimeType, attachmentId }) => {
+				const att = await gmailGet(accessToken, `/users/me/messages/${gmailMessageId}/attachments/${attachmentId}`);
+				if (att?.data) {
+					// Gmail 返回的是 base64url，转为标准 base64
+					const b64 = att.data.replace(/-/g, '+').replace(/_/g, '/');
+					cidMap.set(cid, `data:${mimeType};base64,${b64}`);
+				}
+			}),
+		);
+	}
+
+	if (html) return { html, cidMap };
 
 	const plain = extractPartByMime(msg.payload, 'text/plain');
-	if (plain) return wrapPlainText(plain);
+	if (plain) return { html: wrapPlainText(plain), cidMap };
 
 	return null;
+}
+
+/** 递归收集内联图片（body.data 已内嵌的情况） */
+function collectInlineParts(payload: any, cidMap: CidMap): void {
+	if (!payload) return;
+	const contentId = (payload.headers as any[])?.find((h: any) => h.name.toLowerCase() === 'content-id')?.value;
+	if (contentId && payload.body?.data && payload.mimeType?.startsWith('image/')) {
+		const cid = contentId.replace(/^<|>$/g, '');
+		const b64 = payload.body.data.replace(/-/g, '+').replace(/_/g, '/');
+		cidMap.set(cid, `data:${payload.mimeType};base64,${b64}`);
+	}
+	if (payload.parts) {
+		for (const part of payload.parts) collectInlineParts(part, cidMap);
+	}
+}
+
+/** 递归收集需要通过附件 API 获取的内联图片 */
+function collectInlineAttachmentIds(payload: any, result: { cid: string; mimeType: string; attachmentId: string }[]): void {
+	if (!payload) return;
+	const contentId = (payload.headers as any[])?.find((h: any) => h.name.toLowerCase() === 'content-id')?.value;
+	if (contentId && !payload.body?.data && payload.body?.attachmentId && payload.mimeType?.startsWith('image/')) {
+		result.push({
+			cid: contentId.replace(/^<|>$/g, ''),
+			mimeType: payload.mimeType,
+			attachmentId: payload.body.attachmentId,
+		});
+	}
+	if (payload.parts) {
+		for (const part of payload.parts) collectInlineAttachmentIds(part, result);
+	}
 }
 
 /** 递归提取 payload 中指定 MIME 类型的内容 */

@@ -2,6 +2,7 @@
 export const ROUTE_TELEGRAM_WEBHOOK = '/api/telegram/webhook';
 export const ROUTE_GMAIL_PUSH = '/api/gmail/push';
 export const ROUTE_PREVIEW_API = '/api/preview';
+export const ROUTE_CORS_PROXY = '/api/cors-proxy';
 
 // ── IMAP bridge routes ────────────────────────────────────────────────────────
 export const ROUTE_IMAP_ACCOUNTS = '/api/imap/accounts';
