@@ -44,7 +44,7 @@ preview.get(ROUTE_MAIL, async (c) => {
 
 	// KV 缓存（所有类型共用）
 	const cached = await getCachedMailHtml(c.env, messageId);
-	if (cached) return c.html(proxyImages(cached));
+	if (cached) return c.html(await proxyImages(cached));
 
 	const account = await getAccountByEmail(c.env.DB, accountEmail);
 	if (!account || account.chat_id !== chatId) return c.text('Account not found', 404);
@@ -73,7 +73,7 @@ preview.get(ROUTE_MAIL, async (c) => {
 
 	html = replaceCidReferences(html, cidMap);
 	await putCachedMailHtml(c.env, messageId, html);
-	return c.html(proxyImages(html));
+	return c.html(await proxyImages(html));
 });
 
 // ─── 通用 CORS 代理 ────────────────────────────────────────────────────────

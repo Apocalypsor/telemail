@@ -10,12 +10,52 @@ export function replaceCidReferences(html: string, cidMap: CidMap): string {
 	return html.replace(/cid:([^"'\s)]+)/gi, (match, cid) => cidMap.get(cid) ?? match);
 }
 
-/** 将 HTML 中的外部图片 URL 改写为经由 CORS 代理 */
-export function proxyImages(html: string): string {
-	return html.replace(
-		/(<img\b[^>]*?\bsrc\s*=\s*)(["'])(https?:\/\/[^"']+)\2/gi,
-		(_, before, quote, url) => `${before}${quote}${ROUTE_CORS_PROXY}?url=${encodeURIComponent(url)}${quote}`,
-	);
+/** 将外部 URL 改写为经由 CORS 代理 */
+function proxied(url: string): string {
+	if (!/^https?:\/\//i.test(url)) return url;
+	return `${ROUTE_CORS_PROXY}?url=${encodeURIComponent(url)}`;
+}
+
+/** 用 HTMLRewriter 将 HTML 中所有外部资源 URL 改写为经由 CORS 代理 */
+export async function proxyImages(html: string): Promise<string> {
+	return new HTMLRewriter()
+		.on('img', {
+			element(el) {
+				const src = el.getAttribute('src');
+				if (src) el.setAttribute('src', proxied(src));
+				const srcset = el.getAttribute('srcset');
+				if (srcset) {
+					el.setAttribute(
+						'srcset',
+						srcset.replace(/(\S+)(\s+[\d.]+[wx])/g, (_, url, desc) => `${proxied(url)}${desc}`),
+					);
+				}
+			},
+		})
+		.on('source', {
+			element(el) {
+				const srcset = el.getAttribute('srcset');
+				if (srcset) {
+					el.setAttribute(
+						'srcset',
+						srcset.replace(/(\S+)(\s+[\d.]+[wx])/g, (_, url, desc) => `${proxied(url)}${desc}`),
+					);
+				}
+			},
+		})
+		.on('[style]', {
+			element(el) {
+				const style = el.getAttribute('style');
+				if (style?.includes('url(')) {
+					el.setAttribute(
+						'style',
+						style.replace(/url\(\s*(['"]?)(https?:\/\/[^)'"]+)\1\s*\)/gi, (_, q, url) => `url(${q}${proxied(url)}${q})`),
+					);
+				}
+			},
+		})
+		.transform(new Response(html))
+		.text();
 }
 
 /** 从 postal-mime 附件列表中提取 CID 内联图片为 data URI */
