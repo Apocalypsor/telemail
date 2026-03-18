@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import PostalMime from 'postal-mime';
 import { MAX_BODY_CHARS } from '@/constants';
+import { HTTPError } from 'ky';
+import { http } from '@utils/http';
 import { PreviewPage } from '@components/preview';
 import { getAccountByEmail } from '@db/accounts';
 import { getCachedMailHtml, putCachedMailHtml } from '@db/kv';
@@ -85,9 +87,7 @@ preview.get(ROUTE_CORS_PROXY, async (c) => {
 	if (!verifyProxySignature(c.env.ADMIN_SECRET, url, sig)) return c.text('Invalid signature', 403);
 
 	try {
-		const resp = await fetch(url, { redirect: 'follow' });
-		if (!resp.ok) return c.text('Upstream error', resp.status as ContentfulStatusCode);
-
+		const resp = await http.get(url);
 		const contentType = resp.headers.get('content-type') ?? 'application/octet-stream';
 		return new Response(resp.body, {
 			headers: {
@@ -95,7 +95,8 @@ preview.get(ROUTE_CORS_PROXY, async (c) => {
 				'cache-control': 'public, max-age=86400',
 			},
 		});
-	} catch {
+	} catch (err) {
+		if (err instanceof HTTPError) return c.text('Upstream error', err.response.status as ContentfulStatusCode);
 		return c.text('Failed to fetch image', 502);
 	}
 });

@@ -1,6 +1,8 @@
 import { TG_API_BASE, TG_CAPTION_LIMIT, TG_MAX_RETRY_AFTER_SECS, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '@/constants';
 import type { Attachment } from '@/types';
 import { delay } from '@utils/async';
+import { HTTPError } from 'ky';
+import { http } from '@utils/http';
 
 export { TG_CAPTION_LIMIT, TG_MSG_LIMIT };
 
@@ -46,44 +48,35 @@ async function waitForRateLimit(resp: Response, label: string): Promise<void> {
  * 当 parse_mode 存在且返回 entity parse error 时，自动去掉 parse_mode 并将 text/caption 转为纯文本重试。
  */
 async function tgPost<T = unknown>(url: string, payload: Record<string, unknown>, label: string): Promise<T> {
-	const doFetch = () =>
-		fetch(url, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(payload),
-		});
+	try {
+		return ((await http.post(url, { json: payload }).json()) as { result: T }).result;
+	} catch (err) {
+		if (!(err instanceof HTTPError)) throw err;
+		const { response } = err;
 
-	let resp = await doFetch();
-
-	if (resp.status === 429) {
-		await waitForRateLimit(resp, label);
-		resp = await doFetch();
-	}
-
-	if (resp.ok) return ((await resp.json()) as { result: T }).result;
-
-	const err = (await resp.json()) as unknown;
-	const errDescription = extractTelegramDescription(err);
-
-	if (payload.parse_mode && isEntityParseError(errDescription)) {
-		const textKey = 'text' in payload ? 'text' : 'caption';
-		const textValue = payload[textKey];
-		if (typeof textValue === 'string') {
-			console.warn(`TG ${label} parse_mode failed, retrying as plain text`);
-			const { parse_mode: _, ...rest } = payload;
-			rest[textKey] = markdownV2ToPlainText(textValue);
-			const fallbackResp = await fetch(url, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(rest),
-			});
-			if (fallbackResp.ok) return ((await fallbackResp.json()) as { result: T }).result;
-			const fallbackErr = (await fallbackResp.json()) as unknown;
-			throw new Error(`TG ${label} fallback ${fallbackResp.status}: ${extractTelegramDescription(fallbackErr)}`);
+		// 429 速率限制 → 等待后重试一次
+		if (response.status === 429) {
+			await waitForRateLimit(response, label);
+			return ((await http.post(url, { json: payload }).json()) as { result: T }).result;
 		}
-	}
 
-	throw new Error(`TG ${label} ${resp.status}: ${errDescription}`);
+		const errBody = (await response.json()) as unknown;
+		const errDescription = extractTelegramDescription(errBody);
+
+		// parse_mode 错误 → 回退纯文本
+		if (payload.parse_mode && isEntityParseError(errDescription)) {
+			const textKey = 'text' in payload ? 'text' : 'caption';
+			const textValue = payload[textKey];
+			if (typeof textValue === 'string') {
+				console.warn(`TG ${label} parse_mode failed, retrying as plain text`);
+				const { parse_mode: _, ...rest } = payload;
+				rest[textKey] = markdownV2ToPlainText(textValue);
+				return ((await http.post(url, { json: rest }).json()) as { result: T }).result;
+			}
+		}
+
+		throw new Error(`TG ${label} ${response.status}: ${errDescription}`);
+	}
 }
 
 /** 发送纯文字消息，返回 message_id */
@@ -141,41 +134,43 @@ export async function sendWithAttachments(
 			if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup));
 
 			const url = `${TG_API_BASE}${token}/sendDocument`;
-			let resp = await fetch(url, { method: 'POST', body: form });
-			if (resp.status === 429) {
-				await waitForRateLimit(resp, 'sendDocument');
-				resp = await fetch(url, { method: 'POST', body: form });
-			}
-			if (!resp.ok) {
-				const err = (await resp.json()) as any;
+			try {
+				const data = (await http.post(url, { body: form }).json()) as { result: { message_id: number } };
+				return data.result.message_id;
+			} catch (err) {
+				if (!(err instanceof HTTPError)) throw err;
+				const { response } = err;
+
+				if (response.status === 429) {
+					await waitForRateLimit(response, 'sendDocument');
+					const data = (await http.post(url, { body: form }).json()) as { result: { message_id: number } };
+					return data.result.message_id;
+				}
+
+				const errBody = (await response.json()) as any;
 				console.error('TG sendDocument failed payload:', {
 					chatId,
 					captionLength: caption.length,
 					filename: att.filename || 'attachment',
-					description: err?.description,
+					description: errBody?.description,
 				});
-				if (isEntityParseError(err?.description)) {
+
+				if (isEntityParseError(errBody?.description)) {
 					console.warn('TG sendDocument parse_mode failed, retrying as plain caption');
 					const fallbackForm = new FormData();
 					fallbackForm.append('chat_id', chatId);
 					fallbackForm.append('document', blob, att.filename || 'attachment');
 					fallbackForm.append('caption', markdownV2ToPlainText(caption));
 					if (replyMarkup) fallbackForm.append('reply_markup', JSON.stringify(replyMarkup));
-					const fallbackResp = await fetch(url, { method: 'POST', body: fallbackForm });
-					if (!fallbackResp.ok) {
-						const fallbackErr = (await fallbackResp.json()) as any;
-						throw new Error(`TG sendDocument fallback ${fallbackResp.status}: ${fallbackErr.description}`);
-					}
-					const fallbackData = (await fallbackResp.json()) as { result: { message_id: number } };
+					const fallbackData = (await http.post(url, { body: fallbackForm }).json()) as {
+						result: { message_id: number };
+					};
 					return fallbackData.result.message_id;
 				}
-				throw new Error(`TG sendDocument ${resp.status}: ${err.description}`);
+
+				throw new Error(`TG sendDocument ${response.status}: ${errBody.description}`);
 			}
-			const data = (await resp.json()) as { result: { message_id: number } };
-			return data.result.message_id;
 		} else {
-			// 多附件：先发文字消息（带键盘），再发媒体组作为回复（无 caption）
-			// 这样文字消息有完整 inline keyboard，附件也不会被 caption 拆开
 			const textMsgId = await sendTextMessage(token, chatId, caption, replyMarkup);
 
 			const chunks: Attachment[][] = [];
@@ -248,20 +243,28 @@ async function sendMediaGroupChunk(
 	form.append('media', JSON.stringify(media));
 
 	const url = `${TG_API_BASE}${token}/sendMediaGroup`;
-	let resp = await fetch(url, { method: 'POST', body: form });
-	if (resp.status === 429) {
-		await waitForRateLimit(resp, 'sendMediaGroup');
-		resp = await fetch(url, { method: 'POST', body: form });
-	}
-	if (!resp.ok) {
-		const err = (await resp.json()) as any;
+	try {
+		const data = (await http.post(url, { body: form }).json()) as { result: Array<{ message_id: number }> };
+		return data.result[0].message_id;
+	} catch (err) {
+		if (!(err instanceof HTTPError)) throw err;
+		const { response } = err;
+
+		if (response.status === 429) {
+			await waitForRateLimit(response, 'sendMediaGroup');
+			const data = (await http.post(url, { body: form }).json()) as { result: Array<{ message_id: number }> };
+			return data.result[0].message_id;
+		}
+
+		const errBody = (await response.json()) as any;
 		console.error('TG sendMediaGroup failed payload:', {
 			chatId,
 			captionLength: caption.length,
 			attachments: attachments.length,
-			description: err?.description,
+			description: errBody?.description,
 		});
-		if (isEntityParseError(err?.description) && caption) {
+
+		if (isEntityParseError(errBody?.description) && caption) {
 			console.warn('TG sendMediaGroup parse_mode failed, retrying as plain caption');
 			const fallbackForm = new FormData();
 			fallbackForm.append('chat_id', chatId);
@@ -279,16 +282,12 @@ async function sendMediaGroupChunk(
 				return entry;
 			});
 			fallbackForm.append('media', JSON.stringify(fallbackMedia));
-			const fallbackResp = await fetch(url, { method: 'POST', body: fallbackForm });
-			if (!fallbackResp.ok) {
-				const fallbackErr = (await fallbackResp.json()) as any;
-				throw new Error(`TG sendMediaGroup fallback ${fallbackResp.status}: ${fallbackErr.description}`);
-			}
-			const fallbackData = (await fallbackResp.json()) as { result: Array<{ message_id: number }> };
+			const fallbackData = (await http.post(url, { body: fallbackForm }).json()) as {
+				result: Array<{ message_id: number }>;
+			};
 			return fallbackData.result[0].message_id;
 		}
-		throw new Error(`TG sendMediaGroup ${resp.status}: ${err.description}`);
+
+		throw new Error(`TG sendMediaGroup ${response.status}: ${errBody.description}`);
 	}
-	const data = (await resp.json()) as { result: Array<{ message_id: number }> };
-	return data.result[0].message_id;
 }

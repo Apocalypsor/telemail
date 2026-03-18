@@ -4,6 +4,8 @@ import { AccountType } from '@/types';
 import { getAllAccounts } from '@db/accounts';
 import { getCachedAccessToken, getHistoryId, putCachedAccessToken, putHistoryId } from '@db/kv';
 import type { GoogleTokenResponse } from '@services/email/gmail/oauth';
+import { HTTPError } from 'ky';
+import { http } from '@utils/http';
 
 // ─── OAuth2 ──────────────────────────────────────────────────────────────────
 
@@ -16,22 +18,24 @@ export async function getAccessToken(env: Env, account: Account): Promise<string
 		throw new Error(`Account ${account.email} has no refresh token. Authorize via OAuth first.`);
 	}
 
-	const resp = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({
-			client_id: env.GMAIL_CLIENT_ID,
-			client_secret: env.GMAIL_CLIENT_SECRET,
-			refresh_token: account.refresh_token,
-			grant_type: 'refresh_token',
-		}),
-	});
-
-	if (!resp.ok) {
-		throw new Error(`Token exchange failed for ${account.email}: ${await resp.text()}`);
+	let data: GoogleTokenResponse;
+	try {
+		data = (await http
+			.post(GOOGLE_OAUTH_TOKEN_URL, {
+				body: new URLSearchParams({
+					client_id: env.GMAIL_CLIENT_ID,
+					client_secret: env.GMAIL_CLIENT_SECRET,
+					refresh_token: account.refresh_token,
+					grant_type: 'refresh_token',
+				}),
+			})
+			.json()) as GoogleTokenResponse;
+	} catch (err) {
+		if (err instanceof HTTPError) {
+			throw new Error(`Token exchange failed for ${account.email}: ${await err.response.text()}`);
+		}
+		throw err;
 	}
-
-	const data = (await resp.json()) as GoogleTokenResponse;
 	if (!data.access_token || !data.expires_in) {
 		throw new Error('Token response missing access_token or expires_in');
 	}
@@ -45,30 +49,19 @@ export async function getAccessToken(env: Env, account: Account): Promise<string
 
 /** 调用 Gmail REST API (GET) */
 export async function gmailGet(token: string, path: string): Promise<any> {
-	const resp = await fetch(`${GMAIL_API}${path}`, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	if (!resp.ok) {
-		const text = await resp.text();
-		throw Object.assign(new Error(`Gmail API ${resp.status}: ${text}`), { status: resp.status });
-	}
-	return resp.json();
+	return http
+		.get(`${GMAIL_API}${path}`, {
+			headers: { Authorization: `Bearer ${token}` },
+		})
+		.json();
 }
 
 /** 调用 Gmail REST API (POST with JSON body) */
 export async function gmailPost(token: string, path: string, body: Record<string, unknown>): Promise<any> {
-	const resp = await fetch(`${GMAIL_API}${path}`, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${token}`,
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(body),
+	const resp = await http.post(`${GMAIL_API}${path}`, {
+		headers: { Authorization: `Bearer ${token}` },
+		json: body,
 	});
-	if (!resp.ok) {
-		const text = await resp.text();
-		throw Object.assign(new Error(`Gmail API ${resp.status}: ${text}`), { status: resp.status });
-	}
 	const text = await resp.text();
 	return text ? JSON.parse(text) : null;
 }
@@ -203,7 +196,7 @@ export async function fetchNewMessageIds(token: string, env: Env, account: Accou
 		try {
 			history = await gmailGet(token, path);
 		} catch (err) {
-			if (err instanceof Error && (err as any).status === 404) {
+			if (err instanceof HTTPError && err.response.status === 404) {
 				// historyId 过老，重新同步
 				console.warn(`historyId expired for ${account.email}, resetting`);
 				const profile = await gmailGet(token, '/users/me/profile');

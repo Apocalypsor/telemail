@@ -2,6 +2,7 @@
 
 import { MAX_LINKS } from '@/constants';
 import { extractLinks, prepareBody } from '@utils/format';
+import { http } from '@utils/http';
 
 /** 从逗号分隔的 API Key 列表中随机选一个 */
 function pickRandomKey(apiKeys: string): string {
@@ -9,28 +10,22 @@ function pickRandomKey(apiKeys: string): string {
 	return keys[Math.floor(Math.random() * keys.length)];
 }
 
-/** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode */
+/** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode，最多重试 3 次 */
 async function callLLM(baseUrl: string, apiKeys: string, model: string, prompt: string, json?: boolean): Promise<string> {
 	const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
-	const resp = await fetch(url, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${pickRandomKey(apiKeys)}`,
-		},
-		body: JSON.stringify({
-			model,
-			messages: [{ role: 'user', content: prompt }],
-			stream: false,
-			...(json && { response_format: { type: 'json_object' } }),
-		}),
-	});
+	const data = await http
+		.post(url, {
+			headers: { Authorization: `Bearer ${pickRandomKey(apiKeys)}` },
+			json: {
+				model,
+				messages: [{ role: 'user', content: prompt }],
+				stream: false,
+				...(json && { response_format: { type: 'json_object' } }),
+			},
+			retry: 3,
+		})
+		.json<{ choices?: Array<{ message: { content: string } }> }>();
 
-	if (!resp.ok) {
-		throw new Error(`LLM API ${resp.status}: ${await resp.text()}`);
-	}
-
-	const data = (await resp.json()) as { choices?: Array<{ message: { content: string } }> };
 	const content = data.choices?.[0]?.message?.content;
 	if (!content) throw new Error('LLM API returned no choices');
 	return content.trim();

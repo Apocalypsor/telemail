@@ -12,6 +12,7 @@ import { ROUTE_OAUTH_GOOGLE_CALLBACK, ROUTE_OAUTH_GOOGLE_START } from '@handlers
 import type { Env } from '@/types';
 import { reportErrorToObservability } from '@utils/observability';
 import { renewWatch } from '@services/email/gmail/index';
+import { http } from '@utils/http';
 
 export type GoogleTokenResponse = {
 	access_token?: string;
@@ -121,9 +122,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 	let accountEmail = account?.email || 'unknown';
 
 	const redirectUri = getCallbackUrl(requestUrl.origin);
-	const tokenResp = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+	const tokenResp = await http.post(GOOGLE_OAUTH_TOKEN_URL, {
 		body: new URLSearchParams({
 			code,
 			client_id: env.GMAIL_CLIENT_ID,
@@ -131,6 +130,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 			redirect_uri: redirectUri,
 			grant_type: 'authorization_code',
 		}),
+		throwHttpErrors: false,
 	});
 
 	const rawBody = await tokenResp.text();
@@ -163,15 +163,14 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 		// 用 access_token 从 Gmail API 获取真实邮箱地址
 		if (tokenData.access_token) {
 			try {
-				const profileResp = await fetch(`${GMAIL_API}/users/me/profile`, {
-					headers: { Authorization: `Bearer ${tokenData.access_token}` },
-				});
-				if (profileResp.ok) {
-					const profile = (await profileResp.json()) as { emailAddress?: string };
-					if (profile.emailAddress) {
-						accountEmail = profile.emailAddress;
-						updates.push(updateAccountEmail(env.DB, account.id, profile.emailAddress));
-					}
+				const profile = (await http
+					.get(`${GMAIL_API}/users/me/profile`, {
+						headers: { Authorization: `Bearer ${tokenData.access_token}` },
+					})
+					.json()) as { emailAddress?: string };
+				if (profile.emailAddress) {
+					accountEmail = profile.emailAddress;
+					updates.push(updateAccountEmail(env.DB, account.id, profile.emailAddress));
 				}
 			} catch {
 				// 获取邮箱失败不影响主流程

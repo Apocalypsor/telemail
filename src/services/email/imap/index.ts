@@ -1,4 +1,6 @@
 import type { Env } from '@/types';
+import { HTTPError } from 'ky';
+import { http } from '@utils/http';
 
 async function callBridge(env: Env, method: string, path: string, body?: unknown): Promise<Response> {
 	if (!env.IMAP_BRIDGE_URL || !env.IMAP_BRIDGE_SECRET) {
@@ -6,21 +8,19 @@ async function callBridge(env: Env, method: string, path: string, body?: unknown
 	}
 
 	const url = `${env.IMAP_BRIDGE_URL.replace(/\/$/, '')}${path}`;
-	const resp = await fetch(url, {
-		method,
-		headers: {
-			Authorization: `Bearer ${env.IMAP_BRIDGE_SECRET}`,
-			...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-		},
-		body: body !== undefined ? JSON.stringify(body) : undefined,
-	});
-
-	if (!resp.ok) {
-		const text = await resp.text();
-		throw new Error(`IMAP bridge ${method} ${path} failed (${resp.status}): ${text}`);
+	try {
+		return await http(url, {
+			method,
+			headers: { Authorization: `Bearer ${env.IMAP_BRIDGE_SECRET}` },
+			...(body !== undefined && { json: body }),
+		});
+	} catch (err) {
+		if (err instanceof HTTPError) {
+			const text = await err.response.text();
+			throw new Error(`IMAP bridge ${method} ${path} failed (${err.response.status}): ${text}`);
+		}
+		throw err;
 	}
-
-	return resp;
 }
 
 /** 通知中间件重新拉取账号列表（账号增删后调用） */
@@ -45,7 +45,7 @@ export async function setImapFlag(
  */
 export async function listImapUnread(env: Env, accountId: number, maxResults: number = 20): Promise<{ id: string; subject?: string }[]> {
 	const resp = await callBridge(env, 'POST', '/api/unread', { accountId, maxResults });
-	const { messages } = await resp.json<{ messages: { id: string; subject?: string }[] }>();
+	const { messages } = (await resp.json()) as { messages: { id: string; subject?: string }[] };
 	return messages ?? [];
 }
 
@@ -54,14 +54,14 @@ export async function listImapUnread(env: Env, accountId: number, maxResults: nu
  */
 export async function listImapStarred(env: Env, accountId: number, maxResults: number = 20): Promise<{ id: string; subject?: string }[]> {
 	const resp = await callBridge(env, 'POST', '/api/starred', { accountId, maxResults });
-	const { messages } = await resp.json<{ messages: { id: string; subject?: string }[] }>();
+	const { messages } = (await resp.json()) as { messages: { id: string; subject?: string }[] };
 	return messages ?? [];
 }
 
 /** 检查邮件是否已星标（\Flagged） */
 export async function isImapStarred(env: Env, accountId: number, messageId: string): Promise<boolean> {
 	const resp = await callBridge(env, 'POST', '/api/is-starred', { accountId, messageId });
-	const { starred } = await resp.json<{ starred: boolean }>();
+	const { starred } = (await resp.json()) as { starred: boolean };
 	return starred;
 }
 
@@ -71,7 +71,7 @@ export async function isImapStarred(env: Env, accountId: number, messageId: stri
  */
 export async function fetchImapRawEmail(env: Env, accountId: number, messageId: string): Promise<string> {
 	const resp = await callBridge(env, 'POST', '/api/fetch', { accountId, messageId });
-	const { rawEmail } = await resp.json<{ rawEmail: string }>();
+	const { rawEmail } = (await resp.json()) as { rawEmail: string };
 	return rawEmail;
 }
 
@@ -83,7 +83,6 @@ export async function fetchImapRawEmail(env: Env, accountId: number, messageId: 
 export async function checkImapBridgeHealth(env: Env): Promise<{ ok: boolean; total: number; usable: number } | null> {
 	if (!env.IMAP_BRIDGE_URL) return null;
 	const url = `${env.IMAP_BRIDGE_URL.replace(/\/$/, '')}/api/health`;
-	const resp = await fetch(url);
-	const body = await resp.json<{ ok: boolean; total: number; usable: number }>();
-	return body;
+	const resp = await http.get(url, { throwHttpErrors: false });
+	return (await resp.json()) as { ok: boolean; total: number; usable: number };
 }

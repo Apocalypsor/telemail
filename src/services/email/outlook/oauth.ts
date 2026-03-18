@@ -12,6 +12,7 @@ import { ROUTE_OAUTH_MICROSOFT_CALLBACK, ROUTE_OAUTH_MICROSOFT_START } from '@ha
 import type { Env } from '@/types';
 import { reportErrorToObservability } from '@utils/observability';
 import { renewSubscription } from '@services/email/outlook/index';
+import { http } from '@utils/http';
 
 export type MsTokenResponse = {
 	access_token?: string;
@@ -120,9 +121,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 	let accountEmail = account?.email || 'unknown';
 
 	const redirectUri = getCallbackUrl(requestUrl.origin);
-	const tokenResp = await fetch(MS_OAUTH_TOKEN_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+	const tokenResp = await http.post(MS_OAUTH_TOKEN_URL, {
 		body: new URLSearchParams({
 			code,
 			client_id: env.MS_CLIENT_ID!,
@@ -131,6 +130,7 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 			grant_type: 'authorization_code',
 			scope: MS_MAIL_SCOPE,
 		}),
+		throwHttpErrors: false,
 	});
 
 	const rawBody = await tokenResp.text();
@@ -162,16 +162,15 @@ export async function processOAuthCallback(request: Request, env: Env): Promise<
 		// 用 access_token 获取真实邮箱地址
 		if (tokenData.access_token) {
 			try {
-				const profileResp = await fetch(`${MS_GRAPH_API}/me`, {
-					headers: { Authorization: `Bearer ${tokenData.access_token}` },
-				});
-				if (profileResp.ok) {
-					const profile = (await profileResp.json()) as { mail?: string; userPrincipalName?: string };
-					const email = profile.mail || profile.userPrincipalName;
-					if (email) {
-						accountEmail = email;
-						updates.push(updateAccountEmail(env.DB, account.id, email));
-					}
+				const profile = (await http
+					.get(`${MS_GRAPH_API}/me`, {
+						headers: { Authorization: `Bearer ${tokenData.access_token}` },
+					})
+					.json()) as { mail?: string; userPrincipalName?: string };
+				const email = profile.mail || profile.userPrincipalName;
+				if (email) {
+					accountEmail = email;
+					updates.push(updateAccountEmail(env.DB, account.id, email));
 				}
 			} catch {
 				// 获取邮箱失败不影响主流程
