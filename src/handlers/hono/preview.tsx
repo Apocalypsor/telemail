@@ -11,7 +11,7 @@ import { fetchMailContent, wrapPlainText } from '@services/email/mail-content';
 import { type CidMap, buildCidMapFromAttachments, proxyImages, replaceCidReferences } from '@utils/html';
 import { AccountType, type AppEnv } from '@/types';
 import { formatBody } from '@utils/format';
-import { verifyMailToken } from '@utils/hash';
+import { verifyMailToken, verifyProxySignature } from '@utils/hash';
 import { ROUTE_CORS_PROXY, ROUTE_MAIL, ROUTE_PREVIEW, ROUTE_PREVIEW_API } from '@handlers/hono/routes';
 
 const preview = new Hono<AppEnv>();
@@ -44,7 +44,7 @@ preview.get(ROUTE_MAIL, async (c) => {
 
 	// KV 缓存（所有类型共用）
 	const cached = await getCachedMailHtml(c.env, messageId);
-	if (cached) return c.html(await proxyImages(cached));
+	if (cached) return c.html(await proxyImages(cached, c.env.ADMIN_SECRET));
 
 	const account = await getAccountByEmail(c.env.DB, accountEmail);
 	if (!account || account.chat_id !== chatId) return c.text('Account not found', 404);
@@ -73,14 +73,16 @@ preview.get(ROUTE_MAIL, async (c) => {
 
 	html = replaceCidReferences(html, cidMap);
 	await putCachedMailHtml(c.env, messageId, html);
-	return c.html(await proxyImages(html));
+	return c.html(await proxyImages(html, c.env.ADMIN_SECRET));
 });
 
 // ─── 通用 CORS 代理 ────────────────────────────────────────────────────────
 
 preview.get(ROUTE_CORS_PROXY, async (c) => {
 	const url = c.req.query('url');
-	if (!url) return c.text('Missing url', 400);
+	const sig = c.req.query('sig');
+	if (!url || !sig) return c.text('Missing url or sig', 400);
+	if (!verifyProxySignature(c.env.ADMIN_SECRET, url, sig)) return c.text('Invalid signature', 403);
 
 	try {
 		const resp = await fetch(url, { redirect: 'follow' });

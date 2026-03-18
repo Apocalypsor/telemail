@@ -1,5 +1,6 @@
 import type { Attachment } from 'postal-mime';
 import { ROUTE_CORS_PROXY } from '@handlers/hono/routes';
+import { signProxyUrl } from '@utils/hash';
 
 /** CID → data URI 映射 */
 export type CidMap = Map<string, string>;
@@ -10,24 +11,25 @@ export function replaceCidReferences(html: string, cidMap: CidMap): string {
 	return html.replace(/cid:([^"'\s)]+)/gi, (match, cid) => cidMap.get(cid) ?? match);
 }
 
-/** 将外部 URL 改写为经由 CORS 代理 */
-function proxied(url: string): string {
+/** 将外部 URL 改写为经由 CORS 代理（附带 HMAC 签名） */
+function proxied(url: string, secret: string): string {
 	if (!/^https?:\/\//i.test(url)) return url;
-	return `${ROUTE_CORS_PROXY}?url=${encodeURIComponent(url)}`;
+	const sig = signProxyUrl(secret, url);
+	return `${ROUTE_CORS_PROXY}?url=${encodeURIComponent(url)}&sig=${sig}`;
 }
 
 /** 用 HTMLRewriter 将 HTML 中所有外部资源 URL 改写为经由 CORS 代理 */
-export async function proxyImages(html: string): Promise<string> {
+export async function proxyImages(html: string, secret: string): Promise<string> {
 	return new HTMLRewriter()
 		.on('img', {
 			element(el) {
 				const src = el.getAttribute('src');
-				if (src) el.setAttribute('src', proxied(src));
+				if (src) el.setAttribute('src', proxied(src, secret));
 				const srcset = el.getAttribute('srcset');
 				if (srcset) {
 					el.setAttribute(
 						'srcset',
-						srcset.replace(/(\S+)(\s+[\d.]+[wx])/g, (_, url, desc) => `${proxied(url)}${desc}`),
+						srcset.replace(/(\S+)(\s+[\d.]+[wx])/g, (_, url, desc) => `${proxied(url, secret)}${desc}`),
 					);
 				}
 			},
@@ -38,7 +40,7 @@ export async function proxyImages(html: string): Promise<string> {
 				if (srcset) {
 					el.setAttribute(
 						'srcset',
-						srcset.replace(/(\S+)(\s+[\d.]+[wx])/g, (_, url, desc) => `${proxied(url)}${desc}`),
+						srcset.replace(/(\S+)(\s+[\d.]+[wx])/g, (_, url, desc) => `${proxied(url, secret)}${desc}`),
 					);
 				}
 			},
@@ -49,7 +51,7 @@ export async function proxyImages(html: string): Promise<string> {
 				if (style?.includes('url(')) {
 					el.setAttribute(
 						'style',
-						style.replace(/url\(\s*(['"]?)(https?:\/\/[^)'"]+)\1\s*\)/gi, (_, q, url) => `url(${q}${proxied(url)}${q})`),
+						style.replace(/url\(\s*(['"]?)(https?:\/\/[^)'"]+)\1\s*\)/gi, (_, q, url) => `url(${q}${proxied(url, secret)}${q})`),
 					);
 				}
 			},

@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 /** 常量时间字符串比较，防止计时攻击 */
 export function timingSafeEqual(a: string, b: string): boolean {
 	if (a.length !== b.length) return false;
@@ -32,4 +34,14 @@ export async function verifyMailToken(
 ): Promise<boolean> {
 	const expected = await generateMailToken(secret, messageId, accountEmail, chatId);
 	return timingSafeEqual(expected, token);
+}
+
+/** 为 CORS 代理 URL 生成 HMAC-SHA256 签名（同步） */
+export function signProxyUrl(secret: string, url: string): string {
+	return createHmac('sha256', secret).update(url).digest('hex').slice(0, 32);
+}
+
+/** 验证 CORS 代理 URL 签名 */
+export function verifyProxySignature(secret: string, url: string, signature: string): boolean {
+	return timingSafeEqual(signProxyUrl(secret, url), signature);
 }
