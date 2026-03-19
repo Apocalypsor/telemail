@@ -4,7 +4,7 @@ import { Api } from 'grammy';
 import type { BotCommand } from 'grammy/types';
 
 // 修改此列表后更新 BOT_COMMANDS_VERSION，会自动同步到 Telegram
-const BOT_COMMANDS_VERSION = 3;
+const BOT_COMMANDS_VERSION = 4;
 
 export const BOT_COMMANDS: BotCommand[] = [
 	{ command: 'start', description: '打开管理面板' },
@@ -12,6 +12,7 @@ export const BOT_COMMANDS: BotCommand[] = [
 	{ command: 'accounts', description: '查看我的邮箱账号' },
 	{ command: 'unread', description: '查看未读邮件' },
 	{ command: 'starred', description: '查看星标邮件' },
+	{ command: 'junk', description: '查看垃圾邮件' },
 	{ command: 'users', description: '查看用户列表（管理员）' },
 ];
 

@@ -176,6 +176,12 @@ export async function setReplyMarkup(token: string, chatId: string, messageId: n
 }
 
 /** 删除消息（用于去重时撤回重复消息） */
+/** 生成指向 Telegram 群组消息的深链接 */
+export function buildTgMessageLink(chatId: string, messageId: number): string {
+	const numericId = chatId.replace(/^-100/, '');
+	return `https://t.me/c/${numericId}/${messageId}`;
+}
+
 export async function deleteMessage(token: string, chatId: string, messageId: number): Promise<void> {
 	const url = `${TG_API_BASE}${token}/deleteMessage`;
 	await tgPost(url, { chat_id: chatId, message_id: messageId }, 'deleteMessage');

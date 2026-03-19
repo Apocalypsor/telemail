@@ -5,16 +5,18 @@ import {
 	addStar,
 	getAccessToken,
 	isStarred as gmailIsStarred,
+	listJunkMessages,
 	listStarredMessages,
 	listUnreadMessages,
 	markAsRead,
 	removeStar,
 } from '@services/email/gmail/index';
-import { isImapStarred, listImapStarred, listImapUnread, setImapFlag } from '@services/email/imap';
+import { isImapStarred, listImapJunk, listImapStarred, listImapUnread, setImapFlag } from '@services/email/imap';
 import {
 	addStar as msAddStar,
 	getAccessToken as msGetAccessToken,
 	isStarred as msIsStarred,
+	listJunkMessages as msListJunkMessages,
 	listStarredMessages as msListStarredMessages,
 	listUnreadMessages as msListUnreadMessages,
 	markAsRead as msMarkAsRead,
@@ -33,6 +35,7 @@ export interface EmailProvider {
 	isStarred(messageId: string): Promise<boolean>;
 	listUnread(maxResults?: number): Promise<EmailListItem[]>;
 	listStarred(maxResults?: number): Promise<EmailListItem[]>;
+	listJunk(maxResults?: number): Promise<EmailListItem[]>;
 }
 
 /** 将 (token, ...args) => R 的函数包装为 (...args) => R，自动注入 token */
@@ -52,6 +55,7 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
 			isStarred: (messageId) => isImapStarred(env, account.id, messageId),
 			listUnread: (maxResults) => listImapUnread(env, account.id, maxResults),
 			listStarred: (maxResults) => listImapStarred(env, account.id, maxResults),
+			listJunk: (maxResults) => listImapJunk(env, account.id, maxResults),
 		};
 	}
 
@@ -64,6 +68,7 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
 			isStarred: withToken(t, msIsStarred),
 			listUnread: withToken(t, msListUnreadMessages),
 			listStarred: withToken(t, msListStarredMessages),
+			listJunk: withToken(t, msListJunkMessages),
 		};
 	}
 
@@ -76,5 +81,6 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
 		isStarred: withToken(t, gmailIsStarred),
 		listUnread: withToken(t, listUnreadMessages),
 		listStarred: withToken(t, listStarredMessages),
+		listJunk: withToken(t, listJunkMessages),
 	};
 }

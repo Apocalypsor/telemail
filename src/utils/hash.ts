@@ -53,6 +53,12 @@ export async function verifyMailTokenById(secret: string, messageId: string, acc
 	return timingSafeEqual(expected, token);
 }
 
+/** 生成邮件 web 预览链接（已签名） */
+export async function buildMailPreviewUrl(workerUrl: string, adminSecret: string, emailId: string, accountId: number): Promise<string> {
+	const token = await generateMailTokenById(adminSecret, emailId, accountId);
+	return `${workerUrl.replace(/\/$/, '')}/mail/${emailId}?accountId=${accountId}&t=${token}`;
+}
+
 /** 为 CORS 代理 URL 生成 HMAC-SHA256 签名（同步） */
 export function signProxyUrl(secret: string, url: string): string {
 	return createHmac('sha256', secret).update(url).digest('hex').slice(0, 32);

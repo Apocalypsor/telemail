@@ -58,6 +58,15 @@ export async function listImapStarred(env: Env, accountId: number, maxResults: n
 	return messages ?? [];
 }
 
+/**
+ * 列出垃圾邮件（需中间件实现 POST /api/junk → { messages: { id, subject? }[] }）。
+ */
+export async function listImapJunk(env: Env, accountId: number, maxResults: number = 20): Promise<{ id: string; subject?: string }[]> {
+	const resp = await callBridge(env, 'POST', '/api/junk', { accountId, maxResults });
+	const { messages } = (await resp.json()) as { messages: { id: string; subject?: string }[] };
+	return messages ?? [];
+}
+
 /** 检查邮件是否已星标（\Flagged） */
 export async function isImapStarred(env: Env, accountId: number, messageId: string): Promise<boolean> {
 	const resp = await callBridge(env, 'POST', '/api/is-starred', { accountId, messageId });

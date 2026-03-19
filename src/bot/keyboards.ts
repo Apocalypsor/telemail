@@ -51,7 +51,13 @@ export async function resolveStarredKeyboard(
 
 /** 主菜单键盘 */
 export function mainMenuKeyboard(admin: boolean): InlineKeyboard {
-	const kb = new InlineKeyboard().text('📧 账号管理', 'accs').row().text('📬 未读邮件', 'unread').text('⭐ 星标邮件', 'starred').row();
+	const kb = new InlineKeyboard()
+		.text('📧 账号管理', 'accs')
+		.row()
+		.text('📬 未读邮件', 'unread')
+		.text('⭐ 星标邮件', 'starred')
+		.text('🚫 垃圾邮件', 'junk')
+		.row();
 	if (admin) {
 		kb.text('👥 用户管理', 'users').text('⚙️ 全局操作', 'admin').row();
 	}

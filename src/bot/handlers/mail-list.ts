@@ -1,58 +1,72 @@
 import type { Account, Env } from '@/types';
-import { buildEmailKeyboard } from '@bot/keyboards';
 import { getOwnAccounts } from '@db/accounts';
 import { getMappingsByEmailIds, type MessageMapping } from '@db/message-map';
 import { getEmailProvider, type EmailListItem, type EmailProvider } from '@services/email/provider';
-import { markAllAsRead } from '@services/message-actions';
-import { setReplyMarkup } from '@services/telegram';
+import { markAllAsRead, syncStarButtonsForMappings } from '@services/message-actions';
+import { buildTgMessageLink } from '@services/telegram';
+import { buildMailPreviewUrl } from '@utils/hash';
+import { escapeMdV2 } from '@utils/markdown-v2';
 import { reportErrorToObservability } from '@utils/observability';
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
 
 const MAX_PER_ACCOUNT = 20;
 
-/** 生成 Telegram 消息深链接 */
-function buildMessageLink(chatId: string, messageId: number): string {
-	const numericId = chatId.replace(/^-100/, '');
-	return `https://t.me/c/${numericId}/${messageId}`;
+/** 生成邮件 web 预览链接 */
+async function buildPreviewLink(env: Env, emailId: string, accountId: number): Promise<string | undefined> {
+	if (!env.WORKER_URL) return undefined;
+	return buildMailPreviewUrl(env.WORKER_URL, env.ADMIN_SECRET, emailId, accountId);
+}
+
+interface ListItem {
+	subject?: string;
+	tgLink?: string;
+	previewLink?: string;
 }
 
 interface ListResult {
 	account: Account;
-	items: { subject?: string; link?: string }[];
+	items: ListItem[];
 	total: number;
 	error?: string;
 }
 
-/** 查询单个账号的邮件列表并匹配 Telegram 消息 */
+/** 查询单个账号的邮件列表，同时生成 TG 深链接和 web 预览链接 */
 async function queryAccount(
 	env: Env,
 	account: Account,
 	fetcher: (provider: EmailProvider) => Promise<EmailListItem[]>,
 	errorEvent: string,
 	afterMappings?: (mappings: MessageMapping[], account: Account) => Promise<void>,
+	skipMappingLookup = false,
 ): Promise<ListResult> {
 	try {
 		const provider = getEmailProvider(account, env);
 		const msgs = await fetcher(provider);
 		if (msgs.length === 0) return { account, items: [], total: 0 };
 
-		const mappings = await getMappingsByEmailIds(
-			env.DB,
-			account.id,
-			msgs.map((m) => m.id),
+		// message_map 查询（junk 跳过，因为垃圾邮件从未投递到 TG）
+		let mappingMap = new Map<string, MessageMapping>();
+		if (!skipMappingLookup) {
+			const mappings = await getMappingsByEmailIds(
+				env.DB,
+				account.id,
+				msgs.map((m) => m.id),
+			);
+			if (afterMappings) await afterMappings(mappings, account);
+			mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
+		}
+
+		const items = await Promise.all(
+			msgs.map(async (msg) => {
+				const mapping = mappingMap.get(msg.id);
+				return {
+					subject: msg.subject,
+					tgLink: mapping ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id) : undefined,
+					previewLink: await buildPreviewLink(env, msg.id, account.id),
+				};
+			}),
 		);
-
-		if (afterMappings) await afterMappings(mappings, account);
-
-		const mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
-		const items = msgs.map((msg) => {
-			const mapping = mappingMap.get(msg.id);
-			return {
-				subject: msg.subject,
-				link: mapping ? buildMessageLink(mapping.tg_chat_id, mapping.tg_message_id) : undefined,
-			};
-		});
 
 		return { account, items, total: msgs.length };
 	} catch (err) {
@@ -68,17 +82,20 @@ async function buildListText(
 	fetcher: (provider: EmailProvider) => Promise<EmailListItem[]>,
 	config: { icon: string; label: string; emptyText: string; errorEvent: string },
 	afterMappings?: (mappings: MessageMapping[], account: Account) => Promise<void>,
+	skipMappingLookup = false,
 ): Promise<{ text: string; hasItems: boolean }> {
 	const accounts = await getOwnAccounts(env.DB, userId);
 	if (accounts.length === 0) return { text: '📭 暂无绑定的邮箱账号', hasItems: false };
 
-	const results = await Promise.all(accounts.map((acc) => queryAccount(env, acc, fetcher, config.errorEvent, afterMappings)));
+	const results = await Promise.all(
+		accounts.map((acc) => queryAccount(env, acc, fetcher, config.errorEvent, afterMappings, skipMappingLookup)),
+	);
 
 	const lines: string[] = [];
 	let total = 0;
 
 	for (const r of results) {
-		const accountLabel = r.account.email || `Account #${r.account.id}`;
+		const accountLabel = escapeMdV2(r.account.email || `Account #${r.account.id}`);
 		if (r.error) {
 			lines.push(`❌ ${accountLabel}: 查询失败`);
 			continue;
@@ -86,38 +103,20 @@ async function buildListText(
 		if (r.total === 0) continue;
 
 		total += r.total;
-		lines.push(`\n📧 ${accountLabel} (${r.total} 封${config.label})`);
+		lines.push(`\n📧 ${accountLabel} \\(${r.total} 封${config.label}\\)`);
 		for (const [i, item] of r.items.entries()) {
-			const title = item.subject || '(无主题)';
-			if (item.link) {
-				lines.push(`  ${i + 1}. ${title}\n     ${item.link}`);
-			} else {
-				lines.push(`  ${i + 1}. ${title}`);
-			}
+			const title = escapeMdV2(item.subject || '(无主题)');
+			const linkParts: string[] = [];
+			if (item.tgLink) linkParts.push(`[💬 消息](${item.tgLink})`);
+			if (item.previewLink) linkParts.push(`[👁 预览](${item.previewLink})`);
+			const linksStr = linkParts.length > 0 ? `  ${linkParts.join('  ')}` : '';
+			lines.push(`  ${i + 1}\\. ${title}${linksStr}`);
 		}
 	}
 
 	if (total === 0) return { text: config.emptyText, hasItems: false };
 
 	return { text: `${config.icon} 共 ${total} 封${config.label}\n${lines.join('\n')}`, hasItems: true };
-}
-
-/** 同步星标按钮状态（starred 列表专用 afterMappings 回调） */
-async function syncStarButtons(mappings: MessageMapping[], account: Account, env: Env): Promise<void> {
-	await Promise.all(
-		mappings.map(async (m) => {
-			try {
-				const keyboard = await buildEmailKeyboard(env, m.email_message_id, account.id, true);
-				await setReplyMarkup(env.TELEGRAM_BOT_TOKEN, m.tg_chat_id, m.tg_message_id, keyboard);
-			} catch (err) {
-				if (err instanceof Error && err.message.includes('message is not modified')) return;
-				await reportErrorToObservability(env, 'bot.sync_star_button_failed', err, {
-					chatId: m.tg_chat_id,
-					messageId: m.tg_message_id,
-				});
-			}
-		}),
-	);
 }
 
 const unreadConfig = {
@@ -134,16 +133,24 @@ const starredConfig = {
 	errorEvent: 'bot.starred_query_failed',
 };
 
+const junkConfig = {
+	icon: '🚫',
+	label: '垃圾',
+	emptyText: '✅ 没有垃圾邮件',
+	errorEvent: 'bot.junk_query_failed',
+};
+
 const MARK_ALL_READ_KB = new InlineKeyboard().text('✉️ 标记全部已读', 'mark_all_read');
 
 export function registerMailListHandlers(bot: Bot, env: Env) {
-	const syncStars = (mappings: MessageMapping[], account: Account) => syncStarButtons(mappings, account, env);
+	const syncStars = (mappings: MessageMapping[], account: Account) => syncStarButtonsForMappings(env, mappings, account);
 
 	bot.command('unread', async (ctx) => {
 		const userId = String(ctx.from?.id);
 		const msg = await ctx.reply('🔍 正在查询未读邮件…');
 		const { text, hasItems } = await buildListText(env, userId, (p) => p.listUnread(MAX_PER_ACCOUNT), unreadConfig);
 		await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
+			parse_mode: 'MarkdownV2',
 			link_preview_options: { is_disabled: true },
 			...(hasItems ? { reply_markup: MARK_ALL_READ_KB } : {}),
 		});
@@ -154,6 +161,7 @@ export function registerMailListHandlers(bot: Bot, env: Env) {
 		await ctx.answerCallbackQuery({ text: '正在查询…' });
 		const { text, hasItems } = await buildListText(env, userId, (p) => p.listUnread(MAX_PER_ACCOUNT), unreadConfig);
 		await ctx.reply(text, {
+			parse_mode: 'MarkdownV2',
 			link_preview_options: { is_disabled: true },
 			...(hasItems ? { reply_markup: MARK_ALL_READ_KB } : {}),
 		});
@@ -171,13 +179,33 @@ export function registerMailListHandlers(bot: Bot, env: Env) {
 		const userId = String(ctx.from?.id);
 		const msg = await ctx.reply('🔍 正在查询星标邮件…');
 		const { text } = await buildListText(env, userId, (p) => p.listStarred(MAX_PER_ACCOUNT), starredConfig, syncStars);
-		await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, { link_preview_options: { is_disabled: true } });
+		await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
+			parse_mode: 'MarkdownV2',
+			link_preview_options: { is_disabled: true },
+		});
 	});
 
 	bot.callbackQuery('starred', async (ctx) => {
 		const userId = String(ctx.from.id);
 		await ctx.answerCallbackQuery({ text: '正在查询…' });
 		const { text } = await buildListText(env, userId, (p) => p.listStarred(MAX_PER_ACCOUNT), starredConfig, syncStars);
-		await ctx.reply(text, { link_preview_options: { is_disabled: true } });
+		await ctx.reply(text, { parse_mode: 'MarkdownV2', link_preview_options: { is_disabled: true } });
+	});
+
+	bot.command('junk', async (ctx) => {
+		const userId = String(ctx.from?.id);
+		const msg = await ctx.reply('🔍 正在查询垃圾邮件…');
+		const { text } = await buildListText(env, userId, (p) => p.listJunk(MAX_PER_ACCOUNT), junkConfig, undefined, true);
+		await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
+			parse_mode: 'MarkdownV2',
+			link_preview_options: { is_disabled: true },
+		});
+	});
+
+	bot.callbackQuery('junk', async (ctx) => {
+		const userId = String(ctx.from.id);
+		await ctx.answerCallbackQuery({ text: '正在查询…' });
+		const { text } = await buildListText(env, userId, (p) => p.listJunk(MAX_PER_ACCOUNT), junkConfig, undefined, true);
+		await ctx.reply(text, { parse_mode: 'MarkdownV2', link_preview_options: { is_disabled: true } });
 	});
 }
