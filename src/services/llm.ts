@@ -10,7 +10,7 @@ function pickRandomKey(apiKeys: string): string {
 	return keys[Math.floor(Math.random() * keys.length)];
 }
 
-/** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode，最多重试 3 次 */
+/** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode */
 async function callLLM(baseUrl: string, apiKeys: string, model: string, prompt: string, json?: boolean): Promise<string> {
 	const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
 	const data = await http
@@ -22,7 +22,6 @@ async function callLLM(baseUrl: string, apiKeys: string, model: string, prompt: 
 				stream: false,
 				...(json && { response_format: { type: 'json_object' } }),
 			},
-			retry: 3,
 		})
 		.json<{ choices?: Array<{ message: { content: string } }> }>();
 

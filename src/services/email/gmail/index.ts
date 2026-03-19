@@ -28,7 +28,6 @@ export async function getAccessToken(env: Env, account: Account): Promise<string
 					refresh_token: account.refresh_token,
 					grant_type: 'refresh_token',
 				}),
-				retry: 2,
 			})
 			.json()) as GoogleTokenResponse;
 	} catch (err) {
@@ -53,7 +52,6 @@ export async function gmailGet(token: string, path: string): Promise<any> {
 	return http
 		.get(`${GMAIL_API}${path}`, {
 			headers: { Authorization: `Bearer ${token}` },
-			retry: 2,
 		})
 		.json();
 }
@@ -63,7 +61,6 @@ export async function gmailPost(token: string, path: string, body: Record<string
 	const resp = await http.post(`${GMAIL_API}${path}`, {
 		headers: { Authorization: `Bearer ${token}` },
 		json: body,
-		retry: 2,
 	});
 	const text = await resp.text();
 	return text ? JSON.parse(text) : null;

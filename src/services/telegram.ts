@@ -1,6 +1,5 @@
-import { TG_API_BASE, TG_CAPTION_LIMIT, TG_MAX_RETRY_AFTER_SECS, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '@/constants';
+import { TG_API_BASE, TG_CAPTION_LIMIT, TG_MEDIA_GROUP_LIMIT, TG_MSG_LIMIT } from '@/constants';
 import type { Attachment } from '@/types';
-import { delay } from '@utils/async';
 import { HTTPError } from 'ky';
 import { http } from '@utils/http';
 
@@ -23,28 +22,9 @@ function extractTelegramDescription(payload: unknown): string {
 	return typeof desc === 'string' ? desc : 'Unknown Telegram error';
 }
 
-function extractRetryAfter(body: unknown): number | null {
-	if (body && typeof body === 'object' && 'parameters' in body) {
-		const params = (body as { parameters?: { retry_after?: number } }).parameters;
-		if (params?.retry_after && typeof params.retry_after === 'number') return params.retry_after;
-	}
-	return null;
-}
-
-/** 处理 429 速率限制：等待 retry_after 秒后返回，或当等待时间过长时抛出异常 */
-async function waitForRateLimit(resp: Response, label: string): Promise<void> {
-	const body = (await resp.json()) as unknown;
-	const retryAfter = extractRetryAfter(body);
-	if (retryAfter && retryAfter <= TG_MAX_RETRY_AFTER_SECS) {
-		console.warn(`TG ${label} 429 rate limited, waiting ${retryAfter}s`);
-		await delay(retryAfter);
-		return;
-	}
-	throw new Error(`TG ${label} 429: ${extractTelegramDescription(body)}`);
-}
-
 /**
- * 通用 Telegram JSON API 请求，带 429 速率限制重试和 MarkdownV2 parse error 自动回退。
+ * 通用 Telegram JSON API 请求，带 MarkdownV2 parse error 自动回退。
+ * 429 由 ky 内置 retry 自动处理。
  * 当 parse_mode 存在且返回 entity parse error 时，自动去掉 parse_mode 并将 text/caption 转为纯文本重试。
  */
 async function tgPost<T = unknown>(url: string, payload: Record<string, unknown>, label: string): Promise<T> {
@@ -53,12 +33,6 @@ async function tgPost<T = unknown>(url: string, payload: Record<string, unknown>
 	} catch (err) {
 		if (!(err instanceof HTTPError)) throw err;
 		const { response } = err;
-
-		// 429 速率限制 → 等待后重试一次
-		if (response.status === 429) {
-			await waitForRateLimit(response, label);
-			return ((await http.post(url, { json: payload }).json()) as { result: T }).result;
-		}
 
 		const errBody = (await response.json()) as unknown;
 		const errDescription = extractTelegramDescription(errBody);
@@ -140,12 +114,6 @@ export async function sendWithAttachments(
 			} catch (err) {
 				if (!(err instanceof HTTPError)) throw err;
 				const { response } = err;
-
-				if (response.status === 429) {
-					await waitForRateLimit(response, 'sendDocument');
-					const data = (await http.post(url, { body: form }).json()) as { result: { message_id: number } };
-					return data.result.message_id;
-				}
 
 				const errBody = (await response.json()) as any;
 				console.error('TG sendDocument failed payload:', {
@@ -249,12 +217,6 @@ async function sendMediaGroupChunk(
 	} catch (err) {
 		if (!(err instanceof HTTPError)) throw err;
 		const { response } = err;
-
-		if (response.status === 429) {
-			await waitForRateLimit(response, 'sendMediaGroup');
-			const data = (await http.post(url, { body: form }).json()) as { result: Array<{ message_id: number }> };
-			return data.result[0].message_id;
-		}
 
 		const errBody = (await response.json()) as any;
 		console.error('TG sendMediaGroup failed payload:', {

@@ -13,7 +13,6 @@ async function callBridge(env: Env, method: string, path: string, body?: unknown
 			method,
 			headers: { Authorization: `Bearer ${env.IMAP_BRIDGE_SECRET}` },
 			...(body !== undefined && { json: body }),
-			retry: 2,
 		});
 	} catch (err) {
 		if (err instanceof HTTPError) {
