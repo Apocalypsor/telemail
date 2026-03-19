@@ -53,8 +53,8 @@ export async function resolveStarredKeyboard(
 export function mainMenuKeyboard(admin: boolean): InlineKeyboard {
 	const kb = new InlineKeyboard()
 		.text('📧 账号管理', 'accs')
-		.row()
 		.text('📬 未读邮件', 'unread')
+		.row()
 		.text('⭐ 星标邮件', 'starred')
 		.text('🚫 垃圾邮件', 'junk')
 		.row();
