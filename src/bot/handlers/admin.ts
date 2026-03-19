@@ -1,17 +1,17 @@
+import { countFailedEmails, deleteAllFailedEmails, deleteFailedEmail, getAllFailedEmails, getFailedEmail } from '@db/failed-emails';
 import type { Bot } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import { countFailedEmails, deleteAllFailedEmails, deleteFailedEmail, getAllFailedEmails, getFailedEmail } from '@db/failed-emails';
 
+import type { Env, TelegramUser } from '@/types';
+import { isAdmin } from '@bot/auth';
+import { formatUserName, userListText } from '@bot/formatters';
+import { clearBotState } from '@bot/state';
 import { approveUser, getNonAdminUsers, getUserByTelegramId, rejectUser } from '@db/users';
 import { deleteUserWithAccounts } from '@services/account';
 import { retryAllFailedEmails, retryFailedEmail } from '@services/bridge';
 import { renewWatchAll } from '@services/email/gmail';
 import { renewSubscriptionAll } from '@services/email/outlook';
 import { reportErrorToObservability } from '@utils/observability';
-import type { Env, TelegramUser } from '@/types';
-import { isAdmin } from '@bot/auth';
-import { formatUserName, userListText } from '@bot/formatters';
-import { clearBotState } from '@bot/state';
 
 export function userListKeyboard(users: TelegramUser[], opts?: { showBack?: boolean }): InlineKeyboard {
 	const kb = new InlineKeyboard();
@@ -33,7 +33,9 @@ async function adminMenuKeyboard(env: Env): Promise<InlineKeyboard> {
 	const failedLabel = failedCount > 0 ? `📋 失败邮件 (${failedCount})` : '📋 失败邮件';
 	const kb = new InlineKeyboard().text(failedLabel, 'failed').row().text('🔄 续订所有 Watch', 'walla').row();
 	if (env.WORKER_URL) {
-		kb.url('🔍 HTML 预览工具', `${env.WORKER_URL.replace(/\/$/, '')}/preview`).row();
+		const base = env.WORKER_URL.replace(/\/$/, '');
+		kb.url('🔍 HTML 预览工具', `${base}/preview`).row();
+		kb.url('🚫 垃圾邮件检测', `${base}/junk-check`).row();
 	}
 	kb.text('« 返回', 'menu');
 	return kb;

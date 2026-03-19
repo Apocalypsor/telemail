@@ -1,20 +1,29 @@
-import { Hono } from 'hono';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import PostalMime from 'postal-mime';
 import { MAX_BODY_CHARS } from '@/constants';
-import { HTTPError } from 'ky';
-import { http } from '@utils/http';
+import { AccountType, type AppEnv } from '@/types';
+import { JunkCheckPage } from '@components/junk-check';
 import { PreviewPage } from '@components/preview';
-import { getAccountById, getAccountByEmail } from '@db/accounts';
+import { getAccountByEmail, getAccountById } from '@db/accounts';
 import { getCachedMailHtml, putCachedMailHtml } from '@db/kv';
+import {
+	ROUTE_CORS_PROXY,
+	ROUTE_JUNK_CHECK,
+	ROUTE_JUNK_CHECK_API,
+	ROUTE_MAIL,
+	ROUTE_PREVIEW,
+	ROUTE_PREVIEW_API,
+} from '@handlers/hono/routes';
 import { fetchRawEmailByType } from '@services/bridge';
 import { getAccessToken } from '@services/email/gmail';
 import { fetchMailContent, wrapPlainText } from '@services/email/mail-content';
-import { type CidMap, buildCidMapFromAttachments, proxyImages, replaceCidReferences } from '@utils/html';
-import { AccountType, type AppEnv } from '@/types';
+import { analyzeEmail } from '@services/llm';
 import { formatBody } from '@utils/format';
 import { verifyMailToken, verifyMailTokenById, verifyProxySignature } from '@utils/hash';
-import { ROUTE_CORS_PROXY, ROUTE_MAIL, ROUTE_PREVIEW, ROUTE_PREVIEW_API } from '@handlers/hono/routes';
+import { type CidMap, buildCidMapFromAttachments, proxyImages, replaceCidReferences } from '@utils/html';
+import { http } from '@utils/http';
+import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { HTTPError } from 'ky';
+import PostalMime from 'postal-mime';
 
 const preview = new Hono<AppEnv>();
 
@@ -22,6 +31,19 @@ const preview = new Hono<AppEnv>();
 
 preview.get(ROUTE_PREVIEW, (c) => {
 	return c.html(<PreviewPage />);
+});
+
+// ─── 垃圾邮件检测工具 ────────────────────────────────────────────────────────
+
+preview.get(ROUTE_JUNK_CHECK, (c) => {
+	return c.html(<JunkCheckPage />);
+});
+
+preview.post(ROUTE_JUNK_CHECK_API, async (c) => {
+	const { subject, body } = await c.req.json<{ subject?: string; body?: string }>();
+	if (!c.env.LLM_API_URL || !c.env.LLM_API_KEY || !c.env.LLM_MODEL) return c.json({ error: 'LLM not configured' }, 500);
+	const result = await analyzeEmail(c.env.LLM_API_URL, c.env.LLM_API_KEY, c.env.LLM_MODEL, subject ?? '', body ?? '');
+	return c.json({ isJunk: result.isJunk, junkConfidence: result.junkConfidence, summary: result.summary, tags: result.tags });
 });
 
 preview.post(ROUTE_PREVIEW_API, async (c) => {

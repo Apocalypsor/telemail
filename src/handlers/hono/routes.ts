@@ -20,3 +20,5 @@ export const ROUTE_OAUTH_MICROSOFT_START = '/oauth/microsoft/start';
 export const ROUTE_OAUTH_MICROSOFT_CALLBACK = '/oauth/microsoft/callback';
 export const ROUTE_PREVIEW = '/preview';
 export const ROUTE_MAIL = '/mail/:id';
+export const ROUTE_JUNK_CHECK = '/junk-check';
+export const ROUTE_JUNK_CHECK_API = '/api/junk-check';
