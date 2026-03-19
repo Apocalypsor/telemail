@@ -2,7 +2,7 @@ import PostalMime from 'postal-mime';
 import { MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE } from '@/constants';
 import { getAccountById } from '@db/accounts';
 import { deleteFailedEmail, getAllFailedEmails, putFailedEmail, type FailedEmail } from '@db/failed-emails';
-import { putMessageMapping } from '@db/message-map';
+import { deleteMappingByEmailId, putMessageMapping } from '@db/message-map';
 import { AccountType, type Account, type Env, type QueueMessage } from '@/types';
 import { base64ToArrayBuffer, base64urlToArrayBuffer } from '@utils/base64url';
 import { formatBody, htmlToMarkdown, toTelegramMdV2 } from '@utils/format';
@@ -66,7 +66,7 @@ function buildTelegramHeader(fromName: string, fromAddress: string, recipient: s
 	return lines.join('\n');
 }
 
-/** 调用 LLM 分析邮件并编辑 Telegram 消息（验证码 / 摘要 + 标签） */
+/** 调用 LLM 分析邮件并编辑 Telegram 消息（验证码 / 摘要 + 标签），返回分析结果 */
 async function editMessageWithAnalysis(
 	env: Env,
 	tgToken: string,
@@ -78,7 +78,7 @@ async function editMessageWithAnalysis(
 	plainBody: string,
 	formattedBody: string,
 	keyboard: unknown,
-): Promise<void> {
+): Promise<boolean> {
 	const editMsg = (newText: string) =>
 		isCaption
 			? editMessageCaption(tgToken, chatId, tgMessageId, newText, keyboard)
@@ -89,7 +89,13 @@ async function editMessageWithAnalysis(
 		return null;
 	});
 
-	if (!result) return;
+	if (!result) return false;
+
+	// 置信度 >= 0.8 视为垃圾邮件，由调用方删除消息
+	if (result.isJunk && result.junkConfidence >= 0.8) {
+		console.log(`Junk email detected (confidence=${result.junkConfidence}), will delete`);
+		return true;
+	}
 
 	const tagsLine =
 		result.tags.length > 0 ? `\n\n${result.tags.map((t: string) => `\\#${escapeMdV2(t.replace(/\s+/g, '_'))}`).join('  ')}` : '';
@@ -98,11 +104,12 @@ async function editMessageWithAnalysis(
 		const codeSection = `*🔒 验证码:*  \`${escapeMdV2(result.verificationCode)}\`\n\n`;
 		await editMsg(header + codeSection + wrapExpandableQuote(formattedBody) + tagsLine);
 		console.log('Verification code extracted');
-		return;
+		return false;
 	}
 
 	const summarySection = `*${escapeMdV2('🤖 AI 摘要')}*\n\n${toTelegramMdV2(result.summary)}`;
 	await editMsg(header + summarySection + tagsLine);
+	return false;
 }
 
 /** 按账号类型拉取原始邮件 */
@@ -152,7 +159,7 @@ export async function deliverEmailToTelegram(
 	const formattedBody = formatBody(email.text, email.html, bodyBudget);
 	const text = header + wrapExpandableQuote(formattedBody);
 
-	const keyboard = await buildEmailKeyboard(env, messageId, account.email, chatId, false);
+	const keyboard = await buildEmailKeyboard(env, messageId, account.id, false);
 
 	let sentMessageId: number;
 	if (hasAttachments) {
@@ -183,8 +190,8 @@ export async function deliverEmailToTelegram(
 	waitUntil(
 		(async () => {
 			try {
-				const editKeyboard = await buildEmailKeyboard(env, messageId, account.email, chatId, false);
-				await editMessageWithAnalysis(
+				const editKeyboard = await buildEmailKeyboard(env, messageId, account.id, false);
+				const isJunk = await editMessageWithAnalysis(
 					env,
 					tgToken,
 					chatId,
@@ -196,6 +203,12 @@ export async function deliverEmailToTelegram(
 					formattedBody,
 					editKeyboard,
 				);
+				if (isJunk) {
+					await deleteMessage(tgToken, chatId, sentMessageId).catch(() => {});
+					await deleteMappingByEmailId(env.DB, messageId, account.id).catch((e) =>
+						reportErrorToObservability(env, 'bridge.delete_junk_mapping_error', e),
+					);
+				}
 			} catch (err) {
 				await reportErrorToObservability(env, 'llm.summary_failed', err, { subject });
 				await putFailedEmail(env.DB, {
@@ -257,7 +270,7 @@ export async function retryFailedEmail(failed: FailedEmail, env: Env): Promise<v
 	const charLimit = failed.is_caption ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
 	const bodyBudget = Math.max(Math.floor((charLimit - header.length) * 0.9), 100);
 	const formattedBody = formatBody(email.text, email.html, bodyBudget);
-	const keyboard = await resolveStarredKeyboard(env, failed.tg_chat_id, failed.tg_message_id, failed.email_message_id, account.email);
+	const keyboard = await resolveStarredKeyboard(env, failed.tg_chat_id, failed.tg_message_id, failed.email_message_id, account.id);
 
 	await editMessageWithAnalysis(
 		env,

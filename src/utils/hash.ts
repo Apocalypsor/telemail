@@ -36,6 +36,23 @@ export async function verifyMailToken(
 	return timingSafeEqual(expected, token);
 }
 
+/** 生成基于 accountId 的邮件查看链接 token（比 email+chatId 更简洁） */
+export async function generateMailTokenById(secret: string, messageId: string, accountId: number): Promise<string> {
+	const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+	const data = new TextEncoder().encode(`${messageId}:${accountId}`);
+	const sig = await crypto.subtle.sign('HMAC', key, data);
+	return Array.from(new Uint8Array(sig))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('')
+		.slice(0, 32);
+}
+
+/** 验证基于 accountId 的邮件查看链接 token */
+export async function verifyMailTokenById(secret: string, messageId: string, accountId: number, token: string): Promise<boolean> {
+	const expected = await generateMailTokenById(secret, messageId, accountId);
+	return timingSafeEqual(expected, token);
+}
+
 /** 为 CORS 代理 URL 生成 HMAC-SHA256 签名（同步） */
 export function signProxyUrl(secret: string, url: string): string {
 	return createHmac('sha256', secret).update(url).digest('hex').slice(0, 32);

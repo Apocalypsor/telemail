@@ -5,7 +5,7 @@ import { MAX_BODY_CHARS } from '@/constants';
 import { HTTPError } from 'ky';
 import { http } from '@utils/http';
 import { PreviewPage } from '@components/preview';
-import { getAccountByEmail } from '@db/accounts';
+import { getAccountById, getAccountByEmail } from '@db/accounts';
 import { getCachedMailHtml, putCachedMailHtml } from '@db/kv';
 import { fetchRawEmailByType } from '@services/bridge';
 import { getAccessToken } from '@services/email/gmail';
@@ -13,7 +13,7 @@ import { fetchMailContent, wrapPlainText } from '@services/email/mail-content';
 import { type CidMap, buildCidMapFromAttachments, proxyImages, replaceCidReferences } from '@utils/html';
 import { AccountType, type AppEnv } from '@/types';
 import { formatBody } from '@utils/format';
-import { verifyMailToken, verifyProxySignature } from '@utils/hash';
+import { verifyMailToken, verifyMailTokenById, verifyProxySignature } from '@utils/hash';
 import { ROUTE_CORS_PROXY, ROUTE_MAIL, ROUTE_PREVIEW, ROUTE_PREVIEW_API } from '@handlers/hono/routes';
 
 const preview = new Hono<AppEnv>();
@@ -36,20 +36,33 @@ preview.post(ROUTE_PREVIEW_API, async (c) => {
 preview.get(ROUTE_MAIL, async (c) => {
 	const messageId = c.req.param('id');
 	const token = c.req.query('t');
+	// 新格式：accountId（推荐）；旧格式：email + chatId（向后兼容）
+	const accountIdParam = c.req.query('accountId');
 	const chatId = c.req.query('chatId');
 	const accountEmail = c.req.query('email');
 
-	if (!messageId || !token || !chatId || !accountEmail) return c.text('Missing params', 400);
+	if (!messageId || !token) return c.text('Missing params', 400);
 
-	const valid = await verifyMailToken(c.env.ADMIN_SECRET, messageId, accountEmail, chatId, token);
-	if (!valid) return c.text('Forbidden', 403);
+	let account = null;
+	if (accountIdParam) {
+		const accountId = Number(accountIdParam);
+		if (!Number.isInteger(accountId) || accountId <= 0) return c.text('Invalid accountId', 400);
+		const valid = await verifyMailTokenById(c.env.ADMIN_SECRET, messageId, accountId, token);
+		if (!valid) return c.text('Forbidden', 403);
+		account = await getAccountById(c.env.DB, accountId);
+	} else {
+		if (!chatId || !accountEmail) return c.text('Missing params', 400);
+		const valid = await verifyMailToken(c.env.ADMIN_SECRET, messageId, accountEmail, chatId, token);
+		if (!valid) return c.text('Forbidden', 403);
+		account = await getAccountByEmail(c.env.DB, accountEmail);
+		if (account && account.chat_id !== chatId) account = null;
+	}
+
+	if (!account) return c.text('Account not found', 404);
 
 	// KV 缓存（所有类型共用）
 	const cached = await getCachedMailHtml(c.env, messageId);
 	if (cached) return c.html(await proxyImages(cached, c.env.ADMIN_SECRET));
-
-	const account = await getAccountByEmail(c.env.DB, accountEmail);
-	if (!account || account.chat_id !== chatId) return c.text('Account not found', 404);
 
 	let html: string | null = null;
 	let cidMap: CidMap = new Map();

@@ -2,7 +2,7 @@ import type { Env } from '@/types';
 import { getAccountById } from '@db/accounts';
 import { getMessageMapping } from '@db/message-map';
 import { getEmailProvider } from '@services/email/provider';
-import { generateMailToken } from '@utils/hash';
+import { generateMailTokenById } from '@utils/hash';
 import { InlineKeyboard } from 'grammy';
 
 // ── 邮件消息键盘（星标 / 查看原文）─────────────────────────────────────────
@@ -21,16 +21,10 @@ export function starredKeyboardWithMailUrl(mailUrl: string): InlineKeyboard {
 }
 
 /** 根据星标状态构建邮件消息键盘 */
-export async function buildEmailKeyboard(
-	env: Env,
-	emailMessageId: string,
-	accountEmail: string | null,
-	chatId: string,
-	starred: boolean,
-): Promise<InlineKeyboard> {
-	if (env.WORKER_URL && accountEmail) {
-		const mailToken = await generateMailToken(env.ADMIN_SECRET, emailMessageId, accountEmail, chatId);
-		const mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${emailMessageId}?email=${encodeURIComponent(accountEmail)}&chatId=${encodeURIComponent(chatId)}&t=${mailToken}`;
+export async function buildEmailKeyboard(env: Env, emailMessageId: string, accountId: number, starred: boolean): Promise<InlineKeyboard> {
+	if (env.WORKER_URL) {
+		const mailToken = await generateMailTokenById(env.ADMIN_SECRET, emailMessageId, accountId);
+		const mailUrl = `${env.WORKER_URL.replace(/\/$/, '')}/mail/${emailMessageId}?accountId=${accountId}&t=${mailToken}`;
 		return starred ? starredKeyboardWithMailUrl(mailUrl) : starKeyboardWithMailUrl(mailUrl);
 	}
 	return starred ? STARRED_KEYBOARD : STAR_KEYBOARD;
@@ -42,15 +36,15 @@ export async function resolveStarredKeyboard(
 	chatId: string,
 	tgMessageId: number,
 	emailMessageId: string,
-	accountEmail: string | null,
+	accountId: number,
 ): Promise<InlineKeyboard> {
 	const mapping = await getMessageMapping(env.DB, chatId, tgMessageId);
-	if (!mapping) return buildEmailKeyboard(env, emailMessageId, accountEmail, chatId, false);
+	if (!mapping) return buildEmailKeyboard(env, emailMessageId, accountId, false);
 	const account = await getAccountById(env.DB, mapping.account_id);
-	if (!account) return buildEmailKeyboard(env, emailMessageId, accountEmail, chatId, false);
+	if (!account) return buildEmailKeyboard(env, emailMessageId, accountId, false);
 	const provider = getEmailProvider(account, env);
 	const starred = await provider.isStarred(emailMessageId);
-	return buildEmailKeyboard(env, emailMessageId, accountEmail, chatId, starred);
+	return buildEmailKeyboard(env, emailMessageId, accountId, starred);
 }
 
 // ── 主菜单键盘 ──────────────────────────────────────────────────────────────

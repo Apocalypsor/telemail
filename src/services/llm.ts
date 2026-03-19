@@ -6,7 +6,10 @@ import { http } from '@utils/http';
 
 /** 从逗号分隔的 API Key 列表中随机选一个 */
 function pickRandomKey(apiKeys: string): string {
-	const keys = apiKeys.split(',').map((k) => k.trim()).filter(Boolean);
+	const keys = apiKeys
+		.split(',')
+		.map((k) => k.trim())
+		.filter(Boolean);
 	return keys[Math.floor(Math.random() * keys.length)];
 }
 
@@ -38,6 +41,10 @@ export interface EmailAnalysis {
 	summary: string;
 	/** 标签 */
 	tags: string[];
+	/** 是否为垃圾邮件 */
+	isJunk: boolean;
+	/** 垃圾邮件置信度 0-1 */
+	junkConfidence: number;
 }
 
 /** 一次 LLM 调用完成邮件分析：验证码提取 + 摘要 + 标签 */
@@ -79,8 +86,12 @@ export async function analyzeEmail(
 		`   - Each tag must be a SINGLE word with no spaces (use underscore to join if needed, e.g. "Password_Reset"), no "#" prefix\n` +
 		`   - Capitalize the first letter of each tag (e.g. "Github", "Verification", "Password_Reset")\n` +
 		`   - Capture: sender/service name, category (notification, newsletter, promotion, verification), key topic\n\n` +
+		`4. "junk": An object with junk/spam classification.\n` +
+		`   - "is_junk": true if this is spam, phishing, unsolicited marketing, scam, or bulk promotional email with no personal relevance; false otherwise.\n` +
+		`   - "confidence": A float 0.0–1.0 indicating how confident you are in the junk classification.\n` +
+		`   - Transactional emails (receipts, order confirmations, notifications from services the user signed up for), newsletters from subscribed services, and any email with verification codes are NOT junk.\n\n` +
 		`Output ONLY valid JSON, no other text. Example:\n` +
-		`{"verification_code": null, "summary": "• ...", "tags": ["Github", "Verification", "Security"]}\n\n` +
+		`{"verification_code": null, "summary": "• ...", "tags": ["Github", "Verification", "Security"], "junk": {"is_junk": false, "confidence": 0.05}}\n\n` +
 		`Subject: ${subject}\n\n` +
 		`Body:\n${body}` +
 		linksSection;
@@ -90,15 +101,24 @@ export async function analyzeEmail(
 	// 解析 JSON，容忍 markdown code fence 包裹
 	const jsonStr = raw.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
 	try {
-		const parsed = JSON.parse(jsonStr) as { verification_code?: string | null; summary?: string; tags?: string[] };
+		const parsed = JSON.parse(jsonStr) as {
+			verification_code?: string | null;
+			summary?: string;
+			tags?: string[];
+			junk?: { is_junk?: boolean; confidence?: number };
+		};
 		const code = parsed.verification_code ?? null;
+		const isJunk = parsed.junk?.is_junk === true;
+		const junkConfidence = Math.min(1, Math.max(0, parsed.junk?.confidence ?? 0));
 		return {
 			verificationCode: code && /^[A-Za-z0-9\-]{4,12}$/.test(code) ? code : null,
 			summary: parsed.summary ?? '',
 			tags: (parsed.tags ?? []).slice(0, 5),
+			isJunk,
+			junkConfidence,
 		};
 	} catch {
 		// JSON 解析失败时，把整个输出当摘要
-		return { verificationCode: null, summary: raw, tags: [] };
+		return { verificationCode: null, summary: raw, tags: [], isJunk: false, junkConfidence: 0 };
 	}
 }

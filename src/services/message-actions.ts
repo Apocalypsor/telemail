@@ -23,7 +23,7 @@ export async function toggleStar(env: Env, chatId: string, messageId: number, st
 		await provider.removeStar(mapping.email_message_id);
 	}
 
-	const keyboard = await buildEmailKeyboard(env, mapping.email_message_id, account.email, chatId, starred);
+	const keyboard = await buildEmailKeyboard(env, mapping.email_message_id, account.id, starred);
 	return { ok: true, keyboard, emailMessageId: mapping.email_message_id };
 }
 
