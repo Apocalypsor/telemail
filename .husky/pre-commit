@@ -1,2 +1,2 @@
-bunx tsc --noEmit
-bunx lint-staged
+npx tsc --noEmit
+npx lint-staged
