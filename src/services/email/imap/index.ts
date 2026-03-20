@@ -67,6 +67,13 @@ export async function listImapJunk(env: Env, accountId: number, maxResults: numb
 	return messages ?? [];
 }
 
+/** 检查邮件是否在垃圾邮件文件夹 */
+export async function isImapJunk(env: Env, accountId: number, messageId: string): Promise<boolean> {
+	const resp = await callBridge(env, 'POST', '/api/is-junk', { accountId, messageId });
+	const { junk } = (await resp.json()) as { junk: boolean };
+	return junk;
+}
+
 /** 将邮件标记为垃圾邮件（移到 Junk 文件夹） */
 export async function imapMarkAsJunk(env: Env, accountId: number, messageId: string): Promise<void> {
 	await callBridge(env, 'POST', '/api/mark-as-junk', { accountId, messageId });
@@ -77,9 +84,9 @@ export async function imapMoveToInbox(env: Env, accountId: number, messageId: st
 	await callBridge(env, 'POST', '/api/move-to-inbox', { accountId, messageId });
 }
 
-/** 删除邮件 */
-export async function imapDeleteMessage(env: Env, accountId: number, messageId: string): Promise<void> {
-	await callBridge(env, 'POST', '/api/delete-message', { accountId, messageId });
+/** 移到回收站 */
+export async function imapTrashMessage(env: Env, accountId: number, messageId: string): Promise<void> {
+	await callBridge(env, 'POST', '/api/trash', { accountId, messageId });
 }
 
 /** 清空所有垃圾邮件 */

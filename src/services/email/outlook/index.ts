@@ -119,6 +119,14 @@ export async function isStarred(token: string, messageId: string): Promise<boole
 	return msg.flag?.flagStatus === 'flagged';
 }
 
+/** 检查邮件是否在垃圾邮件文件夹 */
+export async function isJunk(token: string, messageId: string): Promise<boolean> {
+	const msg = await graphGet(token, `/me/messages/${messageId}?$select=parentFolderId`);
+	if (!msg.parentFolderId) return false;
+	const junkFolder = await graphGet(token, `/me/mailFolders('JunkEmail')?$select=id`);
+	return msg.parentFolderId === junkFolder.id;
+}
+
 /** 列出未读邮件（最多 top 条），含标题 */
 export async function listUnreadMessages(token: string, top: number = 20): Promise<{ id: string; subject?: string }[]> {
 	const data = await graphGet(token, `/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$select=id,subject&$top=${top}`);
@@ -150,17 +158,17 @@ export async function moveToInbox(token: string, messageId: string): Promise<voi
 	await graphPost(token, `/me/messages/${messageId}/move`, { destinationId: 'Inbox' });
 }
 
-/** 删除邮件 */
-export async function deleteMessage(token: string, messageId: string): Promise<void> {
-	await graphDelete(token, `/me/messages/${messageId}`);
+/** 移到回收站 */
+export async function trashMessage(token: string, messageId: string): Promise<void> {
+	await graphPost(token, `/me/messages/${messageId}/move`, { destinationId: 'DeletedItems' });
 }
 
-/** 清空所有垃圾邮件 */
+/** 清空所有垃圾邮件（移到回收站） */
 export async function deleteAllJunk(token: string): Promise<number> {
 	const data = await graphGet(token, `/me/mailFolders('JunkEmail')/messages?$select=id&$top=100`);
 	if (!data.value || data.value.length === 0) return 0;
 	const ids = (data.value as { id: string }[]).map((m) => m.id);
-	await Promise.all(ids.map((id) => graphDelete(token, `/me/messages/${id}`)));
+	await Promise.all(ids.map((id) => graphPost(token, `/me/messages/${id}/move`, { destinationId: 'DeletedItems' })));
 	return ids.length;
 }
 

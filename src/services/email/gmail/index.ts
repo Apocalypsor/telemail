@@ -95,6 +95,12 @@ export async function isStarred(token: string, messageId: string): Promise<boole
 	return (msg.labelIds as string[] | undefined)?.includes('STARRED') ?? false;
 }
 
+/** 检查邮件是否在垃圾邮件文件夹 */
+export async function isJunk(token: string, messageId: string): Promise<boolean> {
+	const msg = await gmailGet(token, `/users/me/messages/${messageId}?format=MINIMAL`);
+	return (msg.labelIds as string[] | undefined)?.includes('SPAM') ?? false;
+}
+
 /** 列出未读邮件（最多 maxResults 条），含标题 */
 export async function listUnreadMessages(token: string, maxResults: number = 20): Promise<{ id: string; subject?: string }[]> {
 	const data = await gmailGet(token, `/users/me/messages?q=is:unread&maxResults=${maxResults}`);
@@ -179,12 +185,16 @@ export async function trashMessage(token: string, messageId: string): Promise<vo
 	await gmailPost(token, `/users/me/messages/${messageId}/trash`, {});
 }
 
-/** 清空所有垃圾邮件（永久删除） */
+/** 清空所有垃圾邮件（移入回收站，gmail.modify 权限即可） */
 export async function deleteAllJunk(token: string): Promise<number> {
 	const data = await gmailGet(token, '/users/me/messages?q=in:spam&maxResults=100');
 	if (!data.messages) return 0;
 	const ids = (data.messages as { id: string }[]).map((m) => m.id);
-	await gmailPost(token, '/users/me/messages/batchDelete', { ids });
+	await gmailPost(token, '/users/me/messages/batchModify', {
+		ids,
+		addLabelIds: ['TRASH'],
+		removeLabelIds: ['SPAM'],
+	});
 	return ids.length;
 }
 

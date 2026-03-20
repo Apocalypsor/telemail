@@ -1,18 +1,20 @@
-import { theme } from '@assets/theme';
 import { MAX_BODY_CHARS } from '@/constants';
 import { AccountType, type AppEnv } from '@/types';
+import { theme } from '@assets/theme';
 import { JunkCheckPage } from '@components/junk-check';
 import { PreviewPage } from '@components/preview';
 import { getAccountByEmail, getAccountById } from '@db/accounts';
 import { getCachedMailHtml, putCachedMailHtml } from '@db/kv';
+import { deleteMappingByEmailId, getMappingsByEmailIds } from '@db/message-map';
 import { requireTelegramLogin } from '@handlers/hono/middleware';
 import {
 	ROUTE_CORS_PROXY,
 	ROUTE_JUNK_CHECK,
 	ROUTE_JUNK_CHECK_API,
 	ROUTE_MAIL,
-	ROUTE_MAIL_DELETE,
+	ROUTE_MAIL_MARK_JUNK,
 	ROUTE_MAIL_MOVE_TO_INBOX,
+	ROUTE_MAIL_TRASH,
 	ROUTE_PREVIEW,
 	ROUTE_PREVIEW_API,
 } from '@handlers/hono/routes';
@@ -21,6 +23,7 @@ import { getAccessToken } from '@services/email/gmail';
 import { fetchMailContent, wrapPlainText } from '@services/email/mail-content';
 import { getEmailProvider } from '@services/email/provider';
 import { analyzeEmail } from '@services/llm';
+import { deleteMessage } from '@services/telegram';
 import { formatBody } from '@utils/format';
 import { verifyMailToken, verifyMailTokenById, verifyProxySignature } from '@utils/hash';
 import { type CidMap, buildCidMapFromAttachments, proxyImages, replaceCidReferences } from '@utils/html';
@@ -61,7 +64,7 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
 });
 
 /** 生成邮件预览页的悬浮操作按钮 HTML */
-function buildMailFab(messageId: string, accountId: number, token: string): string {
+function buildMailFab(messageId: string, accountId: number, token: string, inJunk: boolean): string {
 	return `<style>
 :root{
   --fab-primary:${theme.primary};
@@ -120,8 +123,12 @@ function buildMailFab(messageId: string, accountId: number, token: string): stri
 <div id="mail-fab">
 <div id="fab-status" class="fab-status"></div>
 <div id="fab-actions" class="fab-actions">
-<button class="fab-btn inbox" onclick="mailAction('move-to-inbox',this)">📥 移到收件箱</button>
-<button class="fab-btn del" onclick="mailAction('delete',this)">🗑 删除邮件</button>
+${
+	inJunk
+		? `<button class="fab-btn inbox" onclick="mailAction('move-to-inbox',this)">📥 移到收件箱</button>
+<button class="fab-btn del" onclick="mailAction('delete',this)">🗑 删除邮件</button>`
+		: `<button class="fab-btn del" onclick="mailAction('mark-as-junk',this)">🚫 标记为垃圾</button>`
+}
 </div>
 <button class="fab-main" onclick="toggleFab(this)">⚡</button>
 </div>
@@ -176,8 +183,10 @@ preview.get(ROUTE_MAIL, async (c) => {
 
 	if (!account) return c.text('Account not found', 404);
 
-	// 悬浮操作按钮（缓存和非缓存路径共用）
-	const fab = buildMailFab(messageId, account.id, token!);
+	// 检查邮件是否在垃圾邮件文件夹，决定 FAB 按钮
+	const provider = getEmailProvider(account, c.env);
+	const inJunk = await provider.isJunk(messageId).catch(() => false);
+	const fab = buildMailFab(messageId, account.id, token!, inJunk);
 
 	// KV 缓存（所有类型共用）
 	const cached = await getCachedMailHtml(c.env, messageId);
@@ -238,7 +247,7 @@ preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
 	}
 });
 
-preview.post(ROUTE_MAIL_DELETE, async (c) => {
+preview.post(ROUTE_MAIL_TRASH, async (c) => {
 	const messageId = c.req.param('id');
 	const body = (await c.req.json()) as { accountId?: number; token?: string };
 	if (!messageId || !body.accountId || !body.token) return c.json({ ok: false, error: '参数缺失' }, 400);
@@ -248,8 +257,34 @@ preview.post(ROUTE_MAIL_DELETE, async (c) => {
 	if (!account) return c.json({ ok: false, error: '账号未找到' }, 404);
 	try {
 		const provider = getEmailProvider(account, c.env);
-		await provider.deleteMessage(messageId);
+		await provider.trashMessage(messageId);
 		return c.json({ ok: true, message: '已删除' });
+	} catch {
+		return c.json({ ok: false, error: '操作失败' }, 500);
+	}
+});
+
+preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
+	const messageId = c.req.param('id');
+	const body = (await c.req.json()) as { accountId?: number; token?: string };
+	if (!messageId || !body.accountId || !body.token) return c.json({ ok: false, error: '参数缺失' }, 400);
+	const valid = await verifyMailTokenById(c.env.ADMIN_SECRET, messageId, body.accountId, body.token);
+	if (!valid) return c.json({ ok: false, error: '无效的 token' }, 403);
+	const account = await getAccountById(c.env.DB, body.accountId);
+	if (!account) return c.json({ ok: false, error: '账号未找到' }, 404);
+	try {
+		const provider = getEmailProvider(account, c.env);
+		await provider.markAsJunk(messageId);
+
+		// 删除对应的 TG 消息和映射
+		const mappings = await getMappingsByEmailIds(c.env.DB, body.accountId, [messageId]);
+		if (mappings.length > 0) {
+			const m = mappings[0];
+			await deleteMessage(c.env.TELEGRAM_BOT_TOKEN, m.tg_chat_id, m.tg_message_id).catch(() => {});
+			await deleteMappingByEmailId(c.env.DB, messageId, body.accountId).catch(() => {});
+		}
+
+		return c.json({ ok: true, message: '已标记为垃圾邮件' });
 	} catch {
 		return c.json({ ok: false, error: '操作失败' }, 500);
 	}

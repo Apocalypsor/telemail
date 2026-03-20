@@ -26,16 +26,16 @@ export function registerJunkHandler(bot: Bot, env: Env) {
 				return;
 			}
 
-			// 直接从邮件服务删除
+			// 移到垃圾邮件文件夹
 			const provider = getEmailProvider(account, env);
-			await provider.deleteMessage(mapping.email_message_id);
+			await provider.markAsJunk(mapping.email_message_id);
 
 			// 删除 TG 消息和映射
 			await deleteMessage(env.TELEGRAM_BOT_TOKEN, chatId, msg.message_id).catch(() => {});
 			await deleteMappingByEmailId(env.DB, mapping.email_message_id, mapping.account_id).catch(() => {});
 
-			await ctx.answerCallbackQuery({ text: '🗑 已删除垃圾邮件' });
-			console.log(`Deleted junk: email=${mapping.email_message_id}`);
+			await ctx.answerCallbackQuery({ text: '🚫 已标记为垃圾邮件' });
+			console.log(`Marked as junk: email=${mapping.email_message_id}`);
 		} catch (err) {
 			await reportErrorToObservability(env, 'bot.junk_mark_failed', err);
 			await ctx.answerCallbackQuery({ text: '操作失败，请重试' });
