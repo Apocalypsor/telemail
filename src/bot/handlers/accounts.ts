@@ -317,11 +317,22 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 			const account = await createAccount(env.DB, state.chatId, userId);
 			await clearBotState(env, userId);
 
-			const kb = new InlineKeyboard().text('查看账号', `acc:${account.id}`).text('账号列表', 'accs');
-			await ctx.editMessageText(
-				`✅ Gmail 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}\n\n请点击「查看账号」完成 Google OAuth 授权。`,
-				{ reply_markup: kb },
-			);
+			const origin = env.WORKER_URL?.replace(/\/$/, '') || '';
+			const oauthUrl = await generateOAuthUrl(env, account.id, origin);
+			const kb = new InlineKeyboard().url('🔗 点击授权 Google', oauthUrl).row().text('查看账号', `acc:${account.id}`);
+
+			const msg = ctx.callbackQuery.message;
+			if (msg) {
+				await env.EMAIL_KV.put(
+					`${KV_OAUTH_BOT_MSG_PREFIX}${account.id}`,
+					JSON.stringify({ chatId: String(msg.chat.id), messageId: msg.message_id }),
+					{ expirationTtl: OAUTH_STATE_TTL_SECONDS },
+				);
+			}
+
+			await ctx.editMessageText(`✅ Gmail 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}\n\n请点击下方按钮完成 Google 授权：`, {
+				reply_markup: kb,
+			});
 		} catch (err) {
 			await clearBotState(env, userId);
 			await reportErrorToObservability(env, 'bot.create_account_failed', err);
@@ -346,11 +357,22 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
 			const account = await createAccount(env.DB, state.chatId, userId, AccountType.Outlook);
 			await clearBotState(env, userId);
 
-			const kb = new InlineKeyboard().text('查看账号', `acc:${account.id}`).text('账号列表', 'accs');
-			await ctx.editMessageText(
-				`✅ Outlook 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}\n\n请点击「查看账号」完成 Microsoft OAuth 授权。`,
-				{ reply_markup: kb },
-			);
+			const origin = env.WORKER_URL?.replace(/\/$/, '') || '';
+			const oauthUrl = await generateMsOAuthUrl(env, account.id, origin);
+			const kb = new InlineKeyboard().url('🔗 点击授权 Microsoft', oauthUrl).row().text('查看账号', `acc:${account.id}`);
+
+			const msg = ctx.callbackQuery.message;
+			if (msg) {
+				await env.EMAIL_KV.put(
+					`${KV_OAUTH_BOT_MSG_PREFIX}${account.id}`,
+					JSON.stringify({ chatId: String(msg.chat.id), messageId: msg.message_id }),
+					{ expirationTtl: OAUTH_STATE_TTL_SECONDS },
+				);
+			}
+
+			await ctx.editMessageText(`✅ Outlook 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}\n\n请点击下方按钮完成 Microsoft 授权：`, {
+				reply_markup: kb,
+			});
 		} catch (err) {
 			await clearBotState(env, userId);
 			await reportErrorToObservability(env, 'bot.create_account_failed', err);
