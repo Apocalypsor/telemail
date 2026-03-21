@@ -107,8 +107,8 @@ export async function isImapStarred(env: Env, accountId: number, messageId: stri
  * 从中间件按需拉取单封邮件原文（用于 LLM 重试），返回 base64 编码的 RFC 2822 raw email。
  * 中间件需实现 POST /api/fetch → { rawEmail: string }。
  */
-export async function fetchImapRawEmail(env: Env, accountId: number, messageId: string): Promise<string> {
-	const resp = await callBridge(env, 'POST', '/api/fetch', { accountId, messageId });
+export async function fetchImapRawEmail(env: Env, accountId: number, messageId: string, folder?: 'inbox' | 'junk'): Promise<string> {
+	const resp = await callBridge(env, 'POST', '/api/fetch', { accountId, messageId, folder });
 	const { rawEmail } = (await resp.json()) as { rawEmail: string };
 	return rawEmail;
 }

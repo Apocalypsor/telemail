@@ -114,9 +114,14 @@ async function editMessageWithAnalysis(
 }
 
 /** 按账号类型拉取原始邮件 */
-export async function fetchRawEmailByType(account: Account, messageId: string, env: Env): Promise<ArrayBuffer> {
+export async function fetchRawEmailByType(
+	account: Account,
+	messageId: string,
+	env: Env,
+	imapFolder?: 'inbox' | 'junk',
+): Promise<ArrayBuffer> {
 	if (account.type === AccountType.Imap) {
-		const base64 = await fetchImapRawEmail(env, account.id, messageId);
+		const base64 = await fetchImapRawEmail(env, account.id, messageId, imapFolder);
 		return base64ToArrayBuffer(base64);
 	}
 	if (account.type === AccountType.Outlook) {

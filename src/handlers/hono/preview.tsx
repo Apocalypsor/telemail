@@ -125,7 +125,7 @@ preview.get(ROUTE_MAIL, async (c) => {
 	} else {
 		// IMAP + Outlook: 获取原始 MIME 并解析
 		if (account.type !== AccountType.Imap && !account.refresh_token) return c.text('Account not authorized', 403);
-		const rawEmail = await fetchRawEmailByType(account, messageId, c.env);
+		const rawEmail = await fetchRawEmailByType(account, messageId, c.env, inJunk ? 'junk' : 'inbox');
 		const email = await new PostalMime().parse(rawEmail);
 		html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
 		cidMap = buildCidMapFromAttachments(email.attachments);
