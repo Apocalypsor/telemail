@@ -1,5 +1,5 @@
 import { MAIL_HTML_CACHE_TTL } from '@/constants';
-import type { Env } from '@/types';
+import type { Env, MailMeta } from '@/types';
 
 // ─── Key helpers ────────────────────────────────────────────────────────────
 
@@ -47,12 +47,24 @@ function kvMailHtmlKey(gmailMessageId: string): string {
 	return `mail_html:${gmailMessageId}`;
 }
 
-export async function getCachedMailHtml(env: Env, gmailMessageId: string): Promise<string | null> {
-	return env.EMAIL_KV.get(kvMailHtmlKey(gmailMessageId));
+export interface CachedMailData {
+	html: string;
+	meta?: MailMeta;
 }
 
-export async function putCachedMailHtml(env: Env, gmailMessageId: string, html: string): Promise<void> {
-	await env.EMAIL_KV.put(kvMailHtmlKey(gmailMessageId), html, {
+export async function getCachedMailData(env: Env, messageId: string): Promise<CachedMailData | null> {
+	const raw = await env.EMAIL_KV.get(kvMailHtmlKey(messageId));
+	if (!raw) return null;
+	try {
+		return JSON.parse(raw) as CachedMailData;
+	} catch {
+		// 兼容旧格式（纯 HTML 字符串）
+		return { html: raw };
+	}
+}
+
+export async function putCachedMailData(env: Env, messageId: string, data: CachedMailData): Promise<void> {
+	await env.EMAIL_KV.put(kvMailHtmlKey(messageId), JSON.stringify(data), {
 		expirationTtl: MAIL_HTML_CACHE_TTL,
 	});
 }

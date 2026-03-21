@@ -1,10 +1,10 @@
 import { MAX_BODY_CHARS } from '@/constants';
-import { AccountType, type AppEnv } from '@/types';
-import { theme } from '@assets/theme';
+import { AccountType, type AppEnv, type MailMeta } from '@/types';
 import { JunkCheckPage } from '@components/junk-check';
+import { MailPage } from '@components/mail-page';
 import { PreviewPage } from '@components/preview';
 import { getAccountByEmail, getAccountById } from '@db/accounts';
-import { getCachedMailHtml, putCachedMailHtml } from '@db/kv';
+import { getCachedMailData, putCachedMailData } from '@db/kv';
 import { deleteMappingByEmailId, getMappingsByEmailIds } from '@db/message-map';
 import { requireTelegramLogin } from '@handlers/hono/middleware';
 import {
@@ -20,7 +20,7 @@ import {
 } from '@handlers/hono/routes';
 import { deliverEmailToTelegram, fetchRawEmailByType } from '@services/bridge';
 import { getAccessToken } from '@services/email/gmail';
-import { fetchMailContent, wrapPlainText } from '@services/email/mail-content';
+import { fetchMailContent, formatAddress, wrapPlainText } from '@services/email/mail-content';
 import { getEmailProvider } from '@services/email/provider';
 import { analyzeEmail } from '@services/llm';
 import { deleteMessage } from '@services/telegram';
@@ -29,6 +29,7 @@ import { verifyMailToken, verifyMailTokenById, verifyProxySignature } from '@uti
 import { type CidMap, buildCidMapFromAttachments, proxyImages, replaceCidReferences } from '@utils/html';
 import { http } from '@utils/http';
 import { Hono } from 'hono';
+import { raw } from 'hono/html';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { HTTPError } from 'ky';
 import PostalMime from 'postal-mime';
@@ -63,97 +64,6 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
 	return c.json({ isJunk: result.isJunk, junkConfidence: result.junkConfidence, summary: result.summary, tags: result.tags });
 });
 
-/** 生成邮件预览页的悬浮操作按钮 HTML */
-function buildMailFab(messageId: string, accountId: number, token: string, inJunk: boolean): string {
-	return `<style>
-:root{
-  --fab-primary:${theme.primary};
-  --fab-primary-hover:${theme.primaryHover};
-  --fab-danger:${theme.danger};
-  --fab-bg:${theme.surface};
-  --fab-border:${theme.border};
-  --fab-text:${theme.text};
-  --fab-muted:${theme.muted};
-}
-#mail-fab{
-  position:fixed;bottom:24px;right:24px;z-index:9999;
-  display:flex;flex-direction:column;align-items:flex-end;gap:10px;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-}
-@media(max-width:640px){
-  #mail-fab{bottom:16px;right:16px}
-}
-#mail-fab .fab-main{
-  width:52px;height:52px;border-radius:50%;
-  background:var(--fab-primary);color:#fff;border:none;
-  font-size:22px;cursor:pointer;
-  box-shadow:0 4px 14px rgba(0,0,0,.35);
-  transition:transform .2s,background .2s;
-  -webkit-tap-highlight-color:transparent;
-}
-#mail-fab .fab-main:hover{background:var(--fab-primary-hover)}
-#mail-fab .fab-main.open{transform:rotate(45deg);background:var(--fab-border)}
-#mail-fab .fab-actions{
-  display:none;flex-direction:column;align-items:flex-end;gap:8px;
-}
-#mail-fab .fab-actions.show{display:flex}
-#mail-fab .fab-btn{
-  display:flex;align-items:center;gap:8px;
-  padding:10px 18px;border-radius:24px;border:none;
-  color:#fff;font-size:14px;cursor:pointer;
-  box-shadow:0 2px 10px rgba(0,0,0,.3);
-  white-space:nowrap;transition:opacity .2s;
-  -webkit-tap-highlight-color:transparent;
-}
-@media(max-width:640px){
-  #mail-fab .fab-btn{padding:12px 20px;font-size:15px}
-}
-#mail-fab .fab-btn:disabled{opacity:.5;cursor:default}
-#mail-fab .fab-btn.inbox{background:var(--fab-primary)}
-#mail-fab .fab-btn.del{background:var(--fab-danger)}
-#mail-fab .fab-status{
-  background:var(--fab-bg);color:var(--fab-muted);
-  padding:8px 16px;border-radius:16px;font-size:13px;
-  border:1px solid var(--fab-border);
-  box-shadow:0 2px 8px rgba(0,0,0,.3);
-  display:none;max-width:260px;text-align:center;
-}
-#mail-fab .fab-status.show{display:block}
-</style>
-<div id="mail-fab">
-<div id="fab-status" class="fab-status"></div>
-<div id="fab-actions" class="fab-actions">
-${
-	inJunk
-		? `<button class="fab-btn inbox" onclick="mailAction('move-to-inbox',this)">📥 移到收件箱</button>
-<button class="fab-btn del" onclick="mailAction('trash',this)">🗑 删除邮件</button>`
-		: `<button class="fab-btn del" onclick="mailAction('mark-as-junk',this)">🚫 标记为垃圾</button>`
-}
-</div>
-<button class="fab-main" onclick="toggleFab(this)">⚡</button>
-</div>
-<script>
-function toggleFab(btn){
-  btn.classList.toggle('open');
-  document.getElementById('fab-actions').classList.toggle('show');
-  document.getElementById('fab-status').className='fab-status';
-}
-async function mailAction(action,btn){
-  var s=document.getElementById('fab-status');
-  btn.disabled=true;s.className='fab-status show';s.textContent='处理中...';
-  try{
-    var r=await fetch('/api/mail/${encodeURIComponent(messageId)}/'+action,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({accountId:${accountId},token:'${token}'})
-    });
-    var d=await r.json();
-    s.textContent=d.ok?'✅ '+d.message:'❌ '+(d.error||'操作失败');
-    if(d.ok){document.querySelectorAll('.fab-btn').forEach(function(b){b.disabled=true})}
-  }catch(e){s.textContent='❌ 网络错误'}
-}
-</script>`;
-}
-
 // ─── 邮件内容预览 ────────────────────────────────────────────────────────────
 
 preview.get(ROUTE_MAIL, async (c) => {
@@ -186,14 +96,22 @@ preview.get(ROUTE_MAIL, async (c) => {
 	// 检查邮件是否在垃圾邮件文件夹，决定 FAB 按钮
 	const provider = getEmailProvider(account, c.env);
 	const inJunk = await provider.isJunk(messageId).catch(() => false);
-	const fab = buildMailFab(messageId, account.id, token!, inJunk);
+	const pageProps = { messageId, accountId: account.id, token: token!, inJunk, accountEmail: account.email };
 
 	// KV 缓存（所有类型共用）
-	const cached = await getCachedMailHtml(c.env, messageId);
-	if (cached) return c.html((await proxyImages(cached, c.env.ADMIN_SECRET)) + fab);
+	const cached = await getCachedMailData(c.env, messageId);
+	if (cached) {
+		const proxied = await proxyImages(cached.html, c.env.ADMIN_SECRET);
+		return c.html(
+			<MailPage meta={cached.meta ?? {}} {...pageProps}>
+				{raw(proxied)}
+			</MailPage>,
+		);
+	}
 
 	let html: string | null = null;
 	let cidMap: CidMap = new Map();
+	let meta: MailMeta = {};
 
 	if (account.type === AccountType.Gmail) {
 		if (!account.refresh_token) return c.text('Account not authorized', 403);
@@ -202,22 +120,33 @@ preview.get(ROUTE_MAIL, async (c) => {
 		if (result) {
 			html = result.html;
 			cidMap = result.cidMap;
+			meta = result.meta;
 		}
 	} else {
 		// IMAP + Outlook: 获取原始 MIME 并解析
 		if (account.type !== AccountType.Imap && !account.refresh_token) return c.text('Account not authorized', 403);
-		const raw = await fetchRawEmailByType(account, messageId, c.env);
-		const email = await new PostalMime().parse(raw);
+		const rawEmail = await fetchRawEmailByType(account, messageId, c.env);
+		const email = await new PostalMime().parse(rawEmail);
 		html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
 		cidMap = buildCidMapFromAttachments(email.attachments);
+		meta = {
+			subject: email.subject ?? null,
+			from: email.from ? formatAddress(email.from) : null,
+			to: email.to?.map(formatAddress).join(', ') ?? null,
+			date: email.date ?? null,
+		};
 	}
 
 	if (!html) return c.text('No content in this email', 404);
 
 	html = replaceCidReferences(html, cidMap);
-	await putCachedMailHtml(c.env, messageId, html);
+	await putCachedMailData(c.env, messageId, { html, meta });
 	const proxied = await proxyImages(html, c.env.ADMIN_SECRET);
-	return c.html(proxied + fab);
+	return c.html(
+		<MailPage meta={meta} {...pageProps}>
+			{raw(proxied)}
+		</MailPage>,
+	);
 });
 
 // ─── 邮件操作 API ────────────────────────────────────────────────────────────

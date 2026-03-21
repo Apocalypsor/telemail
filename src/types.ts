@@ -106,6 +106,14 @@ export interface Env {
 	MS_WEBHOOK_SECRET?: string;
 }
 
+/** 邮件元数据（发件人/收件人/主题/日期） */
+export interface MailMeta {
+	subject?: string | null;
+	from?: string | null;
+	to?: string | null;
+	date?: string | null;
+}
+
 /** 队列消息体 */
 export interface QueueMessage {
 	/** Gmail messageId 或 IMAP UID（字符串形式），出队时按账号类型分支处理 */

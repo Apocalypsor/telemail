@@ -1,10 +1,24 @@
+import type { MailMeta } from '@/types';
 import { base64urlToString } from '@utils/base64url';
 import type { CidMap } from '@utils/html';
 import { gmailGet } from '@services/email/gmail';
+import type { Address } from 'postal-mime';
+
+export interface FetchMailResult {
+	html: string;
+	cidMap: CidMap;
+	meta: MailMeta;
+}
 
 /** 从 Gmail API 获取邮件正文 HTML，优先 HTML，fallback 到纯文本 */
-export async function fetchMailContent(accessToken: string, gmailMessageId: string): Promise<{ html: string; cidMap: CidMap } | null> {
+export async function fetchMailContent(accessToken: string, gmailMessageId: string): Promise<FetchMailResult | null> {
 	const msg = await gmailGet(accessToken, `/users/me/messages/${gmailMessageId}?format=full`);
+	const meta: MailMeta = {
+		subject: extractHeader(msg.payload, 'subject'),
+		from: extractHeader(msg.payload, 'from'),
+		to: extractHeader(msg.payload, 'to'),
+		date: extractHeader(msg.payload, 'date'),
+	};
 	const html = extractPartByMime(msg.payload, 'text/html');
 
 	const cidMap: CidMap = new Map();
@@ -26,12 +40,17 @@ export async function fetchMailContent(accessToken: string, gmailMessageId: stri
 		);
 	}
 
-	if (html) return { html, cidMap };
+	if (html) return { html, cidMap, meta };
 
 	const plain = extractPartByMime(msg.payload, 'text/plain');
-	if (plain) return { html: wrapPlainText(plain), cidMap };
+	if (plain) return { html: wrapPlainText(plain), cidMap, meta };
 
 	return null;
+}
+
+/** 从 Gmail payload headers 中提取指定头部 */
+function extractHeader(payload: any, name: string): string | null {
+	return (payload.headers as any[])?.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value ?? null;
 }
 
 /** 递归收集内联图片（body.data 已内嵌的情况） */
@@ -80,6 +99,12 @@ function extractPartByMime(payload: any, mimeType: string): string | null {
 	}
 
 	return null;
+}
+
+/** 将 PostalMime Address 格式化为可读字符串 */
+export function formatAddress(addr: Address): string {
+	if (addr.address) return addr.name ? `${addr.name} <${addr.address}>` : addr.address;
+	return addr.name;
 }
 
 /** 将纯文本包裹成可读的 HTML 页面 */

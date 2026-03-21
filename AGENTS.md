@@ -91,6 +91,10 @@ TypeScript path aliases are configured in `tsconfig.json` and resolved by Wrangl
 
 Examples: `import { Env } from '@/types'`, `import { analyzeEmail } from '@services/llm'`, `import { reportErrorToObservability } from '@utils/observability'`.
 
+## Helper Functions
+
+Helper functions must live in the module that owns the domain logic, not in the handler that calls them. Handlers (`src/handlers/`) should only contain routing and request/response orchestration. For example, a function that formats a PostalMime `Address` belongs in `src/services/email/mail-content.ts`, not in the handler that happens to use it. When writing a helper, ask: "which module owns this concept?" and place it there.
+
 ## Theme
 
 All color values are centralized in `src/assets/theme.ts` (slate/blue palette). Used by the mail preview FAB and any inline CSS injected outside of Tailwind context.
