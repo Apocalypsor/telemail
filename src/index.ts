@@ -1,6 +1,7 @@
 import app from '@handlers/hono';
 import { handleQueueBatch } from '@handlers/queue';
 import { retryAllFailedEmails } from '@services/bridge';
+import { isDigestHour, sendDigestNotifications } from '@services/digest';
 import { renewWatchAll } from '@services/email/gmail';
 import { checkImapBridgeHealth } from '@services/email/imap';
 import { renewSubscriptionAll } from '@services/email/outlook';
@@ -45,6 +46,12 @@ async function handleScheduled(event: ScheduledEvent, env: Env): Promise<void> {
 		isMidnight
 			? renewSubscriptionAll(env).catch((error: unknown) =>
 					reportErrorToObservability(env, 'scheduled.outlook_subscription_renew_failed', error),
+				)
+			: Promise.resolve(),
+		// 早9晚6：邮件摘要通知
+		isDigestHour(event.scheduledTime)
+			? sendDigestNotifications(env, event.scheduledTime).catch((error: unknown) =>
+					reportErrorToObservability(env, 'scheduled.digest_failed', error),
 				)
 			: Promise.resolve(),
 	]);

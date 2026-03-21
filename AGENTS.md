@@ -49,7 +49,7 @@ Telemail is a Cloudflare Worker that forwards emails (Gmail / Outlook / IMAP) to
 - **KV** (`EMAIL_KV`): access_token cache, dedup, OAuth state, mail HTML cache, bot info
 - **Queue** (`EMAIL_QUEUE`): email processing with retry (max 3, batch 5, concurrency 3)
 - **Service Binding** (`OBS_SERVICE`): observability error reporting
-- **Cron** (`0 * * * *`): hourly IMAP health check; midnight-only Gmail watch + Outlook subscription renewal
+- **Cron** (`0 * * * *`): hourly IMAP health check; midnight-only Gmail watch + Outlook subscription renewal; 9 AM & 6 PM (Eastern) email digest notifications
 
 **Auth middleware** (`src/handlers/hono/middleware.ts`):
 
@@ -67,8 +67,9 @@ All shared constants live in `src/constants.ts`. This includes:
 - **KV key prefixes**: `KV_OAUTH_STATE_PREFIX`, `KV_OAUTH_BOT_MSG_PREFIX`, `KV_MS_SUB_ACCOUNT_PREFIX`, `KV_MS_SUBSCRIPTION_PREFIX`, `KV_BOT_INFO_KEY`, `KV_BOT_COMMANDS_VERSION_KEY`
 - **TTLs**: `MAIL_HTML_CACHE_TTL`, `OAUTH_STATE_TTL_SECONDS`, `BOT_INFO_TTL`
 - **Telegram limits**: `TG_MSG_LIMIT`, `TG_CAPTION_LIMIT`, `TG_MEDIA_GROUP_LIMIT`, `TG_MAX_RETRY_AFTER_SECS`
-- **LLM / mail processing**: `MAX_BODY_CHARS`, `MAX_LINKS`
+- **LLM / mail processing**: `MAX_BODY_CHARS`, `MAX_LINKS`, `LLM_TIMEOUT_MS`
 - **IMAP flags**: `IMAP_FLAG_SEEN`, `IMAP_FLAG_FLAGGED`
+- **Digest**: `DIGEST_HOURS`, `MAX_DIGEST_LIST`
 - **Display settings**: `MESSAGE_DATE_LOCALE`, `MESSAGE_DATE_TIMEZONE`
 
 When adding new KV keys used across multiple files, add a `KV_` prefixed constant here rather than hardcoding strings.
@@ -102,6 +103,10 @@ All color values are centralized in `src/assets/theme.ts` (slate/blue palette). 
 - `summary`: bullet-point summary (skipped when a verification code is found)
 - `tags`: 1–3 single-word tags, first letter capitalized, same language as the email (e.g. `Github`, `Verification`, `Password_Reset`)
 - `isJunk` / `junkConfidence`: spam classification. Emails with confidence ≥ 0.8 are auto-moved to junk folder, TG message deleted.
+
+## Email Digest
+
+`src/services/digest.ts` sends a daily digest notification to each Telegram chat at 9 AM and 6 PM (based on `MESSAGE_DATE_TIMEZONE`, currently Eastern Time). The digest runs inside the existing hourly cron — `isDigestHour()` checks whether the current local hour matches. For each chat, it groups all accounts, queries unread and junk counts in parallel, and sends a single summary message with inline keyboard buttons to view full lists. Chats with zero unread and zero junk are silently skipped. Digest hours are configured via `DIGEST_HOURS` in `src/constants.ts`.
 
 ## Bot Commands
 

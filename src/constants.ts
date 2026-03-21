@@ -26,7 +26,6 @@ export const TG_API_BASE = 'https://api.telegram.org/bot';
 // ── TTL (seconds) ────────────────────────────────────────────────────────────
 export const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
-
 export const BOT_INFO_TTL = 86400 * 30; // 30 天
 
 // ── Telegram limits ──────────────────────────────────────────────────────────
@@ -37,6 +36,7 @@ export const TG_MEDIA_GROUP_LIMIT = 10;
 // ── LLM / 邮件处理 ──────────────────────────────────────────────────────────
 export const MAX_BODY_CHARS = 4000;
 export const MAX_LINKS = 20;
+export const LLM_TIMEOUT_MS = 30_000; // LLM 请求超时（毫秒）
 
 // ── IMAP flags ───────────────────────────────────────────────────────────────
 export const IMAP_FLAG_SEEN = '\\Seen' as const;
@@ -49,7 +49,10 @@ export const STAR_TAG = ' #星标';
 export const TG_AUTH_MAX_AGE = 86400; // Telegram Login Widget auth_date 有效期（秒）
 export const SESSION_TTL = 7 * 24 * 3600; // session cookie 有效期 7 天
 export const SESSION_COOKIE_NAME = 'tg_session';
-export const LLM_TIMEOUT_MS = 30_000; // LLM 请求超时（毫秒）
+
+// ── Digest ──────────────────────────────────────────────────────────────────
+export const DIGEST_HOURS = [9, 18]; // 摘要发送的本地小时（基于 MESSAGE_DATE_TIMEZONE）
+export const MAX_DIGEST_LIST = 50; // 摘要查询每个账号的最大邮件数
 
 // ── Display ──────────────────────────────────────────────────────────────────
 export const MESSAGE_DATE_LOCALE = 'zh-CN';

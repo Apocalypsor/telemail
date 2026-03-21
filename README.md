@@ -46,6 +46,7 @@
 
 - **每小时**: 检查 IMAP Bridge 中间件健康状态，异常时上报到 Observability Hub。
 - **每天凌晨（UTC 0 点）**: 自动为所有已授权的 **Gmail 账号**续订 watch（watch 7 天后过期）、**Outlook 账号**续订 Graph subscription。
+- **每天早 9 点和晚 6 点**（Eastern Time）: 向每个 Telegram Chat 发送邮件摘要通知，包含各账号的未读和垃圾邮件数量。全部为零时跳过，不打扰。
 
 正文会自动截断以适应 Telegram 的字符限制（纯文本消息 4096 字符，附件标题 1024 字符）。
 
@@ -226,7 +227,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 3. Gmail / Outlook 需要完成 OAuth 授权；IMAP 需要填写服务器信息和密码
 4. 授权成功后自动创建 webhook 订阅，新邮件会实时推送到 Telegram
 
-Cron Trigger 每小时检查 IMAP 中间件健康；每天凌晨（UTC 0 点）自动为所有已授权的 Gmail 账号续订 watch、Outlook 账号续订 Graph subscription。
+Cron Trigger 每小时检查 IMAP 中间件健康；每天凌晨（UTC 0 点）自动续订 Gmail watch 和 Outlook Graph subscription；每天早 9 点和晚 6 点发送邮件摘要通知。
 
 ## Bot 命令
 
@@ -319,6 +320,7 @@ src/
     failed-emails.ts   # LLM 失败邮件记录
   services/
     bridge.ts          # 邮件→Telegram 投递编排（拉取/解析/发送/LLM 摘要）
+    digest.ts          # 邮件摘要定时通知（早9晚6，按 chat 分组发送未读/垃圾数量）
     email/
       gmail/           # Gmail OAuth2 + REST API + watch + history
       outlook/         # Outlook OAuth2 + Graph API + subscription
