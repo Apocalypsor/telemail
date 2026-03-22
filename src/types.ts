@@ -137,5 +137,5 @@ export interface GmailNotification {
 export type Attachment = {
 	filename?: string | null;
 	mimeType?: string | null;
-	content: string | ArrayBuffer;
+	content: string | ArrayBuffer | Uint8Array;
 };

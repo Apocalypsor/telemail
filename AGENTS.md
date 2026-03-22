@@ -11,17 +11,17 @@ For all limits and quotas, retrieve from the product's `/platform/limits/` page.
 
 ## Commands
 
-| Command              | Purpose                                        |
-| -------------------- | ---------------------------------------------- |
-| `npm run dev`        | Build CSS + local development                  |
-| `npm run deploy`     | Build CSS + deploy to Cloudflare               |
-| `npm run build:css`  | Generate Tailwind CSS (src/assets/tailwind.ts) |
-| `npm test`           | Run tests (vitest)                             |
-| `npm run cf-typegen` | Generate TypeScript types from wrangler.jsonc  |
+| Command           | Purpose                                        |
+| ----------------- | ---------------------------------------------- |
+| `pnpm dev`        | Build CSS + local development                  |
+| `pnpm deploy`     | Build CSS + deploy to Cloudflare               |
+| `pnpm build:css`  | Generate Tailwind CSS (src/assets/tailwind.ts) |
+| `pnpm test`       | Run tests (vitest)                             |
+| `pnpm cf-typegen` | Generate TypeScript types from wrangler.jsonc  |
 
-**IMPORTANT**: Prettier + tsc run automatically on pre-commit hook (husky + lint-staged). You can also run `npx prettier --write <file>` manually.
-Run `npm run cf-typegen` after changing bindings in wrangler.jsonc.
-Run `npm run build:css` after changing Tailwind classes in components (auto-runs with dev/deploy).
+**IMPORTANT**: Prettier + tsc run automatically on pre-commit hook (husky + lint-staged). You can also run `pnpm prettier --write <file>` manually.
+Run `pnpm cf-typegen` after changing bindings in wrangler.jsonc.
+Run `pnpm build:css` after changing Tailwind classes in components (auto-runs with dev/deploy).
 
 ## Node.js Compatibility
 

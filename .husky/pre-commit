@@ -1,2 +1,2 @@
-npx tsc --noEmit
-npx lint-staged
+pnpm tsc --noEmit
+pnpm lint-staged

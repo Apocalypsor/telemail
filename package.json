@@ -4,8 +4,8 @@
 	"private": true,
 	"scripts": {
 		"build:css": "node scripts/build-css.mjs",
-		"deploy": "npm run build:css && wrangler deploy",
-		"dev": "npm run build:css && wrangler dev",
+		"deploy": "pnpm run build:css && wrangler deploy",
+		"dev": "pnpm run build:css && wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
 		"cf-typegen": "wrangler types",
@@ -15,15 +15,15 @@
 		"skills:update": "bunx skills update"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.12.4",
-		"@tailwindcss/cli": "^4.2.1",
-		"@types/node": "^25.3.0",
+		"@cloudflare/vitest-pool-workers": "^0.13.3",
+		"@tailwindcss/cli": "^4.2.2",
+		"@types/node": "^25.5.0",
 		"@types/turndown": "^5.0.6",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.4.0",
 		"prettier": "^3.8.1",
-		"typescript": "^5.5.2",
-		"vitest": "~3.2.0",
+		"typescript": "^5.9.3",
+		"vitest": "~4.1.0",
 		"wrangler": "^4.76.0"
 	},
 	"lint-staged": {
@@ -32,10 +32,10 @@
 	},
 	"dependencies": {
 		"grammy": "^1.41.1",
-		"hono": "^4.12.7",
+		"hono": "^4.12.8",
 		"ky": "^1.14.3",
 		"linkedom": "^0.18.12",
-		"postal-mime": "^2.7.3",
+		"postal-mime": "^2.7.4",
 		"turndown": "^7.2.2"
 	}
 }
