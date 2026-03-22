@@ -80,6 +80,7 @@ async function sendDigestToUser(env: Env, userId: string, accounts: Account[], l
 			lines.push(`❌ ${label}: ${escapeMdV2('查询失败')}`);
 			continue;
 		}
+		if (d.unread === 0 && d.junk === 0) continue;
 		lines.push(`📧 ${label}`);
 		lines.push(`    📬 ${d.unread} 封未读  \\|  🚫 ${d.junk} 封垃圾`);
 	}
