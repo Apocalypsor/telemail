@@ -26,7 +26,6 @@ For all limits and quotas, retrieve from the product's `/platform/limits/` page.
 | `pnpm dev`        | Build CSS + local development                  |
 | `pnpm deploy`     | Build CSS + deploy to Cloudflare               |
 | `pnpm build:css`  | Generate Tailwind CSS (src/assets/tailwind.ts) |
-| `pnpm test`       | Run tests (vitest)                             |
 | `pnpm check`      | Lint + format check (Biome)                    |
 | `pnpm typecheck`  | TypeScript type checking (tsc --noEmit)        |
 | `pnpm cf-typegen` | Generate TypeScript types from wrangler.jsonc  |

@@ -24,6 +24,11 @@ turndown.addRule("stripImages", {
 });
 
 export function htmlToMarkdown(html: string): string {
+  // linkedom can't handle orphan elements between <!doctype> and <html>;
+  // they cause document.body to be empty. Strip them before parsing.
+  const htmlTagIdx = html.search(/<html[\s>]/i);
+  if (htmlTagIdx > 0) html = html.substring(htmlTagIdx);
+
   const { document } = parseHTML(html);
   for (const node of document.querySelectorAll("head, style, script")) {
     node.remove();

@@ -7,7 +7,6 @@
     "deploy": "pnpm run build:css && wrangler deploy",
     "dev": "pnpm run build:css && wrangler dev",
     "start": "wrangler dev",
-    "test": "vitest",
     "cf-typegen": "wrangler types",
     "migrate": "wrangler d1 migrations apply gmail-tg-bridge --remote",
     "typecheck": "tsc --noEmit",
