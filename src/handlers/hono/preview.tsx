@@ -1,3 +1,4 @@
+import { buildEmailKeyboard } from "@bot/keyboards";
 import { JunkCheckPage } from "@components/junk-check";
 import { MailPage } from "@components/mail-page";
 import { PreviewPage } from "@components/preview";
@@ -12,6 +13,7 @@ import {
   ROUTE_MAIL,
   ROUTE_MAIL_MARK_JUNK,
   ROUTE_MAIL_MOVE_TO_INBOX,
+  ROUTE_MAIL_TOGGLE_STAR,
   ROUTE_MAIL_TRASH,
   ROUTE_PREVIEW,
   ROUTE_PREVIEW_API,
@@ -25,7 +27,7 @@ import {
 } from "@services/email/mail-content";
 import { getEmailProvider } from "@services/email/provider";
 import { analyzeEmail } from "@services/llm";
-import { deleteMessage } from "@services/telegram";
+import { deleteMessage, setReplyMarkup } from "@services/telegram";
 import { formatBody } from "@utils/format";
 import {
   verifyMailToken,
@@ -133,14 +135,18 @@ preview.get(ROUTE_MAIL, async (c) => {
 
   if (!account) return c.text("Account not found", 404);
 
-  // 检查邮件是否在垃圾邮件文件夹，决定 FAB 按钮
+  // 检查邮件是否在垃圾邮件文件夹和星标状态，决定 FAB 按钮
   const provider = getEmailProvider(account, c.env);
-  const inJunk = await provider.isJunk(messageId).catch(() => false);
+  const [inJunk, starred] = await Promise.all([
+    provider.isJunk(messageId).catch(() => false),
+    provider.isStarred(messageId).catch(() => false),
+  ]);
   const pageProps = {
     messageId,
     accountId: account.id,
     token: token as string,
     inJunk,
+    starred,
     accountEmail: account.email,
   };
 
@@ -302,6 +308,62 @@ preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
     }
 
     return c.json({ ok: true, message: "已标记为垃圾邮件" });
+  } catch {
+    return c.json({ ok: false, error: "操作失败" }, 500);
+  }
+});
+
+preview.post(ROUTE_MAIL_TOGGLE_STAR, async (c) => {
+  const messageId = c.req.param("id");
+  const body = (await c.req.json()) as {
+    accountId?: number;
+    token?: string;
+    starred?: boolean;
+  };
+  if (!messageId || !body.accountId || !body.token || body.starred == null)
+    return c.json({ ok: false, error: "参数缺失" }, 400);
+  const valid = await verifyMailTokenById(
+    c.env.ADMIN_SECRET,
+    messageId,
+    body.accountId,
+    body.token,
+  );
+  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
+  const account = await getAccountById(c.env.DB, body.accountId);
+  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  try {
+    const provider = getEmailProvider(account, c.env);
+    if (body.starred) {
+      await provider.addStar(messageId);
+    } else {
+      await provider.removeStar(messageId);
+    }
+
+    // 同步更新 Telegram 消息的星标按钮
+    const mappings = await getMappingsByEmailIds(c.env.DB, body.accountId, [
+      messageId,
+    ]);
+    if (mappings.length > 0) {
+      const m = mappings[0];
+      const keyboard = await buildEmailKeyboard(
+        c.env,
+        messageId,
+        account.id,
+        body.starred,
+      );
+      await setReplyMarkup(
+        c.env.TELEGRAM_BOT_TOKEN,
+        m.tg_chat_id,
+        m.tg_message_id,
+        keyboard,
+      ).catch(() => {});
+    }
+
+    return c.json({
+      ok: true,
+      message: body.starred ? "已加星标" : "已取消星标",
+      starred: body.starred,
+    });
   } catch {
     return c.json({ ok: false, error: "操作失败" }, 500);
   }

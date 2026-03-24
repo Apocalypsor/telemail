@@ -40,7 +40,7 @@ export const TG_MEDIA_GROUP_LIMIT = 10;
 // ── LLM / 邮件处理 ──────────────────────────────────────────────────────────
 export const MAX_BODY_CHARS = 4000;
 export const MAX_LINKS = 20;
-export const LLM_TIMEOUT_MS = 30_000; // LLM 请求超时（毫秒）
+export const LLM_TIMEOUT_MS = 300_000; // LLM 请求超时（毫秒）
 
 // ── IMAP flags ───────────────────────────────────────────────────────────────
 export const IMAP_FLAG_SEEN = "\\Seen" as const;

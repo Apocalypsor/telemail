@@ -9,6 +9,7 @@ interface MailPageProps {
   accountId: number;
   token: string;
   inJunk: boolean;
+  starred: boolean;
   children: Child;
 }
 
@@ -19,6 +20,7 @@ export function MailPage({
   accountId,
   token,
   inJunk,
+  starred,
   children,
 }: MailPageProps) {
   return (
@@ -30,6 +32,7 @@ export function MailPage({
         accountId={accountId}
         token={token}
         inJunk={inJunk}
+        starred={starred}
       />
     </>
   );
@@ -126,6 +129,8 @@ const FAB_CSS = `
 #mail-fab .fab-btn:disabled{opacity:.5;cursor:default}
 #mail-fab .fab-btn.inbox{background:var(--fab-primary)}
 #mail-fab .fab-btn.del{background:var(--fab-danger)}
+#mail-fab .fab-btn.star{background:#f59e0b}
+#mail-fab .fab-btn.starred{background:#22c55e}
 #mail-fab .fab-status{
   background:var(--fab-bg);color:var(--fab-muted);
   padding:8px 16px;border-radius:16px;font-size:13px;
@@ -139,8 +144,10 @@ function fabScript(
   messageId: string,
   accountId: number,
   token: string,
+  starred: boolean,
 ): string {
   return `
+var _starred=${starred ? "true" : "false"};
 function toggleFab(btn){
   btn.classList.toggle('open');
   document.getElementById('fab-actions').classList.toggle('show');
@@ -158,6 +165,24 @@ async function mailAction(action,btn){
     s.textContent=d.ok?'\\u2705 '+d.message:'\\u274c '+(d.error||'操作失败');
     if(d.ok){document.querySelectorAll('.fab-btn').forEach(function(b){b.disabled=true})}
   }catch(e){s.textContent='\\u274c 网络错误'}
+}
+async function toggleStar(btn){
+  var s=document.getElementById('fab-status');
+  btn.disabled=true;s.className='fab-status show';s.textContent='处理中...';
+  try{
+    var r=await fetch('/api/mail/${encodeURIComponent(messageId)}/toggle-star',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({accountId:${accountId},token:'${token}',starred:!_starred})
+    });
+    var d=await r.json();
+    if(d.ok){
+      _starred=!_starred;
+      btn.className=_starred?'fab-btn starred':'fab-btn star';
+      btn.textContent=_starred?'\\u2705 已星标':'\\u2B50 星标';
+      s.textContent='\\u2705 '+d.message;
+    }else{s.textContent='\\u274c '+(d.error||'操作失败')}
+  }catch(e){s.textContent='\\u274c 网络错误'}
+  finally{btn.disabled=false}
 }`;
 }
 
@@ -166,11 +191,13 @@ function MailFab({
   accountId,
   token,
   inJunk,
+  starred,
 }: {
   messageId: string;
   accountId: number;
   token: string;
   inJunk: boolean;
+  starred: boolean;
 }) {
   return (
     <>
@@ -178,6 +205,13 @@ function MailFab({
       <div id="mail-fab">
         <div id="fab-status" class="fab-status" />
         <div id="fab-actions" class="fab-actions">
+          <button
+            type="button"
+            class={`fab-btn ${starred ? "starred" : "star"}`}
+            onclick="toggleStar(this)"
+          >
+            {starred ? "✅ 已星标" : "⭐ 星标"}
+          </button>
           {inJunk ? (
             <>
               <button
@@ -211,7 +245,7 @@ function MailFab({
       </div>
       <script
         dangerouslySetInnerHTML={{
-          __html: fabScript(messageId, accountId, token),
+          __html: fabScript(messageId, accountId, token, starred),
         }}
       />
     </>

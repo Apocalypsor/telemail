@@ -29,3 +29,4 @@ export const ROUTE_JUNK_CHECK_API = "/api/junk-check";
 export const ROUTE_MAIL_MOVE_TO_INBOX = "/api/mail/:id/move-to-inbox";
 export const ROUTE_MAIL_MARK_JUNK = "/api/mail/:id/mark-as-junk";
 export const ROUTE_MAIL_TRASH = "/api/mail/:id/trash";
+export const ROUTE_MAIL_TOGGLE_STAR = "/api/mail/:id/toggle-star";
