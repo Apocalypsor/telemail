@@ -24,6 +24,14 @@ turndown.addRule("stripImages", {
 });
 
 export function htmlToMarkdown(html: string): string {
+  // Fallback: decode quoted-printable if the MIME parser left it un-decoded
+  if (html.includes("=3D"))
+    html = html
+      .replace(/=\r?\n/g, "")
+      .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) =>
+        String.fromCharCode(Number.parseInt(hex, 16)),
+      );
+
   // linkedom can't handle orphan elements between <!doctype> and <html>;
   // they cause document.body to be empty. Strip them before parsing.
   const htmlTagIdx = html.search(/<html[\s>]/i);
