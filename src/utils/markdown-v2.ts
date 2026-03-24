@@ -7,6 +7,10 @@ export function escapeMdV2(str: string): string {
   return str.replace(/([_*[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
 }
 
+/** NUL byte used as placeholder delimiter in slot-based rendering */
+const NUL = "\x00";
+const SLOT_RE = new RegExp(`${NUL}(\\d+)${NUL}`, "g");
+
 type StyleToken = "*" | "_" | "__" | "~" | "||";
 type CodeToken = "`" | "```";
 
@@ -71,7 +75,7 @@ export function markdownToMdV2(md: string): string {
   function ph(s: string): string {
     const idx = slots.length;
     slots.push(s);
-    return `\x00${idx}\x00`;
+    return `${NUL}${idx}${NUL}`;
   }
 
   /** Convert inline Markdown spans, storing results as placeholder slots. */
@@ -201,7 +205,7 @@ export function markdownToMdV2(md: string): string {
   while (result !== prev) {
     prev = result;
     result = result.replace(
-      /\x00(\d+)\x00/g,
+      SLOT_RE,
       (_, idx: string) => slots[parseInt(idx, 10)],
     );
   }

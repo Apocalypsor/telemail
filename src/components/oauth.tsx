@@ -105,6 +105,7 @@ export function OAuthCallbackPage({
               {refreshToken}
             </textarea>
             <button
+              type="button"
               id="copy"
               class="mt-3 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors text-sm"
             >

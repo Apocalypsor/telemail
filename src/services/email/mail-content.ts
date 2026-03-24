@@ -4,6 +4,18 @@ import type { CidMap } from "@utils/html";
 import type { Address } from "postal-mime";
 import type { MailMeta } from "@/types";
 
+interface GmailHeader {
+  name: string;
+  value: string;
+}
+
+interface GmailPayload {
+  mimeType?: string;
+  headers?: GmailHeader[];
+  body?: { data?: string; attachmentId?: string };
+  parts?: GmailPayload[];
+}
+
 export interface FetchMailResult {
   html: string;
   cidMap: CidMap;
@@ -15,7 +27,7 @@ export async function fetchMailContent(
   accessToken: string,
   gmailMessageId: string,
 ): Promise<FetchMailResult | null> {
-  const msg = await gmailGet(
+  const msg = await gmailGet<{ payload: GmailPayload }>(
     accessToken,
     `/users/me/messages/${gmailMessageId}?format=full`,
   );
@@ -36,11 +48,11 @@ export async function fetchMailContent(
   if (pending.length > 0) {
     await Promise.all(
       pending.map(async ({ cid, mimeType, attachmentId }) => {
-        const att = await gmailGet(
+        const att = await gmailGet<{ data?: string }>(
           accessToken,
           `/users/me/messages/${gmailMessageId}/attachments/${attachmentId}`,
         );
-        if (att?.data) {
+        if (att.data) {
           // Gmail 返回的是 base64url，转为标准 base64
           const b64 = att.data.replace(/-/g, "+").replace(/_/g, "/");
           cidMap.set(cid, `data:${mimeType};base64,${b64}`);
@@ -58,19 +70,18 @@ export async function fetchMailContent(
 }
 
 /** 从 Gmail payload headers 中提取指定头部 */
-function extractHeader(payload: any, name: string): string | null {
+function extractHeader(payload: GmailPayload, name: string): string | null {
   return (
-    (payload.headers as any[])?.find(
-      (h: any) => h.name.toLowerCase() === name.toLowerCase(),
-    )?.value ?? null
+    payload.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())
+      ?.value ?? null
   );
 }
 
 /** 递归收集内联图片（body.data 已内嵌的情况） */
-function collectInlineParts(payload: any, cidMap: CidMap): void {
+function collectInlineParts(payload: GmailPayload, cidMap: CidMap): void {
   if (!payload) return;
-  const contentId = (payload.headers as any[])?.find(
-    (h: any) => h.name.toLowerCase() === "content-id",
+  const contentId = payload.headers?.find(
+    (h) => h.name.toLowerCase() === "content-id",
   )?.value;
   if (
     contentId &&
@@ -88,12 +99,12 @@ function collectInlineParts(payload: any, cidMap: CidMap): void {
 
 /** 递归收集需要通过附件 API 获取的内联图片 */
 function collectInlineAttachmentIds(
-  payload: any,
+  payload: GmailPayload,
   result: { cid: string; mimeType: string; attachmentId: string }[],
 ): void {
   if (!payload) return;
-  const contentId = (payload.headers as any[])?.find(
-    (h: any) => h.name.toLowerCase() === "content-id",
+  const contentId = payload.headers?.find(
+    (h) => h.name.toLowerCase() === "content-id",
   )?.value;
   if (
     contentId &&
@@ -113,7 +124,10 @@ function collectInlineAttachmentIds(
 }
 
 /** 递归提取 payload 中指定 MIME 类型的内容 */
-function extractPartByMime(payload: any, mimeType: string): string | null {
+function extractPartByMime(
+  payload: GmailPayload,
+  mimeType: string,
+): string | null {
   if (!payload) return null;
 
   if (payload.mimeType === mimeType && payload.body?.data) {

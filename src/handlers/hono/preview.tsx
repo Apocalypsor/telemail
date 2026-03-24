@@ -45,7 +45,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPError } from "ky";
 import PostalMime from "postal-mime";
 import { MAX_BODY_CHARS } from "@/constants";
-import { AccountType, type AppEnv, type MailMeta } from "@/types";
+import { type Account, AccountType, type AppEnv, type MailMeta } from "@/types";
 
 const preview = new Hono<AppEnv>();
 
@@ -139,7 +139,7 @@ preview.get(ROUTE_MAIL, async (c) => {
   const pageProps = {
     messageId,
     accountId: account.id,
-    token: token!,
+    token: token as string,
     inJunk,
     accountEmail: account.email,
   };
@@ -228,7 +228,7 @@ preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
           deliverEmailToTelegram(
             raw,
             messageId,
-            account!,
+            account as Account,
             c.env,
             c.executionCtx.waitUntil.bind(c.executionCtx),
           ),

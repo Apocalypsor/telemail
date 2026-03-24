@@ -43,7 +43,7 @@ function MailMetaHeader({
   accountEmail?: string | null;
 }) {
   if (!meta.subject && !meta.from && !meta.to && !accountEmail && !meta.date)
-    return <></>;
+    return null;
 
   return (
     <div
@@ -181,17 +181,23 @@ function MailFab({
           {inJunk ? (
             <>
               <button
+                type="button"
                 class="fab-btn inbox"
                 onclick="mailAction('move-to-inbox',this)"
               >
                 📥 移到收件箱
               </button>
-              <button class="fab-btn del" onclick="mailAction('trash',this)">
+              <button
+                type="button"
+                class="fab-btn del"
+                onclick="mailAction('trash',this)"
+              >
                 🗑 删除邮件
               </button>
             </>
           ) : (
             <button
+              type="button"
               class="fab-btn del"
               onclick="mailAction('mark-as-junk',this)"
             >
@@ -199,7 +205,7 @@ function MailFab({
             </button>
           )}
         </div>
-        <button class="fab-main" onclick="toggleFab(this)">
+        <button type="button" class="fab-main" onclick="toggleFab(this)">
           ⚡
         </button>
       </div>

@@ -147,15 +147,15 @@ export async function sendWithAttachments(
         if (!(err instanceof HTTPError)) throw err;
         const { response } = err;
 
-        const errBody = (await response.json()) as any;
+        const errBody = (await response.json()) as { description?: string };
         console.error("TG sendDocument failed payload:", {
           chatId,
           captionLength: caption.length,
           filename: att.filename || "attachment",
-          description: errBody?.description,
+          description: errBody.description,
         });
 
-        if (isEntityParseError(errBody?.description)) {
+        if (isEntityParseError(errBody.description)) {
           console.warn(
             "TG sendDocument parse_mode failed, retrying as plain caption",
           );
@@ -194,8 +194,10 @@ export async function sendWithAttachments(
       }
       return textMsgId;
     }
-  } catch (e: any) {
-    throw new Error(`发送附件消息异常: ${e.message}`);
+  } catch (e) {
+    throw new Error(
+      `发送附件消息异常: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 
@@ -293,15 +295,15 @@ async function sendMediaGroupChunk(
     if (!(err instanceof HTTPError)) throw err;
     const { response } = err;
 
-    const errBody = (await response.json()) as any;
+    const errBody = (await response.json()) as { description?: string };
     console.error("TG sendMediaGroup failed payload:", {
       chatId,
       captionLength: caption.length,
       attachments: attachments.length,
-      description: errBody?.description,
+      description: errBody.description,
     });
 
-    if (isEntityParseError(errBody?.description) && caption) {
+    if (isEntityParseError(errBody.description) && caption) {
       console.warn(
         "TG sendMediaGroup parse_mode failed, retrying as plain caption",
       );

@@ -150,9 +150,9 @@ async function editMessageWithAnalysis(
       : editTextMessage(tgToken, chatId, tgMessageId, newText, keyboard);
 
   const result = await analyzeEmail(
-    env.LLM_API_URL!,
-    env.LLM_API_KEY!,
-    env.LLM_MODEL!,
+    env.LLM_API_URL as string,
+    env.LLM_API_KEY as string,
+    env.LLM_MODEL as string,
     subject,
     plainBody,
   );
@@ -206,7 +206,7 @@ export async function fetchRawEmailByType(
   }
   // Gmail
   const token = await getAccessToken(env, account);
-  const gmailMsg = await gmailGet(
+  const gmailMsg = await gmailGet<{ raw: string }>(
     token,
     `/users/me/messages/${messageId}?format=raw`,
   );

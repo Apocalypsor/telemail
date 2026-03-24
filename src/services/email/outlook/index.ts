@@ -13,6 +13,23 @@ import {
 } from "@/constants";
 import { type Account, AccountType, type Env } from "@/types";
 
+// ─── Graph API response shapes ───────────────────────────────────────────────
+
+interface GraphMessage {
+  id: string;
+  subject?: string;
+  parentFolderId?: string;
+  flag?: { flagStatus: string };
+}
+
+interface GraphMessageList {
+  value?: GraphMessage[];
+}
+
+interface GraphFolder {
+  id: string;
+}
+
 // ─── OAuth2 ──────────────────────────────────────────────────────────────────
 
 /** 用 refresh_token 换 access_token，带 KV 缓存 */
@@ -34,8 +51,8 @@ export async function getAccessToken(
     data = (await http
       .post(MS_OAUTH_TOKEN_URL, {
         body: new URLSearchParams({
-          client_id: env.MS_CLIENT_ID!,
-          client_secret: env.MS_CLIENT_SECRET!,
+          client_id: env.MS_CLIENT_ID as string,
+          client_secret: env.MS_CLIENT_SECRET as string,
           refresh_token: account.refresh_token,
           grant_type: "refresh_token",
           scope: MS_MAIL_SCOPE,
@@ -66,12 +83,12 @@ export async function getAccessToken(
 // ─── REST helpers ────────────────────────────────────────────────────────────
 
 /** 调用 Graph API (GET) */
-export async function graphGet(token: string, path: string): Promise<any> {
+export async function graphGet<T>(token: string, path: string): Promise<T> {
   return http
     .get(`${MS_GRAPH_API}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    .json();
+    .json() as Promise<T>;
 }
 
 /** 调用 Graph API (PATCH with JSON body) */
@@ -87,17 +104,17 @@ export async function graphPatch(
 }
 
 /** 调用 Graph API (POST with JSON body) */
-export async function graphPost(
+export async function graphPost<T = void>(
   token: string,
   path: string,
   body: Record<string, unknown>,
-): Promise<any> {
+): Promise<T> {
   const resp = await http.post(`${MS_GRAPH_API}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     json: body,
   });
   const text = await resp.text();
-  return text ? JSON.parse(text) : null;
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 /** 调用 Graph API (DELETE) */
@@ -151,7 +168,10 @@ export async function isStarred(
   token: string,
   messageId: string,
 ): Promise<boolean> {
-  const msg = await graphGet(token, `/me/messages/${messageId}?$select=flag`);
+  const msg = await graphGet<GraphMessage>(
+    token,
+    `/me/messages/${messageId}?$select=flag`,
+  );
   return msg.flag?.flagStatus === "flagged";
 }
 
@@ -160,12 +180,12 @@ export async function isJunk(
   token: string,
   messageId: string,
 ): Promise<boolean> {
-  const msg = await graphGet(
+  const msg = await graphGet<GraphMessage>(
     token,
     `/me/messages/${messageId}?$select=parentFolderId`,
   );
   if (!msg.parentFolderId) return false;
-  const junkFolder = await graphGet(
+  const junkFolder = await graphGet<GraphFolder>(
     token,
     `/me/mailFolders('JunkEmail')?$select=id`,
   );
@@ -177,15 +197,12 @@ export async function listUnreadMessages(
   token: string,
   top: number = 20,
 ): Promise<{ id: string; subject?: string }[]> {
-  const data = await graphGet(
+  const data = await graphGet<GraphMessageList>(
     token,
     `/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$select=id,subject&$top=${top}`,
   );
   if (!data.value) return [];
-  return (data.value as { id: string; subject?: string }[]).map((m) => ({
-    id: m.id,
-    subject: m.subject,
-  }));
+  return data.value.map((m) => ({ id: m.id, subject: m.subject }));
 }
 
 /** 列出星标邮件（最多 top 条），含标题 */
@@ -193,15 +210,12 @@ export async function listStarredMessages(
   token: string,
   top: number = 20,
 ): Promise<{ id: string; subject?: string }[]> {
-  const data = await graphGet(
+  const data = await graphGet<GraphMessageList>(
     token,
     `/me/messages?$filter=flag/flagStatus eq 'flagged'&$select=id,subject&$top=${top}`,
   );
   if (!data.value) return [];
-  return (data.value as { id: string; subject?: string }[]).map((m) => ({
-    id: m.id,
-    subject: m.subject,
-  }));
+  return data.value.map((m) => ({ id: m.id, subject: m.subject }));
 }
 
 /** 列出垃圾邮件（最多 top 条），含标题 */
@@ -209,15 +223,12 @@ export async function listJunkMessages(
   token: string,
   top: number = 20,
 ): Promise<{ id: string; subject?: string }[]> {
-  const data = await graphGet(
+  const data = await graphGet<GraphMessageList>(
     token,
     `/me/mailFolders('JunkEmail')/messages?$select=id,subject&$top=${top}`,
   );
   if (!data.value) return [];
-  return (data.value as { id: string; subject?: string }[]).map((m) => ({
-    id: m.id,
-    subject: m.subject,
-  }));
+  return data.value.map((m) => ({ id: m.id, subject: m.subject }));
 }
 
 /** 将邮件标记为垃圾邮件（移到 JunkEmail 文件夹） */
@@ -252,12 +263,12 @@ export async function trashMessage(
 
 /** 清空所有垃圾邮件（移到回收站） */
 export async function trashAllJunk(token: string): Promise<number> {
-  const data = await graphGet(
+  const data = await graphGet<GraphMessageList>(
     token,
     `/me/mailFolders('JunkEmail')/messages?$select=id&$top=100`,
   );
   if (!data.value || data.value.length === 0) return 0;
-  const ids = (data.value as { id: string }[]).map((m) => m.id);
+  const ids = data.value.map((m) => m.id);
   await Promise.all(
     ids.map((id) =>
       graphPost(token, `/me/messages/${id}/move`, {

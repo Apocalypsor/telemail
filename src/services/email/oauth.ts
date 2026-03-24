@@ -232,7 +232,7 @@ export function createOAuthHandler(config: OAuthProviderConfig) {
         try {
           const freshAccount = {
             ...account,
-            refresh_token: (refreshToken || account.refresh_token)!,
+            refresh_token: (refreshToken || account.refresh_token) as string,
             email: accountEmail !== "unknown" ? accountEmail : account.email,
           };
           await config.onAuthorized(env, freshAccount);

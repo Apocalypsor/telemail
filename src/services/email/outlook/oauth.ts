@@ -27,8 +27,8 @@ const handler = createOAuthHandler({
   statePrefix: "ms:",
   extraAuthorizeParams: { response_mode: "query" },
   getCredentials: (env) => ({
-    clientId: env.MS_CLIENT_ID!,
-    clientSecret: env.MS_CLIENT_SECRET!,
+    clientId: env.MS_CLIENT_ID as string,
+    clientSecret: env.MS_CLIENT_SECRET as string,
   }),
   extraTokenBody: () => ({ scope: MS_MAIL_SCOPE }),
   fetchEmail: async (accessToken) => {

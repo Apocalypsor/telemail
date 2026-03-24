@@ -45,9 +45,9 @@ export function PreviewPage() {
             />
           </div>
           <div>
-            <label class="block text-sm text-slate-400 mb-1.5">
+            <span class="block text-sm text-slate-400 mb-1.5">
               输出 MarkdownV2
-            </label>
+            </span>
             <div
               id="output"
               class="min-h-[300px] p-3 bg-slate-900 border border-slate-700 rounded-lg text-blue-300 font-mono text-xs whitespace-pre-wrap break-all overflow-auto"

@@ -84,7 +84,7 @@ export function registerStartHandlers(bot: Bot, env: Env) {
     if (!isAdmin(String(ctx.from.id), env)) {
       return ctx.answerCallbackQuery({ text: "无权操作" });
     }
-    const [, action, targetId] = ctx.match!;
+    const [, action, targetId] = ctx.match as RegExpMatchArray;
     const user = await getUserByTelegramId(env.DB, targetId);
     if (!user) {
       return ctx.answerCallbackQuery({ text: "用户不存在" });

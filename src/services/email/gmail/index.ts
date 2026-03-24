@@ -12,6 +12,40 @@ import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from "@/constants";
 import type { Account, Env } from "@/types";
 import { AccountType } from "@/types";
 
+// ─── Gmail API response shapes ───────────────────────────────────────────────
+
+interface GmailMessage {
+  id: string;
+  labelIds?: string[];
+  raw?: string;
+  payload?: {
+    headers?: { name: string; value: string }[];
+    [key: string]: unknown;
+  };
+}
+
+interface GmailMessageList {
+  messages?: { id: string }[];
+  nextPageToken?: string;
+}
+
+interface GmailHistoryResponse {
+  history?: {
+    messagesAdded?: { message: GmailMessage }[];
+  }[];
+  historyId?: string;
+  nextPageToken?: string;
+}
+
+interface GmailWatchResponse {
+  historyId?: string;
+  expiration?: string;
+}
+
+interface GmailProfile {
+  historyId: string;
+}
+
 // ─── OAuth2 ──────────────────────────────────────────────────────────────────
 
 /** 用 refresh_token 换 access_token，带 KV 缓存（按账号隔离） */
@@ -65,26 +99,26 @@ export async function getAccessToken(
 // ─── REST helpers ────────────────────────────────────────────────────────────
 
 /** 调用 Gmail REST API (GET) */
-export async function gmailGet(token: string, path: string): Promise<any> {
+export async function gmailGet<T>(token: string, path: string): Promise<T> {
   return http
     .get(`${GMAIL_API}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    .json();
+    .json() as Promise<T>;
 }
 
 /** 调用 Gmail REST API (POST with JSON body) */
-export async function gmailPost(
+export async function gmailPost<T = void>(
   token: string,
   path: string,
   body: Record<string, unknown>,
-): Promise<any> {
+): Promise<T> {
   const resp = await http.post(`${GMAIL_API}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     json: body,
   });
   const text = await resp.text();
-  return text ? JSON.parse(text) : null;
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 // ─── Message actions ─────────────────────────────────────────────────────────
@@ -121,11 +155,11 @@ export async function isStarred(
   token: string,
   messageId: string,
 ): Promise<boolean> {
-  const msg = await gmailGet(
+  const msg = await gmailGet<GmailMessage>(
     token,
     `/users/me/messages/${messageId}?format=MINIMAL`,
   );
-  return (msg.labelIds as string[] | undefined)?.includes("STARRED") ?? false;
+  return msg.labelIds?.includes("STARRED") ?? false;
 }
 
 /** 检查邮件是否在垃圾邮件文件夹 */
@@ -133,11 +167,11 @@ export async function isJunk(
   token: string,
   messageId: string,
 ): Promise<boolean> {
-  const msg = await gmailGet(
+  const msg = await gmailGet<GmailMessage>(
     token,
     `/users/me/messages/${messageId}?format=MINIMAL`,
   );
-  return (msg.labelIds as string[] | undefined)?.includes("SPAM") ?? false;
+  return msg.labelIds?.includes("SPAM") ?? false;
 }
 
 /** 列出未读邮件（最多 maxResults 条），含标题 */
@@ -145,22 +179,22 @@ export async function listUnreadMessages(
   token: string,
   maxResults: number = 20,
 ): Promise<{ id: string; subject?: string }[]> {
-  const data = await gmailGet(
+  const data = await gmailGet<GmailMessageList>(
     token,
     `/users/me/messages?q=is:unread&maxResults=${maxResults}`,
   );
   if (!data.messages) return [];
-  const ids = (data.messages as { id: string }[]).map((m) => m.id);
+  const ids = data.messages.map((m) => m.id);
   const details = await Promise.all(
     ids.map(async (id) => {
       try {
-        const msg = await gmailGet(
+        const msg = await gmailGet<GmailMessage>(
           token,
           `/users/me/messages/${id}?format=METADATA&metadataHeaders=Subject`,
         );
-        const subjectHeader = (
-          msg.payload?.headers as { name: string; value: string }[]
-        )?.find((h: { name: string }) => h.name.toLowerCase() === "subject");
+        const subjectHeader = msg.payload?.headers?.find(
+          (h) => h.name.toLowerCase() === "subject",
+        );
         return { id, subject: subjectHeader?.value };
       } catch {
         return { id };
@@ -175,22 +209,22 @@ export async function listStarredMessages(
   token: string,
   maxResults: number = 20,
 ): Promise<{ id: string; subject?: string }[]> {
-  const data = await gmailGet(
+  const data = await gmailGet<GmailMessageList>(
     token,
     `/users/me/messages?q=is:starred&maxResults=${maxResults}`,
   );
   if (!data.messages) return [];
-  const ids = (data.messages as { id: string }[]).map((m) => m.id);
+  const ids = data.messages.map((m) => m.id);
   const details = await Promise.all(
     ids.map(async (id) => {
       try {
-        const msg = await gmailGet(
+        const msg = await gmailGet<GmailMessage>(
           token,
           `/users/me/messages/${id}?format=METADATA&metadataHeaders=Subject`,
         );
-        const subjectHeader = (
-          msg.payload?.headers as { name: string; value: string }[]
-        )?.find((h: { name: string }) => h.name.toLowerCase() === "subject");
+        const subjectHeader = msg.payload?.headers?.find(
+          (h) => h.name.toLowerCase() === "subject",
+        );
         return { id, subject: subjectHeader?.value };
       } catch {
         return { id };
@@ -205,22 +239,22 @@ export async function listJunkMessages(
   token: string,
   maxResults: number = 20,
 ): Promise<{ id: string; subject?: string }[]> {
-  const data = await gmailGet(
+  const data = await gmailGet<GmailMessageList>(
     token,
     `/users/me/messages?q=in:spam&maxResults=${maxResults}`,
   );
   if (!data.messages) return [];
-  const ids = (data.messages as { id: string }[]).map((m) => m.id);
+  const ids = data.messages.map((m) => m.id);
   const details = await Promise.all(
     ids.map(async (id) => {
       try {
-        const msg = await gmailGet(
+        const msg = await gmailGet<GmailMessage>(
           token,
           `/users/me/messages/${id}?format=METADATA&metadataHeaders=Subject`,
         );
-        const subjectHeader = (
-          msg.payload?.headers as { name: string; value: string }[]
-        )?.find((h: { name: string }) => h.name.toLowerCase() === "subject");
+        const subjectHeader = msg.payload?.headers?.find(
+          (h) => h.name.toLowerCase() === "subject",
+        );
         return { id, subject: subjectHeader?.value };
       } catch {
         return { id };
@@ -262,12 +296,12 @@ export async function trashMessage(
 
 /** 清空所有垃圾邮件（移入回收站，gmail.modify 权限即可） */
 export async function trashAllJunk(token: string): Promise<number> {
-  const data = await gmailGet(
+  const data = await gmailGet<GmailMessageList>(
     token,
     "/users/me/messages?q=in:spam&maxResults=100",
   );
   if (!data.messages) return 0;
-  const ids = (data.messages as { id: string }[]).map((m) => m.id);
+  const ids = data.messages.map((m) => m.id);
   await gmailPost(token, "/users/me/messages/batchModify", {
     ids,
     addLabelIds: ["TRASH"],
@@ -288,7 +322,7 @@ export async function stopWatch(env: Env, account: Account): Promise<void> {
 /** 为单个账号注册 / 续订 Gmail push 通知 (watch) */
 export async function renewWatch(env: Env, account: Account): Promise<void> {
   const token = await getAccessToken(env, account);
-  const result = await gmailPost(token, "/users/me/watch", {
+  const result = await gmailPost<GmailWatchResponse>(token, "/users/me/watch", {
     topicName: env.GMAIL_PUBSUB_TOPIC,
     labelIds: ["INBOX"],
   });
@@ -342,15 +376,18 @@ export async function fetchNewMessageIds(
     let path = `/users/me/history?startHistoryId=${storedHistoryId}&historyTypes=messageAdded&labelId=INBOX`;
     if (pageToken) path += `&pageToken=${pageToken}`;
 
-    let history: Record<string, any>;
+    let history: GmailHistoryResponse;
     try {
-      history = await gmailGet(token, path);
+      history = await gmailGet<GmailHistoryResponse>(token, path);
     } catch (err) {
       if (err instanceof HTTPError && err.response.status === 404) {
         // historyId 过老，重新同步
         console.warn(`historyId expired for ${account.email}, resetting`);
-        const profile = await gmailGet(token, "/users/me/profile");
-        await putHistoryId(env, account.id, String(profile.historyId));
+        const profile = await gmailGet<GmailProfile>(
+          token,
+          "/users/me/profile",
+        );
+        await putHistoryId(env, account.id, profile.historyId);
         return [];
       }
       throw err;
