@@ -3,78 +3,78 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "gmail-tg-bridge",
-	"main": "src/index.ts",
-	"compatibility_date": "2026-02-19",
-	"observability": {
-		"enabled": true,
-	},
-	"compatibility_flags": ["nodejs_compat"],
-	"vars": {
-		"WORKER_NAME": "gmail-tg-bridge",
-	},
-	"workers_dev": true,
-	"preview_urls": true,
-	/**
-	 * D1 Database — 多账号信息（email / chat_id / refresh_token / history_id）
-	 * 先运行: pnpm wrangler d1 create gmail-tg-bridge
-	 * 然后把返回的 database_id 填入下方
-	 * 再运行: pnpm wrangler d1 migrations apply gmail-tg-bridge
-	 */
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "gmail-tg-bridge",
-			"database_id": "ed82b3d6-e172-43d6-a9cd-896269dc9b33",
-			"migrations_dir": "migrations",
-		},
-	],
-	/**
-	 * KV Namespace — access_token 缓存、消息去重、OAuth state
-	 * 先运行: pnpm wrangler kv namespace create EMAIL_KV
-	 * 然后把返回的 id 填入下方
-	 */
-	"kv_namespaces": [
-		{
-			"binding": "EMAIL_KV",
-			"id": "69833c83d492434484afcdf4825bb462",
-		},
-	],
-	/**
-	 * Service Binding — 统一错误上报到 Observability Hub
-	 */
-	"services": [
-		{
-			"binding": "OBS_SERVICE",
-			"service": "workers-observability-hub",
-		},
-	],
-	/**
-	 * Queue — 邮件处理队列（sync + message），串行消费，内置重试
-	 * 先运行: pnpm wrangler queues create gmail-tg-queue
-	 */
-	"queues": {
-		"producers": [
-			{
-				"queue": "gmail-tg-queue",
-				"binding": "EMAIL_QUEUE",
-			},
-		],
-		"consumers": [
-			{
-				"queue": "gmail-tg-queue",
-				"max_batch_size": 5,
-				"max_batch_timeout": 1,
-				"max_retries": 3,
-				"max_concurrency": 3,
-			},
-		],
-	},
-	/**
-	 * Cron Trigger — 每小时执行：检查 IMAP 中间件健康；凌晨额外续订 Gmail watch
-	 */
-	"triggers": {
-		"crons": ["0 * * * *"],
-	},
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gmail-tg-bridge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-19",
+  "observability": {
+    "enabled": true
+  },
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "WORKER_NAME": "gmail-tg-bridge"
+  },
+  "workers_dev": true,
+  "preview_urls": true,
+  /**
+   * D1 Database — 多账号信息（email / chat_id / refresh_token / history_id）
+   * 先运行: pnpm wrangler d1 create gmail-tg-bridge
+   * 然后把返回的 database_id 填入下方
+   * 再运行: pnpm wrangler d1 migrations apply gmail-tg-bridge
+   */
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gmail-tg-bridge",
+      "database_id": "ed82b3d6-e172-43d6-a9cd-896269dc9b33",
+      "migrations_dir": "migrations"
+    }
+  ],
+  /**
+   * KV Namespace — access_token 缓存、消息去重、OAuth state
+   * 先运行: pnpm wrangler kv namespace create EMAIL_KV
+   * 然后把返回的 id 填入下方
+   */
+  "kv_namespaces": [
+    {
+      "binding": "EMAIL_KV",
+      "id": "69833c83d492434484afcdf4825bb462"
+    }
+  ],
+  /**
+   * Service Binding — 统一错误上报到 Observability Hub
+   */
+  "services": [
+    {
+      "binding": "OBS_SERVICE",
+      "service": "workers-observability-hub"
+    }
+  ],
+  /**
+   * Queue — 邮件处理队列（sync + message），串行消费，内置重试
+   * 先运行: pnpm wrangler queues create gmail-tg-queue
+   */
+  "queues": {
+    "producers": [
+      {
+        "queue": "gmail-tg-queue",
+        "binding": "EMAIL_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "gmail-tg-queue",
+        "max_batch_size": 5,
+        "max_batch_timeout": 1,
+        "max_retries": 3,
+        "max_concurrency": 3
+      }
+    ]
+  },
+  /**
+   * Cron Trigger — 每小时执行：检查 IMAP 中间件健康；凌晨额外续订 Gmail watch
+   */
+  "triggers": {
+    "crons": ["0 * * * *"]
+  }
 }

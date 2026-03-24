@@ -1,38 +1,51 @@
-import { MAX_BODY_CHARS } from '@/constants';
-import { AccountType, type AppEnv, type MailMeta } from '@/types';
-import { JunkCheckPage } from '@components/junk-check';
-import { MailPage } from '@components/mail-page';
-import { PreviewPage } from '@components/preview';
-import { getAccountByEmail, getAccountById } from '@db/accounts';
-import { getCachedMailData, putCachedMailData } from '@db/kv';
-import { deleteMappingByEmailId, getMappingsByEmailIds } from '@db/message-map';
-import { requireTelegramLogin } from '@handlers/hono/middleware';
+import { JunkCheckPage } from "@components/junk-check";
+import { MailPage } from "@components/mail-page";
+import { PreviewPage } from "@components/preview";
+import { getAccountByEmail, getAccountById } from "@db/accounts";
+import { getCachedMailData, putCachedMailData } from "@db/kv";
+import { deleteMappingByEmailId, getMappingsByEmailIds } from "@db/message-map";
+import { requireTelegramLogin } from "@handlers/hono/middleware";
 import {
-	ROUTE_CORS_PROXY,
-	ROUTE_JUNK_CHECK,
-	ROUTE_JUNK_CHECK_API,
-	ROUTE_MAIL,
-	ROUTE_MAIL_MARK_JUNK,
-	ROUTE_MAIL_MOVE_TO_INBOX,
-	ROUTE_MAIL_TRASH,
-	ROUTE_PREVIEW,
-	ROUTE_PREVIEW_API,
-} from '@handlers/hono/routes';
-import { deliverEmailToTelegram, fetchRawEmailByType } from '@services/bridge';
-import { getAccessToken } from '@services/email/gmail';
-import { fetchMailContent, formatAddress, wrapPlainText } from '@services/email/mail-content';
-import { getEmailProvider } from '@services/email/provider';
-import { analyzeEmail } from '@services/llm';
-import { deleteMessage } from '@services/telegram';
-import { formatBody } from '@utils/format';
-import { verifyMailToken, verifyMailTokenById, verifyProxySignature } from '@utils/hash';
-import { type CidMap, buildCidMapFromAttachments, proxyImages, replaceCidReferences } from '@utils/html';
-import { http } from '@utils/http';
-import { Hono } from 'hono';
-import { raw } from 'hono/html';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { HTTPError } from 'ky';
-import PostalMime from 'postal-mime';
+  ROUTE_CORS_PROXY,
+  ROUTE_JUNK_CHECK,
+  ROUTE_JUNK_CHECK_API,
+  ROUTE_MAIL,
+  ROUTE_MAIL_MARK_JUNK,
+  ROUTE_MAIL_MOVE_TO_INBOX,
+  ROUTE_MAIL_TRASH,
+  ROUTE_PREVIEW,
+  ROUTE_PREVIEW_API,
+} from "@handlers/hono/routes";
+import { deliverEmailToTelegram, fetchRawEmailByType } from "@services/bridge";
+import { getAccessToken } from "@services/email/gmail";
+import {
+  fetchMailContent,
+  formatAddress,
+  wrapPlainText,
+} from "@services/email/mail-content";
+import { getEmailProvider } from "@services/email/provider";
+import { analyzeEmail } from "@services/llm";
+import { deleteMessage } from "@services/telegram";
+import { formatBody } from "@utils/format";
+import {
+  verifyMailToken,
+  verifyMailTokenById,
+  verifyProxySignature,
+} from "@utils/hash";
+import {
+  buildCidMapFromAttachments,
+  type CidMap,
+  proxyImages,
+  replaceCidReferences,
+} from "@utils/html";
+import { http } from "@utils/http";
+import { Hono } from "hono";
+import { raw } from "hono/html";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { HTTPError } from "ky";
+import PostalMime from "postal-mime";
+import { MAX_BODY_CHARS } from "@/constants";
+import { AccountType, type AppEnv, type MailMeta } from "@/types";
 
 const preview = new Hono<AppEnv>();
 
@@ -41,205 +54,286 @@ const loginGuard = requireTelegramLogin();
 // ─── HTML 格式化预览工具 ─────────────────────────────────────────────────────
 
 preview.get(ROUTE_PREVIEW, loginGuard, (c) => {
-	return c.html(<PreviewPage />);
+  return c.html(<PreviewPage />);
 });
 
 preview.post(ROUTE_PREVIEW_API, loginGuard, async (c) => {
-	const { html } = await c.req.json<{ html?: string }>();
-	if (!html) return c.json({ result: '', length: 0 });
-	const result = formatBody(undefined, html, MAX_BODY_CHARS);
-	return c.json({ result, length: result.length });
+  const { html } = await c.req.json<{ html?: string }>();
+  if (!html) return c.json({ result: "", length: 0 });
+  const result = formatBody(undefined, html, MAX_BODY_CHARS);
+  return c.json({ result, length: result.length });
 });
 
 // ─── 垃圾邮件检测工具 ────────────────────────────────────────────────────────
 
 preview.get(ROUTE_JUNK_CHECK, loginGuard, (c) => {
-	return c.html(<JunkCheckPage />);
+  return c.html(<JunkCheckPage />);
 });
 
 preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
-	const { subject, body } = await c.req.json<{ subject?: string; body?: string }>();
-	if (!c.env.LLM_API_URL || !c.env.LLM_API_KEY || !c.env.LLM_MODEL) return c.json({ error: 'LLM not configured' }, 500);
-	const result = await analyzeEmail(c.env.LLM_API_URL, c.env.LLM_API_KEY, c.env.LLM_MODEL, subject ?? '', body ?? '');
-	return c.json({ isJunk: result.isJunk, junkConfidence: result.junkConfidence, summary: result.summary, tags: result.tags });
+  const { subject, body } = await c.req.json<{
+    subject?: string;
+    body?: string;
+  }>();
+  if (!c.env.LLM_API_URL || !c.env.LLM_API_KEY || !c.env.LLM_MODEL)
+    return c.json({ error: "LLM not configured" }, 500);
+  const result = await analyzeEmail(
+    c.env.LLM_API_URL,
+    c.env.LLM_API_KEY,
+    c.env.LLM_MODEL,
+    subject ?? "",
+    body ?? "",
+  );
+  return c.json({
+    isJunk: result.isJunk,
+    junkConfidence: result.junkConfidence,
+    summary: result.summary,
+    tags: result.tags,
+  });
 });
 
 // ─── 邮件内容预览 ────────────────────────────────────────────────────────────
 
 preview.get(ROUTE_MAIL, async (c) => {
-	const messageId = c.req.param('id');
-	const token = c.req.query('t');
-	// 新格式：accountId（推荐）；旧格式：email + chatId（向后兼容）
-	const accountIdParam = c.req.query('accountId');
-	const chatId = c.req.query('chatId');
-	const accountEmail = c.req.query('email');
+  const messageId = c.req.param("id");
+  const token = c.req.query("t");
+  // 新格式：accountId（推荐）；旧格式：email + chatId（向后兼容）
+  const accountIdParam = c.req.query("accountId");
+  const chatId = c.req.query("chatId");
+  const accountEmail = c.req.query("email");
 
-	if (!messageId || !token) return c.text('Missing params', 400);
+  if (!messageId || !token) return c.text("Missing params", 400);
 
-	let account = null;
-	if (accountIdParam) {
-		const accountId = Number(accountIdParam);
-		if (!Number.isInteger(accountId) || accountId <= 0) return c.text('Invalid accountId', 400);
-		const valid = await verifyMailTokenById(c.env.ADMIN_SECRET, messageId, accountId, token);
-		if (!valid) return c.text('Forbidden', 403);
-		account = await getAccountById(c.env.DB, accountId);
-	} else {
-		if (!chatId || !accountEmail) return c.text('Missing params', 400);
-		const valid = await verifyMailToken(c.env.ADMIN_SECRET, messageId, accountEmail, chatId, token);
-		if (!valid) return c.text('Forbidden', 403);
-		account = await getAccountByEmail(c.env.DB, accountEmail);
-		if (account && account.chat_id !== chatId) account = null;
-	}
+  let account = null;
+  if (accountIdParam) {
+    const accountId = Number(accountIdParam);
+    if (!Number.isInteger(accountId) || accountId <= 0)
+      return c.text("Invalid accountId", 400);
+    const valid = await verifyMailTokenById(
+      c.env.ADMIN_SECRET,
+      messageId,
+      accountId,
+      token,
+    );
+    if (!valid) return c.text("Forbidden", 403);
+    account = await getAccountById(c.env.DB, accountId);
+  } else {
+    if (!chatId || !accountEmail) return c.text("Missing params", 400);
+    const valid = await verifyMailToken(
+      c.env.ADMIN_SECRET,
+      messageId,
+      accountEmail,
+      chatId,
+      token,
+    );
+    if (!valid) return c.text("Forbidden", 403);
+    account = await getAccountByEmail(c.env.DB, accountEmail);
+    if (account && account.chat_id !== chatId) account = null;
+  }
 
-	if (!account) return c.text('Account not found', 404);
+  if (!account) return c.text("Account not found", 404);
 
-	// 检查邮件是否在垃圾邮件文件夹，决定 FAB 按钮
-	const provider = getEmailProvider(account, c.env);
-	const inJunk = await provider.isJunk(messageId).catch(() => false);
-	const pageProps = { messageId, accountId: account.id, token: token!, inJunk, accountEmail: account.email };
+  // 检查邮件是否在垃圾邮件文件夹，决定 FAB 按钮
+  const provider = getEmailProvider(account, c.env);
+  const inJunk = await provider.isJunk(messageId).catch(() => false);
+  const pageProps = {
+    messageId,
+    accountId: account.id,
+    token: token!,
+    inJunk,
+    accountEmail: account.email,
+  };
 
-	// KV 缓存（所有类型共用）
-	const cached = await getCachedMailData(c.env, messageId);
-	if (cached) {
-		const proxied = await proxyImages(cached.html, c.env.ADMIN_SECRET);
-		return c.html(
-			<MailPage meta={cached.meta ?? {}} {...pageProps}>
-				{raw(proxied)}
-			</MailPage>,
-		);
-	}
+  // KV 缓存（所有类型共用）
+  const cached = await getCachedMailData(c.env, messageId);
+  if (cached) {
+    const proxied = await proxyImages(cached.html, c.env.ADMIN_SECRET);
+    return c.html(
+      <MailPage meta={cached.meta ?? {}} {...pageProps}>
+        {raw(proxied)}
+      </MailPage>,
+    );
+  }
 
-	let html: string | null = null;
-	let cidMap: CidMap = new Map();
-	let meta: MailMeta = {};
+  let html: string | null = null;
+  let cidMap: CidMap = new Map();
+  let meta: MailMeta = {};
 
-	if (account.type === AccountType.Gmail) {
-		if (!account.refresh_token) return c.text('Account not authorized', 403);
-		const accessToken = await getAccessToken(c.env, account);
-		const result = await fetchMailContent(accessToken, messageId);
-		if (result) {
-			html = result.html;
-			cidMap = result.cidMap;
-			meta = result.meta;
-		}
-	} else {
-		// IMAP + Outlook: 获取原始 MIME 并解析
-		if (account.type !== AccountType.Imap && !account.refresh_token) return c.text('Account not authorized', 403);
-		const rawEmail = await fetchRawEmailByType(account, messageId, c.env, inJunk ? 'junk' : 'inbox');
-		const email = await new PostalMime().parse(rawEmail);
-		html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
-		cidMap = buildCidMapFromAttachments(email.attachments);
-		meta = {
-			subject: email.subject ?? null,
-			from: email.from ? formatAddress(email.from) : null,
-			to: email.to?.map(formatAddress).join(', ') ?? null,
-			date: email.date ?? null,
-		};
-	}
+  if (account.type === AccountType.Gmail) {
+    if (!account.refresh_token) return c.text("Account not authorized", 403);
+    const accessToken = await getAccessToken(c.env, account);
+    const result = await fetchMailContent(accessToken, messageId);
+    if (result) {
+      html = result.html;
+      cidMap = result.cidMap;
+      meta = result.meta;
+    }
+  } else {
+    // IMAP + Outlook: 获取原始 MIME 并解析
+    if (account.type !== AccountType.Imap && !account.refresh_token)
+      return c.text("Account not authorized", 403);
+    const rawEmail = await fetchRawEmailByType(
+      account,
+      messageId,
+      c.env,
+      inJunk ? "junk" : "inbox",
+    );
+    const email = await new PostalMime().parse(rawEmail);
+    html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
+    cidMap = buildCidMapFromAttachments(email.attachments);
+    meta = {
+      subject: email.subject ?? null,
+      from: email.from ? formatAddress(email.from) : null,
+      to: email.to?.map(formatAddress).join(", ") ?? null,
+      date: email.date ?? null,
+    };
+  }
 
-	if (!html) return c.text('No content in this email', 404);
+  if (!html) return c.text("No content in this email", 404);
 
-	html = replaceCidReferences(html, cidMap);
-	await putCachedMailData(c.env, messageId, { html, meta });
-	const proxied = await proxyImages(html, c.env.ADMIN_SECRET);
-	return c.html(
-		<MailPage meta={meta} {...pageProps}>
-			{raw(proxied)}
-		</MailPage>,
-	);
+  html = replaceCidReferences(html, cidMap);
+  await putCachedMailData(c.env, messageId, { html, meta });
+  const proxied = await proxyImages(html, c.env.ADMIN_SECRET);
+  return c.html(
+    <MailPage meta={meta} {...pageProps}>
+      {raw(proxied)}
+    </MailPage>,
+  );
 });
 
 // ─── 邮件操作 API ────────────────────────────────────────────────────────────
 
 preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
-	const messageId = c.req.param('id');
-	const body = (await c.req.json()) as { accountId?: number; token?: string };
-	if (!messageId || !body.accountId || !body.token) return c.json({ ok: false, error: '参数缺失' }, 400);
-	const valid = await verifyMailTokenById(c.env.ADMIN_SECRET, messageId, body.accountId, body.token);
-	if (!valid) return c.json({ ok: false, error: '无效的 token' }, 403);
-	const account = await getAccountById(c.env.DB, body.accountId);
-	if (!account) return c.json({ ok: false, error: '账号未找到' }, 404);
-	try {
-		const provider = getEmailProvider(account, c.env);
-		await provider.moveToInbox(messageId);
+  const messageId = c.req.param("id");
+  const body = (await c.req.json()) as { accountId?: number; token?: string };
+  if (!messageId || !body.accountId || !body.token)
+    return c.json({ ok: false, error: "参数缺失" }, 400);
+  const valid = await verifyMailTokenById(
+    c.env.ADMIN_SECRET,
+    messageId,
+    body.accountId,
+    body.token,
+  );
+  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
+  const account = await getAccountById(c.env.DB, body.accountId);
+  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  try {
+    const provider = getEmailProvider(account, c.env);
+    await provider.moveToInbox(messageId);
 
-		// 重新投递到 TG 频道
-		c.executionCtx.waitUntil(
-			fetchRawEmailByType(account, messageId, c.env)
-				.then((raw) => deliverEmailToTelegram(raw, messageId, account!, c.env, c.executionCtx.waitUntil.bind(c.executionCtx)))
-				.catch((err) => console.error('Re-deliver after move-to-inbox failed:', err)),
-		);
+    // 重新投递到 TG 频道
+    c.executionCtx.waitUntil(
+      fetchRawEmailByType(account, messageId, c.env)
+        .then((raw) =>
+          deliverEmailToTelegram(
+            raw,
+            messageId,
+            account!,
+            c.env,
+            c.executionCtx.waitUntil.bind(c.executionCtx),
+          ),
+        )
+        .catch((err) =>
+          console.error("Re-deliver after move-to-inbox failed:", err),
+        ),
+    );
 
-		return c.json({ ok: true, message: '已移至收件箱并重新投递' });
-	} catch {
-		return c.json({ ok: false, error: '操作失败' }, 500);
-	}
+    return c.json({ ok: true, message: "已移至收件箱并重新投递" });
+  } catch {
+    return c.json({ ok: false, error: "操作失败" }, 500);
+  }
 });
 
 preview.post(ROUTE_MAIL_TRASH, async (c) => {
-	const messageId = c.req.param('id');
-	const body = (await c.req.json()) as { accountId?: number; token?: string };
-	if (!messageId || !body.accountId || !body.token) return c.json({ ok: false, error: '参数缺失' }, 400);
-	const valid = await verifyMailTokenById(c.env.ADMIN_SECRET, messageId, body.accountId, body.token);
-	if (!valid) return c.json({ ok: false, error: '无效的 token' }, 403);
-	const account = await getAccountById(c.env.DB, body.accountId);
-	if (!account) return c.json({ ok: false, error: '账号未找到' }, 404);
-	try {
-		const provider = getEmailProvider(account, c.env);
-		await provider.trashMessage(messageId);
-		return c.json({ ok: true, message: '已删除' });
-	} catch {
-		return c.json({ ok: false, error: '操作失败' }, 500);
-	}
+  const messageId = c.req.param("id");
+  const body = (await c.req.json()) as { accountId?: number; token?: string };
+  if (!messageId || !body.accountId || !body.token)
+    return c.json({ ok: false, error: "参数缺失" }, 400);
+  const valid = await verifyMailTokenById(
+    c.env.ADMIN_SECRET,
+    messageId,
+    body.accountId,
+    body.token,
+  );
+  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
+  const account = await getAccountById(c.env.DB, body.accountId);
+  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  try {
+    const provider = getEmailProvider(account, c.env);
+    await provider.trashMessage(messageId);
+    return c.json({ ok: true, message: "已删除" });
+  } catch {
+    return c.json({ ok: false, error: "操作失败" }, 500);
+  }
 });
 
 preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
-	const messageId = c.req.param('id');
-	const body = (await c.req.json()) as { accountId?: number; token?: string };
-	if (!messageId || !body.accountId || !body.token) return c.json({ ok: false, error: '参数缺失' }, 400);
-	const valid = await verifyMailTokenById(c.env.ADMIN_SECRET, messageId, body.accountId, body.token);
-	if (!valid) return c.json({ ok: false, error: '无效的 token' }, 403);
-	const account = await getAccountById(c.env.DB, body.accountId);
-	if (!account) return c.json({ ok: false, error: '账号未找到' }, 404);
-	try {
-		const provider = getEmailProvider(account, c.env);
-		await provider.markAsJunk(messageId);
+  const messageId = c.req.param("id");
+  const body = (await c.req.json()) as { accountId?: number; token?: string };
+  if (!messageId || !body.accountId || !body.token)
+    return c.json({ ok: false, error: "参数缺失" }, 400);
+  const valid = await verifyMailTokenById(
+    c.env.ADMIN_SECRET,
+    messageId,
+    body.accountId,
+    body.token,
+  );
+  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
+  const account = await getAccountById(c.env.DB, body.accountId);
+  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  try {
+    const provider = getEmailProvider(account, c.env);
+    await provider.markAsJunk(messageId);
 
-		// 删除对应的 TG 消息和映射
-		const mappings = await getMappingsByEmailIds(c.env.DB, body.accountId, [messageId]);
-		if (mappings.length > 0) {
-			const m = mappings[0];
-			await deleteMessage(c.env.TELEGRAM_BOT_TOKEN, m.tg_chat_id, m.tg_message_id).catch(() => {});
-			await deleteMappingByEmailId(c.env.DB, messageId, body.accountId).catch(() => {});
-		}
+    // 删除对应的 TG 消息和映射
+    const mappings = await getMappingsByEmailIds(c.env.DB, body.accountId, [
+      messageId,
+    ]);
+    if (mappings.length > 0) {
+      const m = mappings[0];
+      await deleteMessage(
+        c.env.TELEGRAM_BOT_TOKEN,
+        m.tg_chat_id,
+        m.tg_message_id,
+      ).catch(() => {});
+      await deleteMappingByEmailId(c.env.DB, messageId, body.accountId).catch(
+        () => {},
+      );
+    }
 
-		return c.json({ ok: true, message: '已标记为垃圾邮件' });
-	} catch {
-		return c.json({ ok: false, error: '操作失败' }, 500);
-	}
+    return c.json({ ok: true, message: "已标记为垃圾邮件" });
+  } catch {
+    return c.json({ ok: false, error: "操作失败" }, 500);
+  }
 });
 
 // ─── 通用 CORS 代理 ────────────────────────────────────────────────────────
 
 preview.get(ROUTE_CORS_PROXY, async (c) => {
-	const url = c.req.query('url');
-	const sig = c.req.query('sig');
-	if (!url || !sig) return c.text('Missing url or sig', 400);
-	if (!verifyProxySignature(c.env.ADMIN_SECRET, url, sig)) return c.text('Invalid signature', 403);
+  const url = c.req.query("url");
+  const sig = c.req.query("sig");
+  if (!url || !sig) return c.text("Missing url or sig", 400);
+  if (!verifyProxySignature(c.env.ADMIN_SECRET, url, sig))
+    return c.text("Invalid signature", 403);
 
-	try {
-		const resp = await http.get(url);
-		const contentType = resp.headers.get('content-type') ?? 'application/octet-stream';
-		return new Response(resp.body, {
-			headers: {
-				'content-type': contentType,
-				'cache-control': 'public, max-age=86400',
-			},
-		});
-	} catch (err) {
-		if (err instanceof HTTPError) return c.text('Upstream error', err.response.status as ContentfulStatusCode);
-		return c.text('Failed to fetch image', 502);
-	}
+  try {
+    const resp = await http.get(url);
+    const contentType =
+      resp.headers.get("content-type") ?? "application/octet-stream";
+    return new Response(resp.body, {
+      headers: {
+        "content-type": contentType,
+        "cache-control": "public, max-age=86400",
+      },
+    });
+  } catch (err) {
+    if (err instanceof HTTPError)
+      return c.text(
+        "Upstream error",
+        err.response.status as ContentfulStatusCode,
+      );
+    return c.text("Failed to fetch image", 502);
+  }
 });
 
 export default preview;

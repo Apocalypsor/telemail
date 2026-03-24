@@ -1,212 +1,269 @@
-import { KV_OAUTH_STATE_PREFIX, OAUTH_STATE_TTL_SECONDS } from '@/constants';
-import type { Account, Env } from '@/types';
-import { getAccountById, updateAccountEmail, updateRefreshToken } from '@db/accounts';
-import { putCachedAccessToken } from '@db/kv';
-import { reportErrorToObservability } from '@utils/observability';
-import { http } from '@utils/http';
+import {
+  getAccountById,
+  updateAccountEmail,
+  updateRefreshToken,
+} from "@db/accounts";
+import { putCachedAccessToken } from "@db/kv";
+import { http } from "@utils/http";
+import { reportErrorToObservability } from "@utils/observability";
+import { KV_OAUTH_STATE_PREFIX, OAUTH_STATE_TTL_SECONDS } from "@/constants";
+import type { Account, Env } from "@/types";
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
 export type OAuthTokenResponse = {
-	access_token?: string;
-	expires_in?: number;
-	refresh_token?: string;
-	scope?: string;
-	token_type?: string;
-	error?: string;
-	error_description?: string;
+  access_token?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+  token_type?: string;
+  error?: string;
+  error_description?: string;
 };
 
 type OAuthCallbackResult =
-	| {
-			ok: true;
-			refreshToken: string | undefined;
-			scope: string;
-			expiresIn: number | undefined;
-			accountEmail: string;
-			accountId: number;
-			ownerTelegramId: string | null;
-	  }
-	| { ok: false; title: string; detail: string; status: number };
+  | {
+      ok: true;
+      refreshToken: string | undefined;
+      scope: string;
+      expiresIn: number | undefined;
+      accountEmail: string;
+      accountId: number;
+      ownerTelegramId: string | null;
+    }
+  | { ok: false; title: string; detail: string; status: number };
 
 // ─── Provider config ─────────────────────────────────────────────────────────
 
 export interface OAuthProviderConfig {
-	name: string;
-	authorizeUrl: string;
-	tokenUrl: string;
-	scope: string;
-	startRoute: string;
-	callbackRoute: string;
-	statePrefix: string;
-	extraAuthorizeParams?: Record<string, string>;
-	getCredentials(env: Env): { clientId: string; clientSecret: string };
-	extraTokenBody?(env: Env): Record<string, string>;
-	fetchEmail(accessToken: string): Promise<string | undefined>;
-	onAuthorized(env: Env, account: Account): Promise<void>;
+  name: string;
+  authorizeUrl: string;
+  tokenUrl: string;
+  scope: string;
+  startRoute: string;
+  callbackRoute: string;
+  statePrefix: string;
+  extraAuthorizeParams?: Record<string, string>;
+  getCredentials(env: Env): { clientId: string; clientSecret: string };
+  extraTokenBody?(env: Env): Record<string, string>;
+  fetchEmail(accessToken: string): Promise<string | undefined>;
+  onAuthorized(env: Env, account: Account): Promise<void>;
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
 export function createOAuthHandler(config: OAuthProviderConfig) {
-	function getCallbackUrl(origin: string): string {
-		return new URL(config.callbackRoute, origin).toString();
-	}
+  function getCallbackUrl(origin: string): string {
+    return new URL(config.callbackRoute, origin).toString();
+  }
 
-	function getOAuthPageProps(request: Request, accountId: number, accountEmail: string) {
-		const origin = new URL(request.url).origin;
-		const startUrl = new URL(config.startRoute, origin);
-		startUrl.searchParams.set('account', String(accountId));
+  function getOAuthPageProps(
+    request: Request,
+    accountId: number,
+    accountEmail: string,
+  ) {
+    const origin = new URL(request.url).origin;
+    const startUrl = new URL(config.startRoute, origin);
+    startUrl.searchParams.set("account", String(accountId));
 
-		return {
-			startUrl: startUrl.toString(),
-			callbackUrl: getCallbackUrl(origin),
-			accountEmail,
-		};
-	}
+    return {
+      startUrl: startUrl.toString(),
+      callbackUrl: getCallbackUrl(origin),
+      accountEmail,
+    };
+  }
 
-	async function generateOAuthUrl(env: Env, accountId: number, origin: string): Promise<string> {
-		const state = crypto.randomUUID();
-		await env.EMAIL_KV.put(`${KV_OAUTH_STATE_PREFIX}${config.statePrefix}${state}`, String(accountId), {
-			expirationTtl: OAUTH_STATE_TTL_SECONDS,
-		});
+  async function generateOAuthUrl(
+    env: Env,
+    accountId: number,
+    origin: string,
+  ): Promise<string> {
+    const state = crypto.randomUUID();
+    await env.EMAIL_KV.put(
+      `${KV_OAUTH_STATE_PREFIX}${config.statePrefix}${state}`,
+      String(accountId),
+      {
+        expirationTtl: OAUTH_STATE_TTL_SECONDS,
+      },
+    );
 
-		const { clientId } = config.getCredentials(env);
-		const authUrl = new URL(config.authorizeUrl);
-		authUrl.searchParams.set('client_id', clientId);
-		authUrl.searchParams.set('redirect_uri', getCallbackUrl(origin));
-		authUrl.searchParams.set('response_type', 'code');
-		authUrl.searchParams.set('scope', config.scope);
-		authUrl.searchParams.set('prompt', 'consent');
-		authUrl.searchParams.set('state', state);
-		for (const [k, v] of Object.entries(config.extraAuthorizeParams ?? {})) {
-			authUrl.searchParams.set(k, v);
-		}
+    const { clientId } = config.getCredentials(env);
+    const authUrl = new URL(config.authorizeUrl);
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", getCallbackUrl(origin));
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("scope", config.scope);
+    authUrl.searchParams.set("prompt", "consent");
+    authUrl.searchParams.set("state", state);
+    for (const [k, v] of Object.entries(config.extraAuthorizeParams ?? {})) {
+      authUrl.searchParams.set(k, v);
+    }
 
-		return authUrl.toString();
-	}
+    return authUrl.toString();
+  }
 
-	async function startOAuth(request: Request, env: Env, accountId: number): Promise<Response> {
-		const url = await generateOAuthUrl(env, accountId, new URL(request.url).origin);
-		return Response.redirect(url, 302);
-	}
+  async function startOAuth(
+    request: Request,
+    env: Env,
+    accountId: number,
+  ): Promise<Response> {
+    const url = await generateOAuthUrl(
+      env,
+      accountId,
+      new URL(request.url).origin,
+    );
+    return Response.redirect(url, 302);
+  }
 
-	async function processOAuthCallback(request: Request, env: Env): Promise<OAuthCallbackResult> {
-		const requestUrl = new URL(request.url);
-		const code = requestUrl.searchParams.get('code');
-		const state = requestUrl.searchParams.get('state');
-		const oauthError = requestUrl.searchParams.get('error');
+  async function processOAuthCallback(
+    request: Request,
+    env: Env,
+  ): Promise<OAuthCallbackResult> {
+    const requestUrl = new URL(request.url);
+    const code = requestUrl.searchParams.get("code");
+    const state = requestUrl.searchParams.get("state");
+    const oauthError = requestUrl.searchParams.get("error");
 
-		if (oauthError) {
-			return {
-				ok: false,
-				title: `${config.name} OAuth 授权失败`,
-				detail: requestUrl.searchParams.get('error_description') || oauthError,
-				status: 400,
-			};
-		}
+    if (oauthError) {
+      return {
+        ok: false,
+        title: `${config.name} OAuth 授权失败`,
+        detail: requestUrl.searchParams.get("error_description") || oauthError,
+        status: 400,
+      };
+    }
 
-		if (!code || !state) {
-			return { ok: false, title: '参数缺失', detail: '回调中没有 code 或 state。', status: 400 };
-		}
+    if (!code || !state) {
+      return {
+        ok: false,
+        title: "参数缺失",
+        detail: "回调中没有 code 或 state。",
+        status: 400,
+      };
+    }
 
-		const stateKey = `${KV_OAUTH_STATE_PREFIX}${config.statePrefix}${state}`;
-		const accountIdStr = await env.EMAIL_KV.get(stateKey);
-		if (!accountIdStr) {
-			return { ok: false, title: 'state 无效', detail: '授权会话已过期或不匹配，请重新发起授权。', status: 400 };
-		}
+    const stateKey = `${KV_OAUTH_STATE_PREFIX}${config.statePrefix}${state}`;
+    const accountIdStr = await env.EMAIL_KV.get(stateKey);
+    if (!accountIdStr) {
+      return {
+        ok: false,
+        title: "state 无效",
+        detail: "授权会话已过期或不匹配，请重新发起授权。",
+        status: 400,
+      };
+    }
 
-		const accountId = parseInt(accountIdStr, 10);
-		if (isNaN(accountId) || accountId <= 0) {
-			return { ok: false, title: '参数无效', detail: 'Invalid account ID in state.', status: 400 };
-		}
-		const account = await getAccountById(env.DB, accountId);
-		let accountEmail = account?.email || 'unknown';
+    const accountId = parseInt(accountIdStr, 10);
+    if (Number.isNaN(accountId) || accountId <= 0) {
+      return {
+        ok: false,
+        title: "参数无效",
+        detail: "Invalid account ID in state.",
+        status: 400,
+      };
+    }
+    const account = await getAccountById(env.DB, accountId);
+    let accountEmail = account?.email || "unknown";
 
-		const { clientId, clientSecret } = config.getCredentials(env);
-		const redirectUri = getCallbackUrl(requestUrl.origin);
-		const tokenResp = await http.post(config.tokenUrl, {
-			body: new URLSearchParams({
-				code,
-				client_id: clientId,
-				client_secret: clientSecret,
-				redirect_uri: redirectUri,
-				grant_type: 'authorization_code',
-				...config.extraTokenBody?.(env),
-			}),
-			throwHttpErrors: false,
-		});
+    const { clientId, clientSecret } = config.getCredentials(env);
+    const redirectUri = getCallbackUrl(requestUrl.origin);
+    const tokenResp = await http.post(config.tokenUrl, {
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+        ...config.extraTokenBody?.(env),
+      }),
+      throwHttpErrors: false,
+    });
 
-		const rawBody = await tokenResp.text();
-		let tokenData: OAuthTokenResponse = {};
-		try {
-			tokenData = JSON.parse(rawBody) as OAuthTokenResponse;
-		} catch {
-			/* non-JSON response */
-		}
+    const rawBody = await tokenResp.text();
+    let tokenData: OAuthTokenResponse = {};
+    try {
+      tokenData = JSON.parse(rawBody) as OAuthTokenResponse;
+    } catch {
+      /* non-JSON response */
+    }
 
-		if (!tokenResp.ok) {
-			// Token exchange failed — don't delete state so the user can retry
-			return {
-				ok: false,
-				title: 'Token 交换失败',
-				detail: rawBody || `${tokenResp.status} ${tokenResp.statusText}`,
-				status: tokenResp.status,
-			};
-		}
+    if (!tokenResp.ok) {
+      // Token exchange failed — don't delete state so the user can retry
+      return {
+        ok: false,
+        title: "Token 交换失败",
+        detail: rawBody || `${tokenResp.status} ${tokenResp.statusText}`,
+        status: tokenResp.status,
+      };
+    }
 
-		// Token exchange succeeded — now safe to delete the one-time state
-		await env.EMAIL_KV.delete(stateKey);
+    // Token exchange succeeded — now safe to delete the one-time state
+    await env.EMAIL_KV.delete(stateKey);
 
-		const refreshToken = tokenData.refresh_token;
-		if (account) {
-			const updates: Promise<void>[] = [];
-			if (refreshToken) {
-				updates.push(updateRefreshToken(env.DB, account.id, refreshToken));
-			}
-			if (tokenData.access_token) {
-				try {
-					const email = await config.fetchEmail(tokenData.access_token);
-					if (email) {
-						accountEmail = email;
-						updates.push(updateAccountEmail(env.DB, account.id, email));
-					}
-				} catch {
-					// 获取邮箱失败不影响主流程
-				}
-			}
-			await Promise.all(updates);
+    const refreshToken = tokenData.refresh_token;
+    if (account) {
+      const updates: Promise<void>[] = [];
+      if (refreshToken) {
+        updates.push(updateRefreshToken(env.DB, account.id, refreshToken));
+      }
+      if (tokenData.access_token) {
+        try {
+          const email = await config.fetchEmail(tokenData.access_token);
+          if (email) {
+            accountEmail = email;
+            updates.push(updateAccountEmail(env.DB, account.id, email));
+          }
+        } catch {
+          // 获取邮箱失败不影响主流程
+        }
+      }
+      await Promise.all(updates);
 
-			if (tokenData.access_token && tokenData.expires_in) {
-				await putCachedAccessToken(env, account.id, tokenData.access_token, Math.max(tokenData.expires_in - 120, 60));
-			}
+      if (tokenData.access_token && tokenData.expires_in) {
+        await putCachedAccessToken(
+          env,
+          account.id,
+          tokenData.access_token,
+          Math.max(tokenData.expires_in - 120, 60),
+        );
+      }
 
-			if (refreshToken || account.refresh_token) {
-				try {
-					const freshAccount = {
-						...account,
-						refresh_token: (refreshToken || account.refresh_token)!,
-						email: accountEmail !== 'unknown' ? accountEmail : account.email,
-					};
-					await config.onAuthorized(env, freshAccount);
-				} catch (err) {
-					await reportErrorToObservability(env, `oauth.${config.name.toLowerCase()}_auto_subscribe_failed`, err, {
-						accountEmail,
-					});
-				}
-			}
-		}
+      if (refreshToken || account.refresh_token) {
+        try {
+          const freshAccount = {
+            ...account,
+            refresh_token: (refreshToken || account.refresh_token)!,
+            email: accountEmail !== "unknown" ? accountEmail : account.email,
+          };
+          await config.onAuthorized(env, freshAccount);
+        } catch (err) {
+          await reportErrorToObservability(
+            env,
+            `oauth.${config.name.toLowerCase()}_auto_subscribe_failed`,
+            err,
+            {
+              accountEmail,
+            },
+          );
+        }
+      }
+    }
 
-		return {
-			ok: true,
-			refreshToken,
-			scope: tokenData.scope || config.scope,
-			expiresIn: tokenData.expires_in,
-			accountEmail,
-			accountId,
-			ownerTelegramId: account?.telegram_user_id ?? null,
-		};
-	}
+    return {
+      ok: true,
+      refreshToken,
+      scope: tokenData.scope || config.scope,
+      expiresIn: tokenData.expires_in,
+      accountEmail,
+      accountId,
+      ownerTelegramId: account?.telegram_user_id ?? null,
+    };
+  }
 
-	return { getOAuthPageProps, generateOAuthUrl, startOAuth, processOAuthCallback };
+  return {
+    getOAuthPageProps,
+    generateOAuthUrl,
+    startOAuth,
+    processOAuthCallback,
+  };
 }

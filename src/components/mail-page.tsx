@@ -1,57 +1,83 @@
-import type { MailMeta } from '@/types';
-import { theme } from '@assets/theme';
-import type { Child } from 'hono/jsx';
+import { theme } from "@assets/theme";
+import type { Child } from "hono/jsx";
+import type { MailMeta } from "@/types";
 
 interface MailPageProps {
-	meta: MailMeta;
-	accountEmail?: string | null;
-	messageId: string;
-	accountId: number;
-	token: string;
-	inJunk: boolean;
-	children: Child;
+  meta: MailMeta;
+  accountEmail?: string | null;
+  messageId: string;
+  accountId: number;
+  token: string;
+  inJunk: boolean;
+  children: Child;
 }
 
-export function MailPage({ meta, accountEmail, messageId, accountId, token, inJunk, children }: MailPageProps) {
-	return (
-		<>
-			<MailMetaHeader meta={meta} accountEmail={accountEmail} />
-			{children}
-			<MailFab messageId={messageId} accountId={accountId} token={token} inJunk={inJunk} />
-		</>
-	);
+export function MailPage({
+  meta,
+  accountEmail,
+  messageId,
+  accountId,
+  token,
+  inJunk,
+  children,
+}: MailPageProps) {
+  return (
+    <>
+      <MailMetaHeader meta={meta} accountEmail={accountEmail} />
+      {children}
+      <MailFab
+        messageId={messageId}
+        accountId={accountId}
+        token={token}
+        inJunk={inJunk}
+      />
+    </>
+  );
 }
 
-function MailMetaHeader({ meta, accountEmail }: { meta: MailMeta; accountEmail?: string | null }) {
-	if (!meta.subject && !meta.from && !meta.to && !accountEmail && !meta.date) return <></>;
+function MailMetaHeader({
+  meta,
+  accountEmail,
+}: {
+  meta: MailMeta;
+  accountEmail?: string | null;
+}) {
+  if (!meta.subject && !meta.from && !meta.to && !accountEmail && !meta.date)
+    return <></>;
 
-	return (
-		<div
-			style={`background:${theme.surface};border-bottom:1px solid ${theme.border};padding:12px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;color:${theme.text};line-height:1.7`}
-		>
-			{meta.subject && <div style={`font-size:24px;font-weight:600;color:${theme.text};margin-bottom:6px`}>{meta.subject}</div>}
-			{meta.from && (
-				<div>
-					<span style={`color:${theme.muted}`}>From:</span> {meta.from}
-				</div>
-			)}
-			{meta.to && (
-				<div>
-					<span style={`color:${theme.muted}`}>To:</span> {meta.to}
-				</div>
-			)}
-			{accountEmail && (
-				<div>
-					<span style={`color:${theme.muted}`}>Account:</span> {accountEmail}
-				</div>
-			)}
-			{meta.date && (
-				<div>
-					<span style={`color:${theme.muted}`}>Date:</span> {meta.date}
-				</div>
-			)}
-		</div>
-	);
+  return (
+    <div
+      style={`background:${theme.surface};border-bottom:1px solid ${theme.border};padding:12px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;color:${theme.text};line-height:1.7`}
+    >
+      {meta.subject && (
+        <div
+          style={`font-size:24px;font-weight:600;color:${theme.text};margin-bottom:6px`}
+        >
+          {meta.subject}
+        </div>
+      )}
+      {meta.from && (
+        <div>
+          <span style={`color:${theme.muted}`}>From:</span> {meta.from}
+        </div>
+      )}
+      {meta.to && (
+        <div>
+          <span style={`color:${theme.muted}`}>To:</span> {meta.to}
+        </div>
+      )}
+      {accountEmail && (
+        <div>
+          <span style={`color:${theme.muted}`}>Account:</span> {accountEmail}
+        </div>
+      )}
+      {meta.date && (
+        <div>
+          <span style={`color:${theme.muted}`}>Date:</span> {meta.date}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const FAB_CSS = `
@@ -109,8 +135,12 @@ const FAB_CSS = `
 }
 #mail-fab .fab-status.show{display:block}`;
 
-function fabScript(messageId: string, accountId: number, token: string): string {
-	return `
+function fabScript(
+  messageId: string,
+  accountId: number,
+  token: string,
+): string {
+  return `
 function toggleFab(btn){
   btn.classList.toggle('open');
   document.getElementById('fab-actions').classList.toggle('show');
@@ -131,33 +161,53 @@ async function mailAction(action,btn){
 }`;
 }
 
-function MailFab({ messageId, accountId, token, inJunk }: { messageId: string; accountId: number; token: string; inJunk: boolean }) {
-	return (
-		<>
-			<style dangerouslySetInnerHTML={{ __html: FAB_CSS }} />
-			<div id="mail-fab">
-				<div id="fab-status" class="fab-status" />
-				<div id="fab-actions" class="fab-actions">
-					{inJunk ? (
-						<>
-							<button class="fab-btn inbox" onclick="mailAction('move-to-inbox',this)">
-								📥 移到收件箱
-							</button>
-							<button class="fab-btn del" onclick="mailAction('trash',this)">
-								🗑 删除邮件
-							</button>
-						</>
-					) : (
-						<button class="fab-btn del" onclick="mailAction('mark-as-junk',this)">
-							🚫 标记为垃圾
-						</button>
-					)}
-				</div>
-				<button class="fab-main" onclick="toggleFab(this)">
-					⚡
-				</button>
-			</div>
-			<script dangerouslySetInnerHTML={{ __html: fabScript(messageId, accountId, token) }} />
-		</>
-	);
+function MailFab({
+  messageId,
+  accountId,
+  token,
+  inJunk,
+}: {
+  messageId: string;
+  accountId: number;
+  token: string;
+  inJunk: boolean;
+}) {
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: FAB_CSS }} />
+      <div id="mail-fab">
+        <div id="fab-status" class="fab-status" />
+        <div id="fab-actions" class="fab-actions">
+          {inJunk ? (
+            <>
+              <button
+                class="fab-btn inbox"
+                onclick="mailAction('move-to-inbox',this)"
+              >
+                📥 移到收件箱
+              </button>
+              <button class="fab-btn del" onclick="mailAction('trash',this)">
+                🗑 删除邮件
+              </button>
+            </>
+          ) : (
+            <button
+              class="fab-btn del"
+              onclick="mailAction('mark-as-junk',this)"
+            >
+              🚫 标记为垃圾
+            </button>
+          )}
+        </div>
+        <button class="fab-main" onclick="toggleFab(this)">
+          ⚡
+        </button>
+      </div>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: fabScript(messageId, accountId, token),
+        }}
+      />
+    </>
+  );
 }
