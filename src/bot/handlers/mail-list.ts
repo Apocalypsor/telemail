@@ -6,6 +6,7 @@ import {
   getEmailProvider,
 } from "@services/email/provider";
 import {
+  deleteJunkMappings,
   markAllAsRead,
   syncStarButtonsForMappings,
   trashAllJunkEmails,
@@ -48,6 +49,13 @@ interface ListResult {
   error?: string;
 }
 
+interface ListConfig {
+  icon: string;
+  label: string;
+  emptyText: string;
+  errorEvent: string;
+}
+
 /** 查询单个账号的邮件列表，同时生成 TG 深链接和 web 预览链接 */
 async function queryAccount(
   env: Env,
@@ -58,23 +66,25 @@ async function queryAccount(
     mappings: MessageMapping[],
     account: Account,
   ) => Promise<void>,
-  skipMappingLookup = false,
+  hideTgLinks = false,
 ): Promise<ListResult> {
   try {
     const provider = getEmailProvider(account, env);
     const msgs = await fetcher(provider);
     if (msgs.length === 0) return { account, items: [], total: 0 };
 
-    // message_map 查询（junk 跳过，因为垃圾邮件从未投递到 TG）
     let mappingMap = new Map<string, MessageMapping>();
-    if (!skipMappingLookup) {
+    const needMappings = !!afterMappings || !hideTgLinks;
+    if (needMappings) {
       const mappings = await getMappingsByEmailIds(
         env.DB,
         account.id,
         msgs.map((m) => m.id),
       );
       if (afterMappings) await afterMappings(mappings, account);
-      mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
+      if (!hideTgLinks) {
+        mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
+      }
     }
 
     const items = await Promise.all(
@@ -109,17 +119,12 @@ async function buildListText(
   env: Env,
   userId: string,
   fetcher: (provider: EmailProvider) => Promise<EmailListItem[]>,
-  config: {
-    icon: string;
-    label: string;
-    emptyText: string;
-    errorEvent: string;
-  },
+  config: ListConfig,
   afterMappings?: (
     mappings: MessageMapping[],
     account: Account,
   ) => Promise<void>,
-  skipMappingLookup = false,
+  hideTgLinks = false,
 ): Promise<{ text: string; hasItems: boolean }> {
   const accounts = await getOwnAccounts(env.DB, userId);
   if (accounts.length === 0)
@@ -133,7 +138,7 @@ async function buildListText(
         fetcher,
         config.errorEvent,
         afterMappings,
-        skipMappingLookup,
+        hideTgLinks,
       ),
     ),
   );
@@ -171,159 +176,136 @@ async function buildListText(
   };
 }
 
-const unreadConfig = {
-  icon: "📬",
-  label: "未读",
-  emptyText: "✅ 所有邮箱都没有未读邮件",
-  errorEvent: "bot.unread_query_failed",
-};
+/* ------------------------------------------------------------------ */
+/*  通用注册：每种邮件列表只需一份定义                                   */
+/* ------------------------------------------------------------------ */
 
-const starredConfig = {
-  icon: "⭐",
-  label: "星标",
-  emptyText: "✅ 没有星标邮件",
-  errorEvent: "bot.starred_query_failed",
-};
+interface ListDef {
+  name: string;
+  fetcher: (p: EmailProvider) => Promise<EmailListItem[]>;
+  config: ListConfig;
+  afterMappings?: (
+    mappings: MessageMapping[],
+    account: Account,
+  ) => Promise<void>;
+  /** 隐藏 TG 消息链接（如 junk 列表，TG 消息已被自动删除） */
+  hideTgLinks?: boolean;
+  actionKeyboard?: InlineKeyboard;
+  action?: {
+    callbackName: string;
+    loadingText: string;
+    handler: (
+      env: Env,
+      userId: string,
+    ) => Promise<{ success: number; failed: number }>;
+    resultText: (success: number, failed: number) => string;
+  };
+}
 
-const junkConfig = {
-  icon: "🚫",
-  label: "垃圾",
-  emptyText: "✅ 没有垃圾邮件",
-  errorEvent: "bot.junk_query_failed",
-};
+function registerList(bot: Bot, env: Env, def: ListDef) {
+  const replyMarkupOpt = (hasItems: boolean) =>
+    hasItems && def.actionKeyboard ? { reply_markup: def.actionKeyboard } : {};
 
-const MARK_ALL_READ_KB = new InlineKeyboard().text(
-  "✉️ 标记全部已读",
-  "mark_all_read",
-);
-const DELETE_ALL_JUNK_KB = new InlineKeyboard().text(
-  "🗑 全部删除",
-  "delete_all_junk",
-);
+  const queryList = (userId: string) =>
+    buildListText(
+      env,
+      userId,
+      def.fetcher,
+      def.config,
+      def.afterMappings,
+      def.hideTgLinks,
+    );
+
+  bot.command(def.name, async (ctx) => {
+    const userId = String(ctx.from?.id);
+    const msg = await ctx.reply(`🔍 正在查询${def.config.label}邮件…`);
+    const { text, hasItems } = await queryList(userId);
+    await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
+      parse_mode: "MarkdownV2",
+      link_preview_options: { is_disabled: true },
+      ...replyMarkupOpt(hasItems),
+    });
+  });
+
+  bot.callbackQuery(def.name, async (ctx) => {
+    const userId = String(ctx.from.id);
+    await ctx.answerCallbackQuery({ text: "正在查询…" });
+    const { text, hasItems } = await queryList(userId);
+    await ctx.reply(text, {
+      parse_mode: "MarkdownV2",
+      link_preview_options: { is_disabled: true },
+      ...replyMarkupOpt(hasItems),
+    });
+  });
+
+  if (def.action) {
+    const { callbackName, loadingText, handler, resultText } = def.action;
+    bot.callbackQuery(callbackName, async (ctx) => {
+      const userId = String(ctx.from.id);
+      await ctx.answerCallbackQuery({ text: loadingText });
+      const { success, failed } = await handler(env, userId);
+      await ctx.editMessageText(resultText(success, failed));
+    });
+  }
+}
 
 export function registerMailListHandlers(bot: Bot, env: Env) {
-  const syncStars = (mappings: MessageMapping[], account: Account) =>
-    syncStarButtonsForMappings(env, mappings, account);
-
-  bot.command("unread", async (ctx) => {
-    const userId = String(ctx.from?.id);
-    const msg = await ctx.reply("🔍 正在查询未读邮件…");
-    const { text, hasItems } = await buildListText(
-      env,
-      userId,
-      (p) => p.listUnread(MAX_PER_ACCOUNT),
-      unreadConfig,
-    );
-    await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
-      parse_mode: "MarkdownV2",
-      link_preview_options: { is_disabled: true },
-      ...(hasItems ? { reply_markup: MARK_ALL_READ_KB } : {}),
-    });
+  registerList(bot, env, {
+    name: "unread",
+    fetcher: (p) => p.listUnread(MAX_PER_ACCOUNT),
+    config: {
+      icon: "📬",
+      label: "未读",
+      emptyText: "✅ 所有邮箱都没有未读邮件",
+      errorEvent: "bot.unread_query_failed",
+    },
+    actionKeyboard: new InlineKeyboard().text(
+      "✉️ 标记全部已读",
+      "mark_all_read",
+    ),
+    action: {
+      callbackName: "mark_all_read",
+      loadingText: "正在标记…",
+      handler: markAllAsRead,
+      resultText: (s, f) =>
+        f > 0 ? `✅ 已标记 ${s} 封已读，${f} 封失败` : `✅ 已标记 ${s} 封已读`,
+    },
   });
 
-  bot.callbackQuery("unread", async (ctx) => {
-    const userId = String(ctx.from.id);
-    await ctx.answerCallbackQuery({ text: "正在查询…" });
-    const { text, hasItems } = await buildListText(
-      env,
-      userId,
-      (p) => p.listUnread(MAX_PER_ACCOUNT),
-      unreadConfig,
-    );
-    await ctx.reply(text, {
-      parse_mode: "MarkdownV2",
-      link_preview_options: { is_disabled: true },
-      ...(hasItems ? { reply_markup: MARK_ALL_READ_KB } : {}),
-    });
+  registerList(bot, env, {
+    name: "starred",
+    fetcher: (p) => p.listStarred(MAX_PER_ACCOUNT),
+    config: {
+      icon: "⭐",
+      label: "星标",
+      emptyText: "✅ 没有星标邮件",
+      errorEvent: "bot.starred_query_failed",
+    },
+    afterMappings: (mappings, account) =>
+      syncStarButtonsForMappings(env, mappings, account),
   });
 
-  bot.callbackQuery("mark_all_read", async (ctx) => {
-    const userId = String(ctx.from.id);
-    await ctx.answerCallbackQuery({ text: "正在标记…" });
-    const { success, failed } = await markAllAsRead(env, userId);
-    const resultText =
-      failed > 0
-        ? `✅ 已标记 ${success} 封已读，${failed} 封失败`
-        : `✅ 已标记 ${success} 封已读`;
-    await ctx.editMessageText(resultText);
-  });
-
-  bot.command("starred", async (ctx) => {
-    const userId = String(ctx.from?.id);
-    const msg = await ctx.reply("🔍 正在查询星标邮件…");
-    const { text } = await buildListText(
-      env,
-      userId,
-      (p) => p.listStarred(MAX_PER_ACCOUNT),
-      starredConfig,
-      syncStars,
-    );
-    await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
-      parse_mode: "MarkdownV2",
-      link_preview_options: { is_disabled: true },
-    });
-  });
-
-  bot.callbackQuery("starred", async (ctx) => {
-    const userId = String(ctx.from.id);
-    await ctx.answerCallbackQuery({ text: "正在查询…" });
-    const { text } = await buildListText(
-      env,
-      userId,
-      (p) => p.listStarred(MAX_PER_ACCOUNT),
-      starredConfig,
-      syncStars,
-    );
-    await ctx.reply(text, {
-      parse_mode: "MarkdownV2",
-      link_preview_options: { is_disabled: true },
-    });
-  });
-
-  bot.command("junk", async (ctx) => {
-    const userId = String(ctx.from?.id);
-    const msg = await ctx.reply("🔍 正在查询垃圾邮件…");
-    const { text, hasItems } = await buildListText(
-      env,
-      userId,
-      (p) => p.listJunk(MAX_PER_ACCOUNT),
-      junkConfig,
-      undefined,
-      true,
-    );
-    await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
-      parse_mode: "MarkdownV2",
-      link_preview_options: { is_disabled: true },
-      ...(hasItems ? { reply_markup: DELETE_ALL_JUNK_KB } : {}),
-    });
-  });
-
-  bot.callbackQuery("junk", async (ctx) => {
-    const userId = String(ctx.from.id);
-    await ctx.answerCallbackQuery({ text: "正在查询…" });
-    const { text, hasItems } = await buildListText(
-      env,
-      userId,
-      (p) => p.listJunk(MAX_PER_ACCOUNT),
-      junkConfig,
-      undefined,
-      true,
-    );
-    await ctx.reply(text, {
-      parse_mode: "MarkdownV2",
-      link_preview_options: { is_disabled: true },
-      ...(hasItems ? { reply_markup: DELETE_ALL_JUNK_KB } : {}),
-    });
-  });
-
-  bot.callbackQuery("delete_all_junk", async (ctx) => {
-    const userId = String(ctx.from.id);
-    await ctx.answerCallbackQuery({ text: "正在删除…" });
-    const { success, failed } = await trashAllJunkEmails(env, userId);
-    const resultText =
-      failed > 0
-        ? `🗑 已删除 ${success} 封垃圾邮件，${failed} 个账号失败`
-        : `🗑 已删除 ${success} 封垃圾邮件`;
-    await ctx.editMessageText(resultText);
+  registerList(bot, env, {
+    name: "junk",
+    fetcher: (p) => p.listJunk(MAX_PER_ACCOUNT),
+    config: {
+      icon: "🚫",
+      label: "垃圾",
+      emptyText: "✅ 没有垃圾邮件",
+      errorEvent: "bot.junk_query_failed",
+    },
+    afterMappings: (mappings, account) =>
+      deleteJunkMappings(env, mappings, account),
+    hideTgLinks: true,
+    actionKeyboard: new InlineKeyboard().text("🗑 全部删除", "delete_all_junk"),
+    action: {
+      callbackName: "delete_all_junk",
+      loadingText: "正在删除…",
+      handler: trashAllJunkEmails,
+      resultText: (s, f) =>
+        f > 0
+          ? `🗑 已删除 ${s} 封垃圾邮件，${f} 个账号失败`
+          : `🗑 已删除 ${s} 封垃圾邮件`,
+    },
   });
 }

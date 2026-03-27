@@ -1,8 +1,12 @@
 import { buildEmailKeyboard } from "@bot/keyboards";
 import { getAccountById, getOwnAccounts } from "@db/accounts";
-import { getMessageMapping, type MessageMapping } from "@db/message-map";
+import {
+  deleteMappingByEmailId,
+  getMessageMapping,
+  type MessageMapping,
+} from "@db/message-map";
 import { getEmailProvider } from "@services/email/provider";
-import { setReplyMarkup } from "@services/telegram";
+import { deleteMessage, setReplyMarkup } from "@services/telegram";
 import { reportErrorToObservability } from "@utils/observability";
 import type { InlineKeyboard } from "grammy";
 import type { Account, Env } from "@/types";
@@ -124,6 +128,28 @@ export async function trashAllJunkEmails(
   }
 
   return { success, failed };
+}
+
+/** 删除垃圾邮件对应的 Telegram 消息和映射（junk 列表刷新时调用） */
+export async function deleteJunkMappings(
+  env: Env,
+  mappings: MessageMapping[],
+  _account: Account,
+): Promise<void> {
+  await Promise.all(
+    mappings.map(async (m) => {
+      await deleteMessage(
+        env.TELEGRAM_BOT_TOKEN,
+        m.tg_chat_id,
+        m.tg_message_id,
+      ).catch(() => {});
+      await deleteMappingByEmailId(
+        env.DB,
+        m.email_message_id,
+        m.account_id,
+      ).catch(() => {});
+    }),
+  );
 }
 
 /** 批量同步 Telegram 消息的星标按钮状态（starred 列表刷新时调用） */
