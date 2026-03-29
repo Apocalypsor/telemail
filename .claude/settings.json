@@ -3,7 +3,8 @@
     "allow": [
       "Bash(pnpm check:*)",
       "Bash(git diff:*)",
-      "Bash(pnpm typecheck:*)"
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm add:*)"
     ]
   }
 }

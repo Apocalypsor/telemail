@@ -1,3 +1,4 @@
+import { t } from "@i18n";
 import { InlineKeyboard } from "grammy";
 import type { Account, TelegramUser } from "@/types";
 import { AccountType } from "@/types";
@@ -6,24 +7,28 @@ export function accountDetailText(
   account: Account,
   ownerName?: string,
 ): string {
-  let text = `📧 账号详情 #${account.id}\n\n`;
+  let text = `${t("accounts:detail.title", { id: account.id })}\n\n`;
   if (account.type === AccountType.Imap) {
-    text += `类型: 📬 IMAP\n`;
-    text += `邮箱: ${account.email || "(未设置)"}\n`;
+    text += `${t("accounts:detail.typeLabel", { type: t("accounts:detail.typeImap") })}\n`;
+    text += `${t("accounts:detail.email", { email: account.email || t("common:label.notSet") })}\n`;
     text += `Chat ID: ${account.chat_id}\n`;
-    text += `服务器: ${account.imap_host}:${account.imap_port}${account.imap_secure ? " (TLS)" : ""}\n`;
-    text += `用户名: ${account.imap_user}`;
+    text += `${t("accounts:detail.server", { server: `${account.imap_host}:${account.imap_port}${account.imap_secure ? " (TLS)" : ""}` })}\n`;
+    text += t("accounts:detail.username", { user: account.imap_user });
   } else {
-    const status = account.refresh_token ? "✅ 已授权" : "❌ 未授权";
+    const status = account.refresh_token
+      ? t("common:status.authorized")
+      : t("common:status.notAuthorized");
     const typeName =
-      account.type === AccountType.Outlook ? "📮 Outlook" : "📨 Gmail";
-    text += `类型: ${typeName}\n`;
-    text += `邮箱: ${account.email || "(未设置)"}\n`;
+      account.type === AccountType.Outlook
+        ? t("accounts:detail.typeOutlook")
+        : t("accounts:detail.typeGmail");
+    text += `${t("accounts:detail.typeLabel", { type: typeName })}\n`;
+    text += `${t("accounts:detail.email", { email: account.email || t("common:label.notSet") })}\n`;
     text += `Chat ID: ${account.chat_id}\n`;
-    text += `状态: ${status}`;
+    text += t("accounts:detail.status", { status });
   }
   if (ownerName !== undefined) {
-    text += `\n所有者: ${ownerName || "(无)"}`;
+    text += `\n${t("accounts:detail.owner", { name: ownerName || t("common:label.none") })}`;
   }
   return text;
 }
@@ -31,21 +36,23 @@ export function accountDetailText(
 export function accountDetailKeyboard(account: Account): InlineKeyboard {
   const kb = new InlineKeyboard();
   if (account.type === AccountType.Imap) {
-    kb.text("✏️ 编辑", `acc:${account.id}:edit`).row();
-    kb.text("❌ 删除", `acc:${account.id}:del`).row();
-    kb.text("« 返回账号列表", "accs");
+    kb.text(t("accounts:button.edit"), `acc:${account.id}:edit`).row();
+    kb.text(t("accounts:button.delete"), `acc:${account.id}:del`).row();
+    kb.text(t("common:button.backToAccounts"), "accs");
   } else {
-    const authLabel = account.refresh_token ? "🔑 重新授权" : "🔑 授权";
+    const authLabel = account.refresh_token
+      ? t("accounts:button.reauthorize")
+      : t("accounts:button.authorize");
     kb.text(authLabel, `acc:${account.id}:auth`);
     if (account.refresh_token) {
       kb.text("🔄 Watch", `acc:${account.id}:w`);
     }
     kb.row();
-    kb.text("✏️ 编辑", `acc:${account.id}:edit`);
+    kb.text(t("accounts:button.edit"), `acc:${account.id}:edit`);
     kb.row();
-    kb.text("❌ 删除", `acc:${account.id}:del`);
+    kb.text(t("accounts:button.delete"), `acc:${account.id}:del`);
     kb.row();
-    kb.text("« 返回账号列表", "accs");
+    kb.text(t("common:button.backToAccounts"), "accs");
   }
   return kb;
 }
@@ -58,9 +65,9 @@ export function formatUserName(user: {
 }
 
 export function userListText(users: TelegramUser[]): string {
-  if (users.length === 0) return "👥 暂无用户";
+  if (users.length === 0) return t("admin:users.noUsers");
 
-  let text = `👥 用户列表 (${users.length})\n\n`;
+  let text = `${t("admin:users.title", { count: users.length })}\n\n`;
   for (const u of users) {
     const status = u.approved === 1 ? "✅" : "⏳";
     const name = formatUserName(u);

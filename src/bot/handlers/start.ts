@@ -8,6 +8,7 @@ import {
   rejectUser,
   upsertUser,
 } from "@db/users";
+import { t } from "@i18n";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
@@ -40,11 +41,14 @@ export function registerStartHandlers(bot: Bot, env: Env) {
         const username = ctx.from?.username ? ` (@${ctx.from.username})` : "";
         try {
           const kb = new InlineKeyboard()
-            .text("✅ 批准", `approve:${telegramId}`)
-            .text("❌ 拒绝", `reject:${telegramId}`);
+            .text(t("start:approve"), `approve:${telegramId}`)
+            .text(t("start:reject"), `reject:${telegramId}`);
           await ctx.api.sendMessage(
             env.ADMIN_TELEGRAM_ID,
-            `🆕 新用户注册: ${displayName}${username}\nTelegram ID: ${telegramId}`,
+            t("start:newUser", {
+              name: `${displayName}${username}`,
+              id: telegramId,
+            }),
             {
               reply_markup: kb,
             },
@@ -56,10 +60,10 @@ export function registerStartHandlers(bot: Bot, env: Env) {
     }
 
     if (!admin && user && user.approved !== 1) {
-      return ctx.reply("您的账号正在等待管理员审批，审批通过后会收到通知。");
+      return ctx.reply(t("common:admin.awaitingApprovalFull"));
     }
 
-    return ctx.reply("💻 Telemail 管理面板", {
+    return ctx.reply(t("start:panel"), {
       reply_markup: mainMenuKeyboard(admin),
     });
   });
@@ -73,7 +77,7 @@ export function registerStartHandlers(bot: Bot, env: Env) {
   bot.callbackQuery("menu", async (ctx) => {
     const userId = String(ctx.from.id);
     const admin = isAdmin(userId, env);
-    await ctx.editMessageText("💻 Telemail 管理面板", {
+    await ctx.editMessageText(t("start:panel"), {
       reply_markup: mainMenuKeyboard(admin),
     });
     await ctx.answerCallbackQuery();
@@ -82,34 +86,33 @@ export function registerStartHandlers(bot: Bot, env: Env) {
   // ─── 管理员审批 inline 按钮回调 ──────────────────────────────────────────
   bot.callbackQuery(/^(approve|reject):(\d+)$/, async (ctx) => {
     if (!isAdmin(String(ctx.from.id), env)) {
-      return ctx.answerCallbackQuery({ text: "无权操作" });
+      return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
     }
     const [, action, targetId] = ctx.match as RegExpMatchArray;
     const user = await getUserByTelegramId(env.DB, targetId);
     if (!user) {
-      return ctx.answerCallbackQuery({ text: "用户不存在" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.userNotFound"),
+      });
     }
 
     if (action === "approve") {
       await approveUser(env.DB, targetId);
       await ctx.editMessageText(
-        `✅ 已批准: ${formatUserName(user)} (${targetId})`,
+        t("start:approved", { name: formatUserName(user), id: targetId }),
       );
       try {
-        await ctx.api.sendMessage(
-          targetId,
-          "✅ 您的账号已被管理员批准！发送 /start 开始使用。",
-        );
+        await ctx.api.sendMessage(targetId, t("start:approvedNotify"));
       } catch {
         /* user may have blocked bot */
       }
     } else {
       await rejectUser(env.DB, targetId);
       await ctx.editMessageText(
-        `❌ 已拒绝: ${formatUserName(user)} (${targetId})`,
+        t("start:rejected", { name: formatUserName(user), id: targetId }),
       );
       try {
-        await ctx.api.sendMessage(targetId, "❌ 您的注册申请未通过审批。");
+        await ctx.api.sendMessage(targetId, t("start:rejectedNotify"));
       } catch {
         /* user may have blocked bot */
       }

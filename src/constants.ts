@@ -46,9 +46,6 @@ export const LLM_TIMEOUT_MS = 300_000; // LLM 请求超时（毫秒）
 export const IMAP_FLAG_SEEN = "\\Seen" as const;
 export const IMAP_FLAG_FLAGGED = "\\Flagged" as const;
 
-// ── Tags ─────────────────────────────────────────────────────────────────────
-export const STAR_TAG = " #星标";
-
 // ── Session / Auth ──────────────────────────────────────────────────────────
 export const TG_AUTH_MAX_AGE = 86400; // Telegram Login Widget auth_date 有效期（秒）
 export const SESSION_TTL = 7 * 24 * 3600; // session cookie 有效期 7 天

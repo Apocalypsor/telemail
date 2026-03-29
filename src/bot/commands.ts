@@ -1,3 +1,4 @@
+import { t } from "@i18n";
 import { Api } from "grammy";
 import type { BotCommand } from "grammy/types";
 import { KV_BOT_COMMANDS_VERSION_KEY } from "@/constants";
@@ -7,35 +8,35 @@ import type { Env } from "@/types";
 const BOT_COMMANDS_VERSION = 6;
 
 export const BOT_COMMANDS: BotCommand[] = [
-  { command: "start", description: "打开管理面板" },
-  { command: "help", description: "查看帮助信息" },
-  { command: "accounts", description: "查看我的邮箱账号" },
-  { command: "sync", description: "同步所有邮箱" },
-  { command: "unread", description: "查看未读邮件" },
-  { command: "starred", description: "查看星标邮件" },
-  { command: "junk", description: "查看垃圾邮件" },
-  { command: "users", description: "查看用户列表（管理员）" },
+  { command: "start", description: t("commands:start") },
+  { command: "help", description: t("commands:help") },
+  { command: "accounts", description: t("commands:accounts") },
+  { command: "sync", description: t("commands:sync") },
+  { command: "unread", description: t("commands:unread") },
+  { command: "starred", description: t("commands:starred") },
+  { command: "junk", description: t("commands:junk") },
+  { command: "users", description: t("commands:users") },
 ];
 
-export const HELP_TEXT = `📬 *Telemail 帮助*
+export const HELP_TEXT = `${t("commands:helpTitle")}
 
-*命令列表*
-/start \\- 打开管理面板
-/help \\- 查看帮助信息
-/accounts \\- 查看我的邮箱账号
-/sync \\- 同步所有邮箱
-/unread \\- 查看未读邮件
-/starred \\- 查看星标邮件
-/junk \\- 查看垃圾邮件
-/users \\- 查看用户列表（管理员）
+${t("commands:helpCommands")}
+/start \\- ${t("commands:start")}
+/help \\- ${t("commands:help")}
+/accounts \\- ${t("commands:accounts")}
+/sync \\- ${t("commands:sync")}
+/unread \\- ${t("commands:unread")}
+/starred \\- ${t("commands:starred")}
+/junk \\- ${t("commands:junk")}
+/users \\- ${t("commands:users")}
 
-*功能说明*
-• 支持 Gmail / Outlook / IMAP 邮箱转发到 Telegram
-• 点击 ⭐ 按钮可星标/取消星标邮件，星标自动标记已读
-• 点击 🚫 按钮可标记为垃圾邮件并删除消息
-• 对消息添加 emoji reaction 可标记邮件为已读
-• 打开邮件预览页可移到收件箱、标记垃圾或删除
-• 配置 LLM 后自动生成 AI 摘要，高置信度垃圾邮件自动过滤`;
+${t("commands:helpFeatures")}
+${t("commands:helpFeature1")}
+${t("commands:helpFeature2")}
+${t("commands:helpFeature3")}
+${t("commands:helpFeature4")}
+${t("commands:helpFeature5")}
+${t("commands:helpFeature6")}`;
 
 /**
  * 同步 Bot 命令菜单到 Telegram。

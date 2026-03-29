@@ -1,5 +1,6 @@
 import { getOwnAccounts } from "@db/accounts";
 import { getMappingsByEmailIds, type MessageMapping } from "@db/message-map";
+import { t } from "@i18n";
 import {
   type EmailListItem,
   type EmailProvider,
@@ -128,7 +129,7 @@ async function buildListText(
 ): Promise<{ text: string; hasItems: boolean }> {
   const accounts = await getOwnAccounts(env.DB, userId);
   if (accounts.length === 0)
-    return { text: "📭 暂无绑定的邮箱账号", hasItems: false };
+    return { text: t("common:label.noAccounts"), hasItems: false };
 
   const results = await Promise.all(
     accounts.map((acc) =>
@@ -151,18 +152,24 @@ async function buildListText(
       r.account.email || `Account #${r.account.id}`,
     );
     if (r.error) {
-      lines.push(`❌ ${accountLabel}: 查询失败`);
+      lines.push(
+        `❌ ${accountLabel}: ${escapeMdV2(t("common:error.queryFailed"))}`,
+      );
       continue;
     }
     if (r.total === 0) continue;
 
     total += r.total;
-    lines.push(`\n📧 ${accountLabel} \\(${r.total} 封${config.label}\\)`);
+    lines.push(
+      `\n${escapeMdV2(t("mailList:accountLabel", { label: r.account.email || `Account #${r.account.id}`, count: r.total, type: config.label }))}`,
+    );
     for (const [i, item] of r.items.entries()) {
-      const title = escapeMdV2(item.subject || "(无主题)");
+      const title = escapeMdV2(item.subject || t("mailList:noSubject"));
       const linkParts: string[] = [];
-      if (item.tgLink) linkParts.push(`[💬 消息](${item.tgLink})`);
-      if (item.previewLink) linkParts.push(`[👁 预览](${item.previewLink})`);
+      if (item.tgLink)
+        linkParts.push(`[${t("mailList:tgMessage")}](${item.tgLink})`);
+      if (item.previewLink)
+        linkParts.push(`[${t("mailList:preview")}](${item.previewLink})`);
       const linksStr = linkParts.length > 0 ? `  ${linkParts.join("  ")}` : "";
       lines.push(`  ${i + 1}\\. ${title}${linksStr}`);
     }
@@ -171,7 +178,7 @@ async function buildListText(
   if (total === 0) return { text: config.emptyText, hasItems: false };
 
   return {
-    text: `${config.icon} 共 ${total} 封${config.label}\n${lines.join("\n")}`,
+    text: `${t("mailList:total", { icon: config.icon, total, label: config.label })}\n${lines.join("\n")}`,
     hasItems: true,
   };
 }
@@ -218,7 +225,9 @@ function registerList(bot: Bot, env: Env, def: ListDef) {
 
   bot.command(def.name, async (ctx) => {
     const userId = String(ctx.from?.id);
-    const msg = await ctx.reply(`🔍 正在查询${def.config.label}邮件…`);
+    const msg = await ctx.reply(
+      t("mailList:querying", { label: def.config.label }),
+    );
     const { text, hasItems } = await queryList(userId);
     await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
       parse_mode: "MarkdownV2",
@@ -229,7 +238,7 @@ function registerList(bot: Bot, env: Env, def: ListDef) {
 
   bot.callbackQuery(def.name, async (ctx) => {
     const userId = String(ctx.from.id);
-    await ctx.answerCallbackQuery({ text: "正在查询…" });
+    await ctx.answerCallbackQuery({ text: t("mailList:queryingShort") });
     const { text, hasItems } = await queryList(userId);
     await ctx.reply(text, {
       parse_mode: "MarkdownV2",
@@ -254,21 +263,26 @@ export function registerMailListHandlers(bot: Bot, env: Env) {
     name: "unread",
     fetcher: (p) => p.listUnread(MAX_PER_ACCOUNT),
     config: {
-      icon: "📬",
-      label: "未读",
-      emptyText: "✅ 所有邮箱都没有未读邮件",
+      icon: t("mailList:unread.icon"),
+      label: t("mailList:unread.label"),
+      emptyText: t("mailList:unread.empty"),
       errorEvent: "bot.unread_query_failed",
     },
     actionKeyboard: new InlineKeyboard().text(
-      "✉️ 标记全部已读",
+      t("mailList:unread.markAllRead"),
       "mark_all_read",
     ),
     action: {
       callbackName: "mark_all_read",
-      loadingText: "正在标记…",
+      loadingText: t("mailList:unread.marking"),
       handler: markAllAsRead,
       resultText: (s, f) =>
-        f > 0 ? `✅ 已标记 ${s} 封已读，${f} 封失败` : `✅ 已标记 ${s} 封已读`,
+        f > 0
+          ? t("mailList:unread.markResultWithFailed", {
+              success: s,
+              failed: f,
+            })
+          : t("mailList:unread.markResult", { success: s }),
     },
   });
 
@@ -276,9 +290,9 @@ export function registerMailListHandlers(bot: Bot, env: Env) {
     name: "starred",
     fetcher: (p) => p.listStarred(MAX_PER_ACCOUNT),
     config: {
-      icon: "⭐",
-      label: "星标",
-      emptyText: "✅ 没有星标邮件",
+      icon: t("mailList:starred.icon"),
+      label: t("mailList:starred.label"),
+      emptyText: t("mailList:starred.empty"),
       errorEvent: "bot.starred_query_failed",
     },
     afterMappings: (mappings, account) =>
@@ -289,23 +303,29 @@ export function registerMailListHandlers(bot: Bot, env: Env) {
     name: "junk",
     fetcher: (p) => p.listJunk(MAX_PER_ACCOUNT),
     config: {
-      icon: "🚫",
-      label: "垃圾",
-      emptyText: "✅ 没有垃圾邮件",
+      icon: t("mailList:junk.icon"),
+      label: t("mailList:junk.label"),
+      emptyText: t("mailList:junk.empty"),
       errorEvent: "bot.junk_query_failed",
     },
     afterMappings: (mappings, account) =>
       deleteJunkMappings(env, mappings, account),
     hideTgLinks: true,
-    actionKeyboard: new InlineKeyboard().text("🗑 全部删除", "delete_all_junk"),
+    actionKeyboard: new InlineKeyboard().text(
+      t("mailList:junk.deleteAll"),
+      "delete_all_junk",
+    ),
     action: {
       callbackName: "delete_all_junk",
-      loadingText: "正在删除…",
+      loadingText: t("mailList:junk.deleting"),
       handler: trashAllJunkEmails,
       resultText: (s, f) =>
         f > 0
-          ? `🗑 已删除 ${s} 封垃圾邮件，${f} 个账号失败`
-          : `🗑 已删除 ${s} 封垃圾邮件`,
+          ? t("mailList:junk.deleteResultWithFailed", {
+              success: s,
+              failed: f,
+            })
+          : t("mailList:junk.deleteResult", { success: s }),
     },
   });
 }

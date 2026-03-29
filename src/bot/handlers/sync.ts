@@ -1,5 +1,6 @@
 import { getOwnAccounts } from "@db/accounts";
 import { getMappingsByEmailIds } from "@db/message-map";
+import { t } from "@i18n";
 import { getEmailProvider } from "@services/email/provider";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Bot } from "grammy";
@@ -47,7 +48,7 @@ async function syncAccount(
 /** 同步用户所有账号的未读邮件 */
 async function syncAllAccounts(env: Env, userId: string): Promise<string> {
   const accounts = await getOwnAccounts(env.DB, userId);
-  if (accounts.length === 0) return "📭 暂无绑定的邮箱账号";
+  if (accounts.length === 0) return t("common:label.noAccounts");
 
   const results = await Promise.all(
     accounts.map(async (acc) => {
@@ -61,19 +62,19 @@ async function syncAllAccounts(env: Env, userId: string): Promise<string> {
   for (const r of results) {
     const label = r.account.email || `Account #${r.account.id}`;
     if (r.error) {
-      lines.push(`❌ ${label}: 同步失败`);
+      lines.push(t("sync:failed", { label }));
     } else if (r.enqueued > 0) {
       totalEnqueued += r.enqueued;
-      lines.push(`📧 ${label}: ${r.enqueued} 封新邮件`);
+      lines.push(t("sync:newEmails", { label, count: r.enqueued }));
     } else {
-      lines.push(`✅ ${label}: 无新邮件`);
+      lines.push(t("sync:noNewEmails", { label }));
     }
   }
 
   const header =
     totalEnqueued > 0
-      ? `🔄 同步完成，${totalEnqueued} 封新邮件已入队处理`
-      : "✅ 同步完成，没有新邮件";
+      ? t("sync:completeWithNew", { count: totalEnqueued })
+      : t("sync:completeNoNew");
 
   return `${header}\n\n${lines.join("\n")}`;
 }
@@ -81,14 +82,14 @@ async function syncAllAccounts(env: Env, userId: string): Promise<string> {
 export function registerSyncHandler(bot: Bot, env: Env) {
   bot.command("sync", async (ctx) => {
     const userId = String(ctx.from?.id);
-    const msg = await ctx.reply("🔄 正在同步邮件…");
+    const msg = await ctx.reply(t("sync:syncing"));
     const result = await syncAllAccounts(env, userId);
     await ctx.api.editMessageText(msg.chat.id, msg.message_id, result);
   });
 
   bot.callbackQuery("sync", async (ctx) => {
     const userId = String(ctx.from.id);
-    await ctx.answerCallbackQuery({ text: "正在同步…" });
+    await ctx.answerCallbackQuery({ text: t("sync:syncingShort") });
     const result = await syncAllAccounts(env, userId);
     await ctx.reply(result);
   });

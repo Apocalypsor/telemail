@@ -7,6 +7,7 @@ import {
   putFailedEmail,
 } from "@db/failed-emails";
 import { putMessageMapping } from "@db/message-map";
+import { t } from "@i18n";
 import { getAccessToken, gmailGet } from "@services/email/gmail";
 import { fetchImapRawEmail } from "@services/email/imap";
 import {
@@ -82,15 +83,15 @@ function buildTelegramHeader(
     timeZone: MESSAGE_DATE_TIMEZONE,
   });
   const lines = [
-    `*发件人:*  ${escapeMdV2(`${fromName} <${fromAddress}>`)}`,
-    `*收件人:*  ${escapeMdV2(recipient)}`,
+    `*${t("bridge:header.from")}*  ${escapeMdV2(`${fromName} <${fromAddress}>`)}`,
+    `*${t("bridge:header.to")}*  ${escapeMdV2(recipient)}`,
   ];
   if (accountEmail && accountEmail.toLowerCase() !== recipient.toLowerCase()) {
-    lines.push(`*账  号:*  ${escapeMdV2(accountEmail)}`);
+    lines.push(`*${t("bridge:header.account")}*  ${escapeMdV2(accountEmail)}`);
   }
   lines.push(
-    `*时  间:*  ${escapeMdV2(date)}`,
-    `*主  题:*  ${escapeMdV2(subject)}`,
+    `*${t("bridge:header.time")}*  ${escapeMdV2(date)}`,
+    `*${t("bridge:header.subject")}*  ${escapeMdV2(subject)}`,
     ``,
     ``,
   );
@@ -109,14 +110,14 @@ function prepareEmailContent(
   account: Account,
   isCaption: boolean,
 ) {
-  const subject = email.subject || "无主题";
+  const subject = email.subject || t("bridge:noSubject");
   const recipient =
-    email.to?.map((t) => t.address).join(", ") ||
+    email.to?.map((addr) => addr.address).join(", ") ||
     account.email ||
     `Account #${account.id}`;
   const header = buildTelegramHeader(
     email.from?.name || "",
-    email.from?.address || "未知",
+    email.from?.address || t("bridge:unknown"),
     recipient,
     subject,
     account.email ?? undefined,
@@ -161,18 +162,18 @@ async function editMessageWithAnalysis(
   if (
     result.isJunk &&
     result.junkConfidence >= 0.8 &&
-    !result.tags.some((t) => /^junk$/i.test(t))
+    !result.tags.some((tag) => /^junk$/i.test(tag))
   ) {
     result.tags.push("Junk");
   }
 
   const tagsLine =
     result.tags.length > 0
-      ? `\n\n${result.tags.map((t: string) => `\\#${escapeMdV2(t.replace(/\s+/g, "_"))}`).join("  ")}`
+      ? `\n\n${result.tags.map((tag: string) => `\\#${escapeMdV2(tag.replace(/\s+/g, "_"))}`).join("  ")}`
       : "";
 
   if (result.verificationCode && formattedBody) {
-    const codeSection = `*🔒 验证码:*  \`${escapeMdV2(result.verificationCode)}\`\n\n`;
+    const codeSection = `*${t("bridge:verificationCode")}*  \`${escapeMdV2(result.verificationCode)}\`\n\n`;
     await editMsg(
       header + codeSection + wrapExpandableQuote(formattedBody) + tagsLine,
     );
@@ -180,7 +181,7 @@ async function editMessageWithAnalysis(
     return;
   }
 
-  const summarySection = `*${escapeMdV2("🤖 AI 摘要")}*\n\n${toTelegramMdV2(result.summary)}`;
+  const summarySection = `*${escapeMdV2(t("bridge:aiSummary"))}*\n\n${toTelegramMdV2(result.summary)}`;
   await editMsg(header + summarySection + tagsLine);
 }
 

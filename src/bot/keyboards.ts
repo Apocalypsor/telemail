@@ -1,33 +1,39 @@
 import { getAccountById } from "@db/accounts";
 import { getMessageMapping } from "@db/message-map";
+import { t } from "@i18n";
 import { getEmailProvider } from "@services/email/provider";
 import { generateMailTokenById } from "@utils/hash";
 import { InlineKeyboard } from "grammy";
 import type { Env } from "@/types";
 
-// ── 邮件消息键盘（星标 / 查看原文）─────────────────────────────────────────
+// ── 邮件��息键盘（星标 / 查看原文）─────────────────────────────────────────
 
 /** 星标 inline keyboard（无查看原文按钮） */
-export const STAR_KEYBOARD = new InlineKeyboard()
-  .text("⭐ 星标", "star")
-  .text("🚫 垃圾", "junk_mark");
-export const STARRED_KEYBOARD = new InlineKeyboard()
-  .text("✅ 已星标", "unstar")
-  .text("🚫 垃圾", "junk_mark");
+export function starKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t("keyboards:mail.star"), "star")
+    .text(t("keyboards:mail.junk"), "junk_mark");
+}
+
+export function starredKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t("keyboards:mail.starred"), "starred")
+    .text(t("keyboards:mail.junk"), "junk_mark");
+}
 
 /** 创建带"查看原文"链接的星标键盘 */
 export function starKeyboardWithMailUrl(mailUrl: string): InlineKeyboard {
   return new InlineKeyboard()
-    .text("⭐ 星标", "star")
-    .text("🚫 垃圾", "junk_mark")
-    .url("📧 查看原文", mailUrl);
+    .text(t("keyboards:mail.star"), "star")
+    .text(t("keyboards:mail.junk"), "junk_mark")
+    .url(t("keyboards:mail.viewOriginal"), mailUrl);
 }
 
 export function starredKeyboardWithMailUrl(mailUrl: string): InlineKeyboard {
   return new InlineKeyboard()
-    .text("✅ 已星标", "unstar")
-    .text("🚫 垃圾", "junk_mark")
-    .url("📧 查看原文", mailUrl);
+    .text(t("keyboards:mail.starred"), "starred")
+    .text(t("keyboards:mail.junk"), "junk_mark")
+    .url(t("keyboards:mail.viewOriginal"), mailUrl);
 }
 
 /** 根据星标状态构建邮件消息键盘 */
@@ -48,7 +54,7 @@ export async function buildEmailKeyboard(
       ? starredKeyboardWithMailUrl(mailUrl)
       : starKeyboardWithMailUrl(mailUrl);
   }
-  return starred ? STARRED_KEYBOARD : STAR_KEYBOARD;
+  return starred ? starredKeyboard() : starKeyboard();
 }
 
 /** 从邮件源查询当前星标状态后构建键盘（LLM 处理后编辑消息使用） */
@@ -75,16 +81,18 @@ export async function resolveStarredKeyboard(
 /** 主菜单键盘 */
 export function mainMenuKeyboard(admin: boolean): InlineKeyboard {
   const kb = new InlineKeyboard()
-    .text("📧 账号管理", "accs")
+    .text(t("keyboards:menu.accountManagement"), "accs")
     .row()
-    .text("📬 未读邮件", "unread")
-    .text("🔄 同步邮件", "sync")
+    .text(t("keyboards:menu.unread"), "unread")
+    .text(t("keyboards:menu.sync"), "sync")
     .row()
-    .text("⭐ 星标邮件", "starred")
-    .text("🚫 垃圾邮件", "junk")
+    .text(t("keyboards:menu.starred"), "starred")
+    .text(t("keyboards:menu.junk"), "junk")
     .row();
   if (admin) {
-    kb.text("👥 用户管理", "users").text("⚙️ 全局操作", "admin").row();
+    kb.text(t("keyboards:menu.userManagement"), "users")
+      .text(t("keyboards:menu.globalOps"), "admin")
+      .row();
   }
   return kb;
 }

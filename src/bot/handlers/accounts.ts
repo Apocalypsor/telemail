@@ -14,6 +14,7 @@ import {
   updateAccount,
 } from "@db/accounts";
 import { getAllUsers, getUserByTelegramId } from "@db/users";
+import { t } from "@i18n";
 import { cleanupAndDeleteAccount } from "@services/account";
 import { renewWatch } from "@services/email/gmail";
 import { generateOAuthUrl } from "@services/email/gmail/oauth";
@@ -45,15 +46,17 @@ export function accountListKeyboard(
     const display = acc.email || `#${acc.id}`;
     kb.text(`${status} ${display}`, `acc:${acc.id}`).row();
   }
-  kb.text("➕ 添加账号", "add").row();
+  kb.text(t("accounts:list.addAccount"), "add").row();
   if (options?.isAdmin) {
     const back = options.showBack ? "" : ":s";
     kb.text(
-      options.showAll ? "🔽 收起" : "👀 查看所有账号",
+      options.showAll
+        ? t("accounts:list.collapse")
+        : t("accounts:list.viewAll"),
       options.showAll ? `accs${back}` : `accs:all${back}`,
     ).row();
   }
-  if (options?.showBack) kb.text("« 返回", "menu");
+  if (options?.showBack) kb.text(t("common:button.back"), "menu");
   return kb;
 }
 
@@ -66,7 +69,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     if (!admin) {
       const user = await getUserByTelegramId(env.DB, userId);
       if (!user || user.approved !== 1) {
-        return ctx.reply("您的账号正在等待管理员审批。");
+        return ctx.reply(t("common:admin.awaitingApproval"));
       }
     }
 
@@ -74,7 +77,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       ? await getOwnAccounts(env.DB, userId)
       : await getVisibleAccounts(env.DB, userId, false);
     const text =
-      accounts.length > 0 ? `📧 我的账号 (${accounts.length})` : "📧 暂无账号";
+      accounts.length > 0
+        ? t("accounts:list.myAccounts", { count: accounts.length })
+        : t("accounts:list.noAccounts");
     return ctx.reply(text, {
       reply_markup: accountListKeyboard(accounts, { isAdmin: admin }),
     });
@@ -90,7 +95,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       : await getVisibleAccounts(env.DB, userId, false);
 
     const text =
-      accounts.length > 0 ? `📧 我的账号 (${accounts.length})` : "📧 暂无账号";
+      accounts.length > 0
+        ? t("accounts:list.myAccounts", { count: accounts.length })
+        : t("accounts:list.noAccounts");
     await ctx.editMessageText(text, {
       reply_markup: accountListKeyboard(accounts, {
         isAdmin: admin,
@@ -105,10 +112,10 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const userId = String(ctx.from.id);
     await clearBotState(env, userId);
     if (!isAdmin(userId, env))
-      return ctx.answerCallbackQuery({ text: "无权操作" });
+      return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
 
     const accounts = await getAllAccounts(env.DB);
-    const text = `📧 所有账号 (${accounts.length})`;
+    const text = t("accounts:list.allAccounts", { count: accounts.length });
     await ctx.editMessageText(text, {
       reply_markup: accountListKeyboard(accounts, {
         isAdmin: true,
@@ -124,10 +131,10 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const userId = String(ctx.from.id);
     await clearBotState(env, userId);
     if (!isAdmin(userId, env))
-      return ctx.answerCallbackQuery({ text: "无权操作" });
+      return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
 
     const accounts = await getAllAccounts(env.DB);
-    const text = `📧 所有账号 (${accounts.length})`;
+    const text = t("accounts:list.allAccounts", { count: accounts.length });
     await ctx.editMessageText(text, {
       reply_markup: accountListKeyboard(accounts, {
         isAdmin: true,
@@ -144,7 +151,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const accounts = await getOwnAccounts(env.DB, userId);
 
     const text =
-      accounts.length > 0 ? `📧 我的账号 (${accounts.length})` : "📧 暂无账号";
+      accounts.length > 0
+        ? t("accounts:list.myAccounts", { count: accounts.length })
+        : t("accounts:list.noAccounts");
     await ctx.editMessageText(text, {
       reply_markup: accountListKeyboard(accounts, { isAdmin: true }),
     });
@@ -160,7 +169,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     );
     await clearBotState(env, userId);
     if (!account)
-      return ctx.answerCallbackQuery({ text: "账号不存在或无权访问" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFound"),
+      });
 
     let ownerName: string | undefined;
     if (admin && account.telegram_user_id) {
@@ -185,9 +196,13 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       ctx.match?.[1],
     );
     if (!account)
-      return ctx.answerCallbackQuery({ text: "账号不存在或无权访问" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFound"),
+      });
     if (account.type === AccountType.Imap)
-      return ctx.answerCallbackQuery({ text: "IMAP 账号不需要 OAuth 授权" });
+      return ctx.answerCallbackQuery({
+        text: t("accounts:oauth.imapNoOAuth"),
+      });
 
     try {
       const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
@@ -198,11 +213,14 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       const providerName = isOutlook ? "Microsoft" : "Google";
 
       const kb = new InlineKeyboard()
-        .url("🔗 点击授权", oauthUrl)
+        .url(t("accounts:button.clickAuth"), oauthUrl)
         .row()
-        .text("« 返回", `acc:${accountId}`);
+        .text(t("common:button.back"), `acc:${accountId}`);
       await ctx.editMessageText(
-        `🔑 ${providerName} OAuth 授权\n\n账号: ${account.email || `#${account.id}`}\n\n请点击下方按钮完成 ${providerName} 授权：`,
+        t("accounts:oauth.prompt", {
+          provider: providerName,
+          account: account.email || `#${account.id}`,
+        }),
         { reply_markup: kb },
       );
 
@@ -221,7 +239,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       }
     } catch (err) {
       await reportErrorToObservability(env, "bot.oauth_url_gen_failed", err);
-      return ctx.answerCallbackQuery({ text: "生成授权链接失败" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.genOAuthFailed"),
+      });
     }
     await ctx.answerCallbackQuery();
   });
@@ -230,9 +250,13 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
   bot.callbackQuery(/^acc:(\d+):w$/, async (ctx) => {
     const { account } = await resolveAccount(env, ctx.from.id, ctx.match?.[1]);
     if (!account)
-      return ctx.answerCallbackQuery({ text: "账号不存在或无权访问" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFound"),
+      });
     if (!account.refresh_token)
-      return ctx.answerCallbackQuery({ text: "账号未授权" });
+      return ctx.answerCallbackQuery({
+        text: t("accounts:oauth.notAuthorized"),
+      });
 
     try {
       if (account.type === AccountType.Outlook) {
@@ -241,11 +265,13 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
         await renewWatch(env, account);
       }
       await ctx.answerCallbackQuery({
-        text: `✅ Watch 已续订: ${account.email}`,
+        text: t("accounts:oauth.watchRenewed", { email: account.email }),
       });
     } catch (err) {
       await reportErrorToObservability(env, "bot.watch_renew_failed", err);
-      await ctx.answerCallbackQuery({ text: "❌ Watch 续订失败" });
+      await ctx.answerCallbackQuery({
+        text: t("accounts:oauth.watchFailed"),
+      });
     }
   });
 
@@ -257,13 +283,19 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       ctx.match?.[1],
     );
     if (!account)
-      return ctx.answerCallbackQuery({ text: "账号不存在或无权访问" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFound"),
+      });
 
     const kb = new InlineKeyboard()
-      .text("⚠️ 确认删除", `acc:${accountId}:dy`)
-      .text("取消", `acc:${accountId}`);
+      .text(t("common:button.confirm_delete"), `acc:${accountId}:dy`)
+      .text(t("common:button.cancelPlain"), `acc:${accountId}`);
     await ctx.editMessageText(
-      `⚠️ 确认删除账号 #${accountId}?\n\n邮箱: ${account.email || "(未设置)"}\nChat ID: ${account.chat_id}\n\n此操作不可撤销。`,
+      t("accounts:delete.confirm", {
+        id: accountId,
+        email: account.email || t("common:label.notSet"),
+        chatId: account.chat_id,
+      }),
       { reply_markup: kb },
     );
     await ctx.answerCallbackQuery();
@@ -277,7 +309,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       ctx.match?.[1],
     );
     if (!account)
-      return ctx.answerCallbackQuery({ text: "账号不存在或无权访问" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFound"),
+      });
 
     await cleanupAndDeleteAccount(env, account);
 
@@ -285,7 +319,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       ? await getOwnAccounts(env.DB, userId)
       : await getVisibleAccounts(env.DB, userId, false);
     await ctx.editMessageText(
-      `✅ 账号 #${accountId} 已删除\n\n📧 我的账号 (${accounts.length})`,
+      t("accounts:delete.deleted", { id: accountId, count: accounts.length }),
       {
         reply_markup: accountListKeyboard(accounts, {
           isAdmin: admin,
@@ -293,7 +327,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
         }),
       },
     );
-    await ctx.answerCallbackQuery({ text: "✅ 已删除" });
+    await ctx.answerCallbackQuery({ text: t("common:deleted") });
   });
 
   // Edit menu
@@ -305,18 +339,20 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     );
     await clearBotState(env, userId);
     if (!account)
-      return ctx.answerCallbackQuery({ text: "账号不存在或无权访问" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFound"),
+      });
 
     const kb = new InlineKeyboard()
-      .text("✏️ 编辑 Chat ID", `acc:${accountId}:eci`)
+      .text(t("accounts:edit.chatId"), `acc:${accountId}:eci`)
       .row();
     if (admin) {
-      kb.text("👤 分配所有者", `acc:${accountId}:own`).row();
+      kb.text(t("accounts:edit.assignOwner"), `acc:${accountId}:own`).row();
     }
-    kb.text("« 返回", `acc:${accountId}`);
+    kb.text(t("common:button.back"), `acc:${accountId}`);
 
     await ctx.editMessageText(
-      `✏️ 编辑账号 #${accountId}\n\n${accountDetailText(account)}\n\n选择要编辑的项目：`,
+      `${t("accounts:edit.title", { id: accountId })}\n\n${accountDetailText(account)}\n\n${t("accounts:edit.selectItem")}`,
       { reply_markup: kb },
     );
     await ctx.answerCallbackQuery();
@@ -330,12 +366,17 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       ctx.match?.[1],
     );
     if (!account)
-      return ctx.answerCallbackQuery({ text: "账号不存在或无权访问" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFound"),
+      });
 
     await setBotState(env, userId, { action: "edit_chatid", accountId });
-    const kb = new InlineKeyboard().text("❌ 取消", `acc:${accountId}:edit`);
+    const kb = new InlineKeyboard().text(
+      t("common:button.cancel"),
+      `acc:${accountId}:edit`,
+    );
     await ctx.editMessageText(
-      `✏️ 编辑 Chat ID\n\n当前值: ${account.chat_id}\n\n请发送新的 Chat ID：`,
+      t("accounts:edit.chatIdPrompt", { current: account.chat_id }),
       { reply_markup: kb },
     );
     await ctx.answerCallbackQuery();
@@ -345,24 +386,32 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
   bot.callbackQuery(/^acc:(\d+):own$/, async (ctx) => {
     const userId = String(ctx.from.id);
     if (!isAdmin(userId, env))
-      return ctx.answerCallbackQuery({ text: "无权操作" });
+      return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
 
     const accountId = parseInt(ctx.match?.[1], 10);
     const account = await getAuthorizedAccount(env.DB, accountId, userId, true);
-    if (!account) return ctx.answerCallbackQuery({ text: "账号不存在" });
+    if (!account)
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFoundShort"),
+      });
 
     const users = await getAllUsers(env.DB);
     const kb = new InlineKeyboard();
     for (const u of users) {
       const name = formatUserName(u);
       const current =
-        u.telegram_id === account.telegram_user_id ? " (当前)" : "";
+        u.telegram_id === account.telegram_user_id
+          ? t("accounts:edit.ownerCurrent")
+          : "";
       kb.text(`${name}${current}`, `edown:${accountId}:${u.telegram_id}`).row();
     }
-    kb.text("« 返回", `acc:${accountId}:edit`);
+    kb.text(t("common:button.back"), `acc:${accountId}:edit`);
 
     await ctx.editMessageText(
-      `👤 分配所有者\n\n账号 #${accountId}\n当前所有者: ${account.telegram_user_id || "(无)"}\n\n选择新的所有者：`,
+      t("accounts:edit.ownerTitle", {
+        id: accountId,
+        current: account.telegram_user_id || t("common:label.none"),
+      }),
       {
         reply_markup: kb,
       },
@@ -374,16 +423,22 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
   bot.callbackQuery(/^edown:(\d+):(\d+)$/, async (ctx) => {
     const userId = String(ctx.from.id);
     if (!isAdmin(userId, env))
-      return ctx.answerCallbackQuery({ text: "无权操作" });
+      return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
 
     const accountId = parseInt(ctx.match?.[1], 10);
     const newOwner = ctx.match?.[2];
     const account = await getAuthorizedAccount(env.DB, accountId, userId, true);
-    if (!account) return ctx.answerCallbackQuery({ text: "账号不存在" });
+    if (!account)
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFoundShort"),
+      });
 
     await updateAccount(env.DB, accountId, account.chat_id, newOwner);
     const updated = await getAuthorizedAccount(env.DB, accountId, userId, true);
-    if (!updated) return ctx.answerCallbackQuery({ text: "账号不存在" });
+    if (!updated)
+      return ctx.answerCallbackQuery({
+        text: t("common:error.accountNotFoundShort"),
+      });
     const newOwnerUser = await getUserByTelegramId(env.DB, newOwner);
     const ownerName = newOwnerUser?.username
       ? `@${newOwnerUser.username}`
@@ -391,7 +446,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     await ctx.editMessageText(accountDetailText(updated, ownerName), {
       reply_markup: accountDetailKeyboard(updated),
     });
-    await ctx.answerCallbackQuery({ text: `✅ 已分配给 ${newOwner}` });
+    await ctx.answerCallbackQuery({
+      text: t("accounts:edit.ownerAssigned", { owner: newOwner }),
+    });
   });
 
   // Start add flow
@@ -400,13 +457,12 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     await setBotState(env, userId, { action: "add", step: "chat_id" });
 
     const kb = new InlineKeyboard()
-      .text(`📌 使用当前 Chat ID (${userId})`, `addme`)
+      .text(t("accounts:add.useCurrent", { id: userId }), "addme")
       .row()
-      .text("❌ 取消", "accs");
-    await ctx.editMessageText(
-      "➕ 添加账号\n\n请发送 Chat ID（数字），或点击下方按钮使用当前会话 ID：",
-      { reply_markup: kb },
-    );
+      .text(t("common:button.cancel"), "accs");
+    await ctx.editMessageText(t("accounts:add.promptChatId"), {
+      reply_markup: kb,
+    });
     await ctx.answerCallbackQuery();
   });
 
@@ -420,15 +476,15 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     });
 
     const kb = new InlineKeyboard()
-      .text("📨 Gmail (OAuth)", "addtype:gmail")
+      .text(t("accounts:add.gmail"), "addtype:gmail")
       .row()
-      .text("📮 Outlook (OAuth)", "addtype:outlook")
+      .text(t("accounts:add.outlook"), "addtype:outlook")
       .row()
-      .text("📬 IMAP", "addtype:imap")
+      .text(t("accounts:add.imap"), "addtype:imap")
       .row()
-      .text("❌ 取消", "accs");
+      .text(t("common:button.cancel"), "accs");
     await ctx.editMessageText(
-      `➕ 添加账号\n\nChat ID: ${userId}\n\n选择账号类型：`,
+      t("accounts:add.selectTypePrompt", { chatId: userId }),
       { reply_markup: kb },
     );
     await ctx.answerCallbackQuery();
@@ -439,7 +495,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const userId = String(ctx.from.id);
     const state = await getBotState(env, userId);
     if (!state || state.action !== "add" || state.step !== "type") {
-      return ctx.answerCallbackQuery({ text: "操作已过期" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.operationExpired"),
+      });
     }
 
     try {
@@ -449,9 +507,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
       const oauthUrl = await generateOAuthUrl(env, account.id, origin);
       const kb = new InlineKeyboard()
-        .url("🔗 点击授权 Google", oauthUrl)
+        .url(t("accounts:button.clickAuthGoogle"), oauthUrl)
         .row()
-        .text("查看账号", `acc:${account.id}`);
+        .text(t("common:button.viewAccount"), `acc:${account.id}`);
 
       const msg = ctx.callbackQuery.message;
       if (msg) {
@@ -466,7 +524,10 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       }
 
       await ctx.editMessageText(
-        `✅ Gmail 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}\n\n请点击下方按钮完成 Google 授权：`,
+        t("accounts:gmail.created", {
+          id: account.id,
+          chatId: state.chatId,
+        }),
         {
           reply_markup: kb,
         },
@@ -474,7 +535,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     } catch (err) {
       await clearBotState(env, userId);
       await reportErrorToObservability(env, "bot.create_account_failed", err);
-      await ctx.editMessageText("❌ 创建失败，请稍后重试");
+      await ctx.editMessageText(t("common:error.createFailed"));
     }
     await ctx.answerCallbackQuery();
   });
@@ -484,12 +545,14 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const userId = String(ctx.from.id);
     const state = await getBotState(env, userId);
     if (!state || state.action !== "add" || state.step !== "type") {
-      return ctx.answerCallbackQuery({ text: "操作已过期" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.operationExpired"),
+      });
     }
 
     if (!env.MS_CLIENT_ID || !env.MS_CLIENT_SECRET) {
       return ctx.answerCallbackQuery({
-        text: "❌ Microsoft OAuth 未配置，请联系管理员",
+        text: t("accounts:add.msNotConfigured"),
       });
     }
 
@@ -505,9 +568,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
       const oauthUrl = await generateMsOAuthUrl(env, account.id, origin);
       const kb = new InlineKeyboard()
-        .url("🔗 点击授权 Microsoft", oauthUrl)
+        .url(t("accounts:button.clickAuthMicrosoft"), oauthUrl)
         .row()
-        .text("查看账号", `acc:${account.id}`);
+        .text(t("common:button.viewAccount"), `acc:${account.id}`);
 
       const msg = ctx.callbackQuery.message;
       if (msg) {
@@ -522,7 +585,10 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       }
 
       await ctx.editMessageText(
-        `✅ Outlook 账号已创建 #${account.id}\n\nChat ID: ${state.chatId}\n\n请点击下方按钮完成 Microsoft 授权：`,
+        t("accounts:outlook.created", {
+          id: account.id,
+          chatId: state.chatId,
+        }),
         {
           reply_markup: kb,
         },
@@ -530,7 +596,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     } catch (err) {
       await clearBotState(env, userId);
       await reportErrorToObservability(env, "bot.create_account_failed", err);
-      await ctx.editMessageText("❌ 创建失败，请稍后重试");
+      await ctx.editMessageText(t("common:error.createFailed"));
     }
     await ctx.answerCallbackQuery();
   });
@@ -540,12 +606,14 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const userId = String(ctx.from.id);
     const state = await getBotState(env, userId);
     if (!state || state.action !== "add" || state.step !== "type") {
-      return ctx.answerCallbackQuery({ text: "操作已过期" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.operationExpired"),
+      });
     }
 
     if (!env.IMAP_BRIDGE_URL || !env.IMAP_BRIDGE_SECRET) {
       return ctx.answerCallbackQuery({
-        text: "❌ IMAP 中间件未配置，请联系管理员",
+        text: t("accounts:add.imapNotConfigured"),
       });
     }
 
@@ -554,9 +622,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       step: "host",
       chatId: state.chatId,
     });
-    const kb = new InlineKeyboard().text("❌ 取消", "accs");
+    const kb = new InlineKeyboard().text(t("common:button.cancel"), "accs");
     await ctx.editMessageText(
-      `📬 添加 IMAP 账号\n\nChat ID: ${state.chatId}\n\n请发送 IMAP 服务器地址（如 imap.gmail.com）：`,
+      t("accounts:imap.promptHost", { chatId: state.chatId }),
       {
         reply_markup: kb,
       },
@@ -569,7 +637,9 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const userId = String(ctx.from.id);
     const state = await getBotState(env, userId);
     if (!state || state.action !== "add_imap" || state.step !== "secure") {
-      return ctx.answerCallbackQuery({ text: "操作已过期" });
+      return ctx.answerCallbackQuery({
+        text: t("common:error.operationExpired"),
+      });
     }
 
     const secure = ctx.match?.[1] === "yes";
@@ -578,9 +648,11 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       step: "user",
       imapSecure: secure,
     });
-    const kb = new InlineKeyboard().text("❌ 取消", "accs");
+    const kb = new InlineKeyboard().text(t("common:button.cancel"), "accs");
     await ctx.editMessageText(
-      `📬 添加 IMAP 账号\n\n服务器: ${state.imapHost}:${state.imapPort} ${secure ? "(TLS)" : "(无 TLS)"}\n\n请发送 IMAP 用户名（通常为邮箱地址）：`,
+      t("accounts:imap.promptUser", {
+        server: `${state.imapHost}:${state.imapPort} ${secure ? "(TLS)" : `(${t("accounts:imap.noTls")})`}`,
+      }),
       { reply_markup: kb },
     );
     await ctx.answerCallbackQuery();

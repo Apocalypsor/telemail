@@ -1,0 +1,42 @@
+export default {
+  error: {
+    unauthorized: "无权操作",
+    accountNotFound: "账号不存在或无权访问",
+    accountNotFoundShort: "账号不存在",
+    operationFailed: "操作失败，请重试",
+    operationExpired: "操作已过期",
+    createFailed: "❌ 创建失败，请稍后重试",
+    createFailedDetail: "❌ 创建失败: {{error}}",
+    updateFailedDetail: "❌ 更新失败: {{error}}",
+    userNotFound: "用户不存在",
+    recordNotFound: "记录不存在",
+    genOAuthFailed: "生成授权链接失败",
+    queryFailed: "查询失败",
+  },
+  button: {
+    cancel: "❌ 取消",
+    cancelPlain: "取消",
+    back: "« 返回",
+    backToAccounts: "« 返回账号列表",
+    viewAccount: "查看账号",
+    accountList: "账号列表",
+    confirm_delete: "⚠️ 确认删除",
+  },
+  status: {
+    authorized: "✅ 已授权",
+    notAuthorized: "❌ 未授权",
+  },
+  label: {
+    noAccounts: "📭 暂无绑定的邮箱账号",
+    notSet: "(未设置)",
+    none: "(无)",
+    noSubject: "(无主题)",
+    unknown: "未知",
+  },
+  admin: {
+    only: "⛔ 仅管理员可用",
+    awaitingApproval: "您的账号正在等待管理员审批。",
+    awaitingApprovalFull: "您的账号正在等待管理员审批，审批通过后会收到通知。",
+  },
+  deleted: "✅ 已删除",
+};

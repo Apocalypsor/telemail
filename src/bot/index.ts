@@ -7,6 +7,7 @@ import { registerReactionHandler } from "@bot/handlers/reaction";
 import { registerStarHandler } from "@bot/handlers/star";
 import { registerStartHandlers } from "@bot/handlers/start";
 import { registerSyncHandler } from "@bot/handlers/sync";
+import { t } from "@i18n";
 import { reportErrorToObservability } from "@utils/observability";
 import { Api, Bot } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
@@ -39,7 +40,7 @@ export function createBot(env: Env, botInfo: UserFromGetMe) {
     try {
       if (err.ctx.callbackQuery) {
         await err.ctx
-          .answerCallbackQuery({ text: "❌ 操作失败，请重试" })
+          .answerCallbackQuery({ text: t("common:error.operationFailed") })
           .catch(() => {});
       }
     } catch {

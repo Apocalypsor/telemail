@@ -5,6 +5,7 @@ import {
   getAuthorizedAccount,
   updateAccount,
 } from "@db/accounts";
+import { t } from "@i18n";
 import { syncAccounts } from "@services/email/imap";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Bot } from "grammy";
@@ -29,7 +30,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
     if (state.action === "add") {
       if (state.step === "chat_id") {
         if (!/^-?\d+$/.test(text)) {
-          await ctx.reply("❌ Chat ID 必须为数字，请重新发送：");
+          await ctx.reply(t("accounts:input.chatIdMustBeNumber"));
           return;
         }
         await setBotState(env, userId, {
@@ -38,14 +39,14 @@ export function registerInputHandler(bot: Bot, env: Env) {
           chatId: text,
         });
         const kb = new InlineKeyboard()
-          .text("📨 Gmail (OAuth)", "addtype:gmail")
+          .text(t("accounts:add.gmail"), "addtype:gmail")
           .row()
-          .text("📮 Outlook (OAuth)", "addtype:outlook")
+          .text(t("accounts:add.outlook"), "addtype:outlook")
           .row()
-          .text("📬 IMAP", "addtype:imap")
+          .text(t("accounts:add.imap"), "addtype:imap")
           .row()
-          .text("❌ 取消", "accs");
-        await ctx.reply("请选择账号类型：", { reply_markup: kb });
+          .text(t("common:button.cancel"), "accs");
+        await ctx.reply(t("accounts:add.selectType"), { reply_markup: kb });
       }
     }
 
@@ -53,7 +54,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
     else if (state.action === "add_imap") {
       if (state.step === "host") {
         if (!text) {
-          await ctx.reply("❌ 服务器地址不能为空，请重新发送：");
+          await ctx.reply(t("accounts:input.hostEmpty"));
           return;
         }
         await setBotState(env, userId, {
@@ -61,15 +62,14 @@ export function registerInputHandler(bot: Bot, env: Env) {
           step: "port",
           imapHost: text,
         });
-        const kb = new InlineKeyboard().text("❌ 取消", "accs");
-        await ctx.reply(
-          `服务器: ${text}\n\n请发送 IMAP 端口（如 993 for TLS，143 for STARTTLS）：`,
-          { reply_markup: kb },
-        );
+        const kb = new InlineKeyboard().text(t("common:button.cancel"), "accs");
+        await ctx.reply(t("accounts:imap.promptPort", { host: text }), {
+          reply_markup: kb,
+        });
       } else if (state.step === "port") {
         const port = parseInt(text, 10);
         if (Number.isNaN(port) || port < 1 || port > 65535) {
-          await ctx.reply("❌ 端口必须为 1–65535 之间的数字，请重新发送：");
+          await ctx.reply(t("accounts:input.portInvalid"));
           return;
         }
         await setBotState(env, userId, {
@@ -78,17 +78,19 @@ export function registerInputHandler(bot: Bot, env: Env) {
           imapPort: port,
         });
         const kb = new InlineKeyboard()
-          .text("✅ 是（TLS/SSL）", "imapsecure:yes")
-          .text("❌ 否", "imapsecure:no")
+          .text(t("accounts:imap.secureYes"), "imapsecure:yes")
+          .text(t("accounts:imap.secureNo"), "imapsecure:no")
           .row()
-          .text("取消", "accs");
+          .text(t("common:button.cancelPlain"), "accs");
         await ctx.reply(
-          `服务器: ${state.imapHost}:${port}\n\n是否使用 TLS/SSL 加密？`,
+          t("accounts:imap.promptSecure", {
+            server: `${state.imapHost}:${port}`,
+          }),
           { reply_markup: kb },
         );
       } else if (state.step === "user") {
         if (!text) {
-          await ctx.reply("❌ 用户名不能为空，请重新发送：");
+          await ctx.reply(t("accounts:input.userEmpty"));
           return;
         }
         await setBotState(env, userId, {
@@ -96,11 +98,11 @@ export function registerInputHandler(bot: Bot, env: Env) {
           step: "pass",
           imapUser: text,
         });
-        const kb = new InlineKeyboard().text("❌ 取消", "accs");
-        await ctx.reply("请发送 IMAP 密码：", { reply_markup: kb });
+        const kb = new InlineKeyboard().text(t("common:button.cancel"), "accs");
+        await ctx.reply(t("accounts:imap.promptPass"), { reply_markup: kb });
       } else if (state.step === "pass") {
         if (!text) {
-          await ctx.reply("❌ 密码不能为空，请重新发送：");
+          await ctx.reply(t("accounts:input.passEmpty"));
           return;
         }
         try {
@@ -129,16 +131,22 @@ export function registerInputHandler(bot: Bot, env: Env) {
           }
 
           const kb = new InlineKeyboard()
-            .text("查看账号", `acc:${account.id}`)
-            .text("账号列表", "accs");
+            .text(t("common:button.viewAccount"), `acc:${account.id}`)
+            .text(t("common:button.accountList"), "accs");
           await ctx.reply(
-            `✅ IMAP 账号已创建 #${account.id}\n\n邮箱: ${state.imapUser}\nChat ID: ${state.chatId}`,
+            t("accounts:imap.created", {
+              id: account.id,
+              email: state.imapUser,
+              chatId: state.chatId,
+            }),
             { reply_markup: kb },
           );
         } catch (err) {
           await clearBotState(env, userId);
           await ctx.reply(
-            `❌ 创建失败: ${err instanceof Error ? err.message : String(err)}`,
+            t("common:error.createFailedDetail", {
+              error: err instanceof Error ? err.message : String(err),
+            }),
           );
         }
       }
@@ -147,7 +155,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
     // ─── 编辑 Chat ID ─────────────────────────────────────────────
     else if (state.action === "edit_chatid") {
       if (!/^-?\d+$/.test(text)) {
-        await ctx.reply("❌ Chat ID 必须为数字，请重新发送：");
+        await ctx.reply(t("accounts:input.chatIdMustBeNumber"));
         return;
       }
       const account = await getAuthorizedAccount(
@@ -158,7 +166,7 @@ export function registerInputHandler(bot: Bot, env: Env) {
       );
       if (!account) {
         await clearBotState(env, userId);
-        await ctx.reply("❌ 账号不存在或无权访问");
+        await ctx.reply(`❌ ${t("common:error.accountNotFound")}`);
         return;
       }
 
@@ -166,13 +174,17 @@ export function registerInputHandler(bot: Bot, env: Env) {
         await updateAccount(env.DB, state.accountId, text);
         await clearBotState(env, userId);
         const kb = new InlineKeyboard()
-          .text("查看账号", `acc:${state.accountId}`)
-          .text("账号列表", "accs");
-        await ctx.reply(`✅ Chat ID 已更新为 ${text}`, { reply_markup: kb });
+          .text(t("common:button.viewAccount"), `acc:${state.accountId}`)
+          .text(t("common:button.accountList"), "accs");
+        await ctx.reply(t("accounts:edit.chatIdUpdated", { value: text }), {
+          reply_markup: kb,
+        });
       } catch (err) {
         await clearBotState(env, userId);
         await ctx.reply(
-          `❌ 更新失败: ${err instanceof Error ? err.message : String(err)}`,
+          t("common:error.updateFailedDetail", {
+            error: err instanceof Error ? err.message : String(err),
+          }),
         );
       }
     }

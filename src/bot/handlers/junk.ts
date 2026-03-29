@@ -1,5 +1,6 @@
 import { getAccountById } from "@db/accounts";
 import { deleteMappingByEmailId, getMessageMapping } from "@db/message-map";
+import { t } from "@i18n";
 import { getEmailProvider } from "@services/email/provider";
 import { deleteMessage } from "@services/telegram";
 import { reportErrorToObservability } from "@utils/observability";
@@ -16,13 +17,13 @@ export function registerJunkHandler(bot: Bot, env: Env) {
       const chatId = String(msg.chat.id);
       const mapping = await getMessageMapping(env.DB, chatId, msg.message_id);
       if (!mapping) {
-        await ctx.answerCallbackQuery({ text: "消息映射未找到" });
+        await ctx.answerCallbackQuery({ text: t("junk:mappingNotFound") });
         return;
       }
 
       const account = await getAccountById(env.DB, mapping.account_id);
       if (!account) {
-        await ctx.answerCallbackQuery({ text: "账号未找到" });
+        await ctx.answerCallbackQuery({ text: t("junk:accountNotFound") });
         return;
       }
 
@@ -40,11 +41,13 @@ export function registerJunkHandler(bot: Bot, env: Env) {
         mapping.account_id,
       ).catch(() => {});
 
-      await ctx.answerCallbackQuery({ text: "🚫 已标记为垃圾邮件" });
+      await ctx.answerCallbackQuery({ text: t("junk:markedAsJunk") });
       console.log(`Marked as junk: email=${mapping.email_message_id}`);
     } catch (err) {
       await reportErrorToObservability(env, "bot.junk_mark_failed", err);
-      await ctx.answerCallbackQuery({ text: "操作失败，请重试" });
+      await ctx.answerCallbackQuery({
+        text: t("common:error.operationFailed"),
+      });
     }
   });
 }

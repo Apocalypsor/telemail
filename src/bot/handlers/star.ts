@@ -1,8 +1,8 @@
+import { t } from "@i18n";
 import { markAsReadByMessage, toggleStar } from "@services/message-actions";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Bot } from "grammy";
 import type { MessageEntity } from "grammy/types";
-import { STAR_TAG } from "@/constants";
 import type { Env } from "@/types";
 
 /** 在消息文本末尾追加 #星标 标签 */
@@ -10,13 +10,14 @@ function appendStarTag(
   text: string,
   entities: MessageEntity[],
 ): { text: string; entities: MessageEntity[] } {
-  if (text.endsWith(STAR_TAG)) return { text, entities };
-  const newText = text + STAR_TAG;
+  const tag = t("star:tag");
+  if (text.endsWith(tag)) return { text, entities };
+  const newText = text + tag;
   return {
     text: newText,
     entities: [
       ...entities,
-      { type: "hashtag", offset: text.length + 1, length: STAR_TAG.length - 1 },
+      { type: "hashtag", offset: text.length + 1, length: tag.length - 1 },
     ],
   };
 }
@@ -26,8 +27,9 @@ function stripStarTag(
   text: string,
   entities: MessageEntity[],
 ): { text: string; entities: MessageEntity[] } {
-  if (!text.endsWith(STAR_TAG)) return { text, entities };
-  const newText = text.slice(0, -STAR_TAG.length);
+  const tag = t("star:tag");
+  if (!text.endsWith(tag)) return { text, entities };
+  const newText = text.slice(0, -tag.length);
   return {
     text: newText,
     entities: entities.filter((e) => e.offset + e.length <= newText.length),
@@ -78,11 +80,13 @@ export function registerStarHandler(bot: Bot, env: Env) {
       // 星标同时自动标记已读
       await markAsReadByMessage(env, String(msg.chat.id), msg.message_id);
 
-      await ctx.answerCallbackQuery({ text: "⭐ 已加星标" });
+      await ctx.answerCallbackQuery({ text: t("star:starred") });
       console.log(`Starred: email=${result.emailMessageId}`);
     } catch (err) {
       await reportErrorToObservability(env, "bot.star_failed", err);
-      await ctx.answerCallbackQuery({ text: "操作失败，请重试" });
+      await ctx.answerCallbackQuery({
+        text: t("common:error.operationFailed"),
+      });
     }
   });
 
@@ -125,11 +129,13 @@ export function registerStarHandler(bot: Bot, env: Env) {
         await ctx.editMessageReplyMarkup({ reply_markup: result.keyboard });
       }
 
-      await ctx.answerCallbackQuery({ text: "已取消星标" });
+      await ctx.answerCallbackQuery({ text: t("star:unstarred") });
       console.log(`Unstarred: email=${result.emailMessageId}`);
     } catch (err) {
       await reportErrorToObservability(env, "bot.unstar_failed", err);
-      await ctx.answerCallbackQuery({ text: "操作失败，请重试" });
+      await ctx.answerCallbackQuery({
+        text: t("common:error.operationFailed"),
+      });
     }
   });
 }

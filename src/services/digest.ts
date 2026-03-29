@@ -1,4 +1,5 @@
 import { getAllAccounts } from "@db/accounts";
+import { t } from "@i18n";
 import { getEmailProvider } from "@services/email/provider";
 import { sendTextMessage } from "@services/telegram";
 import { escapeMdV2 } from "@utils/markdown-v2";
@@ -12,8 +13,8 @@ import {
 import type { Account, Env } from "@/types";
 
 const DIGEST_KB = new InlineKeyboard()
-  .text("📬 未读列表", "unread")
-  .text("🚫 垃圾列表", "junk");
+  .text(t("digest:button.unreadList"), "unread")
+  .text(t("digest:button.junkList"), "junk");
 
 interface AccountDigest {
   account: Account;
@@ -39,7 +40,9 @@ function getLocalHour(timestamp: number): number {
 }
 
 function getGreeting(hour: number): string {
-  return hour < 12 ? "🌅 早安" : "🌆 晚上好";
+  return hour < 12
+    ? t("digest:greeting.morning")
+    : t("digest:greeting.evening");
 }
 
 /** 为所有用户发送邮件摘要通知（私聊发送给用户本人） */
@@ -91,22 +94,22 @@ async function sendDigestToUser(
   if (totalUnread === 0 && totalJunk === 0 && !hasErrors) return;
 
   const greeting = getGreeting(localHour);
-  const lines: string[] = [`*${greeting}，这是你的邮件摘要*`, ""];
+  const lines: string[] = [t("digest:header", { greeting }), ""];
 
   for (const d of digests) {
     const label = escapeMdV2(d.account.email || `Account #${d.account.id}`);
     if (d.error) {
-      lines.push(`❌ ${label}: ${escapeMdV2("查询失败")}`);
+      lines.push(`❌ ${label}: ${escapeMdV2(t("common:error.queryFailed"))}`);
       continue;
     }
     if (d.unread === 0 && d.junk === 0) continue;
     lines.push(`📧 ${label}`);
-    lines.push(`    📬 ${d.unread} 封未读  \\|  🚫 ${d.junk} 封垃圾`);
+    lines.push(t("digest:accountStats", { unread: d.unread, junk: d.junk }));
   }
 
   if (totalUnread > 0 || totalJunk > 0) {
     lines.push("");
-    lines.push(`📊 共 ${totalUnread} 封未读，${totalJunk} 封垃圾`);
+    lines.push(t("digest:total", { unread: totalUnread, junk: totalJunk }));
   }
 
   const text = lines.join("\n");
