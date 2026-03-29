@@ -110,7 +110,7 @@ gcloud pubsub subscriptions create gmail-push-sub \
   --ack-deadline=30
 ```
 
-### 2d. Microsoft Entra ID 配置（Outlook，可选）
+### 3. Microsoft Entra ID 配置（Outlook，可选）
 
 1. 打开 [Microsoft Entra ID](https://entra.microsoft.com) → Applications → App registrations → **New registration**
 2. 名称随意，账户类型选 **Accounts in any organizational directory and personal Microsoft accounts**
@@ -119,7 +119,7 @@ gcloud pubsub subscriptions create gmail-push-sub \
 5. 进入 **Certificates & secrets** → New client secret → 记下 Value
 6. 进入 **API permissions** → Add a permission → Microsoft Graph → Delegated permissions → 勾选 `Mail.ReadWrite`、`offline_access`、`User.Read`
 
-### 3. 创建 D1 数据库
+### 4. 创建 D1 数据库
 
 ```sh
 pnpm wrangler d1 create gmail-tg-bridge
@@ -133,7 +133,7 @@ pnpm wrangler d1 create gmail-tg-bridge
 pnpm wrangler d1 migrations apply gmail-tg-bridge --remote
 ```
 
-### 3b. 创建 KV 命名空间
+### 4b. 创建 KV 命名空间
 
 ```sh
 pnpm wrangler kv namespace create EMAIL_KV
@@ -141,7 +141,7 @@ pnpm wrangler kv namespace create EMAIL_KV
 
 将返回的 `id` 填入 `wrangler.jsonc` 中 `kv_namespaces[0].id`。KV 用于 access_token 缓存、消息去重和 OAuth state 存储。
 
-### 3c. 创建 Queue
+### 4c. 创建 Queue
 
 ```sh
 pnpm wrangler queues create gmail-tg-queue
@@ -149,7 +149,7 @@ pnpm wrangler queues create gmail-tg-queue
 
 Queue 用于处理 Gmail history 同步和邮件发送，内置重试。`wrangler.jsonc` 中已配置好 producer 和 consumer 绑定。
 
-### 4. 配置 Secrets
+### 5. 配置 Secrets
 
 ```sh
 # ── 必填 ──
@@ -170,7 +170,7 @@ pnpm wrangler secret put MS_CLIENT_SECRET           # Microsoft Entra ID Client 
 pnpm wrangler secret put MS_WEBHOOK_SECRET          # 自定义密钥，用于验证 Graph webhook
 ```
 
-### 5. AI 摘要（可选）
+### 6. AI 摘要（可选）
 
 配置以下三个环境变量即可启用 AI 摘要功能，使用任何 OpenAI compatible API：
 
@@ -184,7 +184,7 @@ pnpm wrangler secret put LLM_MODEL      # 模型名称（例如 gpt-4o-mini）
 
 三个变量都配置后，新邮件发送到 Telegram 后会异步生成摘要并编辑原消息。
 
-### 6. 查看邮件原文（可选）
+### 7. 查看邮件原文（可选）
 
 配置 `WORKER_URL` 后，Telegram 消息会附带"📧 查看原文"按钮，点击可在浏览器中查看邮件原始 HTML：
 
@@ -194,13 +194,13 @@ pnpm wrangler secret put WORKER_URL  # Worker 对外 URL，例如 https://gmail-
 
 链接使用 HMAC-SHA256（基于 `ADMIN_SECRET` + `messageId` + `chatId`）签名，防止未授权遍历。HTML 内容缓存在 KV 中，7 天后自动过期。
 
-### 7. 部署
+### 8. 部署
 
 ```sh
 pnpm deploy   # 自动先运行 build:css 生成 Tailwind CSS，再部署
 ```
 
-### 8. 设置 Telegram Webhook
+### 9. 设置 Telegram Webhook
 
 部署完成后，设置 Telegram Bot 的 webhook 指向 Worker：
 
@@ -219,7 +219,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 
 > **注意**：如果邮件转发到**频道**，Bot 需要被设为频道管理员才能接收 reaction 事件。
 
-### 9. 添加邮箱账号
+### 10. 添加邮箱账号
 
 通过 Telegram Bot 管理账号：
 
@@ -274,6 +274,9 @@ pnpm cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 
 由 `tsconfig.json` 定义，Wrangler 构建时自动解析。
 
+### 国际化 (i18n)
+
+所有用户可见的字符串通过 [i18next](https://www.i18next.com/) 管理（`import { t } from "@i18n"`），翻译文件按模块拆分在 `src/i18n/locales/zh/` 下。当前仅中文。
 
 ## 环境变量
 
@@ -307,7 +310,9 @@ pnpm cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 | ---- | ----------------------------------- | -------- | ------------------------------------- |
 | GET  | `/favicon.png`                      | -        | Favicon                               |
 | GET  | `/login`                            | -        | Telegram Login 登录页                 |
+| GET  | `/login/callback`                   | -        | Telegram Login 回调                   |
 | GET  | `/preview`                          | Session  | HTML→Telegram MarkdownV2 预览工具     |
+| GET  | `/junk-check`                       | Session  | 垃圾邮件检测工具                      |
 | GET  | `/mail/:id?accountId=X&t=TOKEN`     | HMAC     | 查看邮件原文 HTML（含操作 FAB 按钮）  |
 | GET  | `/oauth/google?account=ID`          | Session  | 指定账号的 Google OAuth 授权说明页    |
 | GET  | `/oauth/google/start?account=ID`    | Session  | 发起指定账号的 Google OAuth           |
@@ -324,9 +329,12 @@ pnpm cf-typegen # 根据 wrangler.jsonc 重新生成 TypeScript 类型
 | POST | `/api/gmail/push?secret=XXX`       | Secret  | Gmail Pub/Sub push 回调           |
 | POST | `/api/outlook/push?secret=XXX`     | Secret  | Outlook Graph webhook             |
 | POST | `/api/preview`                     | Session | HTML 格式化预览（JSON 请求/响应） |
+| POST | `/api/junk-check`                  | Session | 垃圾邮件检测（JSON 请求/响应）    |
 | POST | `/api/mail/:id/move-to-inbox`      | HMAC    | 将垃圾邮件移回收件箱并重投递到 TG |
 | POST | `/api/mail/:id/mark-as-junk`       | HMAC    | 标记为垃圾邮件并删除 TG 消息      |
 | POST | `/api/mail/:id/trash`              | HMAC    | 移到回收站                        |
+| POST | `/api/mail/:id/toggle-star`        | HMAC    | 切换星标状态                      |
+| GET  | `/api/cors-proxy?url=X&sig=X`      | Sig     | 邮件 HTML 内图片 CORS 代理        |
 | GET  | `/api/imap/accounts`               | Bearer  | IMAP 中间件拉取账号列表           |
 | POST | `/api/imap/push`                   | Bearer  | IMAP 中间件推送新邮件通知         |
 
