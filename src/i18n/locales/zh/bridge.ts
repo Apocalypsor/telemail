@@ -8,4 +8,7 @@ export default {
   },
   verificationCode: "🔒 验证码:",
   aiSummary: "🤖 AI 摘要",
+  refreshing: "🔄 正在刷新…",
+  refreshed: "✅ 刷新完成",
+  refreshNoLlm: "LLM 未配置",
 };

@@ -6,7 +6,7 @@ import {
   getAllFailedEmails,
   putFailedEmail,
 } from "@db/failed-emails";
-import { putMessageMapping } from "@db/message-map";
+import { getMessageMapping, putMessageMapping } from "@db/message-map";
 import { t } from "@i18n";
 import { getAccessToken, gmailGet } from "@services/email/gmail";
 import { fetchImapRawEmail } from "@services/email/imap";
@@ -357,6 +357,48 @@ export async function processEmailMessage(
 // 失败邮件重试
 // ---------------------------------------------------------------------------
 
+/** 重新拉取邮件并执行 LLM 分析，编辑 Telegram 消息 */
+async function reanalyzeEmail(
+  env: Env,
+  account: Account,
+  emailMessageId: string,
+  chatId: string,
+  tgMessageId: number,
+  isCaption: boolean,
+): Promise<void> {
+  const rawEmail = await fetchRawEmailByType(account, emailMessageId, env);
+  const parser = new PostalMime();
+  const email = await parser.parse(rawEmail);
+
+  const { subject, header, formattedBody, plainBody } = prepareEmailContent(
+    email,
+    account,
+    isCaption,
+  );
+  if (!plainBody.trim()) return;
+
+  const keyboard = await resolveStarredKeyboard(
+    env,
+    chatId,
+    tgMessageId,
+    emailMessageId,
+    account.id,
+  );
+
+  await editMessageWithAnalysis(
+    env,
+    env.TELEGRAM_BOT_TOKEN,
+    chatId,
+    tgMessageId,
+    isCaption,
+    header,
+    subject,
+    plainBody,
+    formattedBody,
+    keyboard,
+  );
+}
+
 /** 重试单封失败邮件的 LLM 摘要处理，成功后自动删除失败记录 */
 export async function retryFailedEmail(
   failed: FailedEmail,
@@ -368,46 +410,49 @@ export async function retryFailedEmail(
   if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL)
     throw new Error("LLM not configured");
 
-  const rawEmail = await fetchRawEmailByType(
+  await reanalyzeEmail(
+    env,
     account,
     failed.email_message_id,
-    env,
-  );
-
-  const parser = new PostalMime();
-  const email = await parser.parse(rawEmail);
-
-  const { subject, header, formattedBody, plainBody } = prepareEmailContent(
-    email,
-    account,
-    !!failed.is_caption,
-  );
-  if (!plainBody.trim()) {
-    await deleteFailedEmail(env.DB, failed.id);
-    return;
-  }
-  const keyboard = await resolveStarredKeyboard(
-    env,
-    failed.tg_chat_id,
-    failed.tg_message_id,
-    failed.email_message_id,
-    account.id,
-  );
-
-  await editMessageWithAnalysis(
-    env,
-    env.TELEGRAM_BOT_TOKEN,
     failed.tg_chat_id,
     failed.tg_message_id,
     !!failed.is_caption,
-    header,
-    subject,
-    plainBody,
-    formattedBody,
-    keyboard,
   );
 
   await deleteFailedEmail(env.DB, failed.id);
+}
+
+/** 刷新邮件：重新拉取并执行 LLM 分析 */
+export async function refreshEmail(
+  env: Env,
+  chatId: string,
+  tgMessageId: number,
+  isCaption: boolean,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL) {
+    return { ok: false, reason: t("bridge:refreshNoLlm") };
+  }
+
+  const mapping = await getMessageMapping(env.DB, chatId, tgMessageId);
+  if (!mapping) {
+    return { ok: false, reason: t("common:error.mappingNotFound") };
+  }
+
+  const account = await getAccountById(env.DB, mapping.account_id);
+  if (!account) {
+    return { ok: false, reason: t("common:error.accountNotFoundShort") };
+  }
+
+  await reanalyzeEmail(
+    env,
+    account,
+    mapping.email_message_id,
+    chatId,
+    tgMessageId,
+    isCaption,
+  );
+
+  return { ok: true };
 }
 
 /** 重试所有失败邮件，返回 { success, failed } 计数 */

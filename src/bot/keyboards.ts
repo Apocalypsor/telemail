@@ -6,19 +6,21 @@ import { generateMailTokenById } from "@utils/hash";
 import { InlineKeyboard } from "grammy";
 import type { Env } from "@/types";
 
-// ── 邮件��息键盘（星标 / 查看原文）─────────────────────────────────────────
+// ── 邮件信息键盘（星标 / 查看原文）─────────────────────────────────────────
 
 /** 星标 inline keyboard（无查看原文按钮） */
 export function starKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
     .text(t("keyboards:mail.star"), "star")
-    .text(t("keyboards:mail.junk"), "junk_mark");
+    .text(t("keyboards:mail.junk"), "junk_mark")
+    .text(t("keyboards:mail.refresh"), "refresh");
 }
 
 export function starredKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
-    .text(t("keyboards:mail.starred"), "starred")
-    .text(t("keyboards:mail.junk"), "junk_mark");
+    .text(t("keyboards:mail.starred"), "unstar")
+    .text(t("keyboards:mail.junk"), "junk_mark")
+    .text(t("keyboards:mail.refresh"), "refresh");
 }
 
 /** 创建带"查看原文"链接的星标键盘 */
@@ -26,13 +28,15 @@ export function starKeyboardWithMailUrl(mailUrl: string): InlineKeyboard {
   return new InlineKeyboard()
     .text(t("keyboards:mail.star"), "star")
     .text(t("keyboards:mail.junk"), "junk_mark")
+    .text(t("keyboards:mail.refresh"), "refresh")
     .url(t("keyboards:mail.viewOriginal"), mailUrl);
 }
 
 export function starredKeyboardWithMailUrl(mailUrl: string): InlineKeyboard {
   return new InlineKeyboard()
-    .text(t("keyboards:mail.starred"), "starred")
+    .text(t("keyboards:mail.starred"), "unstar")
     .text(t("keyboards:mail.junk"), "junk_mark")
+    .text(t("keyboards:mail.refresh"), "refresh")
     .url(t("keyboards:mail.viewOriginal"), mailUrl);
 }
 

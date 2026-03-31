@@ -1,9 +1,10 @@
 export default {
   mail: {
-    star: "⭐ 星标",
-    starred: "✅ 已星标",
-    junk: "🚫 垃圾",
-    viewOriginal: "📧 查看原文",
+    star: "⭐",
+    starred: "✅",
+    junk: "🚫",
+    refresh: "🔄",
+    viewOriginal: "📧",
   },
   menu: {
     accountManagement: "📧 账号管理",

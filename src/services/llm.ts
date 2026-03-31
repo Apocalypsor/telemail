@@ -128,13 +128,7 @@ export async function analyzeEmail(
       junkConfidence,
     };
   } catch {
-    // JSON 解析失败时，把整个输出当摘要
-    return {
-      verificationCode: null,
-      summary: raw,
-      tags: [],
-      isJunk: false,
-      junkConfidence: 0,
-    };
+    // JSON 解析失败，抛出错误，不编辑消息，保存到 failed_emails 等待重试
+    throw new Error(`LLM returned invalid JSON: ${raw.slice(0, 200)}`);
   }
 }
