@@ -29,6 +29,9 @@ importers:
       turndown:
         specifier: ^7.2.2
         version: 7.2.2
+      workers-observability-hub:
+        specifier: ^1.0.2
+        version: 1.0.2
     devDependencies:
       '@biomejs/biome':
         specifier: 2.4.8
@@ -1644,6 +1647,9 @@ packages:
     engines: {node: '>=16'}
     hasBin: true
 
+  workers-observability-hub@1.0.2:
+    resolution: {integrity: sha512-AHco5G9m6A400BazpN0AzsnP4/sKFKehdA6jvqEIVQUQt/Qz2pim9GZiJkMlgaLJjsVKgKGy7VvfBmeTcwbG/A==}
+
   wrangler@4.76.0:
     resolution: {integrity: sha512-Wan+CU5a0tu4HIxGOrzjNbkmxCT27HUmzrMj6kc7aoAnjSLv50Ggcn2Ant7wNQrD6xW3g31phKupZJgTZ8wZfQ==}
     engines: {node: '>=20.0.0'}
@@ -2894,6 +2900,8 @@ snapshots:
       '@cloudflare/workerd-linux-64': 1.20260317.1
       '@cloudflare/workerd-linux-arm64': 1.20260317.1
       '@cloudflare/workerd-windows-64': 1.20260317.1
+
+  workers-observability-hub@1.0.2: {}
 
   wrangler@4.76.0:
     dependencies:

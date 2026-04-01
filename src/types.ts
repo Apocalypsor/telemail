@@ -1,17 +1,4 @@
-export interface ObservabilityErrorPayload {
-  source: string;
-  event: string;
-  message: string;
-  stack?: string;
-  context?: Record<string, unknown>;
-  timestamp?: string;
-}
-
-export interface ObservabilityServiceBinding {
-  reportError(
-    payload: ObservabilityErrorPayload | null | undefined,
-  ): Promise<void>;
-}
+import type { ObservabilityHubBinding } from "workers-observability-hub";
 
 export enum AccountType {
   Gmail = "gmail",
@@ -85,7 +72,7 @@ export interface Env {
   /** Queue 绑定 */
   EMAIL_QUEUE: Queue<QueueMessage>;
   /** Observability Hub Service Binding */
-  OBS_SERVICE: ObservabilityServiceBinding;
+  OBS_SERVICE: ObservabilityHubBinding;
   /** OpenAI compatible API base URL，例如 https://api.openai.com（可选，不配置则跳过 AI 摘要） */
   LLM_API_URL?: string;
   /** OpenAI compatible API key */
