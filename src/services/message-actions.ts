@@ -136,20 +136,18 @@ export async function deleteJunkMappings(
   mappings: MessageMapping[],
   _account: Account,
 ): Promise<void> {
-  await Promise.all(
-    mappings.map(async (m) => {
-      await deleteMessage(
-        env.TELEGRAM_BOT_TOKEN,
-        m.tg_chat_id,
-        m.tg_message_id,
-      ).catch(() => {});
-      await deleteMappingByEmailId(
-        env.DB,
-        m.email_message_id,
-        m.account_id,
-      ).catch(() => {});
-    }),
-  );
+  for (const m of mappings) {
+    await deleteMessage(
+      env.TELEGRAM_BOT_TOKEN,
+      m.tg_chat_id,
+      m.tg_message_id,
+    ).catch(() => {});
+    await deleteMappingByEmailId(
+      env.DB,
+      m.email_message_id,
+      m.account_id,
+    ).catch(() => {});
+  }
 }
 
 /** 批量同步 Telegram 消息的星标按钮状态（starred 列表刷新时调用） */
@@ -158,37 +156,35 @@ export async function syncStarButtonsForMappings(
   mappings: MessageMapping[],
   account: Account,
 ): Promise<void> {
-  await Promise.all(
-    mappings.map(async (m) => {
-      try {
-        const keyboard = await buildEmailKeyboard(
-          env,
-          m.email_message_id,
-          account.id,
-          true,
-        );
-        await setReplyMarkup(
-          env.TELEGRAM_BOT_TOKEN,
-          m.tg_chat_id,
-          m.tg_message_id,
-          keyboard,
-        );
-      } catch (err) {
-        if (
-          err instanceof Error &&
-          err.message.includes("message is not modified")
-        )
-          return;
-        await reportErrorToObservability(
-          env,
-          "bot.sync_star_button_failed",
-          err,
-          {
-            chatId: m.tg_chat_id,
-            messageId: m.tg_message_id,
-          },
-        );
-      }
-    }),
-  );
+  for (const m of mappings) {
+    try {
+      const keyboard = await buildEmailKeyboard(
+        env,
+        m.email_message_id,
+        account.id,
+        true,
+      );
+      await setReplyMarkup(
+        env.TELEGRAM_BOT_TOKEN,
+        m.tg_chat_id,
+        m.tg_message_id,
+        keyboard,
+      );
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.includes("message is not modified")
+      )
+        continue;
+      await reportErrorToObservability(
+        env,
+        "bot.sync_star_button_failed",
+        err,
+        {
+          chatId: m.tg_chat_id,
+          messageId: m.tg_message_id,
+        },
+      );
+    }
+  }
 }
