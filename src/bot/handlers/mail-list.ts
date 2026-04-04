@@ -45,6 +45,7 @@ interface ListResult {
   items: ListItem[];
   total: number;
   error?: string;
+  mappings?: MessageMapping[];
 }
 
 interface ListConfig {
@@ -72,6 +73,7 @@ async function queryAccount(
     if (msgs.length === 0) return { account, items: [], total: 0 };
 
     let mappingMap = new Map<string, MessageMapping>();
+    let allMappings: MessageMapping[] | undefined;
     const needMappings = !!afterMappings || !hideTgLinks;
     if (needMappings) {
       const mappings = await getMappingsByEmailIds(
@@ -79,7 +81,7 @@ async function queryAccount(
         account.id,
         msgs.map((m) => m.id),
       );
-      if (afterMappings) await afterMappings(mappings, account);
+      if (afterMappings) allMappings = mappings;
       if (!hideTgLinks) {
         mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
       }
@@ -98,7 +100,7 @@ async function queryAccount(
       }),
     );
 
-    return { account, items, total: msgs.length };
+    return { account, items, total: msgs.length, mappings: allMappings };
   } catch (err) {
     await reportErrorToObservability(env, errorEvent, err, {
       accountId: account.id,
@@ -123,7 +125,11 @@ async function buildListText(
     account: Account,
   ) => Promise<void>,
   hideTgLinks = false,
-): Promise<{ text: string; hasItems: boolean }> {
+): Promise<{
+  text: string;
+  hasItems: boolean;
+  pendingTasks?: (() => Promise<void>)[];
+}> {
   const accounts = await getOwnAccounts(env.DB, userId);
   if (accounts.length === 0)
     return { text: t("common:label.noAccounts"), hasItems: false };
@@ -176,9 +182,22 @@ async function buildListText(
 
   if (total === 0) return { text: config.emptyText, hasItems: false };
 
+  // 收集需要在回复消息后执行的后台任务
+  const pendingTasks: (() => Promise<void>)[] = [];
+  if (afterMappings) {
+    for (const r of results) {
+      if (r.mappings && r.mappings.length > 0) {
+        const mappings = r.mappings;
+        const account = r.account;
+        pendingTasks.push(() => afterMappings(mappings, account));
+      }
+    }
+  }
+
   return {
     text: `${t("mailList:total", { icon: config.icon, total, label: config.label })}\n${lines.join("\n")}`,
     hasItems: true,
+    pendingTasks,
   };
 }
 
@@ -222,28 +241,37 @@ function registerList(bot: Bot, env: Env, def: ListDef) {
       def.hideTgLinks,
     );
 
+  const runPendingTasks = async (tasks?: (() => Promise<void>)[]) => {
+    if (!tasks) return;
+    for (const task of tasks) {
+      await task();
+    }
+  };
+
   bot.command(def.name, async (ctx) => {
     const userId = String(ctx.from?.id);
     const msg = await ctx.reply(
       t("mailList:querying", { label: def.config.label }),
     );
-    const { text, hasItems } = await queryList(userId);
+    const { text, hasItems, pendingTasks } = await queryList(userId);
     await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
       parse_mode: "MarkdownV2",
       link_preview_options: { is_disabled: true },
       ...replyMarkupOpt(hasItems),
     });
+    await runPendingTasks(pendingTasks);
   });
 
   bot.callbackQuery(def.name, async (ctx) => {
     const userId = String(ctx.from.id);
     await ctx.answerCallbackQuery({ text: t("mailList:queryingShort") });
-    const { text, hasItems } = await queryList(userId);
+    const { text, hasItems, pendingTasks } = await queryList(userId);
     await ctx.reply(text, {
       parse_mode: "MarkdownV2",
       link_preview_options: { is_disabled: true },
       ...replyMarkupOpt(hasItems),
     });
+    await runPendingTasks(pendingTasks);
   });
 
   if (def.action) {
