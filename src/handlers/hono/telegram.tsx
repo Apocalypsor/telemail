@@ -16,6 +16,9 @@ telegram.post(ROUTE_TELEGRAM_WEBHOOK, async (c) => {
   // 异步同步 Bot 命令菜单（KV 版本号未变时跳过，开销仅一次 KV read）
   c.executionCtx.waitUntil(syncBotCommands(c.env).catch(() => {}));
 
+  // 注入 waitUntil，供 bot handler 在响应后执行后台任务
+  c.env.waitUntil = c.executionCtx.waitUntil.bind(c.executionCtx);
+
   const botInfo = await getBotInfo(c.env);
   const bot = createBot(c.env, botInfo);
   const update = await c.req.json();

@@ -241,10 +241,15 @@ function registerList(bot: Bot, env: Env, def: ListDef) {
       def.hideTgLinks,
     );
 
-  const runPendingTasks = async (tasks?: (() => Promise<void>)[]) => {
-    if (!tasks) return;
-    for (const task of tasks) {
-      await task();
+  const schedulePendingTasks = (tasks?: (() => Promise<void>)[]) => {
+    if (!tasks || tasks.length === 0) return;
+    const run = async () => {
+      for (const task of tasks) {
+        await task();
+      }
+    };
+    if (env.waitUntil) {
+      env.waitUntil(run().catch(() => {}));
     }
   };
 
@@ -259,7 +264,7 @@ function registerList(bot: Bot, env: Env, def: ListDef) {
       link_preview_options: { is_disabled: true },
       ...replyMarkupOpt(hasItems),
     });
-    await runPendingTasks(pendingTasks);
+    schedulePendingTasks(pendingTasks);
   });
 
   bot.callbackQuery(def.name, async (ctx) => {
@@ -271,7 +276,7 @@ function registerList(bot: Bot, env: Env, def: ListDef) {
       link_preview_options: { is_disabled: true },
       ...replyMarkupOpt(hasItems),
     });
-    await runPendingTasks(pendingTasks);
+    schedulePendingTasks(pendingTasks);
   });
 
   if (def.action) {

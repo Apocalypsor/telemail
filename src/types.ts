@@ -49,6 +49,8 @@ export type AppEnv = {
 };
 
 export interface Env {
+  /** 由 webhook handler 注入，用于在响应后执行后台任务 */
+  waitUntil?: (p: Promise<unknown>) => void;
   /** Worker 名称（用于日志/告警） */
   WORKER_NAME: string;
   /** Telegram Bot Token（环境变量 / wrangler secret） */
