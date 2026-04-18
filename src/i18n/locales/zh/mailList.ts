@@ -2,7 +2,7 @@ export default {
   querying: "🔍 正在查询{{label}}邮件…",
   queryingShort: "正在查询…",
   total: "{{icon}} 共 {{total}} 封{{label}}",
-  accountLabel: "📧 {{label}} ({{count}} 封{{type}})",
+  accountLabel: "📧 __{{label}}__ \\({{count}} 封{{type}}\\)",
   tgMessage: "💬 消息",
   preview: "👁 预览",
   unread: {

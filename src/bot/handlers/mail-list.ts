@@ -163,9 +163,13 @@ async function buildListText(
     if (r.total === 0) continue;
 
     total += r.total;
-    // 账号标签前多留一行空白，跟上一个账号的最后一条邮件拉开距离
+    // 账号标签前多留一行空白；i18n 模板里已给邮箱加了 __...__，这里只要把动态值预先转义
     lines.push(
-      `\n\n${escapeMdV2(t("mailList:accountLabel", { label: r.account.email || `Account #${r.account.id}`, count: r.total, type: config.label }))}`,
+      `\n\n${t("mailList:accountLabel", {
+        label: escapeMdV2(r.account.email || `Account #${r.account.id}`),
+        count: r.total,
+        type: escapeMdV2(config.label),
+      })}`,
     );
     for (const [i, item] of r.items.entries()) {
       if (i > 0) lines.push(""); // 空行断开 blockquote，让每封邮件独立成块
