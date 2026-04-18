@@ -163,9 +163,9 @@ async function buildListText(
     if (r.total === 0) continue;
 
     total += r.total;
-    // 账号标签前多留一行空白；i18n 模板里已给邮箱加了 __...__，这里只要把动态值预先转义
+    // i18n 模板里已给邮箱加了 __...__，这里只要把动态值预先转义
     lines.push(
-      `\n\n${t("mailList:accountLabel", {
+      `\n${t("mailList:accountLabel", {
         label: escapeMdV2(r.account.email || `Account #${r.account.id}`),
         count: r.total,
         type: escapeMdV2(config.label),
