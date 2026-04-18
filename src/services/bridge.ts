@@ -6,10 +6,14 @@ import {
   getAllFailedEmails,
   putFailedEmail,
 } from "@db/failed-emails";
-import { getMessageMapping, putMessageMapping } from "@db/message-map";
+import {
+  getMessageMapping,
+  putMessageMapping,
+  updateShortSummary,
+} from "@db/message-map";
 import { t } from "@i18n";
 import { getEmailProvider } from "@providers";
-import { analyzeEmail } from "@services/llm";
+import { analyzeEmail, type EmailAnalysis } from "@services/llm";
 import {
   deleteMessage,
   editMessageCaption,
@@ -114,7 +118,7 @@ async function editMessageWithAnalysis(
   plainBody: string,
   formattedBody: string,
   keyboard: unknown,
-): Promise<void> {
+): Promise<EmailAnalysis> {
   const editMsg = (newText: string) =>
     isCaption
       ? editMessageCaption(tgToken, chatId, tgMessageId, newText, keyboard)
@@ -148,11 +152,12 @@ async function editMessageWithAnalysis(
       header + codeSection + wrapExpandableQuote(formattedBody) + tagsLine,
     );
     console.log("Verification code extracted");
-    return;
+    return result;
   }
 
   const summarySection = `*${escapeMdV2(t("bridge:aiSummary"))}*\n\n${toTelegramMdV2(result.summary)}`;
   await editMsg(header + summarySection + tagsLine);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +227,7 @@ export async function deliverEmailToTelegram(
   waitUntil(
     (async () => {
       try {
-        await editMessageWithAnalysis(
+        const analysis = await editMessageWithAnalysis(
           env,
           tgToken,
           chatId,
@@ -234,6 +239,20 @@ export async function deliverEmailToTelegram(
           formattedBody,
           keyboard,
         );
+        if (analysis.shortSummary) {
+          await updateShortSummary(
+            env.DB,
+            account.id,
+            messageId,
+            analysis.shortSummary,
+          ).catch((e) =>
+            reportErrorToObservability(
+              env,
+              "bridge.update_short_summary_error",
+              e,
+            ),
+          );
+        }
       } catch (err) {
         console.error(
           `LLM analysis failed for message ${messageId}, saving to failed_emails`,
@@ -322,7 +341,7 @@ async function reanalyzeEmail(
     account.id,
   );
 
-  await editMessageWithAnalysis(
+  const analysis = await editMessageWithAnalysis(
     env,
     env.TELEGRAM_BOT_TOKEN,
     chatId,
@@ -334,6 +353,16 @@ async function reanalyzeEmail(
     formattedBody,
     keyboard,
   );
+  if (analysis.shortSummary) {
+    await updateShortSummary(
+      env.DB,
+      account.id,
+      emailMessageId,
+      analysis.shortSummary,
+    ).catch((e) =>
+      reportErrorToObservability(env, "bridge.update_short_summary_error", e),
+    );
+  }
 }
 
 /** 重试单封失败邮件的 LLM 摘要处理，成功后自动删除失败记录 */

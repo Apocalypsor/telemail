@@ -38,7 +38,8 @@ async function buildPreviewLink(
 }
 
 interface ListItem {
-  subject?: string;
+  /** 列表显示标题：优先 LLM 生成的 short_summary，回退到邮件 subject */
+  title?: string;
   tgLink?: string;
   previewLink?: string;
 }
@@ -75,29 +76,25 @@ async function queryAccount(
     const msgs = await fetcher(provider);
     if (msgs.length === 0) return { account, items: [], total: 0 };
 
-    let mappingMap = new Map<string, MessageMapping>();
-    let allMappings: MessageMapping[] | undefined;
-    const needMappings = !!afterMappings || !hideTgLinks;
-    if (needMappings) {
-      const mappings = await getMappingsByEmailIds(
-        env.DB,
-        account.id,
-        msgs.map((m) => m.id),
-      );
-      if (afterMappings) allMappings = mappings;
-      if (!hideTgLinks) {
-        mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
-      }
-    }
+    // 列表始终需要 mapping：tgLink 需要它，short_summary 也存在 mapping 上
+    const mappings = await getMappingsByEmailIds(
+      env.DB,
+      account.id,
+      msgs.map((m) => m.id),
+    );
+    const mappingMap = new Map(mappings.map((m) => [m.email_message_id, m]));
+    const allMappings = afterMappings ? mappings : undefined;
 
     const items = await Promise.all(
       msgs.map(async (msg) => {
         const mapping = mappingMap.get(msg.id);
         return {
-          subject: msg.subject,
-          tgLink: mapping
-            ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
-            : undefined,
+          // 有 LLM 生成的 short_summary 就用它，否则回退到邮件 subject
+          title: mapping?.short_summary || msg.subject,
+          tgLink:
+            mapping && !hideTgLinks
+              ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
+              : undefined,
           previewLink: await buildPreviewLink(env, msg.id, account.id),
         };
       }),
@@ -166,20 +163,21 @@ async function buildListText(
     if (r.total === 0) continue;
 
     total += r.total;
+    // 账号标签前多留一行空白，跟上一个账号的最后一条邮件拉开距离
     lines.push(
-      `\n${escapeMdV2(t("mailList:accountLabel", { label: r.account.email || `Account #${r.account.id}`, count: r.total, type: config.label }))}`,
+      `\n\n${escapeMdV2(t("mailList:accountLabel", { label: r.account.email || `Account #${r.account.id}`, count: r.total, type: config.label }))}`,
     );
     for (const [i, item] of r.items.entries()) {
-      const title = escapeMdV2(
-        item.subject || t("common:label.noSubjectParen"),
+      if (i > 0) lines.push(""); // 空行断开 blockquote，让每封邮件独立成块
+      lines.push(
+        `>${escapeMdV2(item.title || t("common:label.noSubjectParen"))}`,
       );
       const linkParts: string[] = [];
       if (item.tgLink)
         linkParts.push(`[${t("mailList:tgMessage")}](${item.tgLink})`);
       if (item.previewLink)
         linkParts.push(`[${t("mailList:preview")}](${item.previewLink})`);
-      const linksStr = linkParts.length > 0 ? `  ${linkParts.join("  ")}` : "";
-      lines.push(`  ${i + 1}\\. ${title}${linksStr}`);
+      if (linkParts.length > 0) lines.push(`>${linkParts.join(" ")}`);
     }
   }
 

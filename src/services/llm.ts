@@ -46,6 +46,8 @@ export interface EmailAnalysis {
   verificationCode: string | null;
   /** 摘要（bullet list） */
   summary: string;
+  /** 一句话摘要（~30 字，用于邮件列表显示） */
+  shortSummary: string;
   /** 标签 */
   tags: string[];
   /** 是否为垃圾邮件 */
@@ -90,17 +92,21 @@ export async function analyzeEmail(
     `   - State directly what happened, what the key data is, and what action is needed\n` +
     linkRule +
     `   - You may use Markdown formatting: **bold**, _italic_, \`code\`\n\n` +
-    `3. "tags": An array of 1-3 PascalCase tags for this email.\n` +
+    `3. "short_summary": A SINGLE short line (max ~30 characters, no line breaks, no markdown, no bullet) suitable for a list preview.\n` +
+    `   - Same language rule as "summary" (English if email is English, else 简体中文)\n` +
+    `   - Capture the core intent / key fact in a compact form. Examples: "GitHub 登录验证码", "Order #1234 shipped", "LinkedIn weekly digest"\n` +
+    `   - Always produce a non-empty value, even if "summary" is empty (e.g. verification code emails)\n\n` +
+    `4. "tags": An array of 1-3 PascalCase tags for this email.\n` +
     `   Rules:\n` +
     `   - If the email is in English, write tags in English; otherwise write tags in 简体中文\n` +
     `   - Each tag must be PascalCase (first letter of each word capitalized, no spaces or underscores), no "#" prefix (e.g. "PasswordReset", "Github", "OrderConfirmation")\n` +
     `   - Capture: sender/service name, category (notification, newsletter, promotion, verification), key topic\n\n` +
-    `4. "junk": An object with junk/spam classification.\n` +
+    `5. "junk": An object with junk/spam classification.\n` +
     `   - "is_junk": true if this is spam, phishing, unsolicited marketing, scam, or bulk promotional email with no personal relevance; false otherwise.\n` +
     `   - "confidence": A float 0.0–1.0 indicating how confident you are in the junk classification.\n` +
     `   - Transactional emails (receipts, order confirmations, notifications from services the user signed up for), newsletters from subscribed services, and any email with verification codes are NOT junk.\n\n` +
     `Output ONLY valid JSON, no other text. Example:\n` +
-    `{"verification_code": null, "summary": "• ...", "tags": ["Github", "Verification", "Security"], "junk": {"is_junk": false, "confidence": 0.05}}\n\n` +
+    `{"verification_code": null, "summary": "• ...", "short_summary": "GitHub login verification code", "tags": ["Github", "Verification", "Security"], "junk": {"is_junk": false, "confidence": 0.05}}\n\n` +
     `Subject: ${subject}\n\n` +
     `Body:\n${body}` +
     linksSection;
@@ -113,6 +119,7 @@ export async function analyzeEmail(
     const parsed = JSON.parse(jsonStr) as {
       verification_code?: string | null;
       summary?: string;
+      short_summary?: string;
       tags?: string[];
       junk?: { is_junk?: boolean; confidence?: number };
     };
@@ -125,6 +132,7 @@ export async function analyzeEmail(
     return {
       verificationCode: code && /^[A-Za-z0-9-]{4,12}$/.test(code) ? code : null,
       summary: parsed.summary ?? "",
+      shortSummary: (parsed.short_summary ?? "").trim().replace(/\s+/g, " "),
       tags: (parsed.tags ?? []).slice(0, 5),
       isJunk,
       junkConfidence,

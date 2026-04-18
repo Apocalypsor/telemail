@@ -5,12 +5,17 @@ export interface MessageMapping {
   tg_chat_id: string;
   email_message_id: string;
   account_id: number;
+  /** LLM 生成的一句话摘要，用于邮件列表显示（NULL = 未分析，列表回退到 subject） */
+  short_summary: string | null;
 }
 
 /** 保存 Telegram → 邮件消息映射，返回是否实际插入（false = 重复，被 IGNORE） */
 export async function putMessageMapping(
   db: D1Database,
-  mapping: Omit<MessageMapping, "starred">,
+  mapping: Pick<
+    MessageMapping,
+    "tg_message_id" | "tg_chat_id" | "email_message_id" | "account_id"
+  >,
 ): Promise<boolean> {
   const result = await db
     .prepare(
@@ -65,6 +70,21 @@ export async function deleteMappingsByAccountId(
   await db
     .prepare("DELETE FROM message_map WHERE account_id = ?")
     .bind(accountId)
+    .run();
+}
+
+/** 更新邮件 short_summary（LLM 分析成功后调用） */
+export async function updateShortSummary(
+  db: D1Database,
+  accountId: number,
+  emailMessageId: string,
+  shortSummary: string,
+): Promise<void> {
+  await db
+    .prepare(
+      "UPDATE message_map SET short_summary = ? WHERE account_id = ? AND email_message_id = ?",
+    )
+    .bind(shortSummary, accountId, emailMessageId)
     .run();
 }
 
