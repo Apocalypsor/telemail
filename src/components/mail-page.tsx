@@ -9,6 +9,7 @@ interface MailPageProps {
   accountId: number;
   token: string;
   inJunk: boolean;
+  inArchive: boolean;
   starred: boolean;
   canArchive: boolean;
   children: Child;
@@ -21,6 +22,7 @@ export function MailPage({
   accountId,
   token,
   inJunk,
+  inArchive,
   starred,
   canArchive,
   children,
@@ -34,6 +36,7 @@ export function MailPage({
         accountId={accountId}
         token={token}
         inJunk={inJunk}
+        inArchive={inArchive}
         starred={starred}
         canArchive={canArchive}
       />
@@ -195,6 +198,7 @@ function MailFab({
   accountId,
   token,
   inJunk,
+  inArchive,
   starred,
   canArchive,
 }: {
@@ -202,6 +206,7 @@ function MailFab({
   accountId: number;
   token: string;
   inJunk: boolean;
+  inArchive: boolean;
   starred: boolean;
   canArchive: boolean;
 }) {
@@ -211,13 +216,15 @@ function MailFab({
       <div id="mail-fab">
         <div id="fab-status" class="fab-status" />
         <div id="fab-actions" class="fab-actions">
-          <button
-            type="button"
-            class={`fab-btn ${starred ? "starred" : "star"}`}
-            onclick="toggleStar(this)"
-          >
-            {starred ? "✅ 已星标" : "⭐ 星标"}
-          </button>
+          {!inArchive && (
+            <button
+              type="button"
+              class={`fab-btn ${starred ? "starred" : "star"}`}
+              onclick="toggleStar(this)"
+            >
+              {starred ? "✅ 已星标" : "⭐ 星标"}
+            </button>
+          )}
           {inJunk ? (
             <>
               <button
@@ -235,6 +242,14 @@ function MailFab({
                 🗑 删除邮件
               </button>
             </>
+          ) : inArchive ? (
+            <button
+              type="button"
+              class="fab-btn inbox"
+              onclick="mailAction('unarchive',this)"
+            >
+              📥 移出归档
+            </button>
           ) : (
             <>
               {canArchive && (

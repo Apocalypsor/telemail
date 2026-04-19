@@ -27,3 +27,4 @@ export const ROUTE_MAIL_MARK_JUNK = "/api/mail/:id/mark-as-junk";
 export const ROUTE_MAIL_TRASH = "/api/mail/:id/trash";
 export const ROUTE_MAIL_TOGGLE_STAR = "/api/mail/:id/toggle-star";
 export const ROUTE_MAIL_ARCHIVE = "/api/mail/:id/archive";
+export const ROUTE_MAIL_UNARCHIVE = "/api/mail/:id/unarchive";

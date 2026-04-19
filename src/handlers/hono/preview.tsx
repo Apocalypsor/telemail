@@ -16,6 +16,7 @@ import {
   ROUTE_MAIL_MOVE_TO_INBOX,
   ROUTE_MAIL_TOGGLE_STAR,
   ROUTE_MAIL_TRASH,
+  ROUTE_MAIL_UNARCHIVE,
   ROUTE_PREVIEW,
   ROUTE_PREVIEW_API,
 } from "@handlers/hono/routes";
@@ -133,16 +134,6 @@ preview.get(ROUTE_MAIL, async (c) => {
     provider.isJunk(messageId).catch(() => false),
     provider.isStarred(messageId).catch(() => false),
   ]);
-  const pageProps = {
-    messageId,
-    accountId: account.id,
-    token: token as string,
-    inJunk,
-    starred,
-    canArchive: accountCanArchive(account),
-    accountEmail: account.email,
-  };
-
   // folder 提示：list handler 会为 /archived / /junk 的预览链接带上 folder，
   // 用来给 IMAP 指定 UID 所在的文件夹（per-folder scope，INBOX / junk / archive 的 UID 不通用）
   const folderParam = c.req.query("folder");
@@ -152,6 +143,17 @@ preview.get(ROUTE_MAIL, async (c) => {
       : folderParam === "junk" || inJunk
         ? "junk"
         : "inbox";
+
+  const pageProps = {
+    messageId,
+    accountId: account.id,
+    token: token as string,
+    inJunk,
+    inArchive: fetchFolder === "archive",
+    starred,
+    canArchive: accountCanArchive(account),
+    accountEmail: account.email,
+  };
 
   // KV 缓存键带上 accountId + folder —— IMAP UID 在不同文件夹里会撞，必须区分
   const cached = await getCachedMailData(
@@ -307,6 +309,42 @@ preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
     return c.json({ ok: true, message: "已归档" });
   } catch (err) {
     await reportErrorToObservability(c.env, "preview.archive_failed", err, {
+      accountId: account.id,
+    });
+    return c.json({ ok: false, error: "操作失败" }, 500);
+  }
+});
+
+preview.post(ROUTE_MAIL_UNARCHIVE, async (c) => {
+  const resolved = await resolveMailAction(c);
+  if (!resolved.ok) return resolved.response;
+  const { account, messageId } = resolved;
+  try {
+    const provider = getEmailProvider(account, c.env);
+    // 和 move-to-inbox 同样的顺序：先抓原文（此时还在归档里），再 unarchive 拿新 id，最后重新投递
+    const raw = await provider.fetchRawEmail(messageId, "archive");
+    const newMessageId = await provider.unarchiveMessage(messageId);
+
+    c.executionCtx.waitUntil(
+      deliverEmailToTelegram(
+        raw,
+        newMessageId,
+        account as Account,
+        c.env,
+        c.executionCtx.waitUntil.bind(c.executionCtx),
+      ).catch((err) =>
+        reportErrorToObservability(
+          c.env,
+          "preview.redeliver_after_unarchive_failed",
+          err,
+          { accountId: account.id },
+        ),
+      ),
+    );
+
+    return c.json({ ok: true, message: "已移至收件箱并重新投递" });
+  } catch (err) {
+    await reportErrorToObservability(c.env, "preview.unarchive_failed", err, {
       accountId: account.id,
     });
     return c.json({ ok: false, error: "操作失败" }, 500);

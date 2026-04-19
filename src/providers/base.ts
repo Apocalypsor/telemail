@@ -44,6 +44,8 @@ export abstract class EmailProvider {
   abstract listArchived(maxResults?: number): Promise<EmailListItem[]>;
   abstract markAsJunk(messageId: string): Promise<void>;
   abstract moveToInbox(messageId: string): Promise<string>;
+  /** 把邮件从归档文件夹移回收件箱，返回新 messageId（Gmail 不变，IMAP/Outlook 会换） */
+  abstract unarchiveMessage(messageId: string): Promise<string>;
   abstract trashMessage(messageId: string): Promise<void>;
   abstract trashAllJunk(): Promise<number>;
 

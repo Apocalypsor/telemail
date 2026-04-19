@@ -398,6 +398,19 @@ export class GmailProvider extends EmailProvider {
     return messageId;
   }
 
+  async unarchiveMessage(messageId: string): Promise<string> {
+    const labelId = this.account.archive_folder;
+    await gmailPost(
+      await this.token(),
+      `/users/me/messages/${messageId}/modify`,
+      {
+        addLabelIds: ["INBOX"],
+        removeLabelIds: labelId ? [labelId] : [],
+      },
+    );
+    return messageId;
+  }
+
   async archiveMessage(messageId: string) {
     const labelId = this.account.archive_folder;
     if (!labelId) {

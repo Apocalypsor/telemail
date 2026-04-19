@@ -374,6 +374,17 @@ export class OutlookProvider extends EmailProvider {
     });
   }
 
+  async unarchiveMessage(messageId: string): Promise<string> {
+    const moved = await graphPost<GraphMessage>(
+      await this.token(),
+      `/me/messages/${messageId}/move`,
+      { destinationId: "Inbox" },
+    );
+    if (!moved?.id)
+      throw new Error("Outlook unarchive response missing new message id");
+    return moved.id;
+  }
+
   async trashAllJunk() {
     const token = await this.token();
     const data = await graphGet<GraphMessageList>(

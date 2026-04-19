@@ -195,6 +195,19 @@ export class ImapProvider extends EmailProvider {
     return newMessageId;
   }
 
+  async unarchiveMessage(messageId: string): Promise<string> {
+    const resp = await callBridge(this.env, "POST", "/api/unarchive", {
+      accountId: this.account.id,
+      messageId,
+      archiveFolder: this.account.archive_folder ?? undefined,
+    });
+    const { newMessageId } = (await resp.json()) as { newMessageId?: string };
+    if (!newMessageId) {
+      throw new Error("IMAP bridge /api/unarchive did not return newMessageId");
+    }
+    return newMessageId;
+  }
+
   async trashMessage(messageId: string) {
     await callBridge(this.env, "POST", "/api/trash", {
       accountId: this.account.id,
