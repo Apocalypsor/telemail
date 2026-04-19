@@ -1,7 +1,6 @@
 import { getAccountsByEmail, getHistoryId, putHistoryId } from "@db/accounts";
 import { EmailProvider } from "@providers/base";
 import type {
-  FetchMailResult,
   GmailHistoryResponse,
   GmailMessage,
   GmailMessageList,
@@ -10,6 +9,7 @@ import type {
   GmailWatchResponse,
 } from "@providers/gmail/types";
 import { getAccessToken, gmailGet, gmailPost } from "@providers/gmail/utils";
+import type { PreviewContent } from "@providers/types";
 import { base64urlToArrayBuffer, base64urlToString } from "@utils/base64url";
 import { wrapPlainText } from "@utils/format";
 import { HTTPError } from "ky";
@@ -18,9 +18,16 @@ import {
   GOOGLE_OAUTH_AUTHORIZE_URL,
   GOOGLE_OAUTH_TOKEN_URL,
 } from "@/constants";
-import type { Env, MailMeta } from "@/types";
+import type { Account, Env, MailMeta } from "@/types";
 
 export class GmailProvider extends EmailProvider {
+  static displayName = "Gmail";
+  static needsArchiveSetup = true;
+
+  static canArchive(account: Account): boolean {
+    return !!account.archive_folder;
+  }
+
   static oauth = EmailProvider.createOAuthHandler({
     name: "Google",
     authorizeUrl: GOOGLE_OAUTH_AUTHORIZE_URL,
@@ -213,8 +220,8 @@ export class GmailProvider extends EmailProvider {
     return base64urlToArrayBuffer(msg.raw);
   }
 
-  /** 从 Gmail API 获取邮件正文 HTML，优先 HTML，fallback 到纯文本 */
-  async fetchMailContent(messageId: string): Promise<FetchMailResult | null> {
+  /** Gmail 走 API 直接取结构化 payload，比 fetchRawEmail + PostalMime 高效 */
+  async fetchForPreview(messageId: string): Promise<PreviewContent | null> {
     const token = await this.token();
     const msg = await gmailGet<{ payload: GmailPayload }>(
       token,

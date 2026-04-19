@@ -9,49 +9,20 @@ import {
   putCachedAccessToken,
   putOAuthState,
 } from "@db/kv";
+import type {
+  EmailListItem,
+  OAuthCallbackResult,
+  OAuthHandler,
+  OAuthProviderConfig,
+  OAuthTokenResponse,
+  PreviewContent,
+} from "@providers/types";
+import { buildCidMapFromAttachments } from "@services/mail-preview";
+import { formatAddress, wrapPlainText } from "@utils/format";
 import { http } from "@utils/http";
 import { reportErrorToObservability } from "@utils/observability";
+import PostalMime from "postal-mime";
 import type { Account, Env } from "@/types";
-
-export interface EmailListItem {
-  id: string;
-  subject?: string;
-}
-
-export type OAuthTokenResponse = {
-  access_token?: string;
-  expires_in?: number;
-  refresh_token?: string;
-  scope?: string;
-  token_type?: string;
-  error?: string;
-  error_description?: string;
-};
-
-type OAuthCallbackResult =
-  | {
-      ok: true;
-      refreshToken: string | undefined;
-      scope: string;
-      expiresIn: number | undefined;
-      accountEmail: string;
-      accountId: number;
-      ownerTelegramId: string | null;
-    }
-  | { ok: false; title: string; detail: string; status: number };
-
-export interface OAuthProviderConfig {
-  name: string;
-  authorizeUrl: string;
-  tokenUrl: string;
-  scope: string;
-  statePrefix: string;
-  extraAuthorizeParams?: Record<string, string>;
-  getCredentials(env: Env): { clientId: string; clientSecret: string };
-  extraTokenBody?(env: Env): Record<string, string>;
-  fetchEmail(accessToken: string): Promise<string | undefined>;
-  onAuthorized(env: Env, account: Account): Promise<void>;
-}
 
 export abstract class EmailProvider {
   protected account: Account;
@@ -78,9 +49,9 @@ export abstract class EmailProvider {
 
   /**
    * 将邮件归档（移出收件箱）。
-   * Gmail 默认不支持（"归档"等同于丢进 All Mail），需要用户在账号设置里指定 archive_folder（label ID）才能启用。
-   * Outlook 使用 well-known "archive" 文件夹；IMAP 使用 account.archive_folder 或 fallback "Archive"。
-   * 调用前用 `accountCanArchive(account)`（`@providers`）判断当前账号是否可归档。
+   * Gmail: 需要用户指定 archive_folder（label ID），否则 `EmailProvider.canArchive` 返回 false；
+   * Outlook: well-known "archive" 文件夹；IMAP: account.archive_folder 或自动探测 \Archive special-use。
+   * 调用前用 `PROVIDERS[account.type].canArchive(account)` 判断是否可归档。
    */
   abstract archiveMessage(messageId: string): Promise<void>;
 
@@ -93,10 +64,51 @@ export abstract class EmailProvider {
     folder?: "inbox" | "junk",
   ): Promise<ArrayBuffer>;
 
+  /**
+   * 获取邮件用于 Web 预览的内容（HTML + cid map + 元数据）。
+   * 默认实现：拉原始 MIME → PostalMime 解析（Outlook / IMAP 用）；
+   * Gmail 因为有结构化 API，override 这个方法直接取 payload 更高效。
+   */
+  async fetchForPreview(
+    messageId: string,
+    folder: "inbox" | "junk",
+  ): Promise<PreviewContent | null> {
+    const rawEmail = await this.fetchRawEmail(messageId, folder);
+    const email = await new PostalMime().parse(rawEmail);
+    const html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
+    if (!html) return null;
+    return {
+      html,
+      cidMap: buildCidMapFromAttachments(email.attachments),
+      meta: {
+        subject: email.subject ?? null,
+        from: email.from ? formatAddress(email.from) : null,
+        to: email.to?.map(formatAddress).join(", ") ?? null,
+        date: email.date ?? null,
+      },
+    };
+  }
+
   /** 注册/续订推送通知（Gmail watch / Outlook subscription） */
   async renewPush(): Promise<void> {}
   /** 停止推送通知 */
   async stopPush(): Promise<void> {}
+  /**
+   * 账号持久化状态变化后的钩子（删除 / 启用切换 / 配置更新）。
+   * IMAP 用它通知 bridge reconcile 连接；OAuth 默认 no-op。
+   */
+  async onPersistedChange(): Promise<void> {}
+
+  /** 该 provider 对当前 account 是否可执行归档。基类默认 true；Gmail override 检查 archive_folder。 */
+  static canArchive(_account: Account): boolean {
+    return true;
+  }
+
+  /**
+   * provider 是否需要让用户手动挑归档目标（= 账号详情页是否显示归档标签入口）。
+   * 目前只有 Gmail 需要（label 方式），IMAP/Outlook 都自动处理。
+   */
+  static needsArchiveSetup = false;
 
   /** 解析推送通知并将新邮件入队，子类必须 override */
   static async enqueue(_body: unknown, _env: Env): Promise<void> {
@@ -104,7 +116,7 @@ export abstract class EmailProvider {
   }
 
   /** 基于 provider config 构造 OAuth 授权流程的 handler（开始 / 回调） */
-  static createOAuthHandler(config: OAuthProviderConfig) {
+  static createOAuthHandler(config: OAuthProviderConfig): OAuthHandler {
     async function generateOAuthUrl(
       env: Env,
       accountId: number,
@@ -291,20 +303,14 @@ export abstract class EmailProvider {
     }
 
     return {
+      name: config.name,
+      isConfigured: (env: Env) => {
+        const { clientId, clientSecret } = config.getCredentials(env);
+        return !!clientId && !!clientSecret;
+      },
       generateOAuthUrl,
       startOAuth,
       processOAuthCallback,
     };
   }
-}
-
-export type OAuthHandler = ReturnType<typeof EmailProvider.createOAuthHandler>;
-
-/**
- * 具体 EmailProvider 子类的构造器类型。
- * 支持 OAuth 的子类要提供 static `oauth`（IMAP 没有）。
- */
-export interface EmailProviderClass {
-  new (account: Account, env: Env): EmailProvider;
-  oauth?: OAuthHandler;
 }

@@ -1,5 +1,3 @@
-import type { MailMeta } from "@/types";
-
 export interface GmailHeader {
   name: string;
   value: string;
@@ -37,10 +35,4 @@ export interface GmailHistoryResponse {
 
 export interface GmailProfile {
   historyId: string;
-}
-
-export interface FetchMailResult {
-  html: string;
-  cidMap: Map<string, string>;
-  meta: MailMeta;
 }

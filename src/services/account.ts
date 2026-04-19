@@ -4,39 +4,35 @@ import { deleteCachedAccessToken } from "@db/kv";
 import { deleteMappingsByAccountId } from "@db/message-map";
 import { deleteUser } from "@db/users";
 import { getEmailProvider } from "@providers";
-import { syncAccounts } from "@providers/imap";
 import { reportErrorToObservability } from "@utils/observability";
-import { type Account, AccountType, type Env } from "@/types";
+import type { Account, Env } from "@/types";
 
 /** 清理并删除单个邮箱账号（停止 watch/subscription + 删除关联数据 + 删除 DB 记录） */
 export async function cleanupAndDeleteAccount(
   env: Env,
   account: Account,
 ): Promise<void> {
-  // 停止邮件推送
-  if (account.type === AccountType.Imap) {
-    // IMAP 先删账号再同步，让中间件感知变更
-    await deleteAccount(env.DB, account.id);
-    if (env.IMAP_BRIDGE_URL && env.IMAP_BRIDGE_SECRET) {
-      await syncAccounts(env).catch((err) => {
-        reportErrorToObservability(env, "imap.sync_after_delete_failed", err, {
-          accountId: account.id,
-        });
-      });
-    }
-  } else {
-    if (account.refresh_token) {
-      try {
-        const provider = getEmailProvider(account, env);
-        await provider.stopPush();
-      } catch (err) {
-        await reportErrorToObservability(env, "bot.stop_push_failed", err, {
-          accountEmail: account.email,
-        });
-      }
-    }
-    await deleteAccount(env.DB, account.id);
+  const provider = getEmailProvider(account, env);
+  // 删除前：OAuth providers 停 push；IMAP 是 no-op
+  if (account.refresh_token) {
+    await provider.stopPush().catch((err) =>
+      reportErrorToObservability(env, "bot.stop_push_failed", err, {
+        accountEmail: account.email,
+      }),
+    );
   }
+  await deleteAccount(env.DB, account.id);
+  // 删除后：IMAP 通知 bridge reconcile；OAuth 是 no-op
+  await provider.onPersistedChange().catch((err) =>
+    reportErrorToObservability(
+      env,
+      "provider.on_persisted_change_failed",
+      err,
+      {
+        accountId: account.id,
+      },
+    ),
+  );
 
   // 清理关联数据及 KV 缓存
   await Promise.all([

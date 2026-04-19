@@ -20,16 +20,10 @@ import {
   ROUTE_PREVIEW_API,
 } from "@handlers/hono/routes";
 import { resolveMailAction } from "@handlers/hono/utils";
-import {
-  accountCanArchive,
-  type GmailProvider,
-  getEmailProvider,
-} from "@providers";
+import { accountCanArchive, getEmailProvider, PROVIDERS } from "@providers";
 import { deliverEmailToTelegram } from "@services/bridge";
 import { analyzeEmail } from "@services/llm";
 import {
-  buildCidMapFromAttachments,
-  type CidMap,
   proxyImages,
   replaceCidReferences,
   verifyMailToken,
@@ -37,16 +31,15 @@ import {
   verifyProxySignature,
 } from "@services/mail-preview";
 import { deleteMessage, setReplyMarkup } from "@services/telegram";
-import { formatAddress, formatBody, wrapPlainText } from "@utils/format";
+import { formatBody } from "@utils/format";
 import { http } from "@utils/http";
 import { reportErrorToObservability } from "@utils/observability";
 import { Hono } from "hono";
 import { raw } from "hono/html";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPError } from "ky";
-import PostalMime from "postal-mime";
 import { MAX_BODY_CHARS } from "@/constants";
-import { type Account, AccountType, type AppEnv, type MailMeta } from "@/types";
+import type { Account, AppEnv } from "@/types";
 
 const preview = new Hono<AppEnv>();
 
@@ -161,40 +154,16 @@ preview.get(ROUTE_MAIL, async (c) => {
     );
   }
 
-  let html: string | null = null;
-  let cidMap: CidMap = new Map();
-  let meta: MailMeta = {};
+  // OAuth 型 provider 需要已授权；IMAP 没有 oauth，不检查
+  if (PROVIDERS[account.type].oauth && !account.refresh_token)
+    return c.text("Account not authorized", 403);
 
-  if (account.type === AccountType.Gmail) {
-    if (!account.refresh_token) return c.text("Account not authorized", 403);
-    const result = await (provider as GmailProvider).fetchMailContent(
-      messageId,
-    );
-    if (result) {
-      html = result.html;
-      cidMap = result.cidMap;
-      meta = result.meta;
-    }
-  } else {
-    // IMAP + Outlook: 获取原始 MIME 并解析
-    if (account.type !== AccountType.Imap && !account.refresh_token)
-      return c.text("Account not authorized", 403);
-    const rawEmail = await provider.fetchRawEmail(
-      messageId,
-      inJunk ? "junk" : "inbox",
-    );
-    const email = await new PostalMime().parse(rawEmail);
-    html = email.html ?? (email.text ? wrapPlainText(email.text) : null);
-    cidMap = buildCidMapFromAttachments(email.attachments);
-    meta = {
-      subject: email.subject ?? null,
-      from: email.from ? formatAddress(email.from) : null,
-      to: email.to?.map(formatAddress).join(", ") ?? null,
-      date: email.date ?? null,
-    };
-  }
-
-  if (!html) return c.text("No content in this email", 404);
+  const result = await provider.fetchForPreview(
+    messageId,
+    inJunk ? "junk" : "inbox",
+  );
+  if (!result) return c.text("No content in this email", 404);
+  let { html, cidMap, meta } = result;
 
   html = replaceCidReferences(html, cidMap);
   await putCachedMailData(c.env.EMAIL_KV, messageId, { html, meta });

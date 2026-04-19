@@ -1,22 +1,23 @@
 import { getAllAccounts } from "@db/accounts";
-import type {
-  EmailProvider,
-  EmailProviderClass,
-  OAuthHandler,
-} from "@providers/base";
+import type { EmailProvider } from "@providers/base";
 import { GmailProvider } from "@providers/gmail";
 import { ImapProvider } from "@providers/imap";
 import { OutlookProvider } from "@providers/outlook";
+import type { EmailProviderClass, OAuthHandler } from "@providers/types";
 import { type Account, AccountType, type Env } from "@/types";
 
-export {
-  type EmailListItem,
-  EmailProvider,
-  type EmailProviderClass,
-} from "@providers/base";
+export { EmailProvider } from "@providers/base";
 export { GmailProvider } from "@providers/gmail";
 export { ImapProvider } from "@providers/imap";
 export { OutlookProvider } from "@providers/outlook";
+export type {
+  EmailListItem,
+  EmailProviderClass,
+  OAuthHandler,
+  OAuthProviderConfig,
+  OAuthTokenResponse,
+  PreviewContent,
+} from "@providers/types";
 
 /**
  * AccountType → provider class 的唯一映射。新增 provider 在这加一行。
@@ -36,11 +37,10 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
 
 /**
  * 根据 account 判断能否执行归档（不需要实例化 provider 就能问）。
- * 目前只有 Gmail 需要用户先选 archive label。
+ * 委派到 provider class 的静态 `canArchive`，默认 true；Gmail override 需要 archive label。
  */
 export function accountCanArchive(account: Account): boolean {
-  if (account.type === AccountType.Gmail) return !!account.archive_folder;
-  return true;
+  return PROVIDERS[account.type].canArchive(account);
 }
 
 /** 拿到某 provider 的 OAuth handler，不支持 OAuth（IMAP）→ 抛错 */

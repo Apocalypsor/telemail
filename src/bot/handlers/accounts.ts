@@ -19,14 +19,12 @@ import {
 import { putOAuthBotMsg } from "@db/kv";
 import { getAllUsers, getUserByTelegramId } from "@db/users";
 import { t } from "@i18n";
-import { type GmailProvider, getEmailProvider, oauthOf } from "@providers";
-import { syncAccounts } from "@providers/imap";
+import { type GmailProvider, getEmailProvider, PROVIDERS } from "@providers";
 import { cleanupAndDeleteAccount } from "@services/account";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Account, Env } from "@/types";
-import { AccountType } from "@/types";
+import type { Account, AccountType, Env } from "@/types";
 
 async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
   const userId = String(fromId);
@@ -42,9 +40,10 @@ export function accountListKeyboard(
 ): InlineKeyboard {
   const kb = new InlineKeyboard();
   for (const acc of accounts) {
+    // 禁用 > 非 OAuth（IMAP 等，直接视为可用）> OAuth 授权状态
     const status = acc.disabled
       ? "⏸"
-      : acc.type === AccountType.Imap
+      : !PROVIDERS[acc.type].oauth
         ? "📬"
         : acc.refresh_token
           ? "✅"
@@ -205,16 +204,14 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     const nowDisabled = !account.disabled;
     await setAccountDisabled(env.DB, accountId, nowDisabled);
 
-    // IMAP: 立即通知 bridge reconcile 连接（不等下次 sync）
-    if (account.type === AccountType.Imap) {
-      await syncAccounts(env).catch((err) =>
-        reportErrorToObservability(
-          env,
-          "bot.imap_sync_after_toggle_failed",
-          err,
-        ),
+    // 持久化后的钩子：IMAP 会立刻通知 bridge reconcile，其他 provider no-op
+    await getEmailProvider(account, env)
+      .onPersistedChange()
+      .catch((err) =>
+        reportErrorToObservability(env, "bot.on_persisted_change_failed", err, {
+          accountId,
+        }),
       );
-    }
 
     const ownerName = await resolveOwnerName(
       env.DB,
@@ -243,7 +240,8 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       return ctx.answerCallbackQuery({
         text: t("common:error.accountNotFound"),
       });
-    if (account.type === AccountType.Imap)
+    const oauth = PROVIDERS[account.type].oauth;
+    if (!oauth)
       return ctx.answerCallbackQuery({
         text: t("accounts:oauth.imapNoOAuth"),
       });
@@ -251,13 +249,12 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     try {
       const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
       const callbackUrl = `${origin}/oauth/${account.type}/callback`;
-      const oauthUrl = await oauthOf(account.type).generateOAuthUrl(
+      const oauthUrl = await oauth.generateOAuthUrl(
         env,
         accountId,
         callbackUrl,
       );
-      const providerName =
-        account.type === AccountType.Outlook ? "Microsoft" : "Google";
+      const providerName = oauth.name;
 
       const kb = new InlineKeyboard()
         .url(t("accounts:button.clickAuth"), oauthUrl)
@@ -492,7 +489,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
   // Gmail archive label picker
   bot.callbackQuery(/^acc:(\d+):arc$/, async (ctx) => {
     const { account } = await resolveAccount(env, ctx.from.id, ctx.match?.[1]);
-    if (!account || account.type !== AccountType.Gmail)
+    if (!account || !PROVIDERS[account.type].needsArchiveSetup)
       return ctx.answerCallbackQuery({
         text: t("common:error.accountNotFound"),
       });
@@ -545,7 +542,7 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       ctx.from.id,
       ctx.match?.[1],
     );
-    if (!account || account.type !== AccountType.Gmail)
+    if (!account || !PROVIDERS[account.type].needsArchiveSetup)
       return ctx.answerCallbackQuery({
         text: t("common:error.accountNotFound"),
       });
@@ -631,116 +628,72 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     await ctx.answerCallbackQuery();
   });
 
-  // Type selection: Gmail
-  bot.callbackQuery("addtype:gmail", async (ctx) => {
-    const userId = String(ctx.from.id);
-    const state = await getBotState(env, userId);
-    if (!state || state.action !== "add" || state.step !== "type") {
-      return ctx.answerCallbackQuery({
-        text: t("common:error.operationExpired"),
-      });
-    }
+  // Type selection: 所有 OAuth 型 provider 共享这一段流程（addtype:gmail / addtype:outlook / 未来新增）
+  for (const [type, klass] of Object.entries(PROVIDERS) as [
+    AccountType,
+    (typeof PROVIDERS)[AccountType],
+  ][]) {
+    const oauth = klass.oauth;
+    if (!oauth) continue;
 
-    try {
-      const account = await createAccount(env.DB, state.chatId, userId);
-      await clearBotState(env, userId);
-
-      const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
-      const oauthUrl = await oauthOf(AccountType.Gmail).generateOAuthUrl(
-        env,
-        account.id,
-        `${origin}/oauth/${AccountType.Gmail}/callback`,
-      );
-      const kb = new InlineKeyboard()
-        .url(t("accounts:button.clickAuthGoogle"), oauthUrl)
-        .row()
-        .text(t("common:button.viewAccount"), `acc:${account.id}`);
-
-      const msg = ctx.callbackQuery.message;
-      if (msg) {
-        await putOAuthBotMsg(env.EMAIL_KV, account.id, {
-          chatId: String(msg.chat.id),
-          messageId: msg.message_id,
+    bot.callbackQuery(`addtype:${type}`, async (ctx) => {
+      const userId = String(ctx.from.id);
+      const state = await getBotState(env, userId);
+      if (!state || state.action !== "add" || state.step !== "type") {
+        return ctx.answerCallbackQuery({
+          text: t("common:error.operationExpired"),
         });
       }
 
-      await ctx.editMessageText(
-        t("accounts:gmail.created", {
-          id: account.id,
-          chatId: state.chatId,
-        }),
-        {
-          reply_markup: kb,
-        },
-      );
-    } catch (err) {
-      await clearBotState(env, userId);
-      await reportErrorToObservability(env, "bot.create_account_failed", err);
-      await ctx.editMessageText(t("common:error.createFailed"));
-    }
-    await ctx.answerCallbackQuery();
-  });
-
-  // Type selection: Outlook
-  bot.callbackQuery("addtype:outlook", async (ctx) => {
-    const userId = String(ctx.from.id);
-    const state = await getBotState(env, userId);
-    if (!state || state.action !== "add" || state.step !== "type") {
-      return ctx.answerCallbackQuery({
-        text: t("common:error.operationExpired"),
-      });
-    }
-
-    if (!env.MS_CLIENT_ID || !env.MS_CLIENT_SECRET) {
-      return ctx.answerCallbackQuery({
-        text: t("accounts:add.msNotConfigured"),
-      });
-    }
-
-    try {
-      const account = await createAccount(
-        env.DB,
-        state.chatId,
-        userId,
-        AccountType.Outlook,
-      );
-      await clearBotState(env, userId);
-
-      const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
-      const oauthUrl = await oauthOf(AccountType.Outlook).generateOAuthUrl(
-        env,
-        account.id,
-        `${origin}/oauth/${AccountType.Outlook}/callback`,
-      );
-      const kb = new InlineKeyboard()
-        .url(t("accounts:button.clickAuthMicrosoft"), oauthUrl)
-        .row()
-        .text(t("common:button.viewAccount"), `acc:${account.id}`);
-
-      const msg = ctx.callbackQuery.message;
-      if (msg) {
-        await putOAuthBotMsg(env.EMAIL_KV, account.id, {
-          chatId: String(msg.chat.id),
-          messageId: msg.message_id,
+      if (!oauth.isConfigured(env)) {
+        return ctx.answerCallbackQuery({
+          text: t("accounts:add.notConfigured", { provider: oauth.name }),
         });
       }
 
-      await ctx.editMessageText(
-        t("accounts:outlook.created", {
-          id: account.id,
-          chatId: state.chatId,
-        }),
-        {
-          reply_markup: kb,
-        },
-      );
-    } catch (err) {
-      await clearBotState(env, userId);
-      await reportErrorToObservability(env, "bot.create_account_failed", err);
-      await ctx.editMessageText(t("common:error.createFailed"));
-    }
-    await ctx.answerCallbackQuery();
-  });
+      try {
+        const account = await createAccount(env.DB, state.chatId, userId, type);
+        await clearBotState(env, userId);
+
+        const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
+        const oauthUrl = await oauth.generateOAuthUrl(
+          env,
+          account.id,
+          `${origin}/oauth/${type}/callback`,
+        );
+        const kb = new InlineKeyboard()
+          .url(
+            t("accounts:button.clickAuthProvider", { provider: oauth.name }),
+            oauthUrl,
+          )
+          .row()
+          .text(t("common:button.viewAccount"), `acc:${account.id}`);
+
+        const msg = ctx.callbackQuery.message;
+        if (msg) {
+          await putOAuthBotMsg(env.EMAIL_KV, account.id, {
+            chatId: String(msg.chat.id),
+            messageId: msg.message_id,
+          });
+        }
+
+        await ctx.editMessageText(
+          t("accounts:add.oauthCreated", {
+            type: klass.displayName,
+            provider: oauth.name,
+            id: account.id,
+            chatId: state.chatId,
+          }),
+          { reply_markup: kb },
+        );
+      } catch (err) {
+        await clearBotState(env, userId);
+        await reportErrorToObservability(env, "bot.create_account_failed", err);
+        await ctx.editMessageText(t("common:error.createFailed"));
+      }
+      await ctx.answerCallbackQuery();
+    });
+  }
 
   // Type selection: IMAP
   bot.callbackQuery("addtype:imap", async (ctx) => {

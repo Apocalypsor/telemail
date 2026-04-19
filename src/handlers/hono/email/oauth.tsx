@@ -16,7 +16,7 @@ import {
   ROUTE_OAUTH_START,
 } from "@handlers/hono/routes";
 import { PROVIDERS } from "@providers";
-import type { OAuthHandler } from "@providers/base";
+import type { OAuthHandler } from "@providers/types";
 import { Api } from "grammy";
 import { type Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

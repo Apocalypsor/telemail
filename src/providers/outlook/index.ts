@@ -33,6 +33,8 @@ import {
 import type { Env } from "@/types";
 
 export class OutlookProvider extends EmailProvider {
+  static displayName = "Outlook";
+
   static oauth = EmailProvider.createOAuthHandler({
     name: "Microsoft",
     authorizeUrl: MS_OAUTH_AUTHORIZE_URL,

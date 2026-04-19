@@ -1,38 +1,33 @@
 import { getUserByTelegramId } from "@db/users";
 import { t } from "@i18n";
+import { PROVIDERS } from "@providers";
 import { InlineKeyboard } from "grammy";
 import type { Account, TelegramUser } from "@/types";
-import { AccountType } from "@/types";
 
 export function accountDetailText(
   account: Account,
   ownerName?: string,
 ): string {
+  const klass = PROVIDERS[account.type];
   let text = `${t("accounts:detail.title", { id: account.id })}\n\n`;
   if (account.disabled) {
     text += `${t("common:status.disabled")}\n\n`;
   }
-  if (account.type === AccountType.Imap) {
-    text += `${t("accounts:detail.typeLabel", { type: t("accounts:detail.typeImap") })}\n`;
-    text += `${t("accounts:detail.email", { email: account.email || t("common:label.notSet") })}\n`;
-    text += `Chat ID: ${account.chat_id}\n`;
-    text += `${t("accounts:detail.server", { server: `${account.imap_host}:${account.imap_port}${account.imap_secure ? " (TLS)" : ""}` })}\n`;
-    text += t("accounts:detail.username", { user: account.imap_user });
-  } else {
+  text += `${t("accounts:detail.typeLabel", { type: klass.displayName })}\n`;
+  text += `${t("accounts:detail.email", { email: account.email || t("common:label.notSet") })}\n`;
+  text += `Chat ID: ${account.chat_id}\n`;
+  if (klass.oauth) {
     const status = account.refresh_token
       ? t("common:status.authorized")
       : t("common:status.notAuthorized");
-    const typeName =
-      account.type === AccountType.Outlook
-        ? t("accounts:detail.typeOutlook")
-        : t("accounts:detail.typeGmail");
-    text += `${t("accounts:detail.typeLabel", { type: typeName })}\n`;
-    text += `${t("accounts:detail.email", { email: account.email || t("common:label.notSet") })}\n`;
-    text += `Chat ID: ${account.chat_id}\n`;
     text += t("accounts:detail.status", { status });
+  } else {
+    // 非 OAuth（IMAP）：显示服务器 / 用户名
+    text += `${t("accounts:detail.server", { server: `${account.imap_host}:${account.imap_port}${account.imap_secure ? " (TLS)" : ""}` })}\n`;
+    text += t("accounts:detail.username", { user: account.imap_user });
   }
-  if (account.type === AccountType.Gmail) {
-    // 优先展示 label 名称；迁移前的老数据只有 ID 时退而展示 ID；都没有则显示未设置
+  // 需要让用户手动配置归档目标的 provider（目前只有 Gmail）才展示这行
+  if (klass.needsArchiveSetup) {
     const archiveLabel =
       account.archive_folder_name ||
       account.archive_folder ||
@@ -46,16 +41,12 @@ export function accountDetailText(
 }
 
 export function accountDetailKeyboard(account: Account): InlineKeyboard {
+  const klass = PROVIDERS[account.type];
   const kb = new InlineKeyboard();
   const toggleLabel = account.disabled
     ? t("accounts:button.enable")
     : t("accounts:button.disable");
-  if (account.type === AccountType.Imap) {
-    kb.text(t("accounts:button.edit"), `acc:${account.id}:edit`);
-    kb.text(toggleLabel, `acc:${account.id}:t`).row();
-    kb.text(t("accounts:button.delete"), `acc:${account.id}:del`).row();
-    kb.text(t("common:button.backToAccounts"), "accs");
-  } else {
+  if (klass.oauth) {
     const authLabel = account.refresh_token
       ? t("accounts:button.reauthorize")
       : t("accounts:button.authorize");
@@ -65,13 +56,19 @@ export function accountDetailKeyboard(account: Account): InlineKeyboard {
     }
     kb.row();
     kb.text(t("accounts:button.edit"), `acc:${account.id}:edit`);
-    if (account.type === AccountType.Gmail && account.refresh_token) {
+    // 需要用户手动选归档标签的 provider（Gmail）才显示这个按钮
+    if (account.refresh_token && klass.needsArchiveSetup) {
       kb.text(t("archive:gmailLabelButton"), `acc:${account.id}:arc`);
     }
     kb.row();
     kb.text(toggleLabel, `acc:${account.id}:t`);
     kb.text(t("accounts:button.delete"), `acc:${account.id}:del`);
     kb.row();
+    kb.text(t("common:button.backToAccounts"), "accs");
+  } else {
+    kb.text(t("accounts:button.edit"), `acc:${account.id}:edit`);
+    kb.text(toggleLabel, `acc:${account.id}:t`).row();
+    kb.text(t("accounts:button.delete"), `acc:${account.id}:del`).row();
     kb.text(t("common:button.backToAccounts"), "accs");
   }
   return kb;

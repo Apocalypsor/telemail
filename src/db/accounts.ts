@@ -1,4 +1,4 @@
-import { type Account, AccountType } from "@/types";
+import type { Account, AccountType } from "@/types";
 
 export async function getAllAccounts(db: D1Database): Promise<Account[]> {
   const { results } = await db
@@ -78,8 +78,8 @@ export async function getAuthorizedAccount(
 export async function createAccount(
   db: D1Database,
   chatId: string,
-  telegramUserId?: string,
-  type: AccountType = AccountType.Gmail,
+  telegramUserId: string | undefined,
+  type: AccountType,
 ): Promise<Account> {
   const result = await db
     .prepare(

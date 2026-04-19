@@ -1,6 +1,7 @@
 import { getAccountById } from "@db/accounts";
-import { type EmailListItem, EmailProvider } from "@providers/base";
-import { callBridge } from "@providers/imap/utils";
+import { EmailProvider } from "@providers/base";
+import { callBridge, syncAccounts } from "@providers/imap/utils";
+import type { EmailListItem } from "@providers/types";
 import { base64ToArrayBuffer } from "@utils/base64url";
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@/constants";
 import type { Env } from "@/types";
@@ -11,6 +12,14 @@ export {
 } from "@providers/imap/utils";
 
 export class ImapProvider extends EmailProvider {
+  static displayName = "IMAP";
+
+  /** 账号状态变化后立即通知 bridge reconcile（不等下次 sync） */
+  async onPersistedChange() {
+    if (!this.env.IMAP_BRIDGE_URL || !this.env.IMAP_BRIDGE_SECRET) return;
+    await syncAccounts(this.env);
+  }
+
   // ─── Enqueue ──────────────────────────────────────────────────────────
 
   /** 解析 IMAP bridge 推送通知并入队 */

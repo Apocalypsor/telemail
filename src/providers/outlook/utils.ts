@@ -1,5 +1,5 @@
 import { getCachedAccessToken, putCachedAccessToken } from "@db/kv";
-import type { OAuthTokenResponse } from "@providers/base";
+import type { OAuthTokenResponse } from "@providers/types";
 import { http } from "@utils/http";
 import { HTTPError } from "ky";
 import { MS_GRAPH_API, MS_MAIL_SCOPE, MS_OAUTH_TOKEN_URL } from "@/constants";

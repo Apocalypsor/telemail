@@ -26,8 +26,7 @@ export default {
     reauthorize: "🔑 重新授权",
     authorize: "🔑 授权",
     clickAuth: "🔗 点击授权",
-    clickAuthGoogle: "🔗 点击授权 Google",
-    clickAuthMicrosoft: "🔗 点击授权 Microsoft",
+    clickAuthProvider: "🔗 点击授权 {{provider}}",
     disable: "⏸ 禁用",
     enable: "▶ 启用",
   },
@@ -45,7 +44,7 @@ export default {
     gmail: "📨 Gmail (OAuth)",
     outlook: "📮 Outlook (OAuth)",
     imap: "📬 IMAP",
-    msNotConfigured: "❌ Microsoft OAuth 未配置，请联系管理员",
+    notConfigured: "❌ {{provider}} OAuth 未配置，请联系管理员",
     imapNotConfigured: "❌ IMAP 中间件未配置，请联系管理员",
   },
   imap: {
@@ -64,14 +63,8 @@ export default {
     created:
       "✅ IMAP 账号已创建 #{{id}}\n\n邮箱: {{email}}\nChat ID: {{chatId}}",
   },
-  gmail: {
-    created:
-      "✅ Gmail 账号已创建 #{{id}}\n\nChat ID: {{chatId}}\n\n请点击下方按钮完成 Google 授权：",
-  },
-  outlook: {
-    created:
-      "✅ Outlook 账号已创建 #{{id}}\n\nChat ID: {{chatId}}\n\n请点击下方按钮完成 Microsoft 授权：",
-  },
+  oauthCreated:
+    "✅ {{type}} 账号已创建 #{{id}}\n\nChat ID: {{chatId}}\n\n请点击下方按钮完成 {{provider}} 授权：",
   oauth: {
     prompt:
       "🔑 {{provider}} OAuth 授权\n\n账号: {{account}}\n\n请点击下方按钮完成 {{provider}} 授权：",
