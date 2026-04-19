@@ -9,12 +9,8 @@ export default {
   },
   detail: {
     title: "📧 账号详情 #{{id}}",
-    typeImap: "📬 IMAP",
-    typeOutlook: "📮 Outlook",
-    typeGmail: "📨 Gmail",
     typeLabel: "类型: {{type}}",
     email: "邮箱: {{email}}",
-    chatId: "Chat ID: {{chatId}}",
     server: "服务器: {{server}}",
     username: "用户名: {{user}}",
     status: "状态: {{status}}",
@@ -35,7 +31,6 @@ export default {
     toggledOff: "▶ 账号已启用",
   },
   add: {
-    title: "➕ 添加账号",
     promptChatId:
       "➕ 添加账号\n\n请发送 Chat ID（数字），或点击下方按钮使用当前会话 ID：",
     useCurrent: "📌 使用当前 Chat ID ({{id}})",
@@ -46,9 +41,10 @@ export default {
     imap: "📬 IMAP",
     notConfigured: "❌ {{provider}} OAuth 未配置，请联系管理员",
     imapNotConfigured: "❌ IMAP 中间件未配置，请联系管理员",
+    oauthCreated:
+      "✅ {{type}} 账号已创建 #{{id}}\n\nChat ID: {{chatId}}\n\n请点击下方按钮完成 {{provider}} 授权：",
   },
   imap: {
-    title: "📬 添加 IMAP 账号",
     promptHost:
       "📬 添加 IMAP 账号\n\nChat ID: {{chatId}}\n\n请发送 IMAP 服务器地址（如 imap.gmail.com）：",
     promptPort:
@@ -63,8 +59,6 @@ export default {
     created:
       "✅ IMAP 账号已创建 #{{id}}\n\n邮箱: {{email}}\nChat ID: {{chatId}}",
   },
-  oauthCreated:
-    "✅ {{type}} 账号已创建 #{{id}}\n\nChat ID: {{chatId}}\n\n请点击下方按钮完成 {{provider}} 授权：",
   oauth: {
     prompt:
       "🔑 {{provider}} OAuth 授权\n\n账号: {{account}}\n\n请点击下方按钮完成 {{provider}} 授权：",
