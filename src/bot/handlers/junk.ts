@@ -1,5 +1,5 @@
-import { getAccountById } from "@db/accounts";
-import { deleteMappingByEmailId, getMessageMapping } from "@db/message-map";
+import { resolveMessageAccount } from "@bot/utils/message-context";
+import { deleteMappingByEmailId } from "@db/message-map";
 import { t } from "@i18n";
 import { getEmailProvider } from "@providers";
 import { deleteMessage } from "@services/telegram";
@@ -15,21 +15,12 @@ export function registerJunkHandler(bot: Bot, env: Env) {
 
     try {
       const chatId = String(msg.chat.id);
-      const mapping = await getMessageMapping(env.DB, chatId, msg.message_id);
-      if (!mapping) {
-        await ctx.answerCallbackQuery({
-          text: t("common:error.mappingNotFound"),
-        });
+      const resolved = await resolveMessageAccount(env, chatId, msg.message_id);
+      if (!resolved.ok) {
+        await ctx.answerCallbackQuery({ text: resolved.error });
         return;
       }
-
-      const account = await getAccountById(env.DB, mapping.account_id);
-      if (!account) {
-        await ctx.answerCallbackQuery({
-          text: t("common:error.accountNotFoundShort"),
-        });
-        return;
-      }
+      const { mapping, account } = resolved;
 
       // 移到垃圾邮件文件夹
       const provider = getEmailProvider(account, env);

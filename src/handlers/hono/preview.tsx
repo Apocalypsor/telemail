@@ -19,6 +19,7 @@ import {
   ROUTE_PREVIEW,
   ROUTE_PREVIEW_API,
 } from "@handlers/hono/routes";
+import { resolveMailAction } from "@handlers/hono/utils";
 import {
   accountCanArchive,
   type GmailProvider,
@@ -145,7 +146,7 @@ preview.get(ROUTE_MAIL, async (c) => {
     token: token as string,
     inJunk,
     starred,
-    canArchive: provider.canArchive(),
+    canArchive: accountCanArchive(account),
     accountEmail: account.email,
   };
 
@@ -208,19 +209,9 @@ preview.get(ROUTE_MAIL, async (c) => {
 // ─── 邮件操作 API ────────────────────────────────────────────────────────────
 
 preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
-  const messageId = c.req.param("id");
-  const body = (await c.req.json()) as { accountId?: number; token?: string };
-  if (!messageId || !body.accountId || !body.token)
-    return c.json({ ok: false, error: "参数缺失" }, 400);
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    messageId,
-    body.accountId,
-    body.token,
-  );
-  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
-  const account = await getAccountById(c.env.DB, body.accountId);
-  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  const resolved = await resolveMailAction(c);
+  if (!resolved.ok) return resolved.response;
+  const { account, messageId } = resolved;
   try {
     const provider = getEmailProvider(account, c.env);
     // IMAP/Outlook move 之后原 id 失效（IMAP 换 UID，Outlook Graph 换 id），
@@ -258,19 +249,9 @@ preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
 });
 
 preview.post(ROUTE_MAIL_TRASH, async (c) => {
-  const messageId = c.req.param("id");
-  const body = (await c.req.json()) as { accountId?: number; token?: string };
-  if (!messageId || !body.accountId || !body.token)
-    return c.json({ ok: false, error: "参数缺失" }, 400);
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    messageId,
-    body.accountId,
-    body.token,
-  );
-  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
-  const account = await getAccountById(c.env.DB, body.accountId);
-  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  const resolved = await resolveMailAction(c);
+  if (!resolved.ok) return resolved.response;
+  const { account, messageId } = resolved;
   try {
     const provider = getEmailProvider(account, c.env);
     await provider.trashMessage(messageId);
@@ -281,25 +262,15 @@ preview.post(ROUTE_MAIL_TRASH, async (c) => {
 });
 
 preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
-  const messageId = c.req.param("id");
-  const body = (await c.req.json()) as { accountId?: number; token?: string };
-  if (!messageId || !body.accountId || !body.token)
-    return c.json({ ok: false, error: "参数缺失" }, 400);
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    messageId,
-    body.accountId,
-    body.token,
-  );
-  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
-  const account = await getAccountById(c.env.DB, body.accountId);
-  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  const resolved = await resolveMailAction(c);
+  if (!resolved.ok) return resolved.response;
+  const { account, messageId } = resolved;
   try {
     const provider = getEmailProvider(account, c.env);
     await provider.markAsJunk(messageId);
 
     // 删除对应的 TG 消息和映射
-    const mappings = await getMappingsByEmailIds(c.env.DB, body.accountId, [
+    const mappings = await getMappingsByEmailIds(c.env.DB, account.id, [
       messageId,
     ]);
     if (mappings.length > 0) {
@@ -309,7 +280,7 @@ preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
         m.tg_chat_id,
         m.tg_message_id,
       ).catch(() => {});
-      await deleteMappingByEmailId(c.env.DB, messageId, body.accountId).catch(
+      await deleteMappingByEmailId(c.env.DB, messageId, account.id).catch(
         () => {},
       );
     }
@@ -321,30 +292,20 @@ preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
 });
 
 preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
-  const messageId = c.req.param("id");
-  const body = (await c.req.json()) as { accountId?: number; token?: string };
-  if (!messageId || !body.accountId || !body.token)
-    return c.json({ ok: false, error: "参数缺失" }, 400);
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    messageId,
-    body.accountId,
-    body.token,
-  );
-  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
-  const account = await getAccountById(c.env.DB, body.accountId);
-  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
+  const resolved = await resolveMailAction(c);
+  if (!resolved.ok) return resolved.response;
+  const { account, messageId } = resolved;
+  if (!accountCanArchive(account))
+    return c.json(
+      { ok: false, error: "Gmail 归档需要在账号设置里指定归档标签" },
+      400,
+    );
   try {
     const provider = getEmailProvider(account, c.env);
-    if (!provider.canArchive())
-      return c.json(
-        { ok: false, error: "Gmail 归档需要在账号设置里指定归档标签" },
-        400,
-      );
     await provider.archiveMessage(messageId);
 
     // 删除对应的 TG 消息和映射
-    const mappings = await getMappingsByEmailIds(c.env.DB, body.accountId, [
+    const mappings = await getMappingsByEmailIds(c.env.DB, account.id, [
       messageId,
     ]);
     if (mappings.length > 0) {
@@ -354,7 +315,7 @@ preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
         m.tg_chat_id,
         m.tg_message_id,
       ).catch(() => {});
-      await deleteMappingByEmailId(c.env.DB, messageId, body.accountId).catch(
+      await deleteMappingByEmailId(c.env.DB, messageId, account.id).catch(
         () => {},
       );
     }
@@ -369,23 +330,15 @@ preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
 });
 
 preview.post(ROUTE_MAIL_TOGGLE_STAR, async (c) => {
-  const messageId = c.req.param("id");
-  const body = (await c.req.json()) as {
+  const resolved = await resolveMailAction<{
     accountId?: number;
     token?: string;
     starred?: boolean;
-  };
-  if (!messageId || !body.accountId || !body.token || body.starred == null)
+  }>(c);
+  if (!resolved.ok) return resolved.response;
+  const { account, messageId, body } = resolved;
+  if (body.starred == null)
     return c.json({ ok: false, error: "参数缺失" }, 400);
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    messageId,
-    body.accountId,
-    body.token,
-  );
-  if (!valid) return c.json({ ok: false, error: "无效的 token" }, 403);
-  const account = await getAccountById(c.env.DB, body.accountId);
-  if (!account) return c.json({ ok: false, error: "账号未找到" }, 404);
   try {
     const provider = getEmailProvider(account, c.env);
     if (body.starred) {
@@ -395,7 +348,7 @@ preview.post(ROUTE_MAIL_TOGGLE_STAR, async (c) => {
     }
 
     // 同步更新 Telegram 消息的星标按钮
-    const mappings = await getMappingsByEmailIds(c.env.DB, body.accountId, [
+    const mappings = await getMappingsByEmailIds(c.env.DB, account.id, [
       messageId,
     ]);
     if (mappings.length > 0) {

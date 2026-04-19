@@ -135,7 +135,6 @@ export async function trashAllJunkEmails(
 export async function deleteJunkMappings(
   env: Env,
   mappings: MessageMapping[],
-  _account: Account,
 ): Promise<void> {
   for (const m of mappings) {
     await deleteMessage(

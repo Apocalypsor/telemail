@@ -1,3 +1,4 @@
+import { getUserByTelegramId } from "@db/users";
 import { t } from "@i18n";
 import { InlineKeyboard } from "grammy";
 import type { Account, TelegramUser } from "@/types";
@@ -81,6 +82,25 @@ export function formatUserName(user: {
   last_name?: string | null;
 }): string {
   return user.first_name + (user.last_name ? ` ${user.last_name}` : "");
+}
+
+/**
+ * 解析账号所有者名称：
+ * - 非管理员 → 返回 undefined（详情页不显示 owner 行）
+ * - 管理员 + account 无绑定 user → 返回 ""（显示"(无)"）
+ * - 管理员 + 能查到 user → 优先 @username，否则用 formatUserName
+ */
+export async function resolveOwnerName(
+  db: D1Database,
+  admin: boolean,
+  telegramUserId: string | null,
+): Promise<string | undefined> {
+  if (!admin) return undefined;
+  if (!telegramUserId) return "";
+  const owner = await getUserByTelegramId(db, telegramUserId);
+  return owner?.username
+    ? `@${owner.username}`
+    : formatUserName(owner ?? { first_name: telegramUserId });
 }
 
 export function userListText(users: TelegramUser[]): string {

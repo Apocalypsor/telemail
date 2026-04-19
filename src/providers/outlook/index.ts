@@ -7,6 +7,11 @@ import {
   refreshMsSubAccountMapping,
 } from "@db/kv";
 import { EmailProvider } from "@providers/base";
+import type {
+  GraphFolder,
+  GraphMessage,
+  GraphMessageList,
+} from "@providers/outlook/types";
 import {
   fetchRawMime,
   getAccessToken,
@@ -26,21 +31,6 @@ import {
   MS_SUBSCRIPTION_LIFETIME_MINUTES,
 } from "@/constants";
 import type { Env } from "@/types";
-
-interface GraphMessage {
-  id: string;
-  subject?: string;
-  parentFolderId?: string;
-  flag?: { flagStatus: string };
-}
-
-interface GraphMessageList {
-  value?: GraphMessage[];
-}
-
-interface GraphFolder {
-  id: string;
-}
 
 export class OutlookProvider extends EmailProvider {
   static oauth = EmailProvider.createOAuthHandler({

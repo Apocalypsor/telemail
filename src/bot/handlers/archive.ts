@@ -1,7 +1,7 @@
-import { getAccountById } from "@db/accounts";
-import { deleteMappingByEmailId, getMessageMapping } from "@db/message-map";
+import { resolveMessageAccount } from "@bot/utils/message-context";
+import { deleteMappingByEmailId } from "@db/message-map";
 import { t } from "@i18n";
-import { getEmailProvider } from "@providers";
+import { accountCanArchive, getEmailProvider } from "@providers";
 import { deleteMessage } from "@services/telegram";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Bot } from "grammy";
@@ -15,24 +15,14 @@ export function registerArchiveHandler(bot: Bot, env: Env) {
 
     try {
       const chatId = String(msg.chat.id);
-      const mapping = await getMessageMapping(env.DB, chatId, msg.message_id);
-      if (!mapping) {
-        await ctx.answerCallbackQuery({
-          text: t("common:error.mappingNotFound"),
-        });
+      const resolved = await resolveMessageAccount(env, chatId, msg.message_id);
+      if (!resolved.ok) {
+        await ctx.answerCallbackQuery({ text: resolved.error });
         return;
       }
+      const { mapping, account } = resolved;
 
-      const account = await getAccountById(env.DB, mapping.account_id);
-      if (!account) {
-        await ctx.answerCallbackQuery({
-          text: t("common:error.accountNotFoundShort"),
-        });
-        return;
-      }
-
-      const provider = getEmailProvider(account, env);
-      if (!provider.canArchive()) {
+      if (!accountCanArchive(account)) {
         await ctx.answerCallbackQuery({
           text: t("archive:gmailUnconfigured"),
           show_alert: true,
@@ -40,6 +30,7 @@ export function registerArchiveHandler(bot: Bot, env: Env) {
         return;
       }
 
+      const provider = getEmailProvider(account, env);
       await provider.archiveMessage(mapping.email_message_id);
 
       await deleteMessage(env.TELEGRAM_BOT_TOKEN, chatId, msg.message_id).catch(

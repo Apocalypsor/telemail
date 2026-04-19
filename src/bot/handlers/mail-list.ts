@@ -359,8 +359,7 @@ export function registerMailListHandlers(bot: Bot, env: Env) {
       emptyText: t("mailList:junk.empty"),
       errorEvent: "bot.junk_query_failed",
     },
-    afterMappings: (mappings, account) =>
-      deleteJunkMappings(env, mappings, account),
+    afterMappings: (mappings, _account) => deleteJunkMappings(env, mappings),
     hideTgLinks: true,
     actionKeyboard: new InlineKeyboard().text(
       t("mailList:junk.deleteAll"),

@@ -80,12 +80,9 @@ export abstract class EmailProvider {
    * 将邮件归档（移出收件箱）。
    * Gmail 默认不支持（"归档"等同于丢进 All Mail），需要用户在账号设置里指定 archive_folder（label ID）才能启用。
    * Outlook 使用 well-known "archive" 文件夹；IMAP 使用 account.archive_folder 或 fallback "Archive"。
+   * 调用前用 `accountCanArchive(account)`（`@providers`）判断当前账号是否可归档。
    */
   abstract archiveMessage(messageId: string): Promise<void>;
-  /** 当前账号是否可执行归档（Gmail 未配置 archive_folder 时返回 false） */
-  canArchive(): boolean {
-    return true;
-  }
 
   /**
    * 获取原始 MIME 邮件内容。

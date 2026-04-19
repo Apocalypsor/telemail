@@ -3,6 +3,7 @@ import {
   accountDetailKeyboard,
   accountDetailText,
   formatUserName,
+  resolveOwnerName,
 } from "@bot/utils/formatters";
 import { clearBotState, getBotState, setBotState } from "@bot/utils/state";
 import {
@@ -178,15 +179,11 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
         text: t("common:error.accountNotFound"),
       });
 
-    let ownerName: string | undefined;
-    if (admin && account.telegram_user_id) {
-      const owner = await getUserByTelegramId(env.DB, account.telegram_user_id);
-      ownerName = owner?.username
-        ? `@${owner.username}`
-        : formatUserName(owner ?? { first_name: account.telegram_user_id });
-    } else if (admin) {
-      ownerName = "";
-    }
+    const ownerName = await resolveOwnerName(
+      env.DB,
+      admin,
+      account.telegram_user_id,
+    );
     await ctx.editMessageText(accountDetailText(account, ownerName), {
       reply_markup: accountDetailKeyboard(account),
     });
@@ -219,15 +216,11 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
       );
     }
 
-    let ownerName: string | undefined;
-    if (admin && account.telegram_user_id) {
-      const owner = await getUserByTelegramId(env.DB, account.telegram_user_id);
-      ownerName = owner?.username
-        ? `@${owner.username}`
-        : formatUserName(owner ?? { first_name: account.telegram_user_id });
-    } else if (admin) {
-      ownerName = "";
-    }
+    const ownerName = await resolveOwnerName(
+      env.DB,
+      admin,
+      account.telegram_user_id,
+    );
     const updated = { ...account, disabled: nowDisabled ? 1 : 0 };
     await ctx.editMessageText(accountDetailText(updated, ownerName), {
       reply_markup: accountDetailKeyboard(updated),
@@ -581,15 +574,11 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
     }
     await setArchiveFolder(env.DB, accountId, newId, newName);
 
-    let ownerName: string | undefined;
-    if (isAdmin(String(ctx.from.id), env) && account.telegram_user_id) {
-      const owner = await getUserByTelegramId(env.DB, account.telegram_user_id);
-      ownerName = owner?.username
-        ? `@${owner.username}`
-        : formatUserName(owner ?? { first_name: account.telegram_user_id });
-    } else if (isAdmin(String(ctx.from.id), env)) {
-      ownerName = "";
-    }
+    const ownerName = await resolveOwnerName(
+      env.DB,
+      isAdmin(String(ctx.from.id), env),
+      account.telegram_user_id,
+    );
     const updated = {
       ...account,
       archive_folder: newId,

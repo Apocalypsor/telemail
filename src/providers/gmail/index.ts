@@ -1,5 +1,14 @@
 import { getAccountsByEmail, getHistoryId, putHistoryId } from "@db/accounts";
 import { EmailProvider } from "@providers/base";
+import type {
+  FetchMailResult,
+  GmailHistoryResponse,
+  GmailMessage,
+  GmailMessageList,
+  GmailPayload,
+  GmailProfile,
+  GmailWatchResponse,
+} from "@providers/gmail/types";
 import { getAccessToken, gmailGet, gmailPost } from "@providers/gmail/utils";
 import { base64urlToArrayBuffer, base64urlToString } from "@utils/base64url";
 import { wrapPlainText } from "@utils/format";
@@ -10,51 +19,6 @@ import {
   GOOGLE_OAUTH_TOKEN_URL,
 } from "@/constants";
 import type { Env, MailMeta } from "@/types";
-
-interface GmailHeader {
-  name: string;
-  value: string;
-}
-
-interface GmailPayload {
-  mimeType?: string;
-  headers?: GmailHeader[];
-  body?: { data?: string; attachmentId?: string };
-  parts?: GmailPayload[];
-}
-
-interface GmailMessage {
-  id: string;
-  labelIds?: string[];
-  payload?: GmailPayload;
-}
-
-interface GmailMessageList {
-  messages?: { id: string }[];
-}
-
-interface GmailWatchResponse {
-  historyId?: string;
-  expiration?: string;
-}
-
-interface GmailHistoryResponse {
-  history?: {
-    messagesAdded?: { message: GmailMessage }[];
-  }[];
-  historyId?: string;
-  nextPageToken?: string;
-}
-
-interface GmailProfile {
-  historyId: string;
-}
-
-export interface FetchMailResult {
-  html: string;
-  cidMap: Map<string, string>;
-  meta: MailMeta;
-}
 
 export class GmailProvider extends EmailProvider {
   static oauth = EmailProvider.createOAuthHandler({
@@ -406,10 +370,6 @@ export class GmailProvider extends EmailProvider {
       },
     );
     return messageId;
-  }
-
-  canArchive(): boolean {
-    return !!this.account.archive_folder;
   }
 
   async archiveMessage(messageId: string) {
