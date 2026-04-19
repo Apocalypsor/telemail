@@ -19,7 +19,11 @@ import {
   ROUTE_PREVIEW,
   ROUTE_PREVIEW_API,
 } from "@handlers/hono/routes";
-import { type GmailProvider, getEmailProvider } from "@providers";
+import {
+  accountCanArchive,
+  type GmailProvider,
+  getEmailProvider,
+} from "@providers";
 import { deliverEmailToTelegram } from "@services/bridge";
 import { analyzeEmail } from "@services/llm";
 import {
@@ -401,6 +405,7 @@ preview.post(ROUTE_MAIL_TOGGLE_STAR, async (c) => {
         messageId,
         account.id,
         body.starred,
+        accountCanArchive(account),
       );
       await setReplyMarkup(
         c.env.TELEGRAM_BOT_TOKEN,

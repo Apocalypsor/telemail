@@ -5,7 +5,7 @@ import {
   getMessageMapping,
   type MessageMapping,
 } from "@db/message-map";
-import { getEmailProvider } from "@providers";
+import { accountCanArchive, getEmailProvider } from "@providers";
 import { deleteMessage, setReplyMarkup } from "@services/telegram";
 import { reportErrorToObservability } from "@utils/observability";
 import type { InlineKeyboard } from "grammy";
@@ -40,6 +40,7 @@ export async function toggleStar(
     mapping.email_message_id,
     account.id,
     starred,
+    accountCanArchive(account),
   );
   return { ok: true, keyboard, emailMessageId: mapping.email_message_id };
 }
@@ -156,6 +157,7 @@ export async function syncStarButtonsForMappings(
   mappings: MessageMapping[],
   account: Account,
 ): Promise<void> {
+  const canArchive = accountCanArchive(account);
   for (const m of mappings) {
     try {
       const keyboard = await buildEmailKeyboard(
@@ -163,6 +165,7 @@ export async function syncStarButtonsForMappings(
         m.email_message_id,
         account.id,
         true,
+        canArchive,
       );
       await setReplyMarkup(
         env.TELEGRAM_BOT_TOKEN,

@@ -12,7 +12,7 @@ import {
   updateShortSummary,
 } from "@db/message-map";
 import { t } from "@i18n";
-import { getEmailProvider } from "@providers";
+import { accountCanArchive, getEmailProvider } from "@providers";
 import { analyzeEmail, type EmailAnalysis } from "@services/llm";
 import {
   deleteMessage,
@@ -189,7 +189,13 @@ export async function deliverEmailToTelegram(
 
   const hasLlm = !!(env.LLM_API_URL && env.LLM_API_KEY && env.LLM_MODEL);
 
-  const keyboard = await buildEmailKeyboard(env, messageId, account.id, false);
+  const keyboard = await buildEmailKeyboard(
+    env,
+    messageId,
+    account.id,
+    false,
+    accountCanArchive(account),
+  );
 
   let sentMessageId: number;
   if (hasAttachments) {

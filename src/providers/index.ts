@@ -34,6 +34,15 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
   return new PROVIDERS[account.type](account, env);
 }
 
+/**
+ * 根据 account 判断能否执行归档（不需要实例化 provider 就能问）。
+ * 目前只有 Gmail 需要用户先选 archive label。
+ */
+export function accountCanArchive(account: Account): boolean {
+  if (account.type === AccountType.Gmail) return !!account.archive_folder;
+  return true;
+}
+
 /** 拿到某 provider 的 OAuth handler，不支持 OAuth（IMAP）→ 抛错 */
 export function oauthOf(type: AccountType): OAuthHandler {
   const oauth = PROVIDERS[type].oauth;
