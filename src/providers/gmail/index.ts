@@ -1,4 +1,5 @@
 import { getAccountsByEmail, getHistoryId, putHistoryId } from "@db/accounts";
+import { requireSecret } from "@handlers/hono/middleware";
 import { EmailProvider } from "@providers/base";
 import type {
   GmailHistoryResponse,
@@ -12,17 +13,20 @@ import { getAccessToken, gmailGet, gmailPost } from "@providers/gmail/utils";
 import type { PreviewContent } from "@providers/types";
 import { base64urlToArrayBuffer, base64urlToString } from "@utils/base64url";
 import { wrapPlainText } from "@utils/format";
+import type { Hono } from "hono";
 import { HTTPError } from "ky";
 import {
   GMAIL_MODIFY_SCOPE,
   GOOGLE_OAUTH_AUTHORIZE_URL,
   GOOGLE_OAUTH_TOKEN_URL,
 } from "@/constants";
-import type { Account, Env, MailMeta } from "@/types";
+import type { Account, AppEnv, Env, MailMeta, PubSubPushBody } from "@/types";
 
 export class GmailProvider extends EmailProvider {
   static displayName = "Gmail";
   static needsArchiveSetup = true;
+  /** Google Cloud Pub/Sub 推送邮件事件的 HTTP 路径 */
+  private static readonly ROUTE_PUSH = "/api/gmail/push";
 
   static canArchive(account: Account): boolean {
     return !!account.archive_folder;
@@ -58,6 +62,21 @@ export class GmailProvider extends EmailProvider {
 
   private async token(): Promise<string> {
     return getAccessToken(this.env, this.account);
+  }
+
+  // ─── HTTP routes ──────────────────────────────────────────────────────
+
+  /** 注册 Gmail 相关的 HTTP 路由：Pub/Sub push webhook */
+  static registerRoutes(app: Hono<AppEnv>): void {
+    app.post(
+      GmailProvider.ROUTE_PUSH,
+      requireSecret("GMAIL_PUSH_SECRET"),
+      async (c) => {
+        const body = await c.req.json<PubSubPushBody>();
+        await GmailProvider.enqueue(body, c.env);
+        return c.text("OK");
+      },
+    );
   }
 
   // ─── Enqueue ──────────────────────────────────────────────────────────

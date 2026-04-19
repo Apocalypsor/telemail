@@ -1,15 +1,9 @@
 // ── API routes (POST / webhooks) ─────────────────────────────────────────────
+// Provider-specific push / bridge routes 定义在各自的 provider 文件里（见
+// `providers/gmail/index.ts` 等）—— 外部（如 Pub/Sub、MS Graph、IMAP bridge）用的是硬编码 URL。
 export const ROUTE_TELEGRAM_WEBHOOK = "/api/telegram/webhook";
-export const ROUTE_GMAIL_PUSH = "/api/gmail/push";
 export const ROUTE_PREVIEW_API = "/api/preview";
 export const ROUTE_CORS_PROXY = "/api/cors-proxy";
-
-// ── IMAP bridge routes ────────────────────────────────────────────────────────
-export const ROUTE_IMAP_ACCOUNTS = "/api/imap/accounts";
-export const ROUTE_IMAP_PUSH = "/api/imap/push";
-
-// ── Outlook / Microsoft Graph routes ─────────────────────────────────────────
-export const ROUTE_OUTLOOK_PUSH = "/api/outlook/push";
 
 // ── Auth routes ──────────────────────────────────────────────────────────────
 export const ROUTE_LOGIN = "/login";

@@ -1,10 +1,12 @@
-import { getAccountById } from "@db/accounts";
+import { getAccountById, getImapAccounts } from "@db/accounts";
+import { requireBearer } from "@handlers/hono/middleware";
 import { EmailProvider } from "@providers/base";
 import { callBridge, syncAccounts } from "@providers/imap/utils";
 import type { EmailListItem } from "@providers/types";
 import { base64ToArrayBuffer } from "@utils/base64url";
+import type { Hono } from "hono";
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@/constants";
-import type { Env } from "@/types";
+import type { AppEnv, Env } from "@/types";
 
 export {
   checkImapBridgeHealth,
@@ -13,11 +15,46 @@ export {
 
 export class ImapProvider extends EmailProvider {
   static displayName = "IMAP";
+  /** IMAP bridge 拉账号列表的 HTTP 路径 */
+  private static readonly ROUTE_ACCOUNTS = "/api/imap/accounts";
+  /** IMAP bridge 推送新邮件通知的 HTTP 路径 */
+  private static readonly ROUTE_PUSH = "/api/imap/push";
 
   /** 账号状态变化后立即通知 bridge reconcile（不等下次 sync） */
   async onPersistedChange() {
     if (!this.env.IMAP_BRIDGE_URL || !this.env.IMAP_BRIDGE_SECRET) return;
     await syncAccounts(this.env);
+  }
+
+  // ─── HTTP routes ──────────────────────────────────────────────────────
+
+  /**
+   * 注册 IMAP bridge 用到的路由：
+   *  - `GET  /api/imap/accounts` — bridge 定期拉取 IMAP 账号列表
+   *  - `POST /api/imap/push`     — bridge 检测到新邮件时通知 worker
+   */
+  static registerRoutes(app: Hono<AppEnv>): void {
+    const auth = requireBearer("IMAP_BRIDGE_SECRET");
+    app.get(ImapProvider.ROUTE_ACCOUNTS, auth, async (c) => {
+      const accounts = await getImapAccounts(c.env.DB);
+      return c.json(
+        accounts.map((acc) => ({
+          id: acc.id,
+          email: acc.email,
+          chat_id: acc.chat_id,
+          imap_host: acc.imap_host,
+          imap_port: acc.imap_port,
+          imap_secure: !!acc.imap_secure,
+          imap_user: acc.imap_user,
+          imap_pass: acc.imap_pass,
+        })),
+      );
+    });
+    app.post(ImapProvider.ROUTE_PUSH, auth, async (c) => {
+      const body = await c.req.json();
+      await ImapProvider.enqueue(body, c.env);
+      return c.text("OK");
+    });
   }
 
   // ─── Enqueue ──────────────────────────────────────────────────────────

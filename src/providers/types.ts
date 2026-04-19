@@ -1,7 +1,8 @@
 /** Provider 层对外公开的类型定义（接口 / 纯数据形状） */
 
 import type { EmailProvider } from "@providers/base";
-import type { Account, Env, MailMeta } from "@/types";
+import type { Hono } from "hono";
+import type { Account, AppEnv, Env, MailMeta } from "@/types";
 
 /** 列表类 API 返回的最简邮件条目 */
 export interface EmailListItem {
@@ -86,4 +87,9 @@ export interface EmailProviderClass {
   canArchive(account: Account): boolean;
   /** 账号详情页是否显示"归档标签"入口（Gmail 需要，其他自动） */
   needsArchiveSetup: boolean;
+  /**
+   * 注册 provider 自己需要的 HTTP 路由（push webhook、bridge 用的 accounts 列表等）。
+   * 由 `handlers/hono/push.ts` 遍历 PROVIDERS 调用；没有 HTTP 面的 provider 可以不实现。
+   */
+  registerRoutes?(app: Hono<AppEnv>): void;
 }

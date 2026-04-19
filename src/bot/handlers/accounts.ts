@@ -34,7 +34,7 @@ async function resolveAccount(env: Env, fromId: number, accountIdStr: string) {
   return { userId, accountId, admin, account };
 }
 
-export function accountListKeyboard(
+function accountListKeyboard(
   accounts: Account[],
   options?: { isAdmin?: boolean; showAll?: boolean; showBack?: boolean },
 ): InlineKeyboard {

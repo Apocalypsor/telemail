@@ -1,10 +1,8 @@
 import { FAVICON_BASE64 } from "@assets/favicon";
 import auth from "@handlers/hono/auth";
-import gmailPush from "@handlers/hono/email/gmail/push";
-import imapRoutes from "@handlers/hono/email/imap/index";
-import oauth from "@handlers/hono/email/oauth";
-import outlookPush from "@handlers/hono/email/outlook/push";
+import oauth from "@handlers/hono/oauth";
 import preview from "@handlers/hono/preview";
+import push from "@handlers/hono/push";
 import telegram from "@handlers/hono/telegram";
 import { reportErrorToObservability } from "@utils/observability";
 import { Hono } from "hono";
@@ -35,10 +33,8 @@ app.onError(async (error, c) => {
 // ─── Mount sub-routers ──────────────────────────────────────────────────────
 app.route("", auth);
 app.route("", telegram);
-app.route("", gmailPush);
-app.route("", outlookPush);
+app.route("", push);
 app.route("", oauth);
-app.route("", imapRoutes);
 app.route("", preview);
 
 export default app;

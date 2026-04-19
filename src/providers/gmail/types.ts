@@ -1,4 +1,4 @@
-export interface GmailHeader {
+interface GmailHeader {
   name: string;
   value: string;
 }

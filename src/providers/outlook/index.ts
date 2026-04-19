@@ -19,8 +19,10 @@ import {
   graphPatch,
   graphPost,
 } from "@providers/outlook/utils";
+import { timingSafeEqual } from "@utils/hash";
 import { http } from "@utils/http";
 import { reportErrorToObservability } from "@utils/observability";
+import type { Hono } from "hono";
 import { HTTPError } from "ky";
 import {
   MS_GRAPH_API,
@@ -30,10 +32,12 @@ import {
   MS_OAUTH_TOKEN_URL,
   MS_SUBSCRIPTION_LIFETIME_MINUTES,
 } from "@/constants";
-import type { Env } from "@/types";
+import type { AppEnv, Env } from "@/types";
 
 export class OutlookProvider extends EmailProvider {
   static displayName = "Outlook";
+  /** Microsoft Graph webhook 推送变更通知的 HTTP 路径 */
+  private static readonly ROUTE_PUSH = "/api/outlook/push";
 
   static oauth = EmailProvider.createOAuthHandler({
     name: "Microsoft",
@@ -63,6 +67,32 @@ export class OutlookProvider extends EmailProvider {
 
   private async token(): Promise<string> {
     return getAccessToken(this.env, this.account);
+  }
+
+  // ─── HTTP routes ──────────────────────────────────────────────────────
+
+  /** Outlook 的 Graph webhook：先处理 subscription validation 握手，再校验 secret */
+  static registerRoutes(app: Hono<AppEnv>): void {
+    app.post(OutlookProvider.ROUTE_PUSH, async (c) => {
+      // Graph subscription validation handshake —— 必须早于鉴权
+      const validationToken = c.req.query("validationToken");
+      if (validationToken) {
+        return c.text(validationToken, 200, { "Content-Type": "text/plain" });
+      }
+
+      const provided = c.req.query("secret");
+      if (
+        !provided ||
+        !c.env.MS_WEBHOOK_SECRET ||
+        !timingSafeEqual(provided, c.env.MS_WEBHOOK_SECRET)
+      ) {
+        return c.text("Forbidden", 403);
+      }
+
+      const body = await c.req.json();
+      await OutlookProvider.enqueue(body, c.env);
+      return c.text("OK");
+    });
   }
 
   // ─── Enqueue ──────────────────────────────────────────────────────────
@@ -129,7 +159,7 @@ export class OutlookProvider extends EmailProvider {
     }
     const token = await this.token();
     const workerUrl = this.env.WORKER_URL?.replace(/\/$/, "") || "";
-    const notificationUrl = `${workerUrl}/api/outlook/push?secret=${this.env.MS_WEBHOOK_SECRET}`;
+    const notificationUrl = `${workerUrl}${OutlookProvider.ROUTE_PUSH}?secret=${this.env.MS_WEBHOOK_SECRET}`;
 
     const expiration = new Date(
       Date.now() + MS_SUBSCRIPTION_LIFETIME_MINUTES * 60 * 1000,

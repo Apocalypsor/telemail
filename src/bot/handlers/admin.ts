@@ -23,7 +23,7 @@ import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 import type { Env, TelegramUser } from "@/types";
 
-export function userListKeyboard(
+function userListKeyboard(
   users: TelegramUser[],
   opts?: { showBack?: boolean },
 ): InlineKeyboard {

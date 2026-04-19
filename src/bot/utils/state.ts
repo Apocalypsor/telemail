@@ -6,7 +6,7 @@ function botStateKey(userId: string): string {
   return `bot_state:${userId}`;
 }
 
-export type BotInputState =
+type BotInputState =
   | { action: "add"; step: "chat_id" }
   | { action: "add"; step: "type"; chatId: string }
   | { action: "add_imap"; step: "host"; chatId: string }

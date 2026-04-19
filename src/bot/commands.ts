@@ -7,7 +7,7 @@ import type { Env } from "@/types";
 // 修改此列表后更新 BOT_COMMANDS_VERSION，会自动同步到 Telegram
 const BOT_COMMANDS_VERSION = 7;
 
-export const BOT_COMMANDS: BotCommand[] = [
+const BOT_COMMANDS: BotCommand[] = [
   { command: "start", description: t("commands:start") },
   { command: "help", description: t("commands:help") },
   { command: "accounts", description: t("commands:accounts") },

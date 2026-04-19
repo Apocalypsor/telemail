@@ -52,7 +52,7 @@ function kvMailHtmlKey(messageId: string): string {
   return `mail_html:${messageId}`;
 }
 
-export interface CachedMailData {
+interface CachedMailData {
   html: string;
   meta?: MailMeta;
 }
@@ -114,7 +114,7 @@ export async function deleteOAuthState(
 
 // ─── OAuth Bot Message (回写 Bot 消息位置) ──────────────────────────────────
 
-export interface OAuthBotMsg {
+interface OAuthBotMsg {
   chatId: string;
   messageId: number;
 }

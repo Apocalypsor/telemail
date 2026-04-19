@@ -3,7 +3,7 @@ import type { EmailProvider } from "@providers/base";
 import { GmailProvider } from "@providers/gmail";
 import { ImapProvider } from "@providers/imap";
 import { OutlookProvider } from "@providers/outlook";
-import type { EmailProviderClass, OAuthHandler } from "@providers/types";
+import type { EmailProviderClass } from "@providers/types";
 import { type Account, AccountType, type Env } from "@/types";
 
 export { EmailProvider } from "@providers/base";
@@ -41,13 +41,6 @@ export function getEmailProvider(account: Account, env: Env): EmailProvider {
  */
 export function accountCanArchive(account: Account): boolean {
   return PROVIDERS[account.type].canArchive(account);
-}
-
-/** 拿到某 provider 的 OAuth handler，不支持 OAuth（IMAP）→ 抛错 */
-export function oauthOf(type: AccountType): OAuthHandler {
-  const oauth = PROVIDERS[type].oauth;
-  if (!oauth) throw new Error(`${type} does not support OAuth`);
-  return oauth;
 }
 
 /** 为所有已授权且未禁用的账号续订推送通知 */

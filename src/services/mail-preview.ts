@@ -6,7 +6,7 @@ import type { Attachment } from "postal-mime";
 // ─── CID 内联图片 ────────────────────────────────────────────────────────────
 
 /** CID → data URI 映射 */
-export type CidMap = Map<string, string>;
+type CidMap = Map<string, string>;
 
 /** 将 HTML 中的 cid:xxx 引用替换为 data URI */
 export function replaceCidReferences(html: string, cidMap: CidMap): string {
@@ -37,7 +37,7 @@ export function buildCidMapFromAttachments(attachments: Attachment[]): CidMap {
 // ─── CORS 代理签名 ───────────────────────────────────────────────────────────
 
 /** 为 CORS 代理 URL 生成 HMAC-SHA256 签名（同步） */
-export function signProxyUrl(secret: string, url: string): string {
+function signProxyUrl(secret: string, url: string): string {
   return createHmac("sha256", secret).update(url).digest("hex").slice(0, 32);
 }
 
@@ -133,7 +133,7 @@ async function hmacHex(secret: string, data: string): Promise<string> {
 }
 
 /** 生成邮件查看链接的 HMAC-SHA256 token（旧格式：email + chatId） */
-export async function generateMailToken(
+async function generateMailToken(
   secret: string,
   messageId: string,
   accountEmail: string,
