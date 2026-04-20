@@ -2,11 +2,15 @@ import { getCachedBotInfo } from "@db/kv";
 import { countPendingRemindersForEmail } from "@db/reminders";
 import {
   ROUTE_MINI_APP_LIST,
-  ROUTE_MINI_APP_MAIL,
   ROUTE_MINI_APP_REMINDERS,
 } from "@handlers/hono/routes";
 import { t } from "@i18n";
-import { generateMailTokenById } from "@services/mail-preview";
+import {
+  buildMiniAppMailUrl,
+  buildMiniAppRemindersUrl,
+  buildWebMailUrl,
+  generateMailTokenById,
+} from "@services/mail-preview";
 import { InlineKeyboard } from "grammy";
 import type { Env } from "@/types";
 
@@ -92,46 +96,46 @@ export async function buildEmailKeyboard(
   const kb = addCoreButtons(new InlineKeyboard(), starred, canArchive);
   if (!env.WORKER_URL) return kb;
 
-  const base = env.WORKER_URL.replace(/\/$/, "");
+  const base = env.WORKER_URL;
   const [mailToken, reminderCount] = await Promise.all([
     generateMailTokenById(env.ADMIN_SECRET, emailMessageId, accountId),
     // ⏰ label 实时反映该邮件的 pending 提醒数（"⏰" 或 "⏰ (2)"）。
     countPendingRemindersForEmail(env.DB, accountId, emailMessageId),
   ]);
   const remindBtn = remindLabel(reminderCount);
-  // 私聊：直接用 Mini App URL（web_app inline button 仅私聊有效）
-  // 群聊：用 t.me/<bot>/<shortname>?startapp=<feature>_<chat>_<msg> deep link
-  const isPrivateChat = !chatId.startsWith("-");
-  const remindMiniUrl = `${base}${ROUTE_MINI_APP_REMINDERS}?accountId=${accountId}&messageId=${encodeURIComponent(emailMessageId)}&token=${mailToken}`;
-  const mailMiniUrl = `${base}${ROUTE_MINI_APP_MAIL.replace(":id", encodeURIComponent(emailMessageId))}?accountId=${accountId}&t=${mailToken}`;
+  const viewLabel = t("keyboards:mail.viewOriginal");
 
-  if (isPrivateChat) {
+  // 私聊：直接用 Mini App URL（web_app inline button 仅私聊有效）
+  if (!chatId.startsWith("-")) {
     kb.row()
-      .webApp(remindBtn, remindMiniUrl)
-      .webApp(t("keyboards:mail.viewOriginal"), mailMiniUrl);
+      .webApp(
+        remindBtn,
+        buildMiniAppRemindersUrl(base, emailMessageId, accountId, mailToken),
+      )
+      .webApp(
+        viewLabel,
+        buildMiniAppMailUrl(base, emailMessageId, accountId, mailToken),
+      );
     return kb;
   }
 
-  // 群聊：要走 BotFather 注册的具名 Mini App
+  // 群聊：web_app inline button 在群里无效（BUTTON_TYPE_INVALID），改用
+  // `t.me/<bot>/<shortname>?startapp=<feature>_<chat>_<msg>` deep link
+  // 跳到与 bot 的私聊里打开 Mini App。
+  // tgMessageId 在投递初次构建时还没分配，那种情况下退回到 web 预览链接。
   const shortName = env.TG_MINI_APP_SHORT_NAME;
-  if (tgMessageId != null && shortName) {
-    const username = await getCachedBotUsername(env);
-    if (username) {
-      // start_param: <feature>_<chatId>_<tgMsgId>，~20 字符，远低于 64 上限
-      const remindParam = `r_${chatId}_${tgMessageId}`;
-      const mailParam = `m_${chatId}_${tgMessageId}`;
-      const remindUrl = `https://t.me/${username}/${shortName}?startapp=${remindParam}`;
-      const mailDeepUrl = `https://t.me/${username}/${shortName}?startapp=${mailParam}`;
-      kb.row()
-        .url(remindBtn, remindUrl)
-        .url(t("keyboards:mail.viewOriginal"), mailDeepUrl);
-      return kb;
-    }
+  const username =
+    tgMessageId != null && shortName ? await getCachedBotUsername(env) : null;
+  if (tgMessageId != null && shortName && username) {
+    const deepLink = (feature: "r" | "m") =>
+      `https://t.me/${username}/${shortName}?startapp=${feature}_${chatId}_${tgMessageId}`;
+    kb.row().url(remindBtn, deepLink("r")).url(viewLabel, deepLink("m"));
+    return kb;
   }
-  // 群聊但 tgMessageId 未知 / 没缓存到 bot username / 没配 short_name：
-  // 退回到 web 预览链接（浏览器打开），不放 ⏰
-  const webMailUrl = `${base}/mail/${emailMessageId}?accountId=${accountId}&t=${mailToken}`;
-  kb.row().url(t("keyboards:mail.viewOriginal"), webMailUrl);
+  kb.row().url(
+    viewLabel,
+    buildWebMailUrl(base, emailMessageId, accountId, mailToken),
+  );
   return kb;
 }
 

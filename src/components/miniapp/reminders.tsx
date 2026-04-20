@@ -1,32 +1,11 @@
+import { MINIAPP_BASE_CSS } from "@components/miniapp/styles";
 import {
   ROUTE_MINI_APP_MAIL,
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
 } from "@handlers/hono/routes";
 
-const REMINDERS_CSS = `
-:root {
-  color-scheme: light dark;
-  --bg: var(--tg-theme-bg-color, #0f172a);
-  --surface: var(--tg-theme-secondary-bg-color, #1e293b);
-  --text: var(--tg-theme-text-color, #e2e8f0);
-  --hint: var(--tg-theme-hint-color, #94a3b8);
-  --button: var(--tg-theme-button-color, #3b82f6);
-  --button-text: var(--tg-theme-button-text-color, #ffffff);
-  --link: var(--tg-theme-link-color, #60a5fa);
-  --danger: #ef4444;
-  --border: rgba(127,127,127,.18);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 15px;
-  line-height: 1.5;
-  -webkit-tap-highlight-color: transparent;
-}
+const REMINDERS_CSS = `${MINIAPP_BASE_CSS}
 .wrap { max-width: 560px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 20px; font-weight: 600; margin: 4px 0 16px; }
 .section { background: var(--surface); border-radius: 14px; padding: 14px; margin-bottom: 14px; }

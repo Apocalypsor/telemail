@@ -4,9 +4,11 @@ import {
   markReminderSent,
   type Reminder,
 } from "@db/reminders";
-import { ROUTE_MINI_APP_MAIL } from "@handlers/hono/routes";
 import { t } from "@i18n";
-import { generateMailTokenById } from "@services/mail-preview";
+import {
+  buildMiniAppMailUrl,
+  generateMailTokenById,
+} from "@services/mail-preview";
 import { refreshEmailKeyboardAfterReminderChange } from "@services/message-actions";
 import { sendTextMessage } from "@services/telegram";
 import { escapeMdV2 } from "@utils/markdown-v2";
@@ -117,14 +119,14 @@ async function sendEmailReminder(env: Env, r: Reminder): Promise<void> {
       emailMessageId,
       accountId,
     );
-    const miniAppMailUrl =
-      `${env.WORKER_URL.replace(/\/$/, "")}` +
-      ROUTE_MINI_APP_MAIL.replace(":id", encodeURIComponent(emailMessageId)) +
-      `?accountId=${accountId}&t=${encodeURIComponent(token)}`;
+    const url = buildMiniAppMailUrl(
+      env.WORKER_URL,
+      emailMessageId,
+      accountId,
+      token,
+    );
     replyMarkup = {
-      inline_keyboard: [
-        [{ text: t("reminders:viewMail"), web_app: { url: miniAppMailUrl } }],
-      ],
+      inline_keyboard: [[{ text: t("reminders:viewMail"), web_app: { url } }]],
     };
   }
 

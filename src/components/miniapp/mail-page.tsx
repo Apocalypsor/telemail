@@ -1,4 +1,5 @@
 import { theme } from "@assets/theme";
+import { MINIAPP_BASE_CSS } from "@components/miniapp/styles";
 import type { Child } from "hono/jsx";
 import type { MailMeta } from "@/types";
 
@@ -19,17 +20,8 @@ interface MailPageProps {
   children: Child;
 }
 
-const PAGE_CSS = `
-:root {
-  color-scheme: light dark;
-  --bg: var(--tg-theme-bg-color, #0f172a);
-  --surface: var(--tg-theme-secondary-bg-color, #1e293b);
-  --text: var(--tg-theme-text-color, #e2e8f0);
-  --hint: var(--tg-theme-hint-color, #94a3b8);
-  --separator: var(--tg-theme-section-separator-color, rgba(127,127,127,.2));
-}
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+const PAGE_CSS = `${MINIAPP_BASE_CSS}
+html { padding: 0; }
 .mail-meta {
   background: var(--surface);
   border-bottom: 1px solid var(--separator);

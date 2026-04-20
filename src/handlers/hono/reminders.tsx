@@ -33,9 +33,9 @@ import {
 import { accountCanArchive, getEmailProvider, PROVIDERS } from "@providers";
 import { getMailList, isMailListType } from "@services/mail-list";
 import {
+  buildWebMailUrl,
   generateMailTokenById,
-  proxyImages,
-  replaceCidReferences,
+  loadMailForPreview,
   verifyMailTokenById,
 } from "@services/mail-preview";
 import { refreshEmailKeyboardAfterReminderChange } from "@services/message-actions";
@@ -52,11 +52,9 @@ import type { AppEnv } from "@/types";
 
 const reminders = new Hono<AppEnv>();
 
-/**
- * 校验 Mini App 调用：从 X-Telegram-Init-Data 头读取 initData，验签后取 user.id；
- * 还需确保该 telegram 用户已被审批（与 requireTelegramLogin 同口径），否则拒绝。
- */
-async function authMiniApp(c: Context<AppEnv>): Promise<string | null> {
+/** 校验 Mini App 调用：X-Telegram-Init-Data 头验签 + users.approved 检查。
+ *  通过则把 telegram_user_id 放进 c.var.userId（同 requireTelegramLogin 接口）。 */
+async function authenticateMiniApp(c: Context<AppEnv>): Promise<string | null> {
   const initData = c.req.header("x-telegram-init-data");
   if (!initData) return null;
   const tgUser = await verifyTgInitData(c.env.TELEGRAM_BOT_TOKEN, initData);
@@ -66,6 +64,19 @@ async function authMiniApp(c: Context<AppEnv>): Promise<string | null> {
   const dbUser = await getUserByTelegramId(c.env.DB, telegramId);
   if (!dbUser || dbUser.approved !== 1) return null;
   return telegramId;
+}
+
+/** 中间件：所有 Mini App API 路由共享。auth 失败返回 401；通过则把 userId
+ *  写到 c.var.userId，handler 用 `c.get("userId")` 取（非 null）。 */
+async function requireMiniAppAuth(
+  c: Context<AppEnv>,
+  next: () => Promise<void>,
+) {
+  const userId = await authenticateMiniApp(c);
+  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  c.set("userId", userId);
+  c.set("isAdmin", userId === c.env.ADMIN_TELEGRAM_ID);
+  await next();
 }
 
 /**
@@ -175,12 +186,20 @@ async function lookupEmailContext(
 }
 
 // ─── Mini App 页面 ──────────────────────────────────────────────────────────
-// 鉴权放在 API 层（initData 校验）/ token 校验（mail 页），页面本身可裸开
-// —— Mini App 在 TG WebView 里没 cookie，无法套 requireTelegramLogin。
+// 鉴权策略：
+//  - 页面路由（/telegram-app/*）裸开，因为 Mini App 在 TG WebView 里没 cookie，
+//    无法套 requireTelegramLogin。Mail 页内部走 token 校验；其它页 JS 调 API
+//    时再校验。
+//  - 所有 API（/api/reminders/*, /api/mini-app/*）走 requireMiniAppAuth 中间
+//    件，统一在 c.var.userId 里给到鉴权用户。
 //
 // /telegram-app          → 路由页（仅群聊 deep link 会落到这里）
 // /telegram-app/reminders → 提醒设置（私聊 web_app 直接来；群聊 r_ 经路由跳来）
 // /telegram-app/mail/:id  → 邮件预览（私聊 web_app 直接来；群聊 m_ 经路由跳来）
+
+reminders.use("/api/reminders/*", requireMiniAppAuth);
+reminders.use(ROUTE_REMINDERS_API, requireMiniAppAuth);
+reminders.use("/api/mini-app/*", requireMiniAppAuth);
 
 reminders.get(ROUTE_MINI_APP, (c) => c.html(<MiniAppRouterPage />));
 
@@ -196,8 +215,7 @@ reminders.get(ROUTE_MINI_APP_LIST, (c) => {
 // 默认每次都拉新数据（保守，bot/refresh 等场景）；?cache=true 时优先 KV（60s TTL，
 // Mini App 默认调用带这个 flag，强制刷新按钮去掉）。
 reminders.get(ROUTE_MINI_APP_API_LIST, async (c) => {
-  const userId = await authMiniApp(c);
-  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  const userId = c.get("userId");
   const type = c.req.param("type");
   if (!isMailListType(type)) return c.json({ error: "Unknown list type" }, 400);
 
@@ -228,8 +246,7 @@ reminders.get(ROUTE_MINI_APP_API_LIST, async (c) => {
 });
 
 reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
-  // 复用 mail-preview 的 token 鉴权 —— 与 /mail/:id 完全同一套，区别只在最终
-  // 渲染用 MiniAppMailPage（带 telegram-web-app SDK + TG 主题色）。
+  // Token 鉴权（与 /mail/:id 同一套），渲染换 MiniAppMailPage（TG 主题色 + SDK）
   const messageId = c.req.param("id");
   const token = c.req.query("t");
   const accountIdParam = c.req.query("accountId");
@@ -238,34 +255,36 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
   const accountId = Number(accountIdParam);
   if (!Number.isInteger(accountId) || accountId <= 0)
     return c.text("Invalid accountId", 400);
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    messageId,
-    accountId,
-    token,
-  );
-  if (!valid) return c.text("Forbidden", 403);
+  if (
+    !(await verifyMailTokenById(
+      c.env.ADMIN_SECRET,
+      messageId,
+      accountId,
+      token,
+    ))
+  )
+    return c.text("Forbidden", 403);
   const account = await getAccountById(c.env.DB, accountId);
   if (!account) return c.text("Account not found", 404);
 
-  const provider = getEmailProvider(account, c.env);
-  const [inJunk, starred] = await Promise.all([
-    provider.isJunk(messageId).catch(() => false),
-    provider.isStarred(messageId).catch(() => false),
-  ]);
-  const folderParam = c.req.query("folder");
-  const fetchFolder: "inbox" | "junk" | "archive" =
-    folderParam === "archive"
-      ? "archive"
-      : folderParam === "junk" || inJunk
-        ? "junk"
-        : "inbox";
+  const result = await loadMailForPreview(
+    c.env,
+    account,
+    messageId,
+    c.req.query("folder"),
+  );
+  if (!result.ok) return c.text(result.reason, result.status);
 
-  // 浏览器打开按钮的目标：现有的 web 版 /mail/:id，保留 folder 参数
-  const folderQs = fetchFolder !== "inbox" ? `&folder=${fetchFolder}` : "";
-  const webMailUrl = `${(c.env.WORKER_URL ?? "").replace(/\/$/, "")}/mail/${encodeURIComponent(messageId)}?accountId=${account.id}&t=${encodeURIComponent(token)}${folderQs}`;
-
-  // 跳回 TG 原消息：有 mapping 才放（垃圾/归档列表 mapping 通常已被清掉）
+  // Mini app 专属：浏览器打开按钮 + TG 原消息跳转链接
+  const webMailUrl = c.env.WORKER_URL
+    ? buildWebMailUrl(
+        c.env.WORKER_URL,
+        messageId,
+        account.id,
+        token,
+        result.fetchFolder !== "inbox" ? result.fetchFolder : undefined,
+      )
+    : "";
   const mailMappings = await getMappingsByEmailIds(c.env.DB, account.id, [
     messageId,
   ]);
@@ -274,46 +293,21 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
     ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
     : undefined;
 
-  const pageProps = {
-    messageId,
-    accountId: account.id,
-    token,
-    inJunk,
-    inArchive: fetchFolder === "archive",
-    starred,
-    canArchive: accountCanArchive(account),
-    accountEmail: account.email,
-    webMailUrl,
-    tgMessageLink,
-  };
-
-  const cached = await getCachedMailData(
-    c.env.EMAIL_KV,
-    account.id,
-    fetchFolder,
-    messageId,
-  );
-  if (cached) {
-    const proxied = await proxyImages(cached.html, c.env.ADMIN_SECRET);
-    return c.html(
-      <MiniAppMailPage meta={cached.meta ?? {}} {...pageProps}>
-        {raw(proxied)}
-      </MiniAppMailPage>,
-    );
-  }
-  if (PROVIDERS[account.type].oauth && !account.refresh_token)
-    return c.text("Account not authorized", 403);
-  const result = await provider.fetchForPreview(messageId, fetchFolder);
-  if (!result) return c.text("No content in this email", 404);
-  const html = replaceCidReferences(result.html, result.cidMap);
-  await putCachedMailData(c.env.EMAIL_KV, account.id, fetchFolder, messageId, {
-    html,
-    meta: result.meta,
-  });
-  const proxied = await proxyImages(html, c.env.ADMIN_SECRET);
   return c.html(
-    <MiniAppMailPage meta={result.meta} {...pageProps}>
-      {raw(proxied)}
+    <MiniAppMailPage
+      meta={result.meta}
+      messageId={messageId}
+      accountId={account.id}
+      token={token}
+      inJunk={result.inJunk}
+      inArchive={result.fetchFolder === "archive"}
+      starred={result.starred}
+      canArchive={accountCanArchive(account)}
+      accountEmail={account.email}
+      webMailUrl={webMailUrl}
+      tgMessageLink={tgMessageLink}
+    >
+      {raw(result.proxiedHtml)}
     </MiniAppMailPage>,
   );
 });
@@ -325,8 +319,7 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
 // 群里别的成员拿 deep link 给账号主人塞 reminder。
 
 reminders.get(ROUTE_REMINDERS_API_RESOLVE_CONTEXT, async (c) => {
-  const userId = await authMiniApp(c);
-  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  const userId = c.get("userId");
 
   const start = c.req.query("start") ?? "";
   // 形如 -1001234567890_5678 或 1234567890_5678
@@ -358,9 +351,7 @@ reminders.get(ROUTE_REMINDERS_API_RESOLVE_CONTEXT, async (c) => {
 // ─── API: 邮件上下文（页面初始化时拉取 subject 显示） ────────────────────────
 
 reminders.get(ROUTE_REMINDERS_API_EMAIL_CONTEXT, async (c) => {
-  const userId = await authMiniApp(c);
-  if (!userId) return c.json({ error: "Unauthorized" }, 401);
-
+  // userId 不直接用 —— token 已经够 —— 但 middleware 保证已鉴权
   const ctx = await resolveEmailContext(
     c,
     c.req.query("accountId"),
@@ -386,8 +377,7 @@ reminders.get(ROUTE_REMINDERS_API_EMAIL_CONTEXT, async (c) => {
 // 带 (accountId, messageId, token) → 仅返回该邮件的 pending（邮件模式：⏰ 按钮）
 
 reminders.get(ROUTE_REMINDERS_API, async (c) => {
-  const userId = await authMiniApp(c);
-  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  const userId = c.get("userId");
 
   const accountIdQ = c.req.query("accountId");
   const messageIdQ = c.req.query("messageId");
@@ -412,8 +402,7 @@ reminders.get(ROUTE_REMINDERS_API, async (c) => {
 // ─── API: 创建（必须带邮件上下文） ───────────────────────────────────────────
 
 reminders.post(ROUTE_REMINDERS_API, async (c) => {
-  const userId = await authMiniApp(c);
-  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  const userId = c.get("userId");
 
   const body = await c.req
     .json<{
@@ -487,8 +476,7 @@ reminders.post(ROUTE_REMINDERS_API, async (c) => {
 // ─── API: 删除 ───────────────────────────────────────────────────────────────
 
 reminders.delete(ROUTE_REMINDERS_API_ITEM, async (c) => {
-  const userId = await authMiniApp(c);
-  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  const userId = c.get("userId");
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0)
     return c.json({ ok: false, error: "Invalid id" }, 400);
