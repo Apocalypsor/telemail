@@ -135,34 +135,7 @@ async function hmacHex(secret: string, data: string): Promise<string> {
     .slice(0, 32);
 }
 
-/** 生成邮件查看链接的 HMAC-SHA256 token（旧格式：email + chatId） */
-async function generateMailToken(
-  secret: string,
-  messageId: string,
-  accountEmail: string,
-  chatId: string,
-): Promise<string> {
-  return hmacHex(secret, `${messageId}:${accountEmail}:${chatId}`);
-}
-
-/** 验证邮件查看链接的 token（旧格式） */
-export async function verifyMailToken(
-  secret: string,
-  messageId: string,
-  accountEmail: string,
-  chatId: string,
-  token: string,
-): Promise<boolean> {
-  const expected = await generateMailToken(
-    secret,
-    messageId,
-    accountEmail,
-    chatId,
-  );
-  return timingSafeEqual(expected, token);
-}
-
-/** 生成基于 accountId 的邮件查看链接 token（新格式：比 email+chatId 更简洁） */
+/** 生成基于 accountId 的邮件查看链接 HMAC-SHA256 token */
 export async function generateMailTokenById(
   secret: string,
   messageId: string,
@@ -223,7 +196,7 @@ export function buildMiniAppRemindersUrl(
   accountId: number,
   token: string,
 ): string {
-  return `${workerUrl.replace(/\/$/, "")}/telegram-app/reminders?accountId=${accountId}&messageId=${encodeURIComponent(emailId)}&token=${encodeURIComponent(token)}`;
+  return `${workerUrl.replace(/\/$/, "")}/telegram-app/reminders?accountId=${accountId}&emailMessageId=${encodeURIComponent(emailId)}&token=${encodeURIComponent(token)}`;
 }
 
 // ─── 邮件预览数据加载（web /mail/:id 和 mini app /telegram-app/mail/:id 共用） ─

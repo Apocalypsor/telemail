@@ -35,8 +35,8 @@ export const ROUTE_MAIL_UNARCHIVE = "/api/mail/:id/unarchive";
 // 直接跳子页面 URL，绕过 router。
 //
 // 子页面：
-//   /telegram-app/reminders?accountId=&messageId=&token= → 设提醒
-//   /telegram-app/mail/:id?accountId=&t=                  → 邮件预览（含 FAB 操作）
+//   /telegram-app/reminders?accountId=&emailMessageId=&token= → 设提醒
+//   /telegram-app/mail/:id?accountId=&t=                      → 邮件预览（含 FAB 操作）
 //
 // start_param 格式（群聊 deep link 用）：
 //   r_<chatId>_<tgMsgId>  → 提醒（可省略 r_ 前缀，向后兼容旧按钮）

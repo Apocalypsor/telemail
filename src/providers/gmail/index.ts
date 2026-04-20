@@ -123,7 +123,7 @@ export class GmailProvider extends EmailProvider {
       );
       await env.EMAIL_QUEUE.sendBatch(
         messageIds.map((id) => ({
-          body: { accountId: account.id, messageId: id },
+          body: { accountId: account.id, emailMessageId: id },
         })),
       );
     }

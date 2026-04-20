@@ -17,16 +17,6 @@ export async function getAccountById(
     .first<Account>();
 }
 
-export async function getAccountByEmail(
-  db: D1Database,
-  email: string,
-): Promise<Account | null> {
-  return db
-    .prepare("SELECT * FROM accounts WHERE email = ?")
-    .bind(email)
-    .first<Account>();
-}
-
 /** 获取所有使用该 email 的账号（同一邮箱可绑定多个账号） */
 export async function getAccountsByEmail(
   db: D1Database,

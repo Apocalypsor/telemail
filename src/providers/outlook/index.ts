@@ -111,7 +111,9 @@ export class OutlookProvider extends EmailProvider {
     },
     env: Env,
   ): Promise<void> {
-    const batch: Array<{ body: { accountId: number; messageId: string } }> = [];
+    const batch: Array<{
+      body: { accountId: number; emailMessageId: string };
+    }> = [];
 
     for (const notification of body.value) {
       if (notification.clientState !== env.MS_WEBHOOK_SECRET) {
@@ -143,7 +145,9 @@ export class OutlookProvider extends EmailProvider {
         continue;
       }
 
-      batch.push({ body: { accountId: account.id, messageId } });
+      batch.push({
+        body: { accountId: account.id, emailMessageId: messageId },
+      });
     }
 
     if (batch.length > 0) {

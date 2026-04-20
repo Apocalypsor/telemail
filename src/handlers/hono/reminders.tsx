@@ -52,34 +52,34 @@ import type { AppEnv } from "@/types";
 const reminders = new Hono<AppEnv>();
 
 /**
- * 校验 (accountId, messageId, token) 三元组：token 是 mail-preview 用的 HMAC，
+ * 校验 (accountId, emailMessageId, token) 三元组：token 是 mail-preview 用的 HMAC，
  * 等价于"持有该邮件的查看权"。返回查到的 account；否则返回错误响应。
  */
 async function resolveEmailContext(
   c: Context<AppEnv>,
   accountIdRaw: unknown,
-  messageId: unknown,
+  emailMessageId: unknown,
   token: unknown,
 ): Promise<
   | {
       ok: true;
       account: NonNullable<Awaited<ReturnType<typeof getAccountById>>>;
       accountId: number;
-      messageId: string;
+      emailMessageId: string;
     }
   | { ok: false; status: 400 | 403 | 404; error: string }
 > {
   const accountId = Number(accountIdRaw);
   if (!Number.isInteger(accountId) || accountId <= 0)
     return { ok: false, status: 400, error: "Invalid accountId" };
-  if (typeof messageId !== "string" || !messageId)
-    return { ok: false, status: 400, error: "Invalid messageId" };
+  if (typeof emailMessageId !== "string" || !emailMessageId)
+    return { ok: false, status: 400, error: "Invalid emailMessageId" };
   if (typeof token !== "string" || !token)
     return { ok: false, status: 400, error: "Invalid token" };
 
   const valid = await verifyMailTokenById(
     c.env.ADMIN_SECRET,
-    messageId,
+    emailMessageId,
     accountId,
     token,
   );
@@ -87,7 +87,7 @@ async function resolveEmailContext(
 
   const account = await getAccountById(c.env.DB, accountId);
   if (!account) return { ok: false, status: 404, error: "账号不存在" };
-  return { ok: true, account, accountId, messageId };
+  return { ok: true, account, accountId, emailMessageId };
 }
 
 /** 找投递时存的 mapping 和邮件展示文本。
@@ -219,10 +219,10 @@ reminders.get(ROUTE_MINI_APP_API_LIST, async (c) => {
 
 reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
   // Token 鉴权（与 /mail/:id 同一套），渲染换 MiniAppMailPage（TG 主题色 + SDK）
-  const messageId = c.req.param("id");
+  const emailMessageId = c.req.param("id");
   const token = c.req.query("t");
   const accountIdParam = c.req.query("accountId");
-  if (!messageId || !token || !accountIdParam)
+  if (!emailMessageId || !token || !accountIdParam)
     return c.text("Missing params", 400);
   const accountId = Number(accountIdParam);
   if (!Number.isInteger(accountId) || accountId <= 0)
@@ -230,7 +230,7 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
   if (
     !(await verifyMailTokenById(
       c.env.ADMIN_SECRET,
-      messageId,
+      emailMessageId,
       accountId,
       token,
     ))
@@ -242,7 +242,7 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
   const result = await loadMailForPreview(
     c.env,
     account,
-    messageId,
+    emailMessageId,
     c.req.query("folder"),
   );
   if (!result.ok) return c.text(result.reason, result.status);
@@ -251,14 +251,14 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
   const webMailUrl = c.env.WORKER_URL
     ? buildWebMailUrl(
         c.env.WORKER_URL,
-        messageId,
+        emailMessageId,
         account.id,
         token,
         result.fetchFolder !== "inbox" ? result.fetchFolder : undefined,
       )
     : "";
   const mailMappings = await getMappingsByEmailIds(c.env.DB, account.id, [
-    messageId,
+    emailMessageId,
   ]);
   const mapping = mailMappings[0];
   const tgMessageLink = mapping
@@ -268,7 +268,7 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
   return c.html(
     <MiniAppMailPage
       meta={result.meta}
-      messageId={messageId}
+      emailMessageId={emailMessageId}
       accountId={account.id}
       token={token}
       inJunk={result.inJunk}
@@ -286,7 +286,7 @@ reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
 
 // ─── API: 解析群聊 deep link 的 start_param ──────────────────────────────────
 // 群聊用 t.me/<bot>?startapp=<chatId>_<tgMsgId> 跳进 Mini App，这里把短 id
-// 还原成 (accountId, messageId, token)。鉴权：account.telegram_user_id 必须
+// 还原成 (accountId, emailMessageId, token)。鉴权：account.telegram_user_id 必须
 // 等于当前 initData 的 user.id —— 即只有账号主人能为自己邮件设提醒，防止
 // 群里别的成员拿 deep link 给账号主人塞 reminder。
 
@@ -315,7 +315,7 @@ reminders.get(ROUTE_REMINDERS_API_RESOLVE_CONTEXT, async (c) => {
   );
   return c.json({
     accountId: mapping.account_id,
-    messageId: mapping.email_message_id,
+    emailMessageId: mapping.email_message_id,
     token,
   });
 });
@@ -327,7 +327,7 @@ reminders.get(ROUTE_REMINDERS_API_EMAIL_CONTEXT, async (c) => {
   const ctx = await resolveEmailContext(
     c,
     c.req.query("accountId"),
-    c.req.query("messageId"),
+    c.req.query("emailMessageId"),
     c.req.query("token"),
   );
   if (!ctx.ok) return c.json({ error: ctx.error }, ctx.status);
@@ -335,7 +335,7 @@ reminders.get(ROUTE_REMINDERS_API_EMAIL_CONTEXT, async (c) => {
   const { subject, tgChatId } = await lookupEmailContext(
     c,
     ctx.account,
-    ctx.messageId,
+    ctx.emailMessageId,
   );
   return c.json({
     subject,
@@ -346,23 +346,28 @@ reminders.get(ROUTE_REMINDERS_API_EMAIL_CONTEXT, async (c) => {
 
 // ─── API: 列表 ────────────────────────────────────────────────────────────────
 // 不带参数 → 返回用户所有 pending（list-only 模式 / 主菜单"我的提醒"）
-// 带 (accountId, messageId, token) → 仅返回该邮件的 pending（邮件模式：⏰ 按钮）
+// 带 (accountId, emailMessageId, token) → 仅返回该邮件的 pending（邮件模式：⏰ 按钮）
 
 reminders.get(ROUTE_REMINDERS_API, async (c) => {
   const userId = c.get("userId");
 
   const accountIdQ = c.req.query("accountId");
-  const messageIdQ = c.req.query("messageId");
+  const emailMessageIdQ = c.req.query("emailMessageId");
   const tokenQ = c.req.query("token");
-  if (accountIdQ || messageIdQ || tokenQ) {
+  if (accountIdQ || emailMessageIdQ || tokenQ) {
     // 任一存在则三件套都得有效
-    const ctx = await resolveEmailContext(c, accountIdQ, messageIdQ, tokenQ);
+    const ctx = await resolveEmailContext(
+      c,
+      accountIdQ,
+      emailMessageIdQ,
+      tokenQ,
+    );
     if (!ctx.ok) return c.json({ error: ctx.error }, ctx.status);
     const items = await listPendingRemindersForEmail(
       c.env.DB,
       userId,
       ctx.accountId,
-      ctx.messageId,
+      ctx.emailMessageId,
     );
     return c.json({ reminders: items });
   }
@@ -381,7 +386,7 @@ reminders.post(ROUTE_REMINDERS_API, async (c) => {
       text?: string;
       remind_at?: string;
       accountId?: number;
-      messageId?: string;
+      emailMessageId?: string;
       token?: string;
     }>()
     .catch(() => null);
@@ -391,7 +396,7 @@ reminders.post(ROUTE_REMINDERS_API, async (c) => {
   const ctx = await resolveEmailContext(
     c,
     body.accountId,
-    body.messageId,
+    body.emailMessageId,
     body.token,
   );
   if (!ctx.ok) return c.json({ ok: false, error: ctx.error }, ctx.status);
@@ -421,7 +426,7 @@ reminders.post(ROUTE_REMINDERS_API, async (c) => {
   const { tgChatId, tgMessageId, subject } = await lookupEmailContext(
     c,
     ctx.account,
-    ctx.messageId,
+    ctx.emailMessageId,
   );
 
   const id = await createReminder(c.env.DB, {
@@ -429,7 +434,7 @@ reminders.post(ROUTE_REMINDERS_API, async (c) => {
     text,
     remindAtIso: new Date(ts).toISOString(),
     accountId: ctx.accountId,
-    emailMessageId: ctx.messageId,
+    emailMessageId: ctx.emailMessageId,
     emailSubject: subject ?? undefined,
     tgChatId: tgChatId ?? undefined,
     tgMessageId: tgMessageId ?? undefined,
@@ -439,7 +444,7 @@ reminders.post(ROUTE_REMINDERS_API, async (c) => {
     refreshEmailKeyboardAfterReminderChange(
       c.env,
       ctx.account,
-      ctx.messageId,
+      ctx.emailMessageId,
     ).catch(() => {}),
   );
   return c.json({ ok: true, id });

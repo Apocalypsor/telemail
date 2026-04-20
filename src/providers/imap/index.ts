@@ -84,8 +84,8 @@ export class ImapProvider extends EmailProvider {
     console.log(
       `IMAP push: new message for ${account.email}, rfcMessageId=${rfcMessageId}`,
     );
-    // 队列里用 messageId 字段（跨 provider 统一）；对 IMAP 来说它就是 Message-Id
-    await env.EMAIL_QUEUE.send({ accountId, messageId: rfcMessageId });
+    // 队列里用 emailMessageId 字段（跨 provider 统一）；对 IMAP 来说它就是 RFC Message-Id
+    await env.EMAIL_QUEUE.send({ accountId, emailMessageId: rfcMessageId });
   }
 
   // ─── Message actions ──────────────────────────────────────────────────

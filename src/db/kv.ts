@@ -49,14 +49,14 @@ export async function deleteCachedAccessToken(
 
 // ─── Mail HTML Cache ────────────────────────────────────────────────────────
 
-// IMAP 的 messageId 是 per-folder UID，必须带 accountId + folder 否则不同文件夹
-// 的同号 UID 会错误命中同一条缓存
+// 同一封邮件在 INBOX / junk / archive 的渲染可能不同（folder 提示 IMAP 去哪个
+// 文件夹拉 raw），所以 folder 要进 key。emailMessageId 是 provider 原生邮件 id。
 function kvMailHtmlKey(
   accountId: number,
   folder: string,
-  messageId: string,
+  emailMessageId: string,
 ): string {
-  return `mail_html:${accountId}:${folder}:${messageId}`;
+  return `mail_html:${accountId}:${folder}:${emailMessageId}`;
 }
 
 interface CachedMailData {
@@ -68,9 +68,9 @@ export async function getCachedMailData(
   kv: KVNamespace,
   accountId: number,
   folder: string,
-  messageId: string,
+  emailMessageId: string,
 ): Promise<CachedMailData | null> {
-  const raw = await kv.get(kvMailHtmlKey(accountId, folder, messageId));
+  const raw = await kv.get(kvMailHtmlKey(accountId, folder, emailMessageId));
   if (!raw) return null;
   try {
     return JSON.parse(raw) as CachedMailData;
@@ -84,11 +84,11 @@ export async function putCachedMailData(
   kv: KVNamespace,
   accountId: number,
   folder: string,
-  messageId: string,
+  emailMessageId: string,
   data: CachedMailData,
 ): Promise<void> {
   await kv.put(
-    kvMailHtmlKey(accountId, folder, messageId),
+    kvMailHtmlKey(accountId, folder, emailMessageId),
     JSON.stringify(data),
     { expirationTtl: MAIL_HTML_CACHE_TTL },
   );

@@ -30,7 +30,7 @@ async function syncAccount(
 
     await env.EMAIL_QUEUE.sendBatch(
       newMessages.map((m) => ({
-        body: { accountId: account.id, messageId: m.id },
+        body: { accountId: account.id, emailMessageId: m.id },
       })),
     );
     return { enqueued: newMessages.length };

@@ -2,7 +2,7 @@ import { buildEmailKeyboard } from "@bot/keyboards";
 import { JunkCheckPage } from "@components/web/junk-check";
 import { MailPage } from "@components/web/mail-page";
 import { PreviewPage } from "@components/web/preview";
-import { getAccountByEmail, getAccountById } from "@db/accounts";
+import { getAccountById } from "@db/accounts";
 import { deleteMappingByEmailId, getMappingsByEmailIds } from "@db/message-map";
 import { requireTelegramLogin } from "@handlers/hono/middleware";
 import {
@@ -24,7 +24,6 @@ import { deliverEmailToTelegram } from "@services/bridge";
 import { analyzeEmail } from "@services/llm";
 import {
   loadMailForPreview,
-  verifyMailToken,
   verifyMailTokenById,
   verifyProxySignature,
 } from "@services/mail-preview";
@@ -52,19 +51,19 @@ type MailActionBody = {
 
 /**
  * 预览页 POST 邮件操作的公共入口：解析 body + 校验 token + 取 account。
- * 失败时返回 `Response`（调用方直接 return）；成功返回 `{ account, messageId }`。
+ * 失败时返回 `Response`（调用方直接 return）；成功返回 `{ account, emailMessageId }`。
  */
 export async function resolveMailAction<
   B extends MailActionBody = MailActionBody,
 >(
   c: Context<AppEnv>,
 ): Promise<
-  | { ok: true; account: Account; messageId: string; body: B }
+  | { ok: true; account: Account; emailMessageId: string; body: B }
   | { ok: false; response: Response }
 > {
-  const messageId = c.req.param("id");
+  const emailMessageId = c.req.param("id");
   const body = (await c.req.json()) as B;
-  if (!messageId || !body.accountId || !body.token) {
+  if (!emailMessageId || !body.accountId || !body.token) {
     return {
       ok: false,
       response: c.json({ ok: false, error: "参数缺失" }, 400),
@@ -72,7 +71,7 @@ export async function resolveMailAction<
   }
   const valid = await verifyMailTokenById(
     c.env.ADMIN_SECRET,
-    messageId,
+    emailMessageId,
     body.accountId,
     body.token,
   );
@@ -89,7 +88,7 @@ export async function resolveMailAction<
       response: c.json({ ok: false, error: "账号未找到" }, 404),
     };
   }
-  return { ok: true, account, messageId, body };
+  return { ok: true, account, emailMessageId, body };
 }
 
 // ─── HTML 格式化预览工具 ─────────────────────────────────────────────────────
@@ -136,42 +135,25 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
 // ─── 邮件内容预览 ────────────────────────────────────────────────────────────
 
 preview.get(ROUTE_MAIL, async (c) => {
-  const messageId = c.req.param("id");
+  const emailMessageId = c.req.param("id");
   const token = c.req.query("t");
-  // 新格式：accountId（推荐）；旧格式：email + chatId（向后兼容）
   const accountIdParam = c.req.query("accountId");
-  const chatId = c.req.query("chatId");
-  const accountEmail = c.req.query("email");
 
-  if (!messageId || !token) return c.text("Missing params", 400);
+  if (!emailMessageId || !token || !accountIdParam)
+    return c.text("Missing params", 400);
+  const accountId = Number(accountIdParam);
+  if (!Number.isInteger(accountId) || accountId <= 0)
+    return c.text("Invalid accountId", 400);
 
-  let account = null;
-  if (accountIdParam) {
-    const accountId = Number(accountIdParam);
-    if (!Number.isInteger(accountId) || accountId <= 0)
-      return c.text("Invalid accountId", 400);
-    const valid = await verifyMailTokenById(
-      c.env.ADMIN_SECRET,
-      messageId,
-      accountId,
-      token,
-    );
-    if (!valid) return c.text("Forbidden", 403);
-    account = await getAccountById(c.env.DB, accountId);
-  } else {
-    if (!chatId || !accountEmail) return c.text("Missing params", 400);
-    const valid = await verifyMailToken(
-      c.env.ADMIN_SECRET,
-      messageId,
-      accountEmail,
-      chatId,
-      token,
-    );
-    if (!valid) return c.text("Forbidden", 403);
-    account = await getAccountByEmail(c.env.DB, accountEmail);
-    if (account && account.chat_id !== chatId) account = null;
-  }
+  const valid = await verifyMailTokenById(
+    c.env.ADMIN_SECRET,
+    emailMessageId,
+    accountId,
+    token,
+  );
+  if (!valid) return c.text("Forbidden", 403);
 
+  const account = await getAccountById(c.env.DB, accountId);
   if (!account) return c.text("Account not found", 404);
 
   // folder 提示：list handler 会为 /archived / /junk 的预览链接带上 folder，
@@ -179,7 +161,7 @@ preview.get(ROUTE_MAIL, async (c) => {
   const result = await loadMailForPreview(
     c.env,
     account,
-    messageId,
+    emailMessageId,
     c.req.query("folder"),
   );
   if (!result.ok) return c.text(result.reason, result.status);
@@ -187,7 +169,7 @@ preview.get(ROUTE_MAIL, async (c) => {
   return c.html(
     <MailPage
       meta={result.meta}
-      messageId={messageId}
+      emailMessageId={emailMessageId}
       accountId={account.id}
       token={token as string}
       inJunk={result.inJunk}
@@ -206,18 +188,18 @@ preview.get(ROUTE_MAIL, async (c) => {
 preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
   const resolved = await resolveMailAction(c);
   if (!resolved.ok) return resolved.response;
-  const { account, messageId } = resolved;
+  const { account, emailMessageId } = resolved;
   try {
     const provider = getEmailProvider(account, c.env);
     // IMAP/Outlook move 之后原 id 失效（IMAP 换 UID，Outlook Graph 换 id），
     // 所以必须在 move 之前先把 raw 从垃圾箱拉下来，然后用 move 返回的新 id 建 mapping。
-    const raw = await provider.fetchRawEmail(messageId, "junk");
-    const newMessageId = await provider.moveToInbox(messageId);
+    const raw = await provider.fetchRawEmail(emailMessageId, "junk");
+    const newEmailMessageId = await provider.moveToInbox(emailMessageId);
 
     c.executionCtx.waitUntil(
       deliverEmailToTelegram(
         raw,
-        newMessageId,
+        newEmailMessageId,
         account as Account,
         c.env,
         c.executionCtx.waitUntil.bind(c.executionCtx),
@@ -246,10 +228,10 @@ preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
 preview.post(ROUTE_MAIL_TRASH, async (c) => {
   const resolved = await resolveMailAction(c);
   if (!resolved.ok) return resolved.response;
-  const { account, messageId } = resolved;
+  const { account, emailMessageId } = resolved;
   try {
     const provider = getEmailProvider(account, c.env);
-    await provider.trashMessage(messageId);
+    await provider.trashMessage(emailMessageId);
     return c.json({ ok: true, message: "已删除" });
   } catch {
     return c.json({ ok: false, error: "操作失败" }, 500);
@@ -259,14 +241,14 @@ preview.post(ROUTE_MAIL_TRASH, async (c) => {
 preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
   const resolved = await resolveMailAction(c);
   if (!resolved.ok) return resolved.response;
-  const { account, messageId } = resolved;
+  const { account, emailMessageId } = resolved;
   try {
     const provider = getEmailProvider(account, c.env);
-    await provider.markAsJunk(messageId);
+    await provider.markAsJunk(emailMessageId);
 
     // 删除对应的 TG 消息和映射
     const mappings = await getMappingsByEmailIds(c.env.DB, account.id, [
-      messageId,
+      emailMessageId,
     ]);
     if (mappings.length > 0) {
       const m = mappings[0];
@@ -275,7 +257,7 @@ preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
         m.tg_chat_id,
         m.tg_message_id,
       ).catch(() => {});
-      await deleteMappingByEmailId(c.env.DB, messageId, account.id).catch(
+      await deleteMappingByEmailId(c.env.DB, emailMessageId, account.id).catch(
         () => {},
       );
     }
@@ -289,7 +271,7 @@ preview.post(ROUTE_MAIL_MARK_JUNK, async (c) => {
 preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
   const resolved = await resolveMailAction(c);
   if (!resolved.ok) return resolved.response;
-  const { account, messageId } = resolved;
+  const { account, emailMessageId } = resolved;
   if (!accountCanArchive(account))
     return c.json(
       { ok: false, error: "Gmail 归档需要在账号设置里指定归档标签" },
@@ -297,11 +279,11 @@ preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
     );
   try {
     const provider = getEmailProvider(account, c.env);
-    await provider.archiveMessage(messageId);
+    await provider.archiveMessage(emailMessageId);
 
     // 删除对应的 TG 消息和映射
     const mappings = await getMappingsByEmailIds(c.env.DB, account.id, [
-      messageId,
+      emailMessageId,
     ]);
     if (mappings.length > 0) {
       const m = mappings[0];
@@ -310,7 +292,7 @@ preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
         m.tg_chat_id,
         m.tg_message_id,
       ).catch(() => {});
-      await deleteMappingByEmailId(c.env.DB, messageId, account.id).catch(
+      await deleteMappingByEmailId(c.env.DB, emailMessageId, account.id).catch(
         () => {},
       );
     }
@@ -327,17 +309,17 @@ preview.post(ROUTE_MAIL_ARCHIVE, async (c) => {
 preview.post(ROUTE_MAIL_UNARCHIVE, async (c) => {
   const resolved = await resolveMailAction(c);
   if (!resolved.ok) return resolved.response;
-  const { account, messageId } = resolved;
+  const { account, emailMessageId } = resolved;
   try {
     const provider = getEmailProvider(account, c.env);
     // 和 move-to-inbox 同样的顺序：先抓原文（此时还在归档里），再 unarchive 拿新 id，最后重新投递
-    const raw = await provider.fetchRawEmail(messageId, "archive");
-    const newMessageId = await provider.unarchiveMessage(messageId);
+    const raw = await provider.fetchRawEmail(emailMessageId, "archive");
+    const newEmailMessageId = await provider.unarchiveMessage(emailMessageId);
 
     c.executionCtx.waitUntil(
       deliverEmailToTelegram(
         raw,
-        newMessageId,
+        newEmailMessageId,
         account as Account,
         c.env,
         c.executionCtx.waitUntil.bind(c.executionCtx),
@@ -367,26 +349,26 @@ preview.post(ROUTE_MAIL_TOGGLE_STAR, async (c) => {
     starred?: boolean;
   }>(c);
   if (!resolved.ok) return resolved.response;
-  const { account, messageId, body } = resolved;
+  const { account, emailMessageId, body } = resolved;
   if (body.starred == null)
     return c.json({ ok: false, error: "参数缺失" }, 400);
   try {
     const provider = getEmailProvider(account, c.env);
     if (body.starred) {
-      await provider.addStar(messageId);
+      await provider.addStar(emailMessageId);
     } else {
-      await provider.removeStar(messageId);
+      await provider.removeStar(emailMessageId);
     }
 
     // 同步更新 Telegram 消息的星标按钮 + 置顶状态
     const mappings = await getMappingsByEmailIds(c.env.DB, account.id, [
-      messageId,
+      emailMessageId,
     ]);
     if (mappings.length > 0) {
       const m = mappings[0];
       const keyboard = await buildEmailKeyboard(
         c.env,
-        messageId,
+        emailMessageId,
         account.id,
         body.starred,
         accountCanArchive(account),

@@ -120,9 +120,9 @@ export interface MailMeta {
 
 /** 队列消息体 */
 export interface QueueMessage {
-  /** Gmail messageId 或 IMAP UID（字符串形式），出队时按账号类型分支处理 */
   accountId: number;
-  messageId: string;
+  /** Provider 原生邮件 id：Gmail messageId / Outlook Graph id / IMAP RFC 822 Message-Id（非 per-folder UID） */
+  emailMessageId: string;
 }
 
 /** Pub/Sub push 请求体 */

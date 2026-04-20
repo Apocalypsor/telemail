@@ -77,15 +77,15 @@ function remindersScript(): string {
   var fmt2 = function(n){ return n < 10 ? "0" + n : "" + n; };
 
   // 两种模式：
-  //  - 邮件模式：URL 带 (accountId, messageId, token) → 显示邮件卡 + 添加表单 + 列表
+  //  - 邮件模式：URL 带 (accountId, emailMessageId, token) → 显示邮件卡 + 添加表单 + 列表
   //  - 列表模式：URL 无邮件三件套（如主菜单 ⏰ 我的提醒进入）→ 仅显示列表
   var qs = new URLSearchParams(location.search);
   var ctx = {
     accountId: Number(qs.get("accountId")),
-    messageId: qs.get("messageId") || "",
+    emailMessageId: qs.get("emailMessageId") || "",
     token: qs.get("token") || "",
   };
-  var listOnly = !(ctx.accountId && ctx.messageId && ctx.token);
+  var listOnly = !(ctx.accountId && ctx.emailMessageId && ctx.token);
 
   if (listOnly) {
     // 隐藏邮件卡 + 添加表单两个 section
@@ -138,14 +138,14 @@ function remindersScript(): string {
 
   function ctxQuery() {
     return "?accountId=" + ctx.accountId
-      + "&messageId=" + encodeURIComponent(ctx.messageId)
+      + "&emailMessageId=" + encodeURIComponent(ctx.emailMessageId)
       + "&token=" + encodeURIComponent(ctx.token);
   }
 
   function openMail() {
     // 把当前 URL 作为 back 传过去，mail 页 BackButton 据此返回
     var back = encodeURIComponent(location.pathname + location.search);
-    var url = "${ROUTE_MINI_APP_MAIL.replace(":id", "")}" + encodeURIComponent(ctx.messageId)
+    var url = "${ROUTE_MINI_APP_MAIL.replace(":id", "")}" + encodeURIComponent(ctx.emailMessageId)
       + "?accountId=" + ctx.accountId + "&t=" + encodeURIComponent(ctx.token)
       + "&back=" + back;
     location.href = url;
@@ -252,7 +252,7 @@ function remindersScript(): string {
           text: text,
           remind_at: local.toISOString(),
           accountId: ctx.accountId,
-          messageId: ctx.messageId,
+          emailMessageId: ctx.emailMessageId,
           token: ctx.token,
         }),
       });

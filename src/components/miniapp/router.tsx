@@ -53,11 +53,11 @@ function routerScript(): string {
     if (!res.ok) { fail(res.data.error || "无法打开"); return; }
     var d = res.data;
     if (feature === "m") {
-      location.replace("${ROUTE_MINI_APP_MAIL.replace(":id", "")}" + encodeURIComponent(d.messageId)
+      location.replace("${ROUTE_MINI_APP_MAIL.replace(":id", "")}" + encodeURIComponent(d.emailMessageId)
         + "?accountId=" + d.accountId + "&t=" + encodeURIComponent(d.token));
     } else {
       location.replace("${ROUTE_MINI_APP_REMINDERS}?accountId=" + d.accountId
-        + "&messageId=" + encodeURIComponent(d.messageId)
+        + "&emailMessageId=" + encodeURIComponent(d.emailMessageId)
         + "&token=" + encodeURIComponent(d.token));
     }
   })

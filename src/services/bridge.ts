@@ -174,7 +174,7 @@ async function editMessageWithAnalysis(
 /** 解析 raw email 并发送到账号对应的 Telegram chat。 */
 export async function deliverEmailToTelegram(
   rawEmail: ArrayBuffer,
-  messageId: string,
+  emailMessageId: string,
   account: Account,
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
@@ -188,10 +188,12 @@ export async function deliverEmailToTelegram(
   // 查远端状态：队列入队到处理之间可能已被用户在远端 junk/archive/delete；仅 inbox 才投递。
   // 顺带拿到 starred 给初始 keyboard，避免 TG 键盘从 ☆ → ★ 闪烁
   const provider = getEmailProvider(account, env);
-  const state = await provider.resolveMessageState(messageId).catch(() => null);
+  const state = await provider
+    .resolveMessageState(emailMessageId)
+    .catch(() => null);
   if (state && state.location !== "inbox") {
     console.log(
-      `Skip delivery: message=${messageId} already at ${state.location} on remote`,
+      `Skip delivery: email=${emailMessageId} already at ${state.location} on remote`,
     );
     return;
   }
@@ -226,14 +228,14 @@ export async function deliverEmailToTelegram(
   const inserted = await putMessageMapping(env.DB, {
     tg_message_id: sentMessageId,
     tg_chat_id: chatId,
-    email_message_id: messageId,
+    email_message_id: emailMessageId,
     account_id: account.id,
   });
 
   // 唯一索引冲突 → 说明另一个并发请求已经投递过，撤回本次重复消息
   if (!inserted) {
     console.log(
-      `Duplicate delivery detected for ${messageId}, deleting duplicate Telegram message`,
+      `Duplicate delivery detected for ${emailMessageId}, deleting duplicate Telegram message`,
     );
     await deleteMessage(tgToken, chatId, sentMessageId).catch(() => {});
     return;
@@ -241,7 +243,7 @@ export async function deliverEmailToTelegram(
 
   const keyboard = await buildEmailKeyboard(
     env,
-    messageId,
+    emailMessageId,
     account.id,
     initialStarred,
     accountCanArchive(account),
@@ -269,7 +271,7 @@ export async function deliverEmailToTelegram(
         // 键盘回退到陈旧状态）
         const fullKeyboard = await buildEmailKeyboard(
           env,
-          messageId,
+          emailMessageId,
           account.id,
           initialStarred,
           accountCanArchive(account),
@@ -292,7 +294,7 @@ export async function deliverEmailToTelegram(
           await updateShortSummary(
             env.DB,
             account.id,
-            messageId,
+            emailMessageId,
             analysis.shortSummary,
           ).catch((e) =>
             reportErrorToObservability(
@@ -304,12 +306,12 @@ export async function deliverEmailToTelegram(
         }
       } catch (err) {
         console.error(
-          `LLM analysis failed for message ${messageId}, saving to failed_emails`,
+          `LLM analysis failed for email ${emailMessageId}, saving to failed_emails`,
           err,
         );
         await putFailedEmail(env.DB, {
           account_id: account.id,
-          email_message_id: messageId,
+          email_message_id: emailMessageId,
           tg_chat_id: chatId,
           tg_message_id: sentMessageId,
           is_caption: hasSingleAttachment ? 1 : 0,
@@ -340,23 +342,23 @@ export async function processEmailMessage(
   const account = await getAccountById(env.DB, msg.accountId);
   if (!account) {
     console.log(
-      `Account ${msg.accountId} not found, skipping message ${msg.messageId}`,
+      `Account ${msg.accountId} not found, skipping email ${msg.emailMessageId}`,
     );
     return;
   }
   if (account.disabled) {
     console.log(
-      `Account ${msg.accountId} is disabled, dropping message ${msg.messageId}`,
+      `Account ${msg.accountId} is disabled, dropping email ${msg.emailMessageId}`,
     );
     return;
   }
 
   const provider = getEmailProvider(account, env);
-  const rawEmail = await provider.fetchRawEmail(msg.messageId);
+  const rawEmail = await provider.fetchRawEmail(msg.emailMessageId);
 
   await deliverEmailToTelegram(
     rawEmail,
-    msg.messageId,
+    msg.emailMessageId,
     account,
     env,
     waitUntil,

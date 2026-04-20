@@ -16,7 +16,7 @@ export async function handleQueueBatch(
       await reportErrorToObservability(env, "queue.message_failed", error, {
         attempt: msg.attempts,
         accountId: msg.body.accountId,
-        messageId: msg.body.messageId,
+        emailMessageId: msg.body.emailMessageId,
       });
       msg.retry();
     }

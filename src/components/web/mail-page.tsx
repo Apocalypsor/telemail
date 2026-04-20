@@ -5,7 +5,7 @@ import type { MailMeta } from "@/types";
 interface MailPageProps {
   meta: MailMeta;
   accountEmail?: string | null;
-  messageId: string;
+  emailMessageId: string;
   accountId: number;
   token: string;
   inJunk: boolean;
@@ -18,7 +18,7 @@ interface MailPageProps {
 export function MailPage({
   meta,
   accountEmail,
-  messageId,
+  emailMessageId,
   accountId,
   token,
   inJunk,
@@ -32,7 +32,7 @@ export function MailPage({
       <MailMetaHeader meta={meta} accountEmail={accountEmail} />
       {children}
       <MailFab
-        messageId={messageId}
+        emailMessageId={emailMessageId}
         accountId={accountId}
         token={token}
         inJunk={inJunk}
@@ -148,7 +148,7 @@ const FAB_CSS = `
 #mail-fab .fab-status.show{display:block}`;
 
 function fabScript(
-  messageId: string,
+  emailMessageId: string,
   accountId: number,
   token: string,
   starred: boolean,
@@ -164,7 +164,7 @@ async function mailAction(action,btn){
   var s=document.getElementById('fab-status');
   btn.disabled=true;s.className='fab-status show';s.textContent='处理中...';
   try{
-    var r=await fetch('/api/mail/${encodeURIComponent(messageId)}/'+action,{
+    var r=await fetch('/api/mail/${encodeURIComponent(emailMessageId)}/'+action,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({accountId:${accountId},token:'${token}'})
     });
@@ -177,7 +177,7 @@ async function toggleStar(btn){
   var s=document.getElementById('fab-status');
   btn.disabled=true;s.className='fab-status show';s.textContent='处理中...';
   try{
-    var r=await fetch('/api/mail/${encodeURIComponent(messageId)}/toggle-star',{
+    var r=await fetch('/api/mail/${encodeURIComponent(emailMessageId)}/toggle-star',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({accountId:${accountId},token:'${token}',starred:!_starred})
     });
@@ -194,7 +194,7 @@ async function toggleStar(btn){
 }
 
 function MailFab({
-  messageId,
+  emailMessageId,
   accountId,
   token,
   inJunk,
@@ -202,7 +202,7 @@ function MailFab({
   starred,
   canArchive,
 }: {
-  messageId: string;
+  emailMessageId: string;
   accountId: number;
   token: string;
   inJunk: boolean;
@@ -277,7 +277,7 @@ function MailFab({
       </div>
       <script
         dangerouslySetInnerHTML={{
-          __html: fabScript(messageId, accountId, token, starred),
+          __html: fabScript(emailMessageId, accountId, token, starred),
         }}
       />
     </>

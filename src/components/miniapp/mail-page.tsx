@@ -6,7 +6,7 @@ import type { MailMeta } from "@/types";
 interface MailPageProps {
   meta: MailMeta;
   accountEmail?: string | null;
-  messageId: string;
+  emailMessageId: string;
   accountId: number;
   token: string;
   inJunk: boolean;
@@ -98,7 +98,7 @@ const FAB_CSS = `
 `;
 
 function fabScript(
-  messageId: string,
+  emailMessageId: string,
   accountId: number,
   token: string,
   starred: boolean,
@@ -152,7 +152,7 @@ async function mailAction(action,btn){
   var s=document.getElementById('fab-status');
   btn.disabled=true;s.className='fab-status show';s.textContent='处理中...';
   try{
-    var r=await fetch('/api/mail/${encodeURIComponent(messageId)}/'+action,{
+    var r=await fetch('/api/mail/${encodeURIComponent(emailMessageId)}/'+action,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({accountId:${accountId},token:'${token}'})
     });
@@ -165,7 +165,7 @@ async function toggleStar(btn){
   var s=document.getElementById('fab-status');
   btn.disabled=true;s.className='fab-status show';s.textContent='处理中...';
   try{
-    var r=await fetch('/api/mail/${encodeURIComponent(messageId)}/toggle-star',{
+    var r=await fetch('/api/mail/${encodeURIComponent(emailMessageId)}/toggle-star',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({accountId:${accountId},token:'${token}',starred:!_starred})
     });
@@ -240,7 +240,7 @@ function MailMetaHeader({
 }
 
 function MailFab({
-  messageId,
+  emailMessageId,
   accountId,
   token,
   inJunk,
@@ -250,7 +250,7 @@ function MailFab({
   webMailUrl,
   tgMessageLink,
 }: {
-  messageId: string;
+  emailMessageId: string;
   accountId: number;
   token: string;
   inJunk: boolean;
@@ -327,7 +327,7 @@ function MailFab({
       <script
         dangerouslySetInnerHTML={{
           __html: fabScript(
-            messageId,
+            emailMessageId,
             accountId,
             token,
             starred,
@@ -343,7 +343,7 @@ function MailFab({
 export function MiniAppMailPage({
   meta,
   accountEmail,
-  messageId,
+  emailMessageId,
   accountId,
   token,
   inJunk,
@@ -376,7 +376,7 @@ export function MiniAppMailPage({
         />
         <div class="mail-body">{children}</div>
         <MailFab
-          messageId={messageId}
+          emailMessageId={emailMessageId}
           accountId={accountId}
           token={token}
           inJunk={inJunk}

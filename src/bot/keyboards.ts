@@ -79,10 +79,10 @@ export function readStarredFromReplyMarkup(replyMarkup: unknown): boolean {
  * setReplyMarkup —— 这样群聊和私聊只有一条路径。
  *
  * ⏰ / 👁 Mini App 入口：
- * - 私聊：inline `web_app` 按钮直传子页面 URL（带 accountId/messageId/token）
+ * - 私聊：inline `web_app` 按钮直传子页面 URL（带 accountId/emailMessageId/token）
  * - 群聊：`web_app` 在群里无效（BUTTON_TYPE_INVALID），改用 deep link
  *   `t.me/<bot>/<short>?startapp=<feature>_<chatId>_<tgMsgId>`
- *   start_param 由 Mini App 调 resolve-context 接口换出 (accountId, messageId, token)。
+ *   start_param 由 Mini App 调 resolve-context 接口换出 (accountId, emailMessageId, token)。
  *   需要配 `TG_MINI_APP_SHORT_NAME` + BotFather `/newapp`。
  *   未配置时群聊的 ⏰/👁 退化成裸 web URL（无 Mini App 能力）。
  */

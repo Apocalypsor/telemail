@@ -28,7 +28,7 @@ export function isMailListType(s: string): s is MailListType {
 }
 
 export interface MailListEmailItem {
-  /** provider 邮件 id（gmail messageId / outlook id / imap UID） */
+  /** Provider 原生邮件 id：Gmail messageId / Outlook Graph id / IMAP RFC 822 Message-Id */
   id: string;
   /** 显示标题：优先 LLM short_summary，回退邮件 subject */
   title: string | null;
