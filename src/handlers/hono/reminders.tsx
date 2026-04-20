@@ -1,4 +1,4 @@
-import { RemindersPage } from "@components/reminders";
+import { RemindersPage } from "@components/miniapp/reminders";
 import { getAccountById } from "@db/accounts";
 import { getCachedMailData, putCachedMailData } from "@db/kv";
 import { getMappingsByEmailIds, getMessageMapping } from "@db/message-map";

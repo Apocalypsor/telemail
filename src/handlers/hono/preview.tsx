@@ -1,7 +1,7 @@
 import { buildEmailKeyboard } from "@bot/keyboards";
-import { JunkCheckPage } from "@components/junk-check";
-import { MailPage } from "@components/mail-page";
-import { PreviewPage } from "@components/preview";
+import { JunkCheckPage } from "@components/web/junk-check";
+import { MailPage } from "@components/web/mail-page";
+import { PreviewPage } from "@components/web/preview";
 import { getAccountByEmail, getAccountById } from "@db/accounts";
 import { getCachedMailData, putCachedMailData } from "@db/kv";
 import { deleteMappingByEmailId, getMappingsByEmailIds } from "@db/message-map";
