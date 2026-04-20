@@ -97,22 +97,24 @@ function remindersScript(): string {
   var $ = function(id){ return document.getElementById(id); };
   var fmt2 = function(n){ return n < 10 ? "0" + n : "" + n; };
 
-  // 上下文必从 URL 来：私聊场景 web_app inline 按钮直接带；群聊场景由 router
-  // 页面（/telegram-app）解析 start_param 后重定向过来时已经带好。
+  // 两种模式：
+  //  - 邮件模式：URL 带 (accountId, messageId, token) → 显示邮件卡 + 添加表单 + 列表
+  //  - 列表模式：URL 无邮件三件套（如主菜单 ⏰ 我的提醒进入）→ 仅显示列表
   var qs = new URLSearchParams(location.search);
   var ctx = {
     accountId: Number(qs.get("accountId")),
     messageId: qs.get("messageId") || "",
     token: qs.get("token") || "",
   };
+  var listOnly = !(ctx.accountId && ctx.messageId && ctx.token);
 
-  function fatal(msg) {
-    document.body.innerHTML = '<div class="wrap"><div class="fatal">' + msg + '</div></div>';
-  }
-
-  if (!ctx.accountId || !ctx.messageId || !ctx.token) {
-    fatal("请从邮件消息上的 ⏰ 按钮打开本页面");
-    return;
+  if (listOnly) {
+    // 隐藏邮件卡 + 添加表单两个 section
+    var hide = ["email-card", "add-section"];
+    for (var i = 0; i < hide.length; i++) {
+      var el = document.getElementById(hide[i]);
+      if (el) el.style.display = "none";
+    }
   }
 
   function ymd(d) { return d.getFullYear() + "-" + fmt2(d.getMonth()+1) + "-" + fmt2(d.getDate()); }
@@ -286,9 +288,13 @@ function remindersScript(): string {
     }
   });
 
-  setWhen(defaultDate());
-  $("when-date").min = ymd(new Date());
-  loadEmailContext();
+  if (!listOnly) {
+    setWhen(defaultDate());
+    $("when-date").min = ymd(new Date());
+    loadEmailContext();
+  } else {
+    document.querySelector("h1").textContent = "⏰ 我的提醒";
+  }
   loadList();
 })();
 `;
@@ -318,7 +324,7 @@ export function RemindersPage() {
             <div class="open-hint">点击查看邮件 →</div>
           </div>
 
-          <div class="section">
+          <div id="add-section" class="section">
             <label for="when-date">提醒时间</label>
             <div class="when-row">
               <input id="when-date" type="date" />

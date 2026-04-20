@@ -129,7 +129,7 @@ export async function buildEmailKeyboard(
 // ── 主菜单键盘 ──────────────────────────────────────────────────────────────
 
 /** 主菜单键盘 */
-export function mainMenuKeyboard(admin: boolean): InlineKeyboard {
+export function mainMenuKeyboard(admin: boolean, env: Env): InlineKeyboard {
   const kb = new InlineKeyboard()
     .text(t("keyboards:menu.accountManagement"), "accs")
     .row()
@@ -139,8 +139,14 @@ export function mainMenuKeyboard(admin: boolean): InlineKeyboard {
     .text(t("keyboards:menu.junk"), "junk")
     .text(t("keyboards:menu.archived"), "archived")
     .row()
-    .text(t("keyboards:menu.sync"), "sync")
-    .row();
+    .text(t("keyboards:menu.sync"), "sync");
+  // 提醒列表：web_app 直接打开 Mini App 的 list-only 模式（不带邮件上下文）。
+  // /start 走私聊，inline web_app 在私聊里有效。
+  if (env.WORKER_URL) {
+    const remindersUrl = `${env.WORKER_URL.replace(/\/$/, "")}${ROUTE_MINI_APP_REMINDERS}`;
+    kb.row().webApp(t("keyboards:menu.reminders"), remindersUrl);
+  }
+  kb.row();
   if (admin) {
     kb.text(t("keyboards:menu.userManagement"), "users")
       .text(t("keyboards:menu.globalOps"), "admin")

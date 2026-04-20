@@ -3,8 +3,9 @@ import {
   markReminderSent,
   type Reminder,
 } from "@db/reminders";
+import { ROUTE_MINI_APP_MAIL } from "@handlers/hono/routes";
 import { t } from "@i18n";
-import { buildMailPreviewUrl } from "@services/mail-preview";
+import { generateMailTokenById } from "@services/mail-preview";
 import { sendTextMessage } from "@services/telegram";
 import { escapeMdV2 } from "@utils/markdown-v2";
 import { reportErrorToObservability } from "@utils/observability";
@@ -26,13 +27,21 @@ function isPermanentSendError(err: unknown): boolean {
   );
 }
 
+/** 把存的 UTC ISO 格式化成 "YYYY-MM-DD HH:MM UTC" —— 服务端不知道用户时区，
+ *  所以统一显示 UTC 并明确标注，用户自行换算。 */
+function formatRemindAt(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}
+
 /**
  * 扫描 D1 中所有到期的提醒，发送并标记已发送。
- * 邮件提醒 → 发到原邮件落到的 chat（reply_to_message_id），附查看邮件按钮；
- * 通用提醒（旧数据，无邮件上下文）→ 发到用户私聊。
+ * 全部走用户私聊（telegram_user_id），不再投递到原邮件所在 chat ——
+ * 个人提醒不应在群里炸出来。查看邮件按钮用 Mini App URL（私聊 web_app 有效）。
  *
- * 永久性失败（bot 被踢、被屏蔽）也标记 sent_at，避免无限重试；瞬态错误留在
- * pending，下分钟重试。
+ * 永久性失败（bot 被屏蔽、用户停用）也标记 sent_at，避免无限重试；瞬态错误
+ * 留在 pending，下分钟重试。
  */
 export async function dispatchDueReminders(env: Env): Promise<void> {
   const due = await listDueReminders(env.DB, new Date().toISOString());
@@ -62,11 +71,14 @@ export async function dispatchDueReminders(env: Env): Promise<void> {
 }
 
 async function sendEmailReminder(env: Env, r: Reminder): Promise<void> {
-  // 目标 chat：优先用投递时的 mapping（保证落到原邮件所在 chat，可能是群）；
-  // 没有 mapping 时回退到用户私聊
-  const targetChat = r.tg_chat_id ?? r.telegram_user_id;
+  // r.account_id 和 r.email_message_id 在调用前已确认非 null
+  const accountId = r.account_id as number;
+  const emailMessageId = r.email_message_id as string;
 
-  const lines = [t("reminders:reminderHeader")];
+  const lines = [
+    t("reminders:reminderHeader"),
+    `🕒 ${escapeMdV2(formatRemindAt(r.remind_at))}`,
+  ];
   if (r.email_subject) {
     lines.push(`📧 ${escapeMdV2(r.email_subject)}`);
   }
@@ -75,49 +87,39 @@ async function sendEmailReminder(env: Env, r: Reminder): Promise<void> {
   }
   const text = lines.join("\n");
 
-  const replyMarkup =
-    env.WORKER_URL && r.account_id != null && r.email_message_id != null
-      ? {
-          inline_keyboard: [
-            [
-              {
-                text: t("reminders:viewMail"),
-                url: await buildMailPreviewUrl(
-                  env.WORKER_URL,
-                  env.ADMIN_SECRET,
-                  r.email_message_id,
-                  r.account_id,
-                ),
-              },
-            ],
-          ],
-        }
-      : undefined;
-
-  const extras: Record<string, unknown> = {
-    link_preview_options: { is_disabled: true },
-  };
-  if (r.tg_message_id != null) {
-    // reply_parameters: 替代旧的 reply_to_message_id；allow_sending_without_reply
-    // 让原 TG 消息已被删除时也能正常发送（不报错）
-    extras.reply_parameters = {
-      message_id: r.tg_message_id,
-      allow_sending_without_reply: true,
+  // 查看邮件按钮：Mini App URL（私聊 web_app inline 按钮有效）。
+  // 没配 WORKER_URL 时不放按钮 —— 用户自己从邮件 TG 消息找原文。
+  let replyMarkup: unknown;
+  if (env.WORKER_URL) {
+    const token = await generateMailTokenById(
+      env.ADMIN_SECRET,
+      emailMessageId,
+      accountId,
+    );
+    const miniAppMailUrl =
+      `${env.WORKER_URL.replace(/\/$/, "")}` +
+      ROUTE_MINI_APP_MAIL.replace(":id", encodeURIComponent(emailMessageId)) +
+      `?accountId=${accountId}&t=${encodeURIComponent(token)}`;
+    replyMarkup = {
+      inline_keyboard: [
+        [{ text: t("reminders:viewMail"), web_app: { url: miniAppMailUrl } }],
+      ],
     };
   }
 
   await sendTextMessage(
     env.TELEGRAM_BOT_TOKEN,
-    targetChat,
+    r.telegram_user_id,
     text,
     replyMarkup,
-    extras,
+    { link_preview_options: { is_disabled: true } },
   );
 }
 
 async function sendGenericReminder(env: Env, r: Reminder): Promise<void> {
   const text = [
     t("reminders:reminderHeader"),
+    `🕒 ${escapeMdV2(formatRemindAt(r.remind_at))}`,
     "",
     escapeMdV2(r.text || "(无备注)"),
   ].join("\n");
