@@ -6,7 +6,7 @@ export default {
     archive: "📥",
     refresh: "🔄",
     viewOriginal: "📧",
-    remind: "⏰ 提醒",
+    remind: "⏰",
   },
   menu: {
     accountManagement: "📧 账号管理",

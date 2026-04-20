@@ -1,4 +1,6 @@
+import { MiniAppMailPage } from "@components/miniapp/mail-page";
 import { RemindersPage } from "@components/miniapp/reminders";
+import { MiniAppRouterPage } from "@components/miniapp/router";
 import { getAccountById } from "@db/accounts";
 import { getCachedMailData, putCachedMailData } from "@db/kv";
 import { getMappingsByEmailIds, getMessageMapping } from "@db/message-map";
@@ -11,14 +13,18 @@ import {
 import { getUserByTelegramId } from "@db/users";
 import {
   ROUTE_MINI_APP,
+  ROUTE_MINI_APP_MAIL,
+  ROUTE_MINI_APP_REMINDERS,
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
   ROUTE_REMINDERS_API_ITEM,
   ROUTE_REMINDERS_API_RESOLVE_CONTEXT,
 } from "@handlers/hono/routes";
-import { getEmailProvider, PROVIDERS } from "@providers";
+import { accountCanArchive, getEmailProvider, PROVIDERS } from "@providers";
 import {
   generateMailTokenById,
+  proxyImages,
+  replaceCidReferences,
   verifyMailTokenById,
 } from "@services/mail-preview";
 import {
@@ -28,6 +34,7 @@ import {
 import { verifyTgInitData } from "@utils/tg-init-data";
 import type { Context } from "hono";
 import { Hono } from "hono";
+import { raw } from "hono/html";
 import type { AppEnv } from "@/types";
 
 const reminders = new Hono<AppEnv>();
@@ -155,11 +162,91 @@ async function lookupEmailContext(
 }
 
 // ─── Mini App 页面 ──────────────────────────────────────────────────────────
-// 鉴权放在 API 层（initData 校验），页面本身可裸开 —— Mini App 必须能在 TG WebView
-// 里直接打开，没有 cookie，无法套 requireTelegramLogin。
+// 鉴权放在 API 层（initData 校验）/ token 校验（mail 页），页面本身可裸开
+// —— Mini App 在 TG WebView 里没 cookie，无法套 requireTelegramLogin。
+//
+// /telegram-app          → 路由页（仅群聊 deep link 会落到这里）
+// /telegram-app/reminders → 提醒设置（私聊 web_app 直接来；群聊 r_ 经路由跳来）
+// /telegram-app/mail/:id  → 邮件预览（私聊 web_app 直接来；群聊 m_ 经路由跳来）
 
-reminders.get(ROUTE_MINI_APP, (c) => {
-  return c.html(<RemindersPage />);
+reminders.get(ROUTE_MINI_APP, (c) => c.html(<MiniAppRouterPage />));
+
+reminders.get(ROUTE_MINI_APP_REMINDERS, (c) => c.html(<RemindersPage />));
+
+reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
+  // 复用 mail-preview 的 token 鉴权 —— 与 /mail/:id 完全同一套，区别只在最终
+  // 渲染用 MiniAppMailPage（带 telegram-web-app SDK + TG 主题色）。
+  const messageId = c.req.param("id");
+  const token = c.req.query("t");
+  const accountIdParam = c.req.query("accountId");
+  if (!messageId || !token || !accountIdParam)
+    return c.text("Missing params", 400);
+  const accountId = Number(accountIdParam);
+  if (!Number.isInteger(accountId) || accountId <= 0)
+    return c.text("Invalid accountId", 400);
+  const valid = await verifyMailTokenById(
+    c.env.ADMIN_SECRET,
+    messageId,
+    accountId,
+    token,
+  );
+  if (!valid) return c.text("Forbidden", 403);
+  const account = await getAccountById(c.env.DB, accountId);
+  if (!account) return c.text("Account not found", 404);
+
+  const provider = getEmailProvider(account, c.env);
+  const [inJunk, starred] = await Promise.all([
+    provider.isJunk(messageId).catch(() => false),
+    provider.isStarred(messageId).catch(() => false),
+  ]);
+  const folderParam = c.req.query("folder");
+  const fetchFolder: "inbox" | "junk" | "archive" =
+    folderParam === "archive"
+      ? "archive"
+      : folderParam === "junk" || inJunk
+        ? "junk"
+        : "inbox";
+
+  const pageProps = {
+    messageId,
+    accountId: account.id,
+    token,
+    inJunk,
+    inArchive: fetchFolder === "archive",
+    starred,
+    canArchive: accountCanArchive(account),
+    accountEmail: account.email,
+  };
+
+  const cached = await getCachedMailData(
+    c.env.EMAIL_KV,
+    account.id,
+    fetchFolder,
+    messageId,
+  );
+  if (cached) {
+    const proxied = await proxyImages(cached.html, c.env.ADMIN_SECRET);
+    return c.html(
+      <MiniAppMailPage meta={cached.meta ?? {}} {...pageProps}>
+        {raw(proxied)}
+      </MiniAppMailPage>,
+    );
+  }
+  if (PROVIDERS[account.type].oauth && !account.refresh_token)
+    return c.text("Account not authorized", 403);
+  const result = await provider.fetchForPreview(messageId, fetchFolder);
+  if (!result) return c.text("No content in this email", 404);
+  const html = replaceCidReferences(result.html, result.cidMap);
+  await putCachedMailData(c.env.EMAIL_KV, account.id, fetchFolder, messageId, {
+    html,
+    meta: result.meta,
+  });
+  const proxied = await proxyImages(html, c.env.ADMIN_SECRET);
+  return c.html(
+    <MiniAppMailPage meta={result.meta} {...pageProps}>
+      {raw(proxied)}
+    </MiniAppMailPage>,
+  );
 });
 
 // ─── API: 解析群聊 deep link 的 start_param ──────────────────────────────────

@@ -1,5 +1,8 @@
 import { getCachedBotInfo } from "@db/kv";
-import { ROUTE_MINI_APP } from "@handlers/hono/routes";
+import {
+  ROUTE_MINI_APP_MAIL,
+  ROUTE_MINI_APP_REMINDERS,
+} from "@handlers/hono/routes";
 import { t } from "@i18n";
 import { generateMailTokenById } from "@services/mail-preview";
 import { InlineKeyboard } from "grammy";
@@ -87,36 +90,39 @@ export async function buildEmailKeyboard(
     emailMessageId,
     accountId,
   );
-  const mailUrl = `${base}/mail/${emailMessageId}?accountId=${accountId}&t=${mailToken}`;
+  // 私聊：直接用 Mini App URL（web_app inline button 仅私聊有效）
+  // 群聊：用 t.me/<bot>/<shortname>?startapp=<feature>_<chat>_<msg> deep link
   const isPrivateChat = !chatId.startsWith("-");
+  const remindMiniUrl = `${base}${ROUTE_MINI_APP_REMINDERS}?accountId=${accountId}&messageId=${encodeURIComponent(emailMessageId)}&token=${mailToken}`;
+  const mailMiniUrl = `${base}${ROUTE_MINI_APP_MAIL.replace(":id", encodeURIComponent(emailMessageId))}?accountId=${accountId}&t=${mailToken}`;
 
   if (isPrivateChat) {
-    const remindUrl = `${base}${ROUTE_MINI_APP}?accountId=${accountId}&messageId=${encodeURIComponent(emailMessageId)}&token=${mailToken}`;
     kb.row()
-      .webApp(t("keyboards:mail.remind"), remindUrl)
-      .url(t("keyboards:mail.viewOriginal"), mailUrl);
+      .webApp(t("keyboards:mail.remind"), remindMiniUrl)
+      .webApp(t("keyboards:mail.viewOriginal"), mailMiniUrl);
     return kb;
   }
 
-  // 群聊场景：要走 BotFather 注册的具名 Mini App。`?startapp=` 不带 short_name
-  // 只对默认 Mini App 有效；具名 app 必须用 `t.me/<bot>/<short_name>?startapp=...`
-  // 否则 TG 客户端报 BOT_INVALID。
+  // 群聊：要走 BotFather 注册的具名 Mini App
   const shortName = env.TG_MINI_APP_SHORT_NAME;
   if (tgMessageId != null && shortName) {
     const username = await getCachedBotUsername(env);
     if (username) {
-      // start_param 允许 [A-Za-z0-9_-]，max 64：chatId 形如 -1001234567890，
-      // 拼上 _<msgId> 也就 ~20 字符，远低于上限
-      const startParam = `${chatId}_${tgMessageId}`;
-      const remindUrl = `https://t.me/${username}/${shortName}?startapp=${startParam}`;
+      // start_param: <feature>_<chatId>_<tgMsgId>，~20 字符，远低于 64 上限
+      const remindParam = `r_${chatId}_${tgMessageId}`;
+      const mailParam = `m_${chatId}_${tgMessageId}`;
+      const remindUrl = `https://t.me/${username}/${shortName}?startapp=${remindParam}`;
+      const mailUrl = `https://t.me/${username}/${shortName}?startapp=${mailParam}`;
       kb.row()
         .url(t("keyboards:mail.remind"), remindUrl)
         .url(t("keyboards:mail.viewOriginal"), mailUrl);
       return kb;
     }
   }
-  // 群聊但 tgMessageId 未知 / 没缓存到 bot username / 没配 short_name：暂不放 ⏰
-  kb.row().url(t("keyboards:mail.viewOriginal"), mailUrl);
+  // 群聊但 tgMessageId 未知 / 没缓存到 bot username / 没配 short_name：
+  // 退回到 web 预览链接（浏览器打开），不放 ⏰
+  const webMailUrl = `${base}/mail/${emailMessageId}?accountId=${accountId}&t=${mailToken}`;
+  kb.row().url(t("keyboards:mail.viewOriginal"), webMailUrl);
   return kb;
 }
 

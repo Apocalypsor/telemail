@@ -30,10 +30,20 @@ export const ROUTE_MAIL_ARCHIVE = "/api/mail/:id/archive";
 export const ROUTE_MAIL_UNARCHIVE = "/api/mail/:id/unarchive";
 
 // ── Mini App ─────────────────────────────────────────────────────────────────
-// 单页路由，目前只承载 reminder 功能；以后可在同一页内基于 start_param / 路径
-// 参数加更多功能。BotFather `/newapp` 注册时 Web App URL 填
-// `${WORKER_URL}/telegram-app`。
+// `/telegram-app` 是 BotFather `/newapp` 注册的入口（Web App URL）。
+// 进来后 JS 根据 start_param 前缀重定向到具体子页面。私聊场景的 web_app 按钮
+// 直接跳子页面 URL，绕过 router。
+//
+// 子页面：
+//   /telegram-app/reminders?accountId=&messageId=&token= → 设提醒
+//   /telegram-app/mail/:id?accountId=&t=                  → 邮件预览（含 FAB 操作）
+//
+// start_param 格式（群聊 deep link 用）：
+//   r_<chatId>_<tgMsgId>  → 提醒（可省略 r_ 前缀，向后兼容旧按钮）
+//   m_<chatId>_<tgMsgId>  → 邮件
 export const ROUTE_MINI_APP = "/telegram-app";
+export const ROUTE_MINI_APP_REMINDERS = "/telegram-app/reminders";
+export const ROUTE_MINI_APP_MAIL = "/telegram-app/mail/:id";
 // API 路径继续按功能命名（reminder API 不会被复用到其他功能）
 export const ROUTE_REMINDERS_API = "/api/reminders";
 export const ROUTE_REMINDERS_API_ITEM = "/api/reminders/:id";

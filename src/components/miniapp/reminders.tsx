@@ -1,7 +1,7 @@
 import {
+  ROUTE_MINI_APP_MAIL,
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
-  ROUTE_REMINDERS_API_RESOLVE_CONTEXT,
 } from "@handlers/hono/routes";
 
 const REMINDERS_CSS = `
@@ -31,9 +31,11 @@ body {
 h1 { font-size: 20px; font-weight: 600; margin: 4px 0 16px; }
 .section { background: var(--surface); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
 label, .section-title { display: block; font-size: 13px; color: var(--hint); margin-bottom: 6px; }
-.email-card { padding: 12px 14px; border-left: 3px solid var(--button); background: var(--surface); border-radius: 8px; margin-bottom: 14px; }
+.email-card { padding: 12px 14px; border-left: 3px solid var(--button); background: var(--surface); border-radius: 8px; margin-bottom: 14px; cursor: pointer; transition: opacity .15s; }
+.email-card:active { opacity: .65; }
 .email-card .subject { font-size: 15px; font-weight: 600; word-break: break-word; }
 .email-card .from { font-size: 12px; color: var(--hint); margin-top: 2px; }
+.email-card .open-hint { font-size: 11px; color: var(--button); margin-top: 6px; }
 input[type="text"], input[type="date"], input[type="time"], textarea {
   width: 100%; padding: 11px 12px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--bg); color: var(--text);
@@ -86,52 +88,26 @@ function remindersScript(): string {
   var tg = window.Telegram && window.Telegram.WebApp;
   if (tg) { tg.ready(); tg.expand(); }
   var initData = (tg && tg.initData) || "";
-  var startParam = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
 
   var $ = function(id){ return document.getElementById(id); };
   var fmt2 = function(n){ return n < 10 ? "0" + n : "" + n; };
 
-  // 邮件上下文有两种来源：
-  //  1) URL query (私聊场景，inline web_app 直接打开)
-  //  2) start_param (群聊场景，t.me/<bot>?startapp=chatid_msgid 跳进来) → 调
-  //     resolve-context 接口换成 (accountId, messageId, token)
+  // 上下文必从 URL 来：私聊场景 web_app inline 按钮直接带；群聊场景由 router
+  // 页面（/telegram-app）解析 start_param 后重定向过来时已经带好。
   var qs = new URLSearchParams(location.search);
   var ctx = {
     accountId: Number(qs.get("accountId")),
     messageId: qs.get("messageId") || "",
     token: qs.get("token") || "",
   };
-  var hasUrlCtx = ctx.accountId && ctx.messageId && ctx.token;
 
   function fatal(msg) {
     document.body.innerHTML = '<div class="wrap"><div class="fatal">' + msg + '</div></div>';
   }
 
-  async function init() {
-    if (!hasUrlCtx) {
-      if (!startParam) {
-        fatal("请从邮件消息上的 ⏰ 按钮打开本页面");
-        return false;
-      }
-      try {
-        var r = await fetch("${ROUTE_REMINDERS_API_RESOLVE_CONTEXT}?start=" + encodeURIComponent(startParam), {
-          headers: { "x-telegram-init-data": initData },
-        });
-        if (!r.ok) {
-          var err = await r.json().catch(function(){ return {}; });
-          fatal(err.error || "解析邮件信息失败");
-          return false;
-        }
-        var d = await r.json();
-        ctx.accountId = d.accountId;
-        ctx.messageId = d.messageId;
-        ctx.token = d.token;
-      } catch (e) {
-        fatal("网络错误");
-        return false;
-      }
-    }
-    return true;
+  if (!ctx.accountId || !ctx.messageId || !ctx.token) {
+    fatal("请从邮件消息上的 ⏰ 按钮打开本页面");
+    return;
   }
 
   function ymd(d) { return d.getFullYear() + "-" + fmt2(d.getMonth()+1) + "-" + fmt2(d.getDate()); }
@@ -180,20 +156,27 @@ function remindersScript(): string {
       + "&token=" + encodeURIComponent(ctx.token);
   }
 
+  function openMail() {
+    var url = "${ROUTE_MINI_APP_MAIL.replace(":id", "")}" + encodeURIComponent(ctx.messageId)
+      + "?accountId=" + ctx.accountId + "&t=" + encodeURIComponent(ctx.token);
+    location.href = url;
+  }
+
   async function loadEmailContext() {
+    var card = $("email-card");
+    card.addEventListener("click", openMail);
     try {
       var r = await fetch("${ROUTE_REMINDERS_API_EMAIL_CONTEXT}" + ctxQuery(), {
         headers: { "x-telegram-init-data": initData },
       });
       if (!r.ok) throw new Error("ctx");
       var d = await r.json();
-      var card = $("email-card");
       $("email-subject").textContent = d.subject || "(无主题)";
       $("email-from").textContent = d.accountEmail ? "账号: " + d.accountEmail : "";
       card.style.display = "block";
     } catch (e) {
       $("email-subject").textContent = "邮件信息加载失败";
-      $("email-card").style.display = "block";
+      card.style.display = "block";
     }
   }
 
@@ -295,13 +278,10 @@ function remindersScript(): string {
     }
   });
 
-  init().then(function(ready){
-    if (!ready) return;
-    setWhen(defaultDate());
-    $("when-date").min = ymd(new Date());
-    loadEmailContext();
-    loadList();
-  });
+  setWhen(defaultDate());
+  $("when-date").min = ymd(new Date());
+  loadEmailContext();
+  loadList();
 })();
 `;
 }
@@ -327,6 +307,7 @@ export function RemindersPage() {
           <div id="email-card" class="email-card" style="display:none">
             <div id="email-subject" class="subject" />
             <div id="email-from" class="from" />
+            <div class="open-hint">点击查看邮件 →</div>
           </div>
 
           <div class="section">
