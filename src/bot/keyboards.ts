@@ -73,16 +73,18 @@ export function readStarredFromReplyMarkup(replyMarkup: unknown): boolean {
 }
 
 /**
- * 根据星标状态构建邮件消息键盘。
+ * 构建邮件消息的完整 inline keyboard。**必须在 send 之后调用**（需要 tgMessageId
+ * 才能给群聊构造 Mini App deep link）。投递流程是：先 sendTextMessage/
+ * sendWithAttachments 裸发文本拿到 sentMessageId，再 buildEmailKeyboard +
+ * setReplyMarkup —— 这样群聊和私聊只有一条路径。
  *
- * ⏰ 提醒按钮的入口：
- * - 私聊：inline `web_app` 按钮直接打开 Mini App（带 accountId/messageId/token URL 参数）
- * - 群聊：inline `web_app` 在群里无效（BUTTON_TYPE_INVALID），改用 deep link
- *   `t.me/<bot>?startapp=<chatId>_<tgMsgId>` 跳到与 bot 的私聊里打开 Mini App，
+ * ⏰ / 👁 Mini App 入口：
+ * - 私聊：inline `web_app` 按钮直传子页面 URL（带 accountId/messageId/token）
+ * - 群聊：`web_app` 在群里无效（BUTTON_TYPE_INVALID），改用 deep link
+ *   `t.me/<bot>/<short>?startapp=<feature>_<chatId>_<tgMsgId>`
  *   start_param 由 Mini App 调 resolve-context 接口换出 (accountId, messageId, token)。
- *   群聊场景需要 `tgMessageId`（消息 send 之后才知道）—— 投递初次构建键盘时
- *   传 undefined 即可（首次群聊消息不带 ⏰），后续 LLM 分析/refresh/star toggle
- *   走的 keyboard 重建路径都已知 tgMessageId，会补上 ⏰。
+ *   需要配 `TG_MINI_APP_SHORT_NAME` + BotFather `/newapp`。
+ *   未配置时群聊的 ⏰/👁 退化成裸 web URL（无 Mini App 能力）。
  */
 export async function buildEmailKeyboard(
   env: Env,
@@ -91,7 +93,7 @@ export async function buildEmailKeyboard(
   starred: boolean,
   canArchive: boolean,
   chatId: string,
-  tgMessageId?: number,
+  tgMessageId: number,
 ): Promise<InlineKeyboard> {
   const kb = addCoreButtons(new InlineKeyboard(), starred, canArchive);
   if (!env.WORKER_URL) return kb;
@@ -119,19 +121,16 @@ export async function buildEmailKeyboard(
     return kb;
   }
 
-  // 群聊：web_app inline button 在群里无效（BUTTON_TYPE_INVALID），改用
-  // `t.me/<bot>/<shortname>?startapp=<feature>_<chat>_<msg>` deep link
-  // 跳到与 bot 的私聊里打开 Mini App。
-  // tgMessageId 在投递初次构建时还没分配，那种情况下退回到 web 预览链接。
+  // 群聊：走 `t.me/<bot>/<short>?startapp=<feature>_<chat>_<msg>` deep link
   const shortName = env.TG_MINI_APP_SHORT_NAME;
-  const username =
-    tgMessageId != null && shortName ? await getCachedBotUsername(env) : null;
-  if (tgMessageId != null && shortName && username) {
+  const username = shortName ? await getCachedBotUsername(env) : null;
+  if (shortName && username) {
     const deepLink = (feature: "r" | "m") =>
       `https://t.me/${username}/${shortName}?startapp=${feature}_${chatId}_${tgMessageId}`;
     kb.row().url(remindBtn, deepLink("r")).url(viewLabel, deepLink("m"));
     return kb;
   }
+  // 未配 Mini App short name：只给 web 预览链接（群聊无 ⏰ 能力）
   kb.row().url(
     viewLabel,
     buildWebMailUrl(base, emailMessageId, accountId, mailToken),

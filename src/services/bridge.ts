@@ -26,6 +26,7 @@ import {
   editTextMessage,
   sendTextMessage,
   sendWithAttachments,
+  setReplyMarkup,
   TG_CAPTION_LIMIT,
   TG_MSG_LIMIT,
 } from "@services/telegram";
@@ -207,15 +208,9 @@ export async function deliverEmailToTelegram(
 
   const hasLlm = !!(env.LLM_API_URL && env.LLM_API_KEY && env.LLM_MODEL);
 
-  const keyboard = await buildEmailKeyboard(
-    env,
-    messageId,
-    account.id,
-    initialStarred,
-    accountCanArchive(account),
-    chatId,
-  );
-
+  // 投递流程：先裸发消息（无 keyboard）→ 拿到 sentMessageId → 建完整键盘 →
+  // setReplyMarkup。这样群聊和私聊只有一条路径，群聊不再有"先 web 链接、LLM
+  // 完成后切 Mini App"的中间态。
   let sentMessageId: number;
   if (hasAttachments) {
     sentMessageId = await sendWithAttachments(
@@ -223,10 +218,9 @@ export async function deliverEmailToTelegram(
       chatId,
       text,
       email.attachments || [],
-      keyboard,
     );
   } else {
-    sentMessageId = await sendTextMessage(tgToken, chatId, text, keyboard);
+    sentMessageId = await sendTextMessage(tgToken, chatId, text);
   }
 
   const inserted = await putMessageMapping(env.DB, {
@@ -235,11 +229,6 @@ export async function deliverEmailToTelegram(
     email_message_id: messageId,
     account_id: account.id,
   });
-
-  if (inserted && initialStarred) {
-    // 新消息投递完 + 初始就是 star → 同步置顶
-    await syncStarPinState(env, chatId, sentMessageId, true);
-  }
 
   // 唯一索引冲突 → 说明另一个并发请求已经投递过，撤回本次重复消息
   if (!inserted) {
@@ -250,6 +239,24 @@ export async function deliverEmailToTelegram(
     return;
   }
 
+  const keyboard = await buildEmailKeyboard(
+    env,
+    messageId,
+    account.id,
+    initialStarred,
+    accountCanArchive(account),
+    chatId,
+    sentMessageId,
+  );
+  await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard).catch(
+    () => {},
+  );
+
+  if (initialStarred) {
+    // 新消息投递完 + 初始就是 star → 同步置顶
+    await syncStarPinState(env, chatId, sentMessageId, true);
+  }
+
   if (!hasLlm) return;
 
   if (!plainBody.trim()) return;
@@ -257,7 +264,9 @@ export async function deliverEmailToTelegram(
   waitUntil(
     (async () => {
       try {
-        // 重建键盘 —— 现在有 sentMessageId，群聊也能拿到 ⏰ deep link 按钮了
+        // LLM edit 里重建一次键盘取最新 reminder count（期间用户可能刚设了提醒，
+        // /api/reminders 那边也在并发 setReplyMarkup；这里重建保证 edit 不会把
+        // 键盘回退到陈旧状态）
         const fullKeyboard = await buildEmailKeyboard(
           env,
           messageId,
