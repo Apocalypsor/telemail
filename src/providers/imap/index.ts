@@ -1,5 +1,4 @@
 import { getAccountById, getImapAccounts } from "@db/accounts";
-import { getMappingsByEmailIds } from "@db/message-map";
 import { requireBearer } from "@handlers/hono/middleware";
 import { EmailProvider } from "@providers/base";
 import { callBridge, syncAccounts } from "@providers/imap/utils";
@@ -14,6 +13,11 @@ export {
   syncAccounts,
 } from "@providers/imap/utils";
 
+/**
+ * IMAP provider —— 所有 `messageId` 参数都是 RFC 822 Message-Id（全局唯一，跨 folder
+ * 稳定）。不是 IMAP UID。middleware 会按 `SEARCH HEADER Message-Id` 在相关 folder
+ * 里找到当前 UID 再操作。
+ */
 export class ImapProvider extends EmailProvider {
   static displayName = "IMAP";
   /** IMAP bridge 拉账号列表的 HTTP 路径 */
@@ -60,15 +64,15 @@ export class ImapProvider extends EmailProvider {
 
   // ─── Enqueue ──────────────────────────────────────────────────────────
 
-  /** 解析 IMAP bridge 推送通知并入队 */
+  /** 解析 IMAP bridge 推送通知并入队。payload 里 `rfcMessageId` 是 RFC 822 Message-Id。 */
   static async enqueue(
-    body: { accountId: number; messageId: string },
+    body: { accountId: number; rfcMessageId: string },
     env: Env,
   ): Promise<void> {
-    const { accountId, messageId } = body;
+    const { accountId, rfcMessageId } = body;
 
-    if (typeof accountId !== "number" || accountId <= 0 || !messageId) {
-      throw new Error("Missing required fields: accountId, messageId");
+    if (typeof accountId !== "number" || accountId <= 0 || !rfcMessageId) {
+      throw new Error("Missing required fields: accountId, rfcMessageId");
     }
 
     const account = await getAccountById(env.DB, accountId);
@@ -78,9 +82,10 @@ export class ImapProvider extends EmailProvider {
     }
 
     console.log(
-      `IMAP push: new message for ${account.email}, messageId=${messageId}`,
+      `IMAP push: new message for ${account.email}, rfcMessageId=${rfcMessageId}`,
     );
-    await env.EMAIL_QUEUE.send({ accountId, messageId });
+    // 队列里用 messageId 字段（跨 provider 统一）；对 IMAP 来说它就是 Message-Id
+    await env.EMAIL_QUEUE.send({ accountId, messageId: rfcMessageId });
   }
 
   // ─── Message actions ──────────────────────────────────────────────────
@@ -88,7 +93,7 @@ export class ImapProvider extends EmailProvider {
   async markAsRead(messageId: string) {
     await callBridge(this.env, "POST", "/api/flag", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
       flag: IMAP_FLAG_SEEN,
       add: true,
     });
@@ -97,7 +102,7 @@ export class ImapProvider extends EmailProvider {
   async addStar(messageId: string) {
     await callBridge(this.env, "POST", "/api/flag", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
       flag: IMAP_FLAG_FLAGGED,
       add: true,
     });
@@ -106,7 +111,7 @@ export class ImapProvider extends EmailProvider {
   async removeStar(messageId: string) {
     await callBridge(this.env, "POST", "/api/flag", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
       flag: IMAP_FLAG_FLAGGED,
       add: false,
     });
@@ -115,71 +120,42 @@ export class ImapProvider extends EmailProvider {
   async isStarred(messageId: string) {
     const resp = await callBridge(this.env, "POST", "/api/is-starred", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
     });
     const { starred } = (await resp.json()) as { starred: boolean };
     return starred;
   }
 
-  /**
-   * 问 bridge 这封邮件现在是不是在 junk folder。用 RFC Message-Id 做跨 folder 精确
-   * 检查：UID 在 junk folder 里对不上，用 Message-Id `SEARCH HEADER` 才准。
-   *
-   * 历史 mapping 可能没存 Message-Id（migration 0020 之前的数据 / 原邮件无 Message-Id 头），
-   * 此时保守返回 false —— 比让调用方（预览页）误判为 junk 要安全。
-   */
   async isJunk(messageId: string) {
-    const mappings = await getMappingsByEmailIds(this.env.DB, this.account.id, [
-      messageId,
-    ]);
-    const rfcMessageId = mappings[0]?.rfc_message_id;
-    if (!rfcMessageId) return false;
-
     const resp = await callBridge(this.env, "POST", "/api/is-junk", {
       accountId: this.account.id,
-      rfcMessageId,
+      rfcMessageId: messageId,
     });
     const { junk } = (await resp.json()) as { junk: boolean };
     return junk;
   }
 
   /**
-   * IMAP UID 是 per-folder 的，邮件移出 INBOX 后 UID 失效 —— 要跨 folder 对账必须
-   * 用 RFC 822 Message-Id（全局唯一）。
-   *
-   * 策略：
-   *  - 有 `rfcMessageId` → 调 bridge `/api/locate`，按 Message-Id 在 junk / archive /
-   *    trash / INBOX 各文件夹 SEARCH HEADER，精确返回当前位置
-   *  - 没有（历史 mapping 里为 NULL）→ 回退到 `/api/is-junk` + `/api/is-starred`；
-   *    只能分辨 junk / inbox，无法区分 archive / deleted（遗留限制）
+   * 按 RFC Message-Id 跨 folder 定位邮件。bridge `/api/locate` 并行查 INBOX / junk /
+   * archive / trash，返回精确位置 + （inbox 时的）星标状态。
    *
    * 不吞 error —— bridge 瞬时不可达就直接抛给 `reconcileMessageState`，不会误删 TG。
    */
-  async resolveMessageState(
-    messageId: string,
-    rfcMessageId?: string | null,
-  ): Promise<MessageState> {
-    if (rfcMessageId) {
-      const resp = await callBridge(this.env, "POST", "/api/locate", {
-        accountId: this.account.id,
-        rfcMessageId,
-        // 用户自定义的归档文件夹路径；bridge 没配就自动探测 \Archive special-use
-        archiveFolder: this.account.archive_folder ?? undefined,
-      });
-      const body = (await resp.json()) as {
-        location: "inbox" | "junk" | "archive" | "deleted";
-        starred?: boolean;
-      };
-      if (body.location === "inbox") {
-        return { location: "inbox", starred: body.starred ?? false };
-      }
-      return { location: body.location };
+  async resolveMessageState(messageId: string): Promise<MessageState> {
+    const resp = await callBridge(this.env, "POST", "/api/locate", {
+      accountId: this.account.id,
+      rfcMessageId: messageId,
+      // 用户自定义的归档文件夹路径；bridge 没配就自动探测 \Archive special-use
+      archiveFolder: this.account.archive_folder ?? undefined,
+    });
+    const body = (await resp.json()) as {
+      location: "inbox" | "junk" | "archive" | "deleted";
+      starred?: boolean;
+    };
+    if (body.location === "inbox") {
+      return { location: "inbox", starred: body.starred ?? false };
     }
-
-    // 兼容回退：历史 mapping 没有 Message-Id
-    if (await this.isJunk(messageId)) return { location: "junk" };
-    const starred = await this.isStarred(messageId);
-    return { location: "inbox", starred };
+    return { location: body.location };
   }
 
   async listUnread(maxResults: number = 20) {
@@ -230,48 +206,42 @@ export class ImapProvider extends EmailProvider {
   async markAsJunk(messageId: string) {
     await callBridge(this.env, "POST", "/api/mark-as-junk", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
     });
   }
 
+  /**
+   * Junk → INBOX。Message-Id 不会因为 folder 移动而变，所以返回同一个 id。
+   * 保持 abstract signature（Outlook/Gmail 会换 id）的 `Promise<string>`。
+   */
   async moveToInbox(messageId: string): Promise<string> {
-    const resp = await callBridge(this.env, "POST", "/api/move-to-inbox", {
+    await callBridge(this.env, "POST", "/api/move-to-inbox", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
     });
-    const { newMessageId } = (await resp.json()) as { newMessageId?: string };
-    if (!newMessageId) {
-      throw new Error(
-        "IMAP bridge /api/move-to-inbox did not return newMessageId",
-      );
-    }
-    return newMessageId;
+    return messageId;
   }
 
   async unarchiveMessage(messageId: string): Promise<string> {
-    const resp = await callBridge(this.env, "POST", "/api/unarchive", {
+    await callBridge(this.env, "POST", "/api/unarchive", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
       archiveFolder: this.account.archive_folder ?? undefined,
     });
-    const { newMessageId } = (await resp.json()) as { newMessageId?: string };
-    if (!newMessageId) {
-      throw new Error("IMAP bridge /api/unarchive did not return newMessageId");
-    }
-    return newMessageId;
+    return messageId;
   }
 
   async trashMessage(messageId: string) {
     await callBridge(this.env, "POST", "/api/trash", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
     });
   }
 
   async archiveMessage(messageId: string) {
     await callBridge(this.env, "POST", "/api/archive", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
       // 只在用户明确配置过时传；否则让 bridge 自动探测 \Archive special-use
       folder: this.account.archive_folder ?? undefined,
     });
@@ -292,9 +262,9 @@ export class ImapProvider extends EmailProvider {
   ): Promise<ArrayBuffer> {
     const resp = await callBridge(this.env, "POST", "/api/fetch", {
       accountId: this.account.id,
-      messageId,
+      rfcMessageId: messageId,
       folder,
-      // archive 的 UID 只在归档文件夹里有意义，带上用户配的 archive_folder 让 bridge 定位
+      // archive folder 路径只在 hint 为 archive 时有意义
       archiveFolder:
         folder === "archive"
           ? (this.account.archive_folder ?? undefined)

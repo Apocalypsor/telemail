@@ -49,14 +49,9 @@ export abstract class EmailProvider {
    * - location "archive"  —— 已归档
    * - location "deleted"  —— 已删除（或 provider 找不到）
    *
-   * `rfcMessageId` 仅 IMAP 用 —— 它需要 RFC 822 Message-Id 做跨 folder SEARCH；
-   * Gmail/Outlook 忽略。历史 mapping 可能没有此值，IMAP 会回退到旧的 isJunk+isStarred
-   * 路径（无法区分 archive/deleted，但不丢数据）。
+   * 对 IMAP 来说 `messageId` 就是 RFC 822 Message-Id；Gmail/Outlook 是各自的原生 id。
    */
-  abstract resolveMessageState(
-    messageId: string,
-    rfcMessageId?: string | null,
-  ): Promise<MessageState>;
+  abstract resolveMessageState(messageId: string): Promise<MessageState>;
   abstract listUnread(maxResults?: number): Promise<EmailListItem[]>;
   abstract listStarred(maxResults?: number): Promise<EmailListItem[]>;
   abstract listJunk(maxResults?: number): Promise<EmailListItem[]>;

@@ -3,17 +3,14 @@
 export interface MessageMapping {
   tg_message_id: number;
   tg_chat_id: string;
+  /**
+   * Provider 的邮件全局 id：Gmail messageId / Outlook Graph id / IMAP 的 RFC 822
+   * Message-Id（不是 per-folder UID）。对 IMAP 而言跨 folder 稳定。
+   */
   email_message_id: string;
   account_id: number;
   /** LLM 生成的一句话摘要，用于邮件列表显示（NULL = 未分析，列表回退到 subject） */
   short_summary: string | null;
-  /**
-   * RFC 822 Message-Id header（全局唯一）。仅 IMAP 对账用：`email_message_id`
-   * 在 IMAP 里是 per-folder 的 INBOX UID，邮件移出 INBOX 后失效；用 Message-Id
-   * 可以让 middleware 跨 folder `SEARCH HEADER Message-Id` 定位当前位置。
-   * Gmail/Outlook 忽略此字段。历史 mapping / 无 Message-Id 头的邮件为 NULL。
-   */
-  rfc_message_id: string | null;
 }
 
 /** 保存 Telegram → 邮件消息映射，返回是否实际插入（false = 重复，被 IGNORE） */
@@ -21,23 +18,18 @@ export async function putMessageMapping(
   db: D1Database,
   mapping: Pick<
     MessageMapping,
-    | "tg_message_id"
-    | "tg_chat_id"
-    | "email_message_id"
-    | "account_id"
-    | "rfc_message_id"
+    "tg_message_id" | "tg_chat_id" | "email_message_id" | "account_id"
   >,
 ): Promise<boolean> {
   const result = await db
     .prepare(
-      "INSERT OR IGNORE INTO message_map (tg_message_id, tg_chat_id, email_message_id, account_id, rfc_message_id) VALUES (?, ?, ?, ?, ?)",
+      "INSERT OR IGNORE INTO message_map (tg_message_id, tg_chat_id, email_message_id, account_id) VALUES (?, ?, ?, ?)",
     )
     .bind(
       mapping.tg_message_id,
       mapping.tg_chat_id,
       mapping.email_message_id,
       mapping.account_id,
-      mapping.rfc_message_id,
     )
     .run();
   return (result.meta.changes ?? 0) > 0;
