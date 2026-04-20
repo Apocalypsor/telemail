@@ -1,3 +1,4 @@
+import { getAccountById } from "@db/accounts";
 import {
   listDueReminders,
   markReminderSent,
@@ -6,6 +7,7 @@ import {
 import { ROUTE_MINI_APP_MAIL } from "@handlers/hono/routes";
 import { t } from "@i18n";
 import { generateMailTokenById } from "@services/mail-preview";
+import { refreshEmailKeyboardAfterReminderChange } from "@services/message-actions";
 import { sendTextMessage } from "@services/telegram";
 import { escapeMdV2 } from "@utils/markdown-v2";
 import { reportErrorToObservability } from "@utils/observability";
@@ -43,6 +45,24 @@ function formatRemindAt(iso: string): string {
  * 永久性失败（bot 被屏蔽、用户停用）也标记 sent_at，避免无限重试；瞬态错误
  * 留在 pending，下分钟重试。
  */
+/** 标 sent_at 后给邮件 TG 键盘做一次刷新 —— 让 ⏰ 上的 count -1。
+ *  通用提醒（无邮件上下文）跳过。 */
+async function markSentAndRefresh(env: Env, r: Reminder): Promise<void> {
+  await markReminderSent(env.DB, r.id);
+  if (r.account_id == null || r.email_message_id == null) return;
+  const account = await getAccountById(env.DB, r.account_id);
+  if (!account) return;
+  await refreshEmailKeyboardAfterReminderChange(
+    env,
+    account,
+    r.email_message_id,
+  ).catch((err) =>
+    reportErrorToObservability(env, "reminders.refresh_keyboard_failed", err, {
+      reminderId: r.id,
+    }),
+  );
+}
+
 export async function dispatchDueReminders(env: Env): Promise<void> {
   const due = await listDueReminders(env.DB, new Date().toISOString());
   if (due.length === 0) return;
@@ -55,10 +75,11 @@ export async function dispatchDueReminders(env: Env): Promise<void> {
         } else {
           await sendGenericReminder(env, r);
         }
-        await markReminderSent(env.DB, r.id);
+        await markSentAndRefresh(env, r);
       } catch (err) {
         if (isPermanentSendError(err)) {
-          await markReminderSent(env.DB, r.id);
+          // 永久失败也算"发出了" —— count -1，键盘也刷新
+          await markSentAndRefresh(env, r);
         }
         await reportErrorToObservability(env, "reminders.send_failed", err, {
           reminderId: r.id,

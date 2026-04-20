@@ -193,9 +193,12 @@ function remindersScript(): string {
   function renderList(items) {
     var ul = $("list");
     ul.innerHTML = "";
+    var countEl = $("list-count");
+    if (countEl) countEl.textContent = items.length ? " (" + items.length + ")" : "";
     if (!items.length) {
       var e = document.createElement("div");
-      e.className = "empty"; e.textContent = "暂无待提醒事项";
+      e.className = "empty";
+      e.textContent = listOnly ? "暂无待提醒事项" : "本邮件还没有设过提醒";
       ul.appendChild(e); return;
     }
     items.forEach(function(it){
@@ -203,7 +206,9 @@ function remindersScript(): string {
       var meta = document.createElement("div"); meta.className = "meta";
       var when = document.createElement("div"); when.className = "when"; when.textContent = fmtWhen(it.remind_at);
       meta.appendChild(when);
-      if (it.email_subject) {
+      // email subject 只在 list-only 模式（多封邮件混合）显示；email 模式下顶部
+      // 已经有邮件卡，重复就冗余了。
+      if (listOnly && it.email_subject) {
         var sub = document.createElement("div"); sub.className = "subject"; sub.textContent = "📧 " + it.email_subject;
         meta.appendChild(sub);
       }
@@ -220,8 +225,10 @@ function remindersScript(): string {
   }
 
   async function loadList() {
+    // email 模式 → 仅查这封邮件的提醒；list-only → 查用户全部
+    var url = "${ROUTE_REMINDERS_API}" + (listOnly ? "" : ctxQuery());
     try {
-      var r = await fetch("${ROUTE_REMINDERS_API}", { headers: { "x-telegram-init-data": initData } });
+      var r = await fetch(url, { headers: { "x-telegram-init-data": initData } });
       if (!r.ok) throw new Error("list");
       var d = await r.json();
       renderList(d.reminders || []);
@@ -294,6 +301,7 @@ function remindersScript(): string {
     loadEmailContext();
   } else {
     document.querySelector("h1").textContent = "⏰ 我的提醒";
+    $("list-title").textContent = "所有待提醒";
   }
   loadList();
 })();
@@ -373,7 +381,10 @@ export function RemindersPage() {
           </div>
 
           <div class="section">
-            <div class="section-title">所有待提醒</div>
+            <div class="section-title">
+              <span id="list-title">已设的提醒</span>
+              <span id="list-count" />
+            </div>
             <ul id="list" class="list">
               <div class="empty">加载中…</div>
             </ul>

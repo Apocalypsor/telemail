@@ -1,3 +1,4 @@
+import { MiniAppMailListPage } from "@components/miniapp/mail-list";
 import { MiniAppMailPage } from "@components/miniapp/mail-page";
 import { RemindersPage } from "@components/miniapp/reminders";
 import { MiniAppRouterPage } from "@components/miniapp/router";
@@ -8,11 +9,15 @@ import {
   countPendingReminders,
   createReminder,
   deletePendingReminder,
+  getReminderById,
   listPendingReminders,
+  listPendingRemindersForEmail,
 } from "@db/reminders";
 import { getUserByTelegramId } from "@db/users";
 import {
   ROUTE_MINI_APP,
+  ROUTE_MINI_APP_API_LIST,
+  ROUTE_MINI_APP_LIST,
   ROUTE_MINI_APP_MAIL,
   ROUTE_MINI_APP_REMINDERS,
   ROUTE_REMINDERS_API,
@@ -21,12 +26,14 @@ import {
   ROUTE_REMINDERS_API_RESOLVE_CONTEXT,
 } from "@handlers/hono/routes";
 import { accountCanArchive, getEmailProvider, PROVIDERS } from "@providers";
+import { getMailList, isMailListType } from "@services/mail-list";
 import {
   generateMailTokenById,
   proxyImages,
   replaceCidReferences,
   verifyMailTokenById,
 } from "@services/mail-preview";
+import { refreshEmailKeyboardAfterReminderChange } from "@services/message-actions";
 import {
   REMINDER_PER_USER_LIMIT,
   REMINDER_TEXT_MAX,
@@ -173,6 +180,33 @@ reminders.get(ROUTE_MINI_APP, (c) => c.html(<MiniAppRouterPage />));
 
 reminders.get(ROUTE_MINI_APP_REMINDERS, (c) => c.html(<RemindersPage />));
 
+reminders.get(ROUTE_MINI_APP_LIST, (c) => {
+  const type = c.req.param("type");
+  if (!isMailListType(type)) return c.text("Unknown list type", 404);
+  return c.html(<MiniAppMailListPage type={type} />);
+});
+
+// 列表 JSON API：复用 services/mail-list 同一份数据，bot 文本回复也走它
+reminders.get(ROUTE_MINI_APP_API_LIST, async (c) => {
+  const userId = await authMiniApp(c);
+  if (!userId) return c.json({ error: "Unauthorized" }, 401);
+  const type = c.req.param("type");
+  if (!isMailListType(type)) return c.json({ error: "Unknown list type" }, 400);
+
+  const result = await getMailList(c.env, userId, type);
+  // 副作用（starred 同步键盘 / junk 清 mapping）后台跑，不阻塞响应
+  if (result.pendingSideEffects.length > 0) {
+    c.executionCtx.waitUntil(
+      Promise.allSettled(result.pendingSideEffects.map((t) => t())),
+    );
+  }
+  return c.json({
+    type: result.type,
+    results: result.results,
+    total: result.total,
+  });
+});
+
 reminders.get(ROUTE_MINI_APP_MAIL, async (c) => {
   // 复用 mail-preview 的 token 鉴权 —— 与 /mail/:id 完全同一套，区别只在最终
   // 渲染用 MiniAppMailPage（带 telegram-web-app SDK + TG 主题色）。
@@ -317,11 +351,30 @@ reminders.get(ROUTE_REMINDERS_API_EMAIL_CONTEXT, async (c) => {
   });
 });
 
-// ─── API: 列表（用户所有 pending） ───────────────────────────────────────────
+// ─── API: 列表 ────────────────────────────────────────────────────────────────
+// 不带参数 → 返回用户所有 pending（list-only 模式 / 主菜单"我的提醒"）
+// 带 (accountId, messageId, token) → 仅返回该邮件的 pending（邮件模式：⏰ 按钮）
 
 reminders.get(ROUTE_REMINDERS_API, async (c) => {
   const userId = await authMiniApp(c);
   if (!userId) return c.json({ error: "Unauthorized" }, 401);
+
+  const accountIdQ = c.req.query("accountId");
+  const messageIdQ = c.req.query("messageId");
+  const tokenQ = c.req.query("token");
+  if (accountIdQ || messageIdQ || tokenQ) {
+    // 任一存在则三件套都得有效
+    const ctx = await resolveEmailContext(c, accountIdQ, messageIdQ, tokenQ);
+    if (!ctx.ok) return c.json({ error: ctx.error }, ctx.status);
+    const items = await listPendingRemindersForEmail(
+      c.env.DB,
+      userId,
+      ctx.accountId,
+      ctx.messageId,
+    );
+    return c.json({ reminders: items });
+  }
+
   const items = await listPendingReminders(c.env.DB, userId);
   return c.json({ reminders: items });
 });
@@ -390,6 +443,14 @@ reminders.post(ROUTE_REMINDERS_API, async (c) => {
     tgChatId: tgChatId ?? undefined,
     tgMessageId: tgMessageId ?? undefined,
   });
+  // 后台刷新邮件 TG 消息的键盘 —— ⏰ 按钮上的 count 立即 +1
+  c.executionCtx.waitUntil(
+    refreshEmailKeyboardAfterReminderChange(
+      c.env,
+      ctx.account,
+      ctx.messageId,
+    ).catch(() => {}),
+  );
   return c.json({ ok: true, id });
 });
 
@@ -401,8 +462,31 @@ reminders.delete(ROUTE_REMINDERS_API_ITEM, async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0)
     return c.json({ ok: false, error: "Invalid id" }, 400);
+
+  // 删除前先读出 account_id + email_message_id，删除后用来刷键盘
+  const reminder = await getReminderById(c.env.DB, id);
+  if (!reminder || reminder.telegram_user_id !== userId)
+    return c.json({ ok: false, error: "未找到提醒" }, 404);
+
   const ok = await deletePendingReminder(c.env.DB, userId, id);
   if (!ok) return c.json({ ok: false, error: "未找到提醒" }, 404);
+
+  if (reminder.account_id != null && reminder.email_message_id != null) {
+    const accountId = reminder.account_id;
+    const emailMessageId = reminder.email_message_id;
+    c.executionCtx.waitUntil(
+      (async () => {
+        const account = await getAccountById(c.env.DB, accountId);
+        if (account) {
+          await refreshEmailKeyboardAfterReminderChange(
+            c.env,
+            account,
+            emailMessageId,
+          ).catch(() => {});
+        }
+      })(),
+    );
+  }
   return c.json({ ok: true });
 });
 

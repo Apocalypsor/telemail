@@ -68,6 +68,52 @@ export async function listPendingReminders(
   return results;
 }
 
+/** 列出某用户某封邮件下所有待发送提醒（按时间升序） */
+export async function listPendingRemindersForEmail(
+  db: D1Database,
+  telegramUserId: string,
+  accountId: number,
+  emailMessageId: string,
+): Promise<Reminder[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM reminders
+       WHERE telegram_user_id = ? AND account_id = ? AND email_message_id = ?
+         AND sent_at IS NULL
+       ORDER BY remind_at ASC`,
+    )
+    .bind(telegramUserId, accountId, emailMessageId)
+    .all<Reminder>();
+  return results;
+}
+
+/** 统计某封邮件未发送的提醒数（用于 keyboard 上显示数字） */
+export async function countPendingRemindersForEmail(
+  db: D1Database,
+  accountId: number,
+  emailMessageId: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM reminders
+       WHERE account_id = ? AND email_message_id = ? AND sent_at IS NULL`,
+    )
+    .bind(accountId, emailMessageId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/** 按 id 取单条提醒（删除前用来读 account_id/email_message_id 决定是否刷键盘） */
+export async function getReminderById(
+  db: D1Database,
+  id: number,
+): Promise<Reminder | null> {
+  return db
+    .prepare(`SELECT * FROM reminders WHERE id = ?`)
+    .bind(id)
+    .first<Reminder>();
+}
+
 /** 删除某用户的待发送提醒（不允许删别人的，所以 WHERE 双重约束） */
 export async function deletePendingReminder(
   db: D1Database,

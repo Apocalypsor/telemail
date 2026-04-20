@@ -1,5 +1,7 @@
 import { getCachedBotInfo } from "@db/kv";
+import { countPendingRemindersForEmail } from "@db/reminders";
 import {
+  ROUTE_MINI_APP_LIST,
   ROUTE_MINI_APP_MAIL,
   ROUTE_MINI_APP_REMINDERS,
 } from "@handlers/hono/routes";
@@ -35,6 +37,12 @@ function addCoreButtons(
   if (canArchive) kb.text(t("keyboards:mail.archive"), "archive");
   kb.text(t("keyboards:mail.refresh"), "refresh");
   return kb;
+}
+
+/** ⏰ 按钮 label：有待提醒就带数字 `⏰ (N)`，否则裸 emoji */
+function remindLabel(count: number): string {
+  const base = t("keyboards:mail.remind");
+  return count > 0 ? `${base} (${count})` : base;
 }
 
 /**
@@ -85,11 +93,12 @@ export async function buildEmailKeyboard(
   if (!env.WORKER_URL) return kb;
 
   const base = env.WORKER_URL.replace(/\/$/, "");
-  const mailToken = await generateMailTokenById(
-    env.ADMIN_SECRET,
-    emailMessageId,
-    accountId,
-  );
+  const [mailToken, reminderCount] = await Promise.all([
+    generateMailTokenById(env.ADMIN_SECRET, emailMessageId, accountId),
+    // ⏰ label 实时反映该邮件的 pending 提醒数（"⏰" 或 "⏰ (2)"）。
+    countPendingRemindersForEmail(env.DB, accountId, emailMessageId),
+  ]);
+  const remindBtn = remindLabel(reminderCount);
   // 私聊：直接用 Mini App URL（web_app inline button 仅私聊有效）
   // 群聊：用 t.me/<bot>/<shortname>?startapp=<feature>_<chat>_<msg> deep link
   const isPrivateChat = !chatId.startsWith("-");
@@ -98,7 +107,7 @@ export async function buildEmailKeyboard(
 
   if (isPrivateChat) {
     kb.row()
-      .webApp(t("keyboards:mail.remind"), remindMiniUrl)
+      .webApp(remindBtn, remindMiniUrl)
       .webApp(t("keyboards:mail.viewOriginal"), mailMiniUrl);
     return kb;
   }
@@ -112,10 +121,10 @@ export async function buildEmailKeyboard(
       const remindParam = `r_${chatId}_${tgMessageId}`;
       const mailParam = `m_${chatId}_${tgMessageId}`;
       const remindUrl = `https://t.me/${username}/${shortName}?startapp=${remindParam}`;
-      const mailUrl = `https://t.me/${username}/${shortName}?startapp=${mailParam}`;
+      const mailDeepUrl = `https://t.me/${username}/${shortName}?startapp=${mailParam}`;
       kb.row()
-        .url(t("keyboards:mail.remind"), remindUrl)
-        .url(t("keyboards:mail.viewOriginal"), mailUrl);
+        .url(remindBtn, remindUrl)
+        .url(t("keyboards:mail.viewOriginal"), mailDeepUrl);
       return kb;
     }
   }
@@ -130,23 +139,37 @@ export async function buildEmailKeyboard(
 
 /** 主菜单键盘 */
 export function mainMenuKeyboard(admin: boolean, env: Env): InlineKeyboard {
-  const kb = new InlineKeyboard()
-    .text(t("keyboards:menu.accountManagement"), "accs")
-    .row()
-    .text(t("keyboards:menu.unread"), "unread")
-    .text(t("keyboards:menu.starred"), "starred")
-    .row()
-    .text(t("keyboards:menu.junk"), "junk")
-    .text(t("keyboards:menu.archived"), "archived")
-    .row()
-    .text(t("keyboards:menu.sync"), "sync");
-  // 提醒列表：web_app 直接打开 Mini App 的 list-only 模式（不带邮件上下文）。
-  // /start 走私聊，inline web_app 在私聊里有效。
+  const kb = new InlineKeyboard().text(
+    t("keyboards:menu.accountManagement"),
+    "accs",
+  );
+  // 邮件列表 + 提醒：私聊里 web_app 直接打开 Mini App。
+  // 没配 WORKER_URL 时回退到 callback（文本回复，靠 /unread 等命令）。
+  // /start 默认私聊，inline web_app 在私聊有效。
   if (env.WORKER_URL) {
-    const remindersUrl = `${env.WORKER_URL.replace(/\/$/, "")}${ROUTE_MINI_APP_REMINDERS}`;
-    kb.row().webApp(t("keyboards:menu.reminders"), remindersUrl);
+    const base = env.WORKER_URL.replace(/\/$/, "");
+    const listUrl = (type: string) =>
+      `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
+    kb.row()
+      .webApp(t("keyboards:menu.unread"), listUrl("unread"))
+      .webApp(t("keyboards:menu.starred"), listUrl("starred"))
+      .row()
+      .webApp(t("keyboards:menu.junk"), listUrl("junk"))
+      .webApp(t("keyboards:menu.archived"), listUrl("archived"))
+      .row()
+      .webApp(
+        t("keyboards:menu.reminders"),
+        `${base}${ROUTE_MINI_APP_REMINDERS}`,
+      );
+  } else {
+    kb.row()
+      .text(t("keyboards:menu.unread"), "unread")
+      .text(t("keyboards:menu.starred"), "starred")
+      .row()
+      .text(t("keyboards:menu.junk"), "junk")
+      .text(t("keyboards:menu.archived"), "archived");
   }
-  kb.row();
+  kb.row().text(t("keyboards:menu.sync"), "sync").row();
   if (admin) {
     kb.text(t("keyboards:menu.userManagement"), "users")
       .text(t("keyboards:menu.globalOps"), "admin")

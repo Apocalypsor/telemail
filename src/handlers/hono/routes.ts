@@ -44,6 +44,10 @@ export const ROUTE_MAIL_UNARCHIVE = "/api/mail/:id/unarchive";
 export const ROUTE_MINI_APP = "/telegram-app";
 export const ROUTE_MINI_APP_REMINDERS = "/telegram-app/reminders";
 export const ROUTE_MINI_APP_MAIL = "/telegram-app/mail/:id";
+export const ROUTE_MINI_APP_LIST = "/telegram-app/list/:type";
+
+// API
+export const ROUTE_MINI_APP_API_LIST = "/api/mini-app/list/:type";
 // API 路径继续按功能命名（reminder API 不会被复用到其他功能）
 export const ROUTE_REMINDERS_API = "/api/reminders";
 export const ROUTE_REMINDERS_API_ITEM = "/api/reminders/:id";

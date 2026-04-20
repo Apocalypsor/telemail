@@ -2,6 +2,7 @@ import { buildEmailKeyboard } from "@bot/keyboards";
 import { getAccountById, getOwnAccounts } from "@db/accounts";
 import {
   deleteMappingByEmailId,
+  getMappingsByEmailIds,
   getMessageMapping,
   type MessageMapping,
 } from "@db/message-map";
@@ -288,6 +289,50 @@ export async function deleteJunkMappings(
       m.email_message_id,
       m.account_id,
     ).catch(() => {});
+  }
+}
+
+/** 用最新的 reminder count 重建邮件 keyboard 并 setReplyMarkup。
+ *  Mini App 创建/删除提醒后调用 —— 让 ⏰ 按钮上的数字立即更新。
+ *  没 mapping（邮件没在 TG）或 setReplyMarkup 报 "not modified" 都静默跳过。 */
+export async function refreshEmailKeyboardAfterReminderChange(
+  env: Env,
+  account: Account,
+  emailMessageId: string,
+): Promise<void> {
+  const mappings = await getMappingsByEmailIds(env.DB, account.id, [
+    emailMessageId,
+  ]);
+  const m = mappings[0];
+  if (!m) return;
+
+  const provider = getEmailProvider(account, env);
+  const starred = await provider.isStarred(emailMessageId).catch(() => false);
+  const keyboard = await buildEmailKeyboard(
+    env,
+    emailMessageId,
+    account.id,
+    starred,
+    accountCanArchive(account),
+    m.tg_chat_id,
+    m.tg_message_id,
+  );
+  try {
+    await setReplyMarkup(
+      env.TELEGRAM_BOT_TOKEN,
+      m.tg_chat_id,
+      m.tg_message_id,
+      keyboard,
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("message is not modified"))
+      return;
+    await reportErrorToObservability(
+      env,
+      "reminder.refresh_keyboard_failed",
+      err,
+      { accountId: account.id, emailMessageId },
+    );
   }
 }
 
