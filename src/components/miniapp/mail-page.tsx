@@ -108,14 +108,17 @@ function fabScript(
 var tg = window.Telegram && window.Telegram.WebApp;
 if (tg) {
   tg.ready(); tg.expand();
-  // TG 顶栏原生返回按钮 —— 有 history 就返回上一页（如 reminders）；
-  // 没 history（直接 deep-link 进来）就关闭 Mini App。
+  // TG 顶栏 BackButton：仅当 URL 带 ?back= 时显示，跳转回该 URL。
+  // 直接 deep link / web_app 进来时不带 back，按钮隐藏 —— 用户用 TG 自带的 X 关闭。
+  // 显式 back URL 比 window.history 更可靠：避免跨页面残留的 BackButton 状态错乱。
   if (tg.BackButton) {
-    tg.BackButton.show();
-    tg.BackButton.onClick(function(){
-      if (window.history.length > 1) window.history.back();
-      else tg.close();
-    });
+    var backUrl = new URLSearchParams(location.search).get("back");
+    if (backUrl) {
+      tg.BackButton.show();
+      tg.BackButton.onClick(function(){ location.href = backUrl; });
+    } else {
+      tg.BackButton.hide();
+    }
   }
 }
 var _starred=${starred ? "true" : "false"};

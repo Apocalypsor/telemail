@@ -18,7 +18,10 @@ function routerScript(): string {
   return `
 (function(){
   var tg = window.Telegram && window.Telegram.WebApp;
-  if (tg) { tg.ready(); tg.expand(); }
+  if (tg) {
+    tg.ready(); tg.expand();
+    if (tg.BackButton) tg.BackButton.hide();
+  }
   var initData = (tg && tg.initData) || "";
   var sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
 

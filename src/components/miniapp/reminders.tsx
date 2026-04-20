@@ -86,7 +86,12 @@ function remindersScript(): string {
   return `
 (function(){
   var tg = window.Telegram && window.Telegram.WebApp;
-  if (tg) { tg.ready(); tg.expand(); }
+  if (tg) {
+    tg.ready(); tg.expand();
+    // 提醒是 root 页面，没有上级 —— 显式隐藏 BackButton 防止从 mail 页返回后
+    // 残留可见状态（TG WebApp 的 BackButton state 跨页面持久化）。
+    if (tg.BackButton) tg.BackButton.hide();
+  }
   var initData = (tg && tg.initData) || "";
 
   var $ = function(id){ return document.getElementById(id); };
@@ -157,8 +162,11 @@ function remindersScript(): string {
   }
 
   function openMail() {
+    // 把当前 URL 作为 back 传过去，mail 页 BackButton 据此返回
+    var back = encodeURIComponent(location.pathname + location.search);
     var url = "${ROUTE_MINI_APP_MAIL.replace(":id", "")}" + encodeURIComponent(ctx.messageId)
-      + "?accountId=" + ctx.accountId + "&t=" + encodeURIComponent(ctx.token);
+      + "?accountId=" + ctx.accountId + "&t=" + encodeURIComponent(ctx.token)
+      + "&back=" + back;
     location.href = url;
   }
 
