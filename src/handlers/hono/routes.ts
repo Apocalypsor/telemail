@@ -28,3 +28,8 @@ export const ROUTE_MAIL_TRASH = "/api/mail/:id/trash";
 export const ROUTE_MAIL_TOGGLE_STAR = "/api/mail/:id/toggle-star";
 export const ROUTE_MAIL_ARCHIVE = "/api/mail/:id/archive";
 export const ROUTE_MAIL_UNARCHIVE = "/api/mail/:id/unarchive";
+
+// ── Reminders Mini App ───────────────────────────────────────────────────────
+export const ROUTE_REMINDERS = "/reminders";
+export const ROUTE_REMINDERS_API = "/api/reminders";
+export const ROUTE_REMINDERS_API_ITEM = "/api/reminders/:id";
