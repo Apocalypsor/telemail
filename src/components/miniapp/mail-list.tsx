@@ -1,4 +1,4 @@
-import { MINIAPP_BASE_CSS } from "@components/miniapp/styles";
+import { MiniAppShell } from "@components/miniapp/layout";
 import {
   ROUTE_MINI_APP_API_LIST,
   ROUTE_MINI_APP_MAIL,
@@ -12,7 +12,7 @@ const TITLES: Record<MailListType, string> = {
   archived: "📥 归档邮件",
 };
 
-const PAGE_CSS = `${MINIAPP_BASE_CSS}
+const PAGE_CSS = `
 .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
 .head-row { display: flex; justify-content: space-between; align-items: center; }
 h1 { font-size: 20px; font-weight: 600; margin: 4px 0; }
@@ -151,39 +151,26 @@ function listScript(type: MailListType): string {
 
 export function MiniAppMailListPage({ type }: { type: MailListType }) {
   return (
-    <html lang="zh-CN">
-      <head>
-        <meta charset="utf-8" />
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
-        />
-        <title>{TITLES[type]} — Telemail</title>
-        <link rel="icon" type="image/png" href="/favicon.png" />
-        <script src="https://telegram.org/js/telegram-web-app.js" />
-        <style dangerouslySetInnerHTML={{ __html: PAGE_CSS }} />
-      </head>
-      <body>
-        <div class="wrap">
-          <div class="head-row">
-            <h1>{TITLES[type]}</h1>
-            <button
-              id="refresh"
-              type="button"
-              class="refresh"
-              title="强制刷新"
-              aria-label="强制刷新"
-            >
-              ↻
-            </button>
-          </div>
-          <div id="meta" class="meta" />
-          <div id="content">
-            <div class="loading">加载中…</div>
-          </div>
+    <MiniAppShell title={`${TITLES[type]} — Telemail`} extraCss={PAGE_CSS}>
+      <div class="wrap">
+        <div class="head-row">
+          <h1>{TITLES[type]}</h1>
+          <button
+            id="refresh"
+            type="button"
+            class="refresh"
+            title="强制刷新"
+            aria-label="强制刷新"
+          >
+            ↻
+          </button>
         </div>
-        <script dangerouslySetInnerHTML={{ __html: listScript(type) }} />
-      </body>
-    </html>
+        <div id="meta" class="meta" />
+        <div id="content">
+          <div class="loading">加载中…</div>
+        </div>
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: listScript(type) }} />
+    </MiniAppShell>
   );
 }

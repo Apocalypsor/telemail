@@ -1,11 +1,11 @@
-import { MINIAPP_BASE_CSS } from "@components/miniapp/styles";
+import { MiniAppShell } from "@components/miniapp/layout";
 import {
   ROUTE_MINI_APP_MAIL,
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
 } from "@handlers/hono/routes";
 
-const REMINDERS_CSS = `${MINIAPP_BASE_CSS}
+const REMINDERS_CSS = `
 .wrap { max-width: 560px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 20px; font-weight: 600; margin: 4px 0 16px; }
 .section { background: var(--surface); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
@@ -289,88 +289,75 @@ function remindersScript(): string {
 
 export function RemindersPage() {
   return (
-    <html lang="zh-CN">
-      <head>
-        <meta charset="utf-8" />
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
-        />
-        <title>邮件提醒 — Telemail</title>
-        <link rel="icon" type="image/png" href="/favicon.png" />
-        <script src="https://telegram.org/js/telegram-web-app.js" />
-        <style dangerouslySetInnerHTML={{ __html: REMINDERS_CSS }} />
-      </head>
-      <body>
-        <div class="wrap">
-          <h1>⏰ 邮件提醒</h1>
+    <MiniAppShell title="邮件提醒 — Telemail" extraCss={REMINDERS_CSS}>
+      <div class="wrap">
+        <h1>⏰ 邮件提醒</h1>
 
-          <div id="email-card" class="email-card" style="display:none">
-            <div id="email-subject" class="subject" />
-            <div id="email-from" class="from" />
-            <div class="open-hint">点击查看邮件 →</div>
-          </div>
-
-          <div id="add-section" class="section">
-            <label for="when-date">提醒时间</label>
-            <div class="when-row">
-              <input id="when-date" type="date" />
-              <input id="when-time" type="time" />
-            </div>
-            <div class="presets">
-              <button type="button" class="preset" data-mins="10">
-                10 分钟
-              </button>
-              <button type="button" class="preset" data-mins="30">
-                30 分钟
-              </button>
-              <button type="button" class="preset" data-mins="60">
-                1 小时
-              </button>
-              <button type="button" class="preset" data-mins="180">
-                3 小时
-              </button>
-              <button type="button" class="preset" data-mins="tonight20">
-                今晚 20:00
-              </button>
-              <button type="button" class="preset" data-mins="tomorrow9">
-                明早 09:00
-              </button>
-            </div>
-
-            <label for="text" style="margin-top:14px">
-              备注（可选）
-            </label>
-            <textarea
-              id="text"
-              maxlength={1000}
-              placeholder="可留空 —— 不填只发送邮件主题和链接"
-            />
-
-            <button
-              id="save"
-              type="button"
-              class="btn-primary"
-              style="margin-top:14px"
-            >
-              保存提醒
-            </button>
-            <div id="status" class="status" />
-            <div class="helper">时间按你设备的本地时区</div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">
-              <span id="list-title">已设的提醒</span>
-              <span id="list-count" />
-            </div>
-            <ul id="list" class="list">
-              <div class="empty">加载中…</div>
-            </ul>
-          </div>
+        <div id="email-card" class="email-card" style="display:none">
+          <div id="email-subject" class="subject" />
+          <div id="email-from" class="from" />
+          <div class="open-hint">点击查看邮件 →</div>
         </div>
-        <script dangerouslySetInnerHTML={{ __html: remindersScript() }} />
-      </body>
-    </html>
+
+        <div id="add-section" class="section">
+          <label for="when-date">提醒时间</label>
+          <div class="when-row">
+            <input id="when-date" type="date" />
+            <input id="when-time" type="time" />
+          </div>
+          <div class="presets">
+            <button type="button" class="preset" data-mins="10">
+              10 分钟
+            </button>
+            <button type="button" class="preset" data-mins="30">
+              30 分钟
+            </button>
+            <button type="button" class="preset" data-mins="60">
+              1 小时
+            </button>
+            <button type="button" class="preset" data-mins="180">
+              3 小时
+            </button>
+            <button type="button" class="preset" data-mins="tonight20">
+              今晚 20:00
+            </button>
+            <button type="button" class="preset" data-mins="tomorrow9">
+              明早 09:00
+            </button>
+          </div>
+
+          <label for="text" style="margin-top:14px">
+            备注（可选）
+          </label>
+          <textarea
+            id="text"
+            maxlength={1000}
+            placeholder="可留空 —— 不填只发送邮件主题和链接"
+          />
+
+          <button
+            id="save"
+            type="button"
+            class="btn-primary"
+            style="margin-top:14px"
+          >
+            保存提醒
+          </button>
+          <div id="status" class="status" />
+          <div class="helper">时间按你设备的本地时区</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            <span id="list-title">已设的提醒</span>
+            <span id="list-count" />
+          </div>
+          <ul id="list" class="list">
+            <div class="empty">加载中…</div>
+          </ul>
+        </div>
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: remindersScript() }} />
+    </MiniAppShell>
   );
 }
