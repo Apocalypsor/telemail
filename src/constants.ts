@@ -39,10 +39,6 @@ export const TG_AUTH_MAX_AGE = 86400; // Telegram Login Widget auth_date 有效�
 export const SESSION_TTL = 7 * 24 * 3600; // session cookie 有效期 7 天
 export const SESSION_COOKIE_NAME = "tg_session";
 
-// ── Digest ──────────────────────────────────────────────────────────────────
-export const DIGEST_HOURS = [9, 18]; // 摘要发送的本地小时（基于 MESSAGE_DATE_TIMEZONE）
-export const MAX_DIGEST_LIST = 50; // 摘要查询每个账号的最大邮件数
-
 // ── Display ──────────────────────────────────────────────────────────────────
 export const MESSAGE_DATE_LOCALE = "zh-CN";
 export const MESSAGE_DATE_TIMEZONE = "America/New_York";

@@ -29,8 +29,8 @@ Run `pnpm cf-typegen` after changing bindings in wrangler.jsonc.
 - **Archive**: `provider.archiveMessage(messageId)` + `accountCanArchive(account)`. Gmail requires the user to pick a label (stored in `accounts.archive_folder` + `accounts.archive_folder_name`); without it `canArchive()` returns false.
 - **State reconciliation**: all "remote → TG" syncs funnel through `reconcileMessageState` (`services/message-actions.ts`), which uses `provider.resolveMessageState` and either removes the TG msg (non-inbox) or syncs star/pin (inbox).
 - **Star pin**: ⭐ email ↔ pinned TG msg. Single entry point: `syncStarPinState` in `services/message-actions.ts`. A `pin-cleanup` handler deletes TG's "Bot pinned" service messages.
-- **Disable/enable**: `accounts.disabled` pauses without deleting. Enforced in `services/bridge.ts::processEmailMessage` (queue consumer) + filtered in push renewal / digest / mail-list / `/sync` / `getImapAccounts`.
-- **Cron**: single `* * * * *` trigger. `handleScheduled` (`src/index.ts`) dispatches due reminders every minute; `getUTCMinutes() === 0` gates hourly batch (retry / health / digest); midnight renews pushes.
+- **Disable/enable**: `accounts.disabled` pauses without deleting. Enforced in `services/bridge.ts::processEmailMessage` (queue consumer) + filtered in push renewal / mail-list / `/sync` / `getImapAccounts`.
+- **Cron**: single `* * * * *` trigger. `handleScheduled` (`src/handlers/scheduled.ts`, parallel to `handlers/queue.ts`) dispatches due reminders every minute; `getUTCMinutes() === 0` gates the hourly batch (retry / IMAP bridge health); midnight additionally renews pushes.
 - **Mail preview helpers** (CID inlining, image proxy rewriting, token signing) live in `src/services/mail-preview.ts`.
 - **Mini App** (`src/components/miniapp/`): three pages on the same TG domain.
   - `/telegram-app` → router, reads `start_param` (`r_<chat>_<msg>` / `m_<chat>_<msg>`) and redirects.

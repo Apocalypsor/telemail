@@ -45,9 +45,9 @@
 
 ### 定时任务（Cron Trigger）
 
-- **每小时**: 检查 IMAP Bridge 中间件健康状态，异常时上报到 Observability Hub。
+- **每分钟**: 分发到期的提醒（Mini App 设置的邮件提醒）。
+- **每小时**: 检查 IMAP Bridge 中间件健康状态，异常时上报到 Observability Hub；自动重试失败的 LLM 摘要。
 - **每天凌晨（UTC 0 点）**: 通过 `renewAllPush()` 自动为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）。
-- **每天早 9 点和晚 6 点**（Eastern Time）: 向每个 Telegram Chat 发送邮件摘要通知，包含各账号的未读和垃圾邮件数量。全部为零时跳过，不打扰。
 
 正文会自动截断以适应 Telegram 的字符限制（纯文本消息 4096 字符，附件标题 1024 字符）。
 
@@ -230,7 +230,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 3. Gmail / Outlook 需要完成 OAuth 授权；IMAP 需要填写服务器信息和密码
 4. 授权成功后自动创建 webhook 订阅，新邮件会实时推送到 Telegram
 
-Cron Trigger 每小时检查 IMAP 中间件健康；每天凌晨（UTC 0 点）自动续订所有账号的推送通知；每天早 9 点和晚 6 点发送邮件摘要通知。
+Cron Trigger 每分钟分发到期提醒；每小时检查 IMAP 中间件健康并重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
 
 ## Bot 命令
 
