@@ -299,34 +299,6 @@ pnpm migrate    # 应用 D1 migrations 到远端
 
 每个邮箱账号的 `type`、`refresh_token`、`chat_id` 等信息存储在 D1 数据库的 `accounts` 表中，通过 Telegram Bot 管理。
 
-## Telegram 消息格式
-
-```text
-发件人:  Name <email@example.com>
-时  间:  2026/2/22 10:30:00
-主  题:  Subject line
-
-（正文内容，过长时自动截断）
-```
-
-启用 AI 摘要后，消息会被编辑为：
-
-```text
-发件人:  Name <email@example.com>
-时  间:  2026/2/22 10:30:00
-主  题:  Subject line
-
-🤖 AI 摘要
-
-（AI 生成的摘要内容）
-
-#Github  #Verification  #Security
-```
-
-标签为单词、首字母大写，最多 3 个，与邮件语言一致。
-
-附件会作为可下载文件附在同一条消息中。
-
 ## 许可证
 
 [AGPL-3.0-or-later](./LICENSE) © 2026 Apocalypsor
