@@ -6,9 +6,9 @@ import {
   type MailListResult,
   type MailListType,
 } from "@services/mail-list";
-import { buildMailPreviewUrl } from "@services/mail-preview";
 import { markAllAsRead, trashAllJunkEmails } from "@services/message-actions";
 import { buildTgMessageLink } from "@services/telegram";
+import { buildMailPreviewUrl } from "@utils/mail-token";
 import { escapeMdV2 } from "@utils/markdown-v2";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";

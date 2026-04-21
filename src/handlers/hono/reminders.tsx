@@ -32,18 +32,18 @@ import {
 } from "@handlers/hono/routes";
 import { accountCanArchive, getEmailProvider, PROVIDERS } from "@providers";
 import { getMailList, isMailListType } from "@services/mail-list";
-import {
-  buildWebMailUrl,
-  generateMailTokenById,
-  loadMailForPreview,
-  verifyMailTokenById,
-} from "@services/mail-preview";
+import { loadMailForPreview } from "@services/mail-preview";
 import { refreshEmailKeyboardAfterReminderChange } from "@services/message-actions";
 import {
   REMINDER_PER_USER_LIMIT,
   REMINDER_TEXT_MAX,
 } from "@services/reminders";
 import { buildTgMessageLink } from "@services/telegram";
+import {
+  buildWebMailUrl,
+  generateMailTokenById,
+  verifyMailTokenById,
+} from "@utils/mail-token";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { raw } from "hono/html";

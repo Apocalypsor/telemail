@@ -1,55 +1,18 @@
-import { getCachedAccessToken, putCachedAccessToken } from "@db/kv";
-import type { OAuthTokenResponse } from "@providers/types";
+import { refreshAccessToken } from "@providers/utils";
 import { http } from "@utils/http";
-import { HTTPError } from "ky";
 import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from "@/constants";
 import type { Account, Env } from "@/types";
 
-/** 用 refresh_token 换 access_token，带 KV 缓存（按账号隔离） */
+/** 用 refresh_token 换 access_token（KV 缓存，共用 base.ts 的实现） */
 export async function getAccessToken(
   env: Env,
   account: Account,
 ): Promise<string> {
-  const cached = await getCachedAccessToken(env.EMAIL_KV, account.id);
-  if (cached) return cached;
-
-  if (!account.refresh_token) {
-    throw new Error(
-      `Account ${account.email} has no refresh token. Authorize via OAuth first.`,
-    );
-  }
-
-  let data: OAuthTokenResponse;
-  try {
-    data = (await http
-      .post(GOOGLE_OAUTH_TOKEN_URL, {
-        body: new URLSearchParams({
-          client_id: env.GMAIL_CLIENT_ID,
-          client_secret: env.GMAIL_CLIENT_SECRET,
-          refresh_token: account.refresh_token,
-          grant_type: "refresh_token",
-        }),
-      })
-      .json()) as OAuthTokenResponse;
-  } catch (err) {
-    if (err instanceof HTTPError) {
-      throw new Error(
-        `Token exchange failed for ${account.email}: ${await err.response.text()}`,
-      );
-    }
-    throw err;
-  }
-  if (!data.access_token || !data.expires_in) {
-    throw new Error("Token response missing access_token or expires_in");
-  }
-  await putCachedAccessToken(
-    env.EMAIL_KV,
-    account.id,
-    data.access_token,
-    Math.max(data.expires_in - 120, 60),
-  );
-
-  return data.access_token;
+  return refreshAccessToken(env, account, {
+    tokenUrl: GOOGLE_OAUTH_TOKEN_URL,
+    clientId: env.GMAIL_CLIENT_ID,
+    clientSecret: env.GMAIL_CLIENT_SECRET,
+  });
 }
 
 /** 调用 Gmail REST API (GET) */

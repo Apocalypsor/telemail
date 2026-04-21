@@ -6,7 +6,7 @@ import {
   buildMiniAppRemindersUrl,
   buildWebMailUrl,
   generateMailTokenById,
-} from "@services/mail-preview";
+} from "@utils/mail-token";
 import { InlineKeyboard } from "grammy";
 import type { Env } from "@/types";
 

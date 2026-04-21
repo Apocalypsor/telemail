@@ -5,12 +5,9 @@ import {
   type Reminder,
 } from "@db/reminders";
 import { t } from "@i18n";
-import {
-  buildMiniAppMailUrl,
-  generateMailTokenById,
-} from "@services/mail-preview";
 import { refreshEmailKeyboardAfterReminderChange } from "@services/message-actions";
 import { sendTextMessage } from "@services/telegram";
+import { buildMiniAppMailUrl, generateMailTokenById } from "@utils/mail-token";
 import { escapeMdV2 } from "@utils/markdown-v2";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Env } from "@/types";

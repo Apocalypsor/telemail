@@ -22,15 +22,13 @@ import {
 import { accountCanArchive, getEmailProvider } from "@providers";
 import { deliverEmailToTelegram } from "@services/bridge";
 import { analyzeEmail } from "@services/llm";
-import {
-  loadMailForPreview,
-  verifyMailTokenById,
-  verifyProxySignature,
-} from "@services/mail-preview";
+import { loadMailForPreview } from "@services/mail-preview";
 import { syncStarPinState } from "@services/message-actions";
 import { deleteMessage, setReplyMarkup } from "@services/telegram";
 import { formatBody } from "@utils/format";
 import { http } from "@utils/http";
+import { verifyProxySignature } from "@utils/mail-html";
+import { verifyMailTokenById } from "@utils/mail-token";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Context } from "hono";
 import { Hono } from "hono";

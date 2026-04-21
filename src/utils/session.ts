@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "@utils/hash";
+import { hmacSha256Hex, timingSafeEqual } from "@utils/hash";
 import { SESSION_TTL, TG_AUTH_MAX_AGE } from "@/constants";
 
 // ── Telegram Login Widget ───────────────────────────────────────────────────
@@ -62,22 +62,7 @@ export async function generateSessionCookie(
 ): Promise<{ value: string; maxAge: number }> {
   const ts = Math.floor(Date.now() / 1000);
   const payload = `${telegramId}:${ts}`;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(payload),
-  );
-  const hmac = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 32);
+  const hmac = await hmacSha256Hex(secret, payload, 32);
   return { value: `${payload}:${hmac}`, maxAge: SESSION_TTL };
 }
 
@@ -92,24 +77,7 @@ export async function verifySessionCookie(
   const ts = parseInt(tsStr, 10);
   if (Number.isNaN(ts) || Date.now() / 1000 - ts > SESSION_TTL) return null;
 
-  const payload = `${telegramId}:${tsStr}`;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(payload),
-  );
-  const expected = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 32);
-
+  const expected = await hmacSha256Hex(secret, `${telegramId}:${tsStr}`, 32);
   if (!timingSafeEqual(expected, hmac)) return null;
   return telegramId;
 }

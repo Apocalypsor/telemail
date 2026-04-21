@@ -20,7 +20,8 @@ Run `pnpm cf-typegen` after changing bindings in wrangler.jsonc.
 ## Conventions
 
 - **Layering**: `src/handlers/` only do routing / auth / req-resp shaping; business logic lives in `src/services/` or on a provider method.
-- **Helpers & types**: shared helper functions go in `src/utils/`; shared interfaces / types go in `src/types.ts` (or a colocated `types.ts` for module-scoped shapes like `providers/types.ts`). Don't inline reusable helpers or interfaces into handlers/services.
+- **Helpers**: if a helper is used by only ONE file, keep it file-private next to its caller. If used by MULTIPLE files, lift it to the nearest `utils/` dir — `src/utils/` for cross-cutting helpers, `src/bot/utils/` / `src/providers/<p>/utils.ts` for layer-scoped ones. Same goes for deduping: if you spot the same logic copy-pasted in two places (HMAC signing, OAuth refresh, etc.), extract it rather than keeping both.
+- **Shared types**: shared interfaces / types go in `src/types.ts` (cross-cutting) or a colocated `types.ts` (module-scoped, e.g. `providers/types.ts`, `providers/outlook/types.ts`). Don't inline reusable types into handlers/services.
 - **Error reporting**: use `reportErrorToObservability()`, not `console.error`.
 - **Email providers**: abstract class in `src/providers/base.ts`, shared interfaces in `src/providers/types.ts`, barrel in `src/providers/index.ts` (exports `PROVIDERS`, `getEmailProvider`, `accountCanArchive`). Each concrete provider (`gmail/`, `outlook/`, `imap/`) has its own `index.ts` class + `utils.ts` + optional `types.ts`.
 - **Provider polymorphism**: never branch on `account.type` outside `providers/`. Per-provider differences live on the class — static metadata (`displayName`, `oauth`, `canArchive`), instance methods (fetch / list / archive / push / `resolveMessageState` / `onPersistedChange`), and `static registerRoutes(app)` for webhooks (so adding a provider needs no handler wiring).

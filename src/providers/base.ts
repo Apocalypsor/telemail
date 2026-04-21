@@ -18,9 +18,9 @@ import type {
   OAuthTokenResponse,
   PreviewContent,
 } from "@providers/types";
-import { buildCidMapFromAttachments } from "@services/mail-preview";
 import { formatAddress, wrapPlainText } from "@utils/format";
 import { http } from "@utils/http";
+import { buildCidMapFromAttachments } from "@utils/mail-html";
 import { reportErrorToObservability } from "@utils/observability";
 import PostalMime from "postal-mime";
 import type { Account, Env } from "@/types";

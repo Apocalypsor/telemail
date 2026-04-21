@@ -5,11 +5,11 @@ import {
   type EmailProvider,
   getEmailProvider,
 } from "@providers";
-import { generateMailTokenById } from "@services/mail-preview";
 import {
   deleteJunkMappings,
   syncStarButtonsForMappings,
 } from "@services/message-actions";
+import { generateMailTokenById } from "@utils/mail-token";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Account, Env } from "@/types";
 
