@@ -53,7 +53,6 @@ import {
 } from "@utils/mail-token";
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { raw } from "hono/html";
 import type { AppEnv } from "@/types";
 
 const miniapp = new Hono<AppEnv>();
@@ -303,9 +302,8 @@ miniapp.get(ROUTE_MINI_APP_MAIL, async (c) => {
       accountEmail={account.email}
       webMailUrl={webMailUrl}
       tgMessageLink={tgMessageLink}
-    >
-      {raw(result.proxiedHtml)}
-    </MiniAppMailPage>,
+      bodyHtml={result.proxiedHtml}
+    />,
   );
 });
 

@@ -36,7 +36,6 @@ import { verifyMailTokenById } from "@utils/mail-token";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { raw } from "hono/html";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPError } from "ky";
 import { MAX_BODY_CHARS } from "@/constants";
@@ -182,9 +181,8 @@ preview.get(ROUTE_MAIL, async (c) => {
       starred={result.starred}
       canArchive={accountCanArchive(account)}
       accountEmail={account.email}
-    >
-      {raw(result.proxiedHtml)}
-    </MailPage>,
+      bodyHtml={result.proxiedHtml}
+    />,
   );
 });
 

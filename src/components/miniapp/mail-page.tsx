@@ -1,6 +1,6 @@
 import { MiniAppShell } from "@components/miniapp/layout";
+import { MailBodyFrame } from "@components/shared/mail-body-frame";
 import { MailFab, type MailFabProps } from "@components/shared/mail-fab";
-import type { Child } from "hono/jsx";
 import type { MailMeta } from "@/types";
 
 interface MiniAppMailPageProps extends MailFabProps {
@@ -10,7 +10,8 @@ interface MiniAppMailPageProps extends MailFabProps {
   webMailUrl: string;
   /** 跳回 TG 里原邮件消息的深链接，没 mapping 时省略 */
   tgMessageLink?: string;
-  children: Child;
+  /** 已经过 CID 内联 + 图片代理改写的邮件正文 HTML */
+  bodyHtml: string;
 }
 
 const PAGE_CSS = `
@@ -30,11 +31,13 @@ html { padding: 0; }
 .mail-meta .subject:active { opacity: .6; }
 .mail-meta .subject .ext { font-size: 14px; opacity: .7; margin-left: 4px; }
 .mail-meta .actions { margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
-.mail-meta .actions a {
+.mail-meta .actions a, .mail-meta .actions button {
   font-size: 12px; color: var(--tg-theme-link-color, #60a5fa);
   text-decoration: none; -webkit-tap-highlight-color: transparent;
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit;
 }
-.mail-meta .actions a:active { opacity: .6; }
+.mail-meta .actions a:active, .mail-meta .actions button:active { opacity: .6; }
 .mail-meta .label { color: var(--hint); }
 .mail-body { padding: 16px; padding-bottom: 100px; word-break: break-word; }
 `.trim();
@@ -44,6 +47,7 @@ html { padding: 0; }
  *  - BackButton：URL 带 ?back= 时显示，点击跳回该 URL
  *  - 头部链接：用 `data-mini-link` 属性标记，event 委托走 tg.openLink /
  *    tg.openTelegramLink，避免在 a 标签上写 inline onclick
+ *  - 分享按钮：`data-mini-share` → `t.me/share/url` 打开 TG 转发弹窗
  */
 const MAIL_PAGE_SCRIPT = `
 (function () {
@@ -77,6 +81,21 @@ const MAIL_PAGE_SCRIPT = `
       }
     });
   });
+  var shareBtn = document.querySelector('[data-mini-share]');
+  if (shareBtn) {
+    shareBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var text = shareBtn.getAttribute('data-share-text') || '';
+      var url = shareBtn.getAttribute('data-share-url') || '';
+      var shareLink = 'https://t.me/share/url?url=' + encodeURIComponent(url)
+        + '&text=' + encodeURIComponent(text);
+      if (tg && tg.openTelegramLink) {
+        tg.openTelegramLink(shareLink);
+      } else {
+        window.open(shareLink, '_blank');
+      }
+    });
+  }
 })();
 `.trim();
 
@@ -94,6 +113,8 @@ function MailMetaHeader({
   if (!meta.subject && !meta.from && !meta.to && !accountEmail && !meta.date)
     return null;
 
+  const shareText = meta.subject ? `📧 ${meta.subject}` : "";
+
   return (
     <div class="mail-meta">
       {meta.subject && (
@@ -107,13 +128,23 @@ function MailMetaHeader({
           <span class="ext">↗</span>
         </a>
       )}
-      {tgMessageLink && (
-        <div class="actions">
+      <div class="actions">
+        {tgMessageLink && (
           <a href={tgMessageLink} data-mini-link="tg">
             💬 跳到 TG 原消息
           </a>
-        </div>
-      )}
+        )}
+        {webMailUrl && (
+          <button
+            type="button"
+            data-mini-share="true"
+            data-share-text={shareText}
+            data-share-url={webMailUrl}
+          >
+            📤 分享
+          </button>
+        )}
+      </div>
       {meta.from && (
         <div>
           <span class="label">From:</span> {meta.from}
@@ -143,7 +174,7 @@ export function MiniAppMailPage({
   accountEmail,
   webMailUrl,
   tgMessageLink,
-  children,
+  bodyHtml,
   ...fabProps
 }: MiniAppMailPageProps) {
   return (
@@ -157,7 +188,9 @@ export function MiniAppMailPage({
         webMailUrl={webMailUrl}
         tgMessageLink={tgMessageLink}
       />
-      <div class="mail-body">{children}</div>
+      <div class="mail-body">
+        <MailBodyFrame bodyHtml={bodyHtml} />
+      </div>
       <MailFab {...fabProps} />
       <script dangerouslySetInnerHTML={{ __html: MAIL_PAGE_SCRIPT }} />
     </MiniAppShell>

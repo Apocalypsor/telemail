@@ -1,24 +1,25 @@
 import { theme } from "@assets/theme";
+import { MailBodyFrame } from "@components/shared/mail-body-frame";
 import { MailFab, type MailFabProps } from "@components/shared/mail-fab";
-import type { Child } from "hono/jsx";
 import type { MailMeta } from "@/types";
 
 interface MailPageProps extends MailFabProps {
   meta: MailMeta;
   accountEmail?: string | null;
-  children: Child;
+  /** 已经过 CID 内联 + 图片代理改写的邮件正文 HTML */
+  bodyHtml: string;
 }
 
 export function MailPage({
   meta,
   accountEmail,
-  children,
+  bodyHtml,
   ...fabProps
 }: MailPageProps) {
   return (
     <>
       <MailMetaHeader meta={meta} accountEmail={accountEmail} />
-      {children}
+      <MailBodyFrame bodyHtml={bodyHtml} />
       <MailFab {...fabProps} />
     </>
   );
