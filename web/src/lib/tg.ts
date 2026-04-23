@@ -218,17 +218,19 @@ export interface SecondaryButtonConfig extends MainButtonConfig {
 }
 
 /**
- * MainButton / SecondaryButton 的公共行为：挂文字 + 启用 / 进度 / 可见性 +
- * 配色 + 位置（仅 Secondary），卸载自动 hide + offClick。
+ * MainButton / SecondaryButton 的公共行为 —— 拆成三个 useEffect，按职责隔离
+ * 依赖，**避免星标等状态切换导致按钮 hide → show 的闪烁**。
+ *
+ * 1) 可见性：只依赖 `visible`（text 是否非空）。状态 flip 时才 hide/show，
+ *    文字变色、loading 切换都不触发。
+ * 2) 配置：setText / enable / showProgress / color / position。不碰可见性。
+ * 3) 点击：onClick / offClick。不碰可见性和配置。
  *
  * `text` / `is_active` / `is_visible` 走 `setText` + `enable/disable` +
  * `show/hide` 三段而不是 `setParams`：Android 客户端历史上对 `setParams` 的
  * 可见性 / 启用状态组合有兼容问题（见 vkruglikov/react-telegram-web-app
- * discussion #69 / 类似 issue 一堆）。三段式是 TG 官方示例的写法，所有客户端
- * 都稳。
- *
- * `color` / `text_color` / `position` 不受那个 bug 影响，可以走 `setParams`
- * 单独下发。
+ * discussion #69）。`color` / `text_color` / `position` 不受那个 bug 影响，
+ * 可以走 `setParams` 单独下发。
  */
 function useBottomButton(
   getBtn: () => TelegramMainButton | TelegramSecondaryButton | undefined,
@@ -236,19 +238,31 @@ function useBottomButton(
 ): void {
   const { text, onClick, loading, disabled, color, textColor, position } =
     config;
+  const visible = Boolean(text);
+
+  // 1) 可见性 —— visible 不变时整个 effect 不重跑，避免闪烁
   useEffect(() => {
     const btn = getBtn();
     if (!btn) return;
-    if (!text) {
-      btn.hide();
-      return;
+    if (visible) {
+      btn.show();
+      return () => {
+        btn.hideProgress();
+        btn.hide();
+      };
     }
+    btn.hide();
+  }, [visible, getBtn]);
+
+  // 2) 配置 —— 只 mutate，不碰 show/hide
+  useEffect(() => {
+    const btn = getBtn();
+    if (!btn || !text) return;
     btn.setText(text);
     if (disabled || loading) btn.disable();
     else btn.enable();
     if (loading) btn.showProgress(false);
     else btn.hideProgress();
-    // 颜色 / 位置用 setParams 单独下发，避免 is_active / is_visible 的兼容坑
     const params: {
       color?: string;
       text_color?: string;
@@ -260,14 +274,17 @@ function useBottomButton(
     if (Object.keys(params).length > 0) {
       (btn.setParams as (p: typeof params) => void)(params);
     }
-    btn.show();
+  }, [text, loading, disabled, color, textColor, position, getBtn]);
+
+  // 3) 点击 —— onClick 变了摘旧绑新，视觉上透明
+  useEffect(() => {
+    const btn = getBtn();
+    if (!btn || !text) return;
     btn.onClick(onClick);
     return () => {
       btn.offClick(onClick);
-      btn.hideProgress();
-      btn.hide();
     };
-  }, [text, onClick, loading, disabled, color, textColor, position, getBtn]);
+  }, [onClick, text, getBtn]);
 }
 
 const getMainButton = () => getTelegram()?.MainButton;
