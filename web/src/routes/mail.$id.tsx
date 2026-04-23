@@ -126,7 +126,8 @@ function WebMailPage() {
           onChanged={() => qc.invalidateQueries({ queryKey })}
         />
 
-        <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4 sm:p-6 overflow-hidden">
+        {/* 正文区故意不留左右 padding：iframe 贴卡片边沿，信息密度更高 */}
+        <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 py-4 sm:py-6 overflow-hidden">
           <MailBodyFrame bodyHtml={d.bodyHtml} />
         </div>
       </article>
