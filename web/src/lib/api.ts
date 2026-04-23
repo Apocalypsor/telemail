@@ -2,12 +2,19 @@ import ky, { HTTPError } from "ky";
 import { getInitData } from "./tg";
 
 /**
- * 共享 ky 实例：所有 API 调用都自动带 `X-Telegram-Init-Data` 头，后端的
- * `requireMiniAppAuth` 中间件按此校验身份。Pages + Worker 同域部署（方案 A，
- * `telemail.app/api/*` 由 Workers Route 转发到 Worker），所以 baseURL 用相对路径。
+ * 共享 ky 实例：所有 API 调用自动带 `X-Telegram-Init-Data` 头，后端
+ * `requireMiniAppAuth` 中间件按此校验身份。
+ *
+ * `prefixUrl` 必须是**绝对 origin**（如 `https://telemail.dov.moe`），不能
+ * 留空。留空时 ky 把相对输入交给 `fetch()` 按文档 base URI 解析 —— Mini App
+ * 当前页是 `/telegram-app/reminders`，`fetch("api/reminders")` 会被解成
+ * `/telegram-app/api/reminders`，打到 Pages，Worker Route 接不到。用
+ * `window.location.origin` 在 dev（Vite :5173，proxy 转发 /api/*）和生产
+ * （Pages + Worker 同域 Routes）两处自然都对。
  */
 export const api = ky.create({
-  prefixUrl: "",
+  prefixUrl:
+    typeof window !== "undefined" ? window.location.origin : "http://localhost",
   retry: 0,
   hooks: {
     beforeRequest: [
