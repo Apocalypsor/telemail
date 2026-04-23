@@ -2,7 +2,7 @@ import { Button, Card, Chip, Skeleton, Spinner } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { api, extractErrorMessage } from "@/lib/api";
 import {
@@ -15,7 +15,7 @@ import {
   type Reminder,
   remindersListResponseSchema,
 } from "@/lib/schemas";
-import { getTelegram } from "@/lib/tg";
+import { getTelegram, useBackButton } from "@/lib/tg";
 
 // 三件套任缺其一 → 退化为"所有待提醒"列表模式。用 fallback 吞掉格式错误，
 // 避免脏 URL 让整页崩在 errorComponent。
@@ -199,9 +199,8 @@ function RemindersPage() {
 
   const minDate = ymd(new Date());
 
-  useEffect(() => {
-    getTelegram()?.BackButton?.hide();
-  }, []);
+  // 提醒页是根页面（主菜单 / deep link 直达），永远不显示 BackButton
+  useBackButton(undefined);
 
   const reminders = remindersQuery.data?.reminders ?? [];
 
@@ -389,14 +388,7 @@ function AddSection({
         size="lg"
         fullWidth
       >
-        {saving ? (
-          <span className="inline-flex items-center gap-2">
-            <Spinner size="sm" />
-            保存中…
-          </span>
-        ) : (
-          "保存提醒"
-        )}
+        {saving ? <Spinner size="sm" /> : "保存提醒"}
       </Button>
 
       {status && (

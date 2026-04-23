@@ -2,14 +2,13 @@ import { Skeleton } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
-import { useEffect } from "react";
 import { z } from "zod";
 import { MailBodyFrame } from "@/components/mail-body-frame";
 import { MailFab } from "@/components/mail-fab";
 import { api } from "@/lib/api";
 import { ROUTE_MINI_APP_API_MAIL } from "@/lib/routes";
 import { mailPreviewResponseSchema } from "@/lib/schemas";
-import { getTelegram } from "@/lib/tg";
+import { getTelegram, useBackButton } from "@/lib/tg";
 
 // accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
 // folder / back 可选。
@@ -54,25 +53,8 @@ function MailPreviewPage() {
     },
   });
 
-  // BackButton 绑定：URL 带 ?back= 时显示，点击跳回该 URL（mail-list / reminders）
-  useEffect(() => {
-    const tg = getTelegram();
-    const bb = tg?.BackButton;
-    if (!bb) return;
-    if (!search.back) {
-      bb.hide();
-      return;
-    }
-    const handler = () => {
-      window.location.href = search.back as string;
-    };
-    bb.show();
-    bb.onClick(handler);
-    return () => {
-      bb.offClick(handler);
-      bb.hide();
-    };
-  }, [search.back]);
+  // BackButton：URL 带 ?back= 时显示并跳回该 URL；没有就隐藏（从 bot 按钮直接进来）
+  useBackButton(search.back);
 
   if (q.isLoading) {
     return (
@@ -109,7 +91,13 @@ function MailPreviewPage() {
         webMailUrl={d.webMailUrl}
         tgMessageLink={d.tgMessageLink}
       />
-      <div className="px-4 py-4 pb-24 break-words">
+      {/* 底部预留 FAB 高度（~56px）+ 24 间距 + iOS 安全区，保证 FAB 不遮文末 */}
+      <div
+        className="px-4 py-4 break-words"
+        style={{
+          paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
         <MailBodyFrame bodyHtml={d.bodyHtml} />
       </div>
       <MailFab

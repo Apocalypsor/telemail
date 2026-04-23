@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 /**
  * Telegram WebApp SDK wrapper：在 TG WebView 里 `window.Telegram.WebApp` 由
  * `telegram-web-app.js` 注入；非 TG 环境（本地 Vite 直连预览）下返回 null。
@@ -68,14 +70,46 @@ export function syncThemeFromTelegram(): void {
   document.documentElement.classList.toggle("dark", scheme === "dark");
 }
 
-/** 每个页面挂载时调用一次：ready + expand + 默认隐藏 BackButton（跨页面状态持久化） */
+/**
+ * App 启动时调用一次：ready + expand + 主题。
+ *
+ * **注意不碰 BackButton**。BackButton 的显示状态由每个页面用 `useBackButton`
+ * 自己声明。之前在这里无条件 hide 会和子页面的 show 冲突 —— React useEffect
+ * 运行顺序是子先于父，父在 `__root` 里 hide 会把子组件 show 过的覆盖掉。
+ */
 export function initTelegramChrome(): void {
   const tg = getTelegram();
   syncThemeFromTelegram();
   if (!tg) return;
   tg.ready();
   tg.expand();
-  tg.BackButton?.hide();
-  // TG 切换主题时（用户改系统设置）广播 themeChanged 事件，实时跟上
   tg.onEvent?.("themeChanged", syncThemeFromTelegram);
+}
+
+/**
+ * 页面声明 BackButton 行为：
+ *   useBackButton(url)        → 显示返回键，点击 location.href = url
+ *   useBackButton(undefined)  → 隐藏返回键（根页面）
+ *
+ * 每个页面调用一次，卸载时自动 hide + 摘 handler。
+ */
+export function useBackButton(targetUrl: string | undefined): void {
+  useEffect(() => {
+    const tg = getTelegram();
+    const bb = tg?.BackButton;
+    if (!bb) return;
+    if (!targetUrl) {
+      bb.hide();
+      return;
+    }
+    const handler = () => {
+      window.location.href = targetUrl;
+    };
+    bb.show();
+    bb.onClick(handler);
+    return () => {
+      bb.offClick(handler);
+      bb.hide();
+    };
+  }, [targetUrl]);
 }

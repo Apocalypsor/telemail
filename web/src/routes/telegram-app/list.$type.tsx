@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Skeleton } from "@heroui/react";
+import { Button, Card, Chip, Skeleton, Spinner } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
@@ -18,13 +18,12 @@ import {
   mailListResponseSchema,
   mailListTypeSchema,
 } from "@/lib/schemas";
-import { getTelegram } from "@/lib/tg";
+import { getTelegram, useBackButton } from "@/lib/tg";
 
 interface BulkAction {
   label: string;
   url: string;
   confirmText: string;
-  loadingText: string;
   danger?: boolean;
 }
 
@@ -33,13 +32,11 @@ const BULK_ACTIONS: Partial<Record<MailListType, BulkAction>> = {
     label: "✓ 全部已读",
     url: ROUTE_MINI_APP_API_MARK_ALL_READ,
     confirmText: "把所有未读邮件标记为已读？",
-    loadingText: "标记中…",
   },
   junk: {
     label: "🗑 清空垃圾",
     url: ROUTE_MINI_APP_API_TRASH_ALL_JUNK,
     confirmText: "清空所有账号的垃圾邮件？此操作不可撤销。",
-    loadingText: "清理中…",
     danger: true,
   },
 };
@@ -62,6 +59,9 @@ function MailListPage() {
   const { type: typeParam } = Route.useParams();
   const type = mailListTypeSchema.parse(typeParam);
   const bulk = BULK_ACTIONS[type];
+
+  // 列表页从 bot 按钮直接进来，没有上一级，不显示 BackButton
+  useBackButton(undefined);
 
   const qc = useQueryClient();
   const [meta, setMeta] = useState<{
@@ -109,7 +109,8 @@ function MailListPage() {
     if (!bulk) return;
     const tg = getTelegram();
     const run = () => {
-      setMeta({ msg: bulk.loadingText, kind: "" });
+      // 不再写 loadingText，按钮自己走 isDisabled + Spinner
+      setMeta(null);
       bulkMut.mutate();
     };
     if (tg?.showConfirm) {
@@ -149,7 +150,7 @@ function MailListPage() {
               size="sm"
               className="rounded-full"
             >
-              {bulk.label}
+              {bulkMut.isPending ? <Spinner size="sm" /> : bulk.label}
             </Button>
           )}
           <Button
