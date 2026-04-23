@@ -1,28 +1,21 @@
 import { buildEmailKeyboard } from "@bot/keyboards";
-import { JunkCheckPage } from "@components/web/junk-check";
-import { MailPage } from "@components/web/mail-page";
-import { PreviewPage } from "@components/web/preview";
 import { getAccountById } from "@db/accounts";
 import { getMappingsByEmailIds } from "@db/message-map";
 import { requireTelegramLogin } from "@handlers/hono/middleware";
 import {
   ROUTE_CORS_PROXY,
-  ROUTE_JUNK_CHECK,
   ROUTE_JUNK_CHECK_API,
-  ROUTE_MAIL,
   ROUTE_MAIL_ARCHIVE,
   ROUTE_MAIL_MARK_JUNK,
   ROUTE_MAIL_MOVE_TO_INBOX,
   ROUTE_MAIL_TOGGLE_STAR,
   ROUTE_MAIL_TRASH,
   ROUTE_MAIL_UNARCHIVE,
-  ROUTE_PREVIEW,
   ROUTE_PREVIEW_API,
 } from "@handlers/hono/routes";
 import { accountCanArchive, getEmailProvider } from "@providers";
 import { deliverEmailToTelegram } from "@services/bridge";
 import { analyzeEmail } from "@services/llm";
-import { loadMailForPreview } from "@services/mail-preview";
 import {
   cleanupTgForEmail,
   markEmailAsRead,
@@ -93,10 +86,7 @@ export async function resolveMailAction<
 }
 
 // ─── HTML 格式化预览工具 ─────────────────────────────────────────────────────
-
-preview.get(ROUTE_PREVIEW, loginGuard, (c) => {
-  return c.html(<PreviewPage />);
-});
+// 页面 /preview 已搬到 Pages（web/src/routes/preview.tsx），只留 API。
 
 preview.post(ROUTE_PREVIEW_API, loginGuard, async (c) => {
   const { html } = await c.req.json<{ html?: string }>();
@@ -106,10 +96,7 @@ preview.post(ROUTE_PREVIEW_API, loginGuard, async (c) => {
 });
 
 // ─── 垃圾邮件检测工具 ────────────────────────────────────────────────────────
-
-preview.get(ROUTE_JUNK_CHECK, loginGuard, (c) => {
-  return c.html(<JunkCheckPage />);
-});
+// 页面 /junk-check 已搬到 Pages，只留 API。
 
 preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
   const { subject, body } = await c.req.json<{
@@ -133,60 +120,9 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
   });
 });
 
-// ─── 邮件内容预览 ────────────────────────────────────────────────────────────
-
-preview.get(ROUTE_MAIL, async (c) => {
-  const emailMessageId = c.req.param("id");
-  const token = c.req.query("t");
-  const accountIdParam = c.req.query("accountId");
-
-  if (!emailMessageId || !token || !accountIdParam)
-    return c.text("Missing params", 400);
-  const accountId = Number(accountIdParam);
-  if (!Number.isInteger(accountId) || accountId <= 0)
-    return c.text("Invalid accountId", 400);
-
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    emailMessageId,
-    accountId,
-    token,
-  );
-  if (!valid) return c.text("Forbidden", 403);
-
-  const account = await getAccountById(c.env.DB, accountId);
-  if (!account) return c.text("Account not found", 404);
-
-  // folder 提示：list handler 会为 /archived / /junk 的预览链接带上 folder，
-  // 用来给 IMAP 指定 UID 所在的文件夹（per-folder scope，INBOX / junk / archive 的 UID 不通用）
-  const result = await loadMailForPreview(
-    c.env,
-    account,
-    emailMessageId,
-    c.req.query("folder"),
-  );
-  if (!result.ok) return c.text(result.reason, result.status);
-
-  // 用户打开预览 = 看过这封邮件，标已读（best-effort，不阻塞响应）
-  c.executionCtx.waitUntil(markEmailAsRead(c.env, account, emailMessageId));
-
-  return c.html(
-    <MailPage
-      meta={result.meta}
-      emailMessageId={emailMessageId}
-      accountId={account.id}
-      token={token as string}
-      inJunk={result.inJunk}
-      inArchive={result.fetchFolder === "archive"}
-      starred={result.starred}
-      canArchive={accountCanArchive(account)}
-      accountEmail={account.email}
-      bodyHtml={result.proxiedHtml}
-    />,
-  );
-});
-
 // ─── 邮件操作 API ────────────────────────────────────────────────────────────
+// 邮件内容预览页 /mail/:id 已搬到 Pages（web/src/routes/mail.$id.tsx），通过
+// GET /api/mini-app/mail/:id 拿 JSON。Worker 只保留下面这些 POST action。
 
 preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
   const resolved = await resolveMailAction(c);
