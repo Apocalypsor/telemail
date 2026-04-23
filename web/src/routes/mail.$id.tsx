@@ -5,7 +5,7 @@ import { zodValidator } from "@tanstack/zod-adapter";
 import { useState } from "react";
 import { z } from "zod";
 import { api, extractErrorMessage } from "@/api/client";
-import { ROUTE_MINI_APP_API_MAIL } from "@/api/routes";
+import { ROUTE_MAIL_API } from "@/api/routes";
 import { mailPreviewResponseSchema, okResponseSchema } from "@/api/schemas";
 import { MailBodyFrame } from "@/components/mail-body-frame";
 
@@ -43,7 +43,7 @@ function WebMailPage() {
   const q = useQuery({
     queryKey,
     queryFn: async () => {
-      const url = ROUTE_MINI_APP_API_MAIL.replace(
+      const url = ROUTE_MAIL_API.replace(
         ":id",
         encodeURIComponent(emailMessageId),
       ).replace(/^\//, "");

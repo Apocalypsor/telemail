@@ -17,7 +17,6 @@ import {
 import { requireMiniAppAuth } from "@handlers/hono/middleware";
 import {
   ROUTE_MINI_APP_API_LIST,
-  ROUTE_MINI_APP_API_MAIL,
   ROUTE_MINI_APP_API_MARK_ALL_READ,
   ROUTE_MINI_APP_API_TRASH_ALL_JUNK,
   ROUTE_REMINDERS_API,
@@ -25,12 +24,10 @@ import {
   ROUTE_REMINDERS_API_ITEM,
   ROUTE_REMINDERS_API_RESOLVE_CONTEXT,
 } from "@handlers/hono/routes";
-import { accountCanArchive, getEmailProvider, PROVIDERS } from "@providers";
+import { getEmailProvider, PROVIDERS } from "@providers";
 import { getMailList, isMailListType } from "@services/mail-list";
-import { loadMailForPreview } from "@services/mail-preview";
 import {
   markAllAsRead,
-  markEmailAsRead,
   refreshEmailKeyboardAfterReminderChange,
   trashAllJunkEmails,
 } from "@services/message-actions";
@@ -38,12 +35,7 @@ import {
   REMINDER_PER_USER_LIMIT,
   REMINDER_TEXT_MAX,
 } from "@services/reminders";
-import { buildTgMessageLink } from "@services/telegram";
-import {
-  buildWebMailUrl,
-  generateMailTokenById,
-  verifyMailTokenById,
-} from "@utils/mail-token";
+import { generateMailTokenById, verifyMailTokenById } from "@utils/mail-token";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { AppEnv } from "@/types";
@@ -158,10 +150,10 @@ async function lookupEmailContext(
 
 // ─── Mini App API ──────────────────────────────────────────────────────────
 // 鉴权策略：
-//  - 所有 API（/api/reminders/*, /api/mini-app/*）走 requireMiniAppAuth 中间件，
-//    统一在 c.var.userId 里给到鉴权用户（X-Telegram-Init-Data 头签名校验）。
-//  - Mail preview API（/api/mini-app/mail/:id）除了 initData 还额外校验 token，
-//    等价于 "持有该邮件的查看权"。
+//  - 本文件下的所有 API（/api/reminders/*, /api/mini-app/*）走 requireMiniAppAuth
+//    中间件，统一在 c.var.userId 里给到鉴权用户（X-Telegram-Init-Data 头签名校验）。
+//  - 邮件正文预览 API 是 GET /api/mail/:id，在 `preview.tsx` 里，走 token-only
+//    （Web 浏览器里也能调，不需要 initData），不经这里的中间件。
 //  - Mini App 页面（/telegram-app/*）本身由前端 SPA（Cloudflare Pages）渲染，
 //    不在 Worker 上。方案 A：同域 + Workers Routes 分流 /api/* → Worker。
 
@@ -218,70 +210,8 @@ miniapp.post(ROUTE_MINI_APP_API_TRASH_ALL_JUNK, async (c) => {
   return c.json(result);
 });
 
-// 邮件预览 JSON API：前端（Cloudflare Pages）在 /mail/:id 路由里调这个拿
-// meta + bodyHtml + FAB 状态。token 校验和原 SSR 版一致。
-miniapp.get(ROUTE_MINI_APP_API_MAIL, async (c) => {
-  const emailMessageId = c.req.param("id");
-  const token = c.req.query("t");
-  const accountIdParam = c.req.query("accountId");
-  if (!emailMessageId || !token || !accountIdParam)
-    return c.json({ error: "Missing params" }, 400);
-  const accountId = Number(accountIdParam);
-  if (!Number.isInteger(accountId) || accountId <= 0)
-    return c.json({ error: "Invalid accountId" }, 400);
-  if (
-    !(await verifyMailTokenById(
-      c.env.ADMIN_SECRET,
-      emailMessageId,
-      accountId,
-      token,
-    ))
-  )
-    return c.json({ error: "Forbidden" }, 403);
-  const account = await getAccountById(c.env.DB, accountId);
-  if (!account) return c.json({ error: "Account not found" }, 404);
-
-  const result = await loadMailForPreview(
-    c.env,
-    account,
-    emailMessageId,
-    c.req.query("folder"),
-  );
-  if (!result.ok) return c.json({ error: result.reason }, result.status);
-
-  // 用户打开预览 = 看过这封邮件，标已读（best-effort，不阻塞响应）
-  c.executionCtx.waitUntil(markEmailAsRead(c.env, account, emailMessageId));
-
-  // "浏览器打开"按钮 + TG 原消息跳转链接（保留原 SSR 行为）
-  const webMailUrl = c.env.WORKER_URL
-    ? buildWebMailUrl(
-        c.env.WORKER_URL,
-        emailMessageId,
-        account.id,
-        token,
-        result.fetchFolder !== "inbox" ? result.fetchFolder : undefined,
-      )
-    : "";
-  const mailMappings = await getMappingsByEmailIds(c.env.DB, account.id, [
-    emailMessageId,
-  ]);
-  const mapping = mailMappings[0];
-  const tgMessageLink = mapping
-    ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
-    : null;
-
-  return c.json({
-    meta: result.meta,
-    accountEmail: account.email,
-    bodyHtml: result.proxiedHtml,
-    inJunk: result.inJunk,
-    inArchive: result.fetchFolder === "archive",
-    starred: result.starred,
-    canArchive: accountCanArchive(account),
-    webMailUrl,
-    tgMessageLink,
-  });
-});
+// 邮件预览 JSON API 已搬到 `preview.tsx`（GET /api/mail/:id），走 token-only
+// 鉴权 —— Web 浏览器里的 /mail/:id 页也能直接用，不需要 initData。
 
 // ─── API: 解析群聊 deep link 的 start_param ──────────────────────────────────
 // 群聊用 t.me/<bot>?startapp=<chatId>_<tgMsgId> 跳进 Mini App，这里把短 id

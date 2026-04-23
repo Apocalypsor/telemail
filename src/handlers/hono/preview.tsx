@@ -5,6 +5,7 @@ import { requireTelegramLogin } from "@handlers/hono/middleware";
 import {
   ROUTE_CORS_PROXY,
   ROUTE_JUNK_CHECK_API,
+  ROUTE_MAIL_API,
   ROUTE_MAIL_ARCHIVE,
   ROUTE_MAIL_MARK_JUNK,
   ROUTE_MAIL_MOVE_TO_INBOX,
@@ -16,16 +17,17 @@ import {
 import { accountCanArchive, getEmailProvider } from "@providers";
 import { deliverEmailToTelegram } from "@services/bridge";
 import { analyzeEmail } from "@services/llm";
+import { loadMailForPreview } from "@services/mail-preview";
 import {
   cleanupTgForEmail,
   markEmailAsRead,
   syncStarPinState,
 } from "@services/message-actions";
-import { setReplyMarkup } from "@services/telegram";
+import { buildTgMessageLink, setReplyMarkup } from "@services/telegram";
 import { formatBody } from "@utils/format";
 import { http } from "@utils/http";
 import { verifyProxySignature } from "@utils/mail-html";
-import { verifyMailTokenById } from "@utils/mail-token";
+import { buildWebMailUrl, verifyMailTokenById } from "@utils/mail-token";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -44,45 +46,68 @@ type MailActionBody = {
 };
 
 /**
- * 预览页 POST 邮件操作的公共入口：解析 body + 校验 token + 取 account。
- * 失败时返回 `Response`（调用方直接 return）；成功返回 `{ account, emailMessageId }`。
+ * (emailMessageId, accountId, token) 三元组校验 —— GET 预览页和 POST 动作
+ * 共用的核心逻辑。输入全走 `unknown`，调用方从 body / query / param 拿什么
+ * 就塞什么。返回 `Response` 失败不走这里 —— 调用方按自己的错误格式包装。
  */
-export async function resolveMailAction<
-  B extends MailActionBody = MailActionBody,
->(
+async function resolveMailContext(
+  env: AppEnv["Bindings"],
+  emailMessageId: string | undefined,
+  accountIdRaw: unknown,
+  tokenRaw: unknown,
+): Promise<
+  | { ok: true; account: Account; emailMessageId: string; token: string }
+  | { ok: false; status: 400 | 403 | 404; error: string }
+> {
+  if (!emailMessageId)
+    return { ok: false, status: 400, error: "Invalid emailMessageId" };
+  const accountId =
+    typeof accountIdRaw === "number" ? accountIdRaw : Number(accountIdRaw);
+  if (!Number.isInteger(accountId) || accountId <= 0)
+    return { ok: false, status: 400, error: "Invalid accountId" };
+  if (typeof tokenRaw !== "string" || !tokenRaw)
+    return { ok: false, status: 400, error: "Invalid token" };
+  const valid = await verifyMailTokenById(
+    env.ADMIN_SECRET,
+    emailMessageId,
+    accountId,
+    tokenRaw,
+  );
+  if (!valid) return { ok: false, status: 403, error: "Forbidden" };
+  const account = await getAccountById(env.DB, accountId);
+  if (!account) return { ok: false, status: 404, error: "Account not found" };
+  return { ok: true, account, emailMessageId, token: tokenRaw };
+}
+
+/**
+ * 预览页 POST 邮件操作的公共入口：解析 body + 校验 token + 取 account。
+ * 失败时返回 `Response`（调用方直接 return）；成功返回 `{ account, emailMessageId, body }`。
+ */
+async function resolveMailAction<B extends MailActionBody = MailActionBody>(
   c: Context<AppEnv>,
 ): Promise<
   | { ok: true; account: Account; emailMessageId: string; body: B }
   | { ok: false; response: Response }
 > {
-  const emailMessageId = c.req.param("id");
   const body = (await c.req.json()) as B;
-  if (!emailMessageId || !body.accountId || !body.token) {
-    return {
-      ok: false,
-      response: c.json({ ok: false, error: "参数缺失" }, 400),
-    };
-  }
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    emailMessageId,
+  const ctx = await resolveMailContext(
+    c.env,
+    c.req.param("id"),
     body.accountId,
     body.token,
   );
-  if (!valid) {
+  if (!ctx.ok) {
     return {
       ok: false,
-      response: c.json({ ok: false, error: "无效的 token" }, 403),
+      response: c.json({ ok: false, error: ctx.error }, ctx.status),
     };
   }
-  const account = await getAccountById(c.env.DB, body.accountId);
-  if (!account) {
-    return {
-      ok: false,
-      response: c.json({ ok: false, error: "账号未找到" }, 404),
-    };
-  }
-  return { ok: true, account, emailMessageId, body };
+  return {
+    ok: true,
+    account: ctx.account,
+    emailMessageId: ctx.emailMessageId,
+    body,
+  };
 }
 
 // ─── HTML 格式化预览工具 ─────────────────────────────────────────────────────
@@ -122,7 +147,61 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
 
 // ─── 邮件操作 API ────────────────────────────────────────────────────────────
 // 邮件内容预览页 /mail/:id 已搬到 Pages（web/src/routes/mail.$id.tsx），通过
-// GET /api/mini-app/mail/:id 拿 JSON。Worker 只保留下面这些 POST action。
+// GET /api/mail/:id 拿 JSON。Worker 只保留下面这些 POST action。
+
+// 邮件预览 JSON API：Web 和 Mini App 的 mail preview 页都调这个。
+// 鉴权只走 token（HMAC-signed with emailMessageId + accountId + ADMIN_SECRET）
+// —— 持有 token = 有权看这封邮件；不需要叠 initData。
+preview.get(ROUTE_MAIL_API, async (c) => {
+  const ctx = await resolveMailContext(
+    c.env,
+    c.req.param("id"),
+    c.req.query("accountId"),
+    c.req.query("t"),
+  );
+  if (!ctx.ok) return c.json({ error: ctx.error }, ctx.status);
+  const { account, emailMessageId, token } = ctx;
+
+  const result = await loadMailForPreview(
+    c.env,
+    account,
+    emailMessageId,
+    c.req.query("folder"),
+  );
+  if (!result.ok) return c.json({ error: result.reason }, result.status);
+
+  // 用户打开预览 = 看过这封邮件，标已读（best-effort，不阻塞响应）
+  c.executionCtx.waitUntil(markEmailAsRead(c.env, account, emailMessageId));
+
+  const webMailUrl = c.env.WORKER_URL
+    ? buildWebMailUrl(
+        c.env.WORKER_URL,
+        emailMessageId,
+        account.id,
+        token,
+        result.fetchFolder !== "inbox" ? result.fetchFolder : undefined,
+      )
+    : "";
+  const mailMappings = await getMappingsByEmailIds(c.env.DB, account.id, [
+    emailMessageId,
+  ]);
+  const mapping = mailMappings[0];
+  const tgMessageLink = mapping
+    ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
+    : null;
+
+  return c.json({
+    meta: result.meta,
+    accountEmail: account.email,
+    bodyHtml: result.proxiedHtml,
+    inJunk: result.inJunk,
+    inArchive: result.fetchFolder === "archive",
+    starred: result.starred,
+    canArchive: accountCanArchive(account),
+    webMailUrl,
+    tgMessageLink,
+  });
+});
 
 preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
   const resolved = await resolveMailAction(c);
