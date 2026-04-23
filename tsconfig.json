@@ -51,7 +51,8 @@
       "@components/*": ["./src/components/*"],
       "@assets/*": ["./src/assets/*"],
       "@i18n": ["./src/i18n"],
-      "@i18n/*": ["./src/i18n/*"]
+      "@i18n/*": ["./src/i18n/*"],
+      "@web/*": ["./web/src/*"]
     }
   },
   "exclude": ["test"],

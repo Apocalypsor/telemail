@@ -1,4 +1,3 @@
-import { ROUTE_MINI_APP_LIST } from "@handlers/hono/routes";
 import { t } from "@i18n";
 import {
   getMailList,
@@ -10,6 +9,7 @@ import { markAllAsRead, trashAllJunkEmails } from "@services/message-actions";
 import { buildTgMessageLink } from "@services/telegram";
 import { buildMailPreviewUrl } from "@utils/mail-token";
 import { escapeMdV2 } from "@utils/markdown-v2";
+import { ROUTE_MINI_APP_LIST } from "@web/paths";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 import type { Env } from "@/types";
