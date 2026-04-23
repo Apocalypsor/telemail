@@ -46,8 +46,42 @@ type MailActionBody = {
 };
 
 /**
+ * (emailMessageId, accountId, token) 三元组校验 —— GET 预览页和 POST 动作
+ * 共用的核心逻辑。输入全走 `unknown`，调用方从 body / query / param 拿什么
+ * 就塞什么。返回 `Response` 失败不走这里 —— 调用方按自己的错误格式包装。
+ */
+async function resolveMailContext(
+  env: AppEnv["Bindings"],
+  emailMessageId: string | undefined,
+  accountIdRaw: unknown,
+  tokenRaw: unknown,
+): Promise<
+  | { ok: true; account: Account; emailMessageId: string; token: string }
+  | { ok: false; status: 400 | 403 | 404; error: string }
+> {
+  if (!emailMessageId)
+    return { ok: false, status: 400, error: "Invalid emailMessageId" };
+  const accountId =
+    typeof accountIdRaw === "number" ? accountIdRaw : Number(accountIdRaw);
+  if (!Number.isInteger(accountId) || accountId <= 0)
+    return { ok: false, status: 400, error: "Invalid accountId" };
+  if (typeof tokenRaw !== "string" || !tokenRaw)
+    return { ok: false, status: 400, error: "Invalid token" };
+  const valid = await verifyMailTokenById(
+    env.ADMIN_SECRET,
+    emailMessageId,
+    accountId,
+    tokenRaw,
+  );
+  if (!valid) return { ok: false, status: 403, error: "Forbidden" };
+  const account = await getAccountById(env.DB, accountId);
+  if (!account) return { ok: false, status: 404, error: "Account not found" };
+  return { ok: true, account, emailMessageId, token: tokenRaw };
+}
+
+/**
  * 预览页 POST 邮件操作的公共入口：解析 body + 校验 token + 取 account。
- * 失败时返回 `Response`（调用方直接 return）；成功返回 `{ account, emailMessageId }`。
+ * 失败时返回 `Response`（调用方直接 return）；成功返回 `{ account, emailMessageId, body }`。
  */
 export async function resolveMailAction<
   B extends MailActionBody = MailActionBody,
@@ -57,34 +91,25 @@ export async function resolveMailAction<
   | { ok: true; account: Account; emailMessageId: string; body: B }
   | { ok: false; response: Response }
 > {
-  const emailMessageId = c.req.param("id");
   const body = (await c.req.json()) as B;
-  if (!emailMessageId || !body.accountId || !body.token) {
-    return {
-      ok: false,
-      response: c.json({ ok: false, error: "参数缺失" }, 400),
-    };
-  }
-  const valid = await verifyMailTokenById(
-    c.env.ADMIN_SECRET,
-    emailMessageId,
+  const ctx = await resolveMailContext(
+    c.env,
+    c.req.param("id"),
     body.accountId,
     body.token,
   );
-  if (!valid) {
+  if (!ctx.ok) {
     return {
       ok: false,
-      response: c.json({ ok: false, error: "无效的 token" }, 403),
+      response: c.json({ ok: false, error: ctx.error }, ctx.status),
     };
   }
-  const account = await getAccountById(c.env.DB, body.accountId);
-  if (!account) {
-    return {
-      ok: false,
-      response: c.json({ ok: false, error: "账号未找到" }, 404),
-    };
-  }
-  return { ok: true, account, emailMessageId, body };
+  return {
+    ok: true,
+    account: ctx.account,
+    emailMessageId: ctx.emailMessageId,
+    body,
+  };
 }
 
 // ─── HTML 格式化预览工具 ─────────────────────────────────────────────────────
@@ -130,25 +155,14 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
 // 鉴权只走 token（HMAC-signed with emailMessageId + accountId + ADMIN_SECRET）
 // —— 持有 token = 有权看这封邮件；不需要叠 initData。
 preview.get(ROUTE_MAIL_API, async (c) => {
-  const emailMessageId = c.req.param("id");
-  const token = c.req.query("t");
-  const accountIdParam = c.req.query("accountId");
-  if (!emailMessageId || !token || !accountIdParam)
-    return c.json({ error: "Missing params" }, 400);
-  const accountId = Number(accountIdParam);
-  if (!Number.isInteger(accountId) || accountId <= 0)
-    return c.json({ error: "Invalid accountId" }, 400);
-  if (
-    !(await verifyMailTokenById(
-      c.env.ADMIN_SECRET,
-      emailMessageId,
-      accountId,
-      token,
-    ))
-  )
-    return c.json({ error: "Forbidden" }, 403);
-  const account = await getAccountById(c.env.DB, accountId);
-  if (!account) return c.json({ error: "Account not found" }, 404);
+  const ctx = await resolveMailContext(
+    c.env,
+    c.req.param("id"),
+    c.req.query("accountId"),
+    c.req.query("t"),
+  );
+  if (!ctx.ok) return c.json({ error: ctx.error }, ctx.status);
+  const { account, emailMessageId, token } = ctx;
 
   const result = await loadMailForPreview(
     c.env,
