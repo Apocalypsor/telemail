@@ -21,6 +21,8 @@ export const ROUTE_OAUTH_CALLBACK = `/oauth/:${PARAM_PROVIDER}/callback`;
 // Page routes for /preview /junk-check /mail/:id 已搬到 Pages（web/src/paths.ts），
 // 这里只保留 API endpoints。
 export const ROUTE_JUNK_CHECK_API = "/api/junk-check";
+// GET mail preview JSON —— token-only auth，Web 和 Mini App 共用
+export const ROUTE_MAIL_API = "/api/mail/:id";
 export const ROUTE_MAIL_MOVE_TO_INBOX = "/api/mail/:id/move-to-inbox";
 export const ROUTE_MAIL_MARK_JUNK = "/api/mail/:id/mark-as-junk";
 export const ROUTE_MAIL_TRASH = "/api/mail/:id/trash";
@@ -32,7 +34,6 @@ export const ROUTE_MAIL_UNARCHIVE = "/api/mail/:id/unarchive";
 // UI 页面路径（/telegram-app/*）属于 web，定义在 web/src/paths.ts。
 // 本文件只管 Worker 自己定义的 API endpoints。
 export const ROUTE_MINI_APP_API_LIST = "/api/mini-app/list/:type";
-export const ROUTE_MINI_APP_API_MAIL = "/api/mini-app/mail/:id";
 export const ROUTE_MINI_APP_API_MARK_ALL_READ =
   "/api/mini-app/mark-all-as-read";
 export const ROUTE_MINI_APP_API_TRASH_ALL_JUNK = "/api/mini-app/trash-all-junk";

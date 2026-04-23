@@ -5,6 +5,7 @@ import { requireTelegramLogin } from "@handlers/hono/middleware";
 import {
   ROUTE_CORS_PROXY,
   ROUTE_JUNK_CHECK_API,
+  ROUTE_MAIL_API,
   ROUTE_MAIL_ARCHIVE,
   ROUTE_MAIL_MARK_JUNK,
   ROUTE_MAIL_MOVE_TO_INBOX,
@@ -16,16 +17,17 @@ import {
 import { accountCanArchive, getEmailProvider } from "@providers";
 import { deliverEmailToTelegram } from "@services/bridge";
 import { analyzeEmail } from "@services/llm";
+import { loadMailForPreview } from "@services/mail-preview";
 import {
   cleanupTgForEmail,
   markEmailAsRead,
   syncStarPinState,
 } from "@services/message-actions";
-import { setReplyMarkup } from "@services/telegram";
+import { buildTgMessageLink, setReplyMarkup } from "@services/telegram";
 import { formatBody } from "@utils/format";
 import { http } from "@utils/http";
 import { verifyProxySignature } from "@utils/mail-html";
-import { verifyMailTokenById } from "@utils/mail-token";
+import { buildWebMailUrl, verifyMailTokenById } from "@utils/mail-token";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -122,7 +124,72 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
 
 // ─── 邮件操作 API ────────────────────────────────────────────────────────────
 // 邮件内容预览页 /mail/:id 已搬到 Pages（web/src/routes/mail.$id.tsx），通过
-// GET /api/mini-app/mail/:id 拿 JSON。Worker 只保留下面这些 POST action。
+// GET /api/mail/:id 拿 JSON。Worker 只保留下面这些 POST action。
+
+// 邮件预览 JSON API：Web 和 Mini App 的 mail preview 页都调这个。
+// 鉴权只走 token（HMAC-signed with emailMessageId + accountId + ADMIN_SECRET）
+// —— 持有 token = 有权看这封邮件；不需要叠 initData。
+preview.get(ROUTE_MAIL_API, async (c) => {
+  const emailMessageId = c.req.param("id");
+  const token = c.req.query("t");
+  const accountIdParam = c.req.query("accountId");
+  if (!emailMessageId || !token || !accountIdParam)
+    return c.json({ error: "Missing params" }, 400);
+  const accountId = Number(accountIdParam);
+  if (!Number.isInteger(accountId) || accountId <= 0)
+    return c.json({ error: "Invalid accountId" }, 400);
+  if (
+    !(await verifyMailTokenById(
+      c.env.ADMIN_SECRET,
+      emailMessageId,
+      accountId,
+      token,
+    ))
+  )
+    return c.json({ error: "Forbidden" }, 403);
+  const account = await getAccountById(c.env.DB, accountId);
+  if (!account) return c.json({ error: "Account not found" }, 404);
+
+  const result = await loadMailForPreview(
+    c.env,
+    account,
+    emailMessageId,
+    c.req.query("folder"),
+  );
+  if (!result.ok) return c.json({ error: result.reason }, result.status);
+
+  // 用户打开预览 = 看过这封邮件，标已读（best-effort，不阻塞响应）
+  c.executionCtx.waitUntil(markEmailAsRead(c.env, account, emailMessageId));
+
+  const webMailUrl = c.env.WORKER_URL
+    ? buildWebMailUrl(
+        c.env.WORKER_URL,
+        emailMessageId,
+        account.id,
+        token,
+        result.fetchFolder !== "inbox" ? result.fetchFolder : undefined,
+      )
+    : "";
+  const mailMappings = await getMappingsByEmailIds(c.env.DB, account.id, [
+    emailMessageId,
+  ]);
+  const mapping = mailMappings[0];
+  const tgMessageLink = mapping
+    ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
+    : null;
+
+  return c.json({
+    meta: result.meta,
+    accountEmail: account.email,
+    bodyHtml: result.proxiedHtml,
+    inJunk: result.inJunk,
+    inArchive: result.fetchFolder === "archive",
+    starred: result.starred,
+    canArchive: accountCanArchive(account),
+    webMailUrl,
+    tgMessageLink,
+  });
+});
 
 preview.post(ROUTE_MAIL_MOVE_TO_INBOX, async (c) => {
   const resolved = await resolveMailAction(c);

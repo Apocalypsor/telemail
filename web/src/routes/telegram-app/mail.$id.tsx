@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { api } from "@/api/client";
-import { ROUTE_MINI_APP_API_MAIL } from "@/api/routes";
+import { ROUTE_MAIL_API } from "@/api/routes";
 import { mailPreviewResponseSchema } from "@/api/schemas";
 import { MailBodyFrame } from "@/components/mail-body-frame";
 import { MailFab } from "@/components/mail-fab";
@@ -40,7 +40,7 @@ function MailPreviewPage() {
   const q = useQuery({
     queryKey,
     queryFn: async () => {
-      const url = ROUTE_MINI_APP_API_MAIL.replace(
+      const url = ROUTE_MAIL_API.replace(
         ":id",
         encodeURIComponent(emailMessageId),
       ).replace(/^\//, "");
