@@ -92,6 +92,23 @@ export const mailPreviewResponseSchema = z.object({
 });
 export type MailPreviewResponse = z.infer<typeof mailPreviewResponseSchema>;
 
+// ─── HTML → MarkdownV2 preview tool (POST /api/preview) ─────────────────────
+
+export const previewResponseSchema = z.object({
+  result: z.string(),
+  length: z.number(),
+});
+
+// ─── Junk classifier (POST /api/junk-check) ─────────────────────────────────
+
+export const junkCheckResponseSchema = z.object({
+  isJunk: z.boolean(),
+  junkConfidence: z.number(),
+  summary: z.string(),
+  tags: z.array(z.string()),
+  error: z.string().optional(),
+});
+
 // ─── Generic { ok, error? } ─────────────────────────────────────────────────
 
 export const okResponseSchema = z.object({

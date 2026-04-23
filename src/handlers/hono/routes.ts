@@ -18,9 +18,8 @@ export const ROUTE_OAUTH_SETUP = `/oauth/:${PARAM_PROVIDER}`;
 export const ROUTE_OAUTH_START = `/oauth/:${PARAM_PROVIDER}/start`;
 export const ROUTE_OAUTH_CALLBACK = `/oauth/:${PARAM_PROVIDER}/callback`;
 
-export const ROUTE_PREVIEW = "/preview";
-export const ROUTE_MAIL = "/mail/:id";
-export const ROUTE_JUNK_CHECK = "/junk-check";
+// Page routes for /preview /junk-check /mail/:id 已搬到 Pages（web/src/paths.ts），
+// 这里只保留 API endpoints。
 export const ROUTE_JUNK_CHECK_API = "/api/junk-check";
 export const ROUTE_MAIL_MOVE_TO_INBOX = "/api/mail/:id/move-to-inbox";
 export const ROUTE_MAIL_MARK_JUNK = "/api/mail/:id/mark-as-junk";
