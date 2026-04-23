@@ -48,6 +48,7 @@ export const ROUTE_MINI_APP_LIST = "/telegram-app/list/:type";
 
 // API
 export const ROUTE_MINI_APP_API_LIST = "/api/mini-app/list/:type";
+export const ROUTE_MINI_APP_API_MAIL = "/api/mini-app/mail/:id";
 export const ROUTE_MINI_APP_API_MARK_ALL_READ =
   "/api/mini-app/mark-all-as-read";
 export const ROUTE_MINI_APP_API_TRASH_ALL_JUNK = "/api/mini-app/trash-all-junk";

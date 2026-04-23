@@ -171,3 +171,10 @@ dist
 
 # Generated Tailwind CSS
 src/assets/tailwind.ts
+
+# TanStack Router auto-generated manifest (regenerated on every web build)
+web/src/routeTree.gen.ts
+
+# Build artifacts
+web/dist/
+*.tsbuildinfo

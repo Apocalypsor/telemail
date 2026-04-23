@@ -1,7 +1,3 @@
-import { MiniAppMailListPage } from "@components/miniapp/mail-list";
-import { MiniAppMailPage } from "@components/miniapp/mail-page";
-import { RemindersPage } from "@components/miniapp/reminders";
-import { MiniAppRouterPage } from "@components/miniapp/router";
 import { getAccountById } from "@db/accounts";
 import {
   getCachedMailData,
@@ -20,13 +16,10 @@ import {
 } from "@db/reminders";
 import { requireMiniAppAuth } from "@handlers/hono/middleware";
 import {
-  ROUTE_MINI_APP,
   ROUTE_MINI_APP_API_LIST,
+  ROUTE_MINI_APP_API_MAIL,
   ROUTE_MINI_APP_API_MARK_ALL_READ,
   ROUTE_MINI_APP_API_TRASH_ALL_JUNK,
-  ROUTE_MINI_APP_LIST,
-  ROUTE_MINI_APP_MAIL,
-  ROUTE_MINI_APP_REMINDERS,
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
   ROUTE_REMINDERS_API_ITEM,
@@ -163,31 +156,18 @@ async function lookupEmailContext(
   };
 }
 
-// ─── Mini App 页面 ──────────────────────────────────────────────────────────
+// ─── Mini App API ──────────────────────────────────────────────────────────
 // 鉴权策略：
-//  - 页面路由（/telegram-app/*）裸开，因为 Mini App 在 TG WebView 里没 cookie，
-//    无法套 requireTelegramLogin。Mail 页内部走 token 校验；其它页 JS 调 API
-//    时再校验。
-//  - 所有 API（/api/reminders/*, /api/mini-app/*）走 requireMiniAppAuth 中间
-//    件，统一在 c.var.userId 里给到鉴权用户。
-//
-// /telegram-app          → 路由页（仅群聊 deep link 会落到这里）
-// /telegram-app/reminders → 提醒设置（私聊 web_app 直接来；群聊 r_ 经路由跳来）
-// /telegram-app/mail/:id  → 邮件预览（私聊 web_app 直接来；群聊 m_ 经路由跳来）
+//  - 所有 API（/api/reminders/*, /api/mini-app/*）走 requireMiniAppAuth 中间件，
+//    统一在 c.var.userId 里给到鉴权用户（X-Telegram-Init-Data 头签名校验）。
+//  - Mail preview API（/api/mini-app/mail/:id）除了 initData 还额外校验 token，
+//    等价于 "持有该邮件的查看权"。
+//  - Mini App 页面（/telegram-app/*）本身由前端 SPA（Cloudflare Pages）渲染，
+//    不在 Worker 上。方案 A：同域 + Workers Routes 分流 /api/* → Worker。
 
 miniapp.use("/api/reminders/*", requireMiniAppAuth);
 miniapp.use(ROUTE_REMINDERS_API, requireMiniAppAuth);
 miniapp.use("/api/mini-app/*", requireMiniAppAuth);
-
-miniapp.get(ROUTE_MINI_APP, (c) => c.html(<MiniAppRouterPage />));
-
-miniapp.get(ROUTE_MINI_APP_REMINDERS, (c) => c.html(<RemindersPage />));
-
-miniapp.get(ROUTE_MINI_APP_LIST, (c) => {
-  const type = c.req.param("type");
-  if (!isMailListType(type)) return c.text("Unknown list type", 404);
-  return c.html(<MiniAppMailListPage type={type} />);
-});
 
 // 列表 JSON API：复用 services/mail-list 同一份数据，bot 文本回复也走它。
 // 默认每次都拉新数据（保守，bot/refresh 等场景）；?cache=true 时优先 KV（60s TTL，
@@ -238,16 +218,17 @@ miniapp.post(ROUTE_MINI_APP_API_TRASH_ALL_JUNK, async (c) => {
   return c.json(result);
 });
 
-miniapp.get(ROUTE_MINI_APP_MAIL, async (c) => {
-  // Token 鉴权（与 /mail/:id 同一套），渲染换 MiniAppMailPage（TG 主题色 + SDK）
+// 邮件预览 JSON API：前端（Cloudflare Pages）在 /mail/:id 路由里调这个拿
+// meta + bodyHtml + FAB 状态。token 校验和原 SSR 版一致。
+miniapp.get(ROUTE_MINI_APP_API_MAIL, async (c) => {
   const emailMessageId = c.req.param("id");
   const token = c.req.query("t");
   const accountIdParam = c.req.query("accountId");
   if (!emailMessageId || !token || !accountIdParam)
-    return c.text("Missing params", 400);
+    return c.json({ error: "Missing params" }, 400);
   const accountId = Number(accountIdParam);
   if (!Number.isInteger(accountId) || accountId <= 0)
-    return c.text("Invalid accountId", 400);
+    return c.json({ error: "Invalid accountId" }, 400);
   if (
     !(await verifyMailTokenById(
       c.env.ADMIN_SECRET,
@@ -256,9 +237,9 @@ miniapp.get(ROUTE_MINI_APP_MAIL, async (c) => {
       token,
     ))
   )
-    return c.text("Forbidden", 403);
+    return c.json({ error: "Forbidden" }, 403);
   const account = await getAccountById(c.env.DB, accountId);
-  if (!account) return c.text("Account not found", 404);
+  if (!account) return c.json({ error: "Account not found" }, 404);
 
   const result = await loadMailForPreview(
     c.env,
@@ -266,12 +247,12 @@ miniapp.get(ROUTE_MINI_APP_MAIL, async (c) => {
     emailMessageId,
     c.req.query("folder"),
   );
-  if (!result.ok) return c.text(result.reason, result.status);
+  if (!result.ok) return c.json({ error: result.reason }, result.status);
 
   // 用户打开预览 = 看过这封邮件，标已读（best-effort，不阻塞响应）
   c.executionCtx.waitUntil(markEmailAsRead(c.env, account, emailMessageId));
 
-  // Mini app 专属：浏览器打开按钮 + TG 原消息跳转链接
+  // "浏览器打开"按钮 + TG 原消息跳转链接（保留原 SSR 行为）
   const webMailUrl = c.env.WORKER_URL
     ? buildWebMailUrl(
         c.env.WORKER_URL,
@@ -287,24 +268,19 @@ miniapp.get(ROUTE_MINI_APP_MAIL, async (c) => {
   const mapping = mailMappings[0];
   const tgMessageLink = mapping
     ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
-    : undefined;
+    : null;
 
-  return c.html(
-    <MiniAppMailPage
-      meta={result.meta}
-      emailMessageId={emailMessageId}
-      accountId={account.id}
-      token={token}
-      inJunk={result.inJunk}
-      inArchive={result.fetchFolder === "archive"}
-      starred={result.starred}
-      canArchive={accountCanArchive(account)}
-      accountEmail={account.email}
-      webMailUrl={webMailUrl}
-      tgMessageLink={tgMessageLink}
-      bodyHtml={result.proxiedHtml}
-    />,
-  );
+  return c.json({
+    meta: result.meta,
+    accountEmail: account.email,
+    bodyHtml: result.proxiedHtml,
+    inJunk: result.inJunk,
+    inArchive: result.fetchFolder === "archive",
+    starred: result.starred,
+    canArchive: accountCanArchive(account),
+    webMailUrl,
+    tgMessageLink,
+  });
 });
 
 // ─── API: 解析群聊 deep link 的 start_param ──────────────────────────────────
