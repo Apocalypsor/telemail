@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@heroui/react";
+import { Spinner } from "@heroui/react";
 import { useState } from "react";
 import { api, extractErrorMessage } from "@/lib/api";
 import { okResponseSchema } from "@/lib/schemas";
@@ -26,6 +26,9 @@ type Action =
 /**
  * 邮件预览页右下角的悬浮操作按钮组。展开时从主按钮向上叠加动作按钮，
  * 每个按钮 POST 到 `/api/mail/:id/<action>`（Worker 侧 token 鉴权，不走 initData）。
+ *
+ * 定位：`fixed` + `env(safe-area-inset-bottom)` 让 iOS 底部手势区 / 刘海机型
+ * 的安全区也避让开；外层 `position: fixed` 确保视口相对定位，不吃父级变换。
  */
 export function MailFab({
   emailMessageId,
@@ -58,7 +61,7 @@ export function MailFab({
 
   async function onAction(action: Action) {
     setPending(action);
-    setStatus("处理中…");
+    setStatus(null); // pending 态用按钮内联 Spinner 反馈，不占浮层气泡
     try {
       if (action === "toggle-star") {
         const next = !starred;
@@ -90,15 +93,22 @@ export function MailFab({
   const isBusy = pending != null;
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] flex flex-col items-end gap-2">
+    <div
+      className="fixed z-[9999] flex flex-col items-end gap-2 pointer-events-none"
+      style={{
+        // iOS 安全区 + 基础内边距；右侧同理避让刘海屏
+        bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+        right: "calc(1rem + env(safe-area-inset-right, 0px))",
+      }}
+    >
       {status && (
-        <div className="bg-[color:var(--surface)] text-[color:var(--surface-foreground)] px-4 py-2 rounded-2xl text-[13px] border border-[color:var(--surface-secondary)] shadow-lg max-w-[280px] text-center">
+        <div className="pointer-events-auto bg-[color:var(--surface)] text-[color:var(--surface-foreground)] px-4 py-2 rounded-2xl text-[13px] border border-[color:var(--surface-secondary)] shadow-lg max-w-[280px] text-center">
           {status}
         </div>
       )}
 
       {open && (
-        <div className="flex flex-col items-end gap-2">
+        <div className="pointer-events-auto flex flex-col items-end gap-2">
           {!inArchive && (
             <ActionButton
               label={starred ? "✅ 已星标" : "⭐ 星标"}
@@ -156,21 +166,21 @@ export function MailFab({
         </div>
       )}
 
-      <Button
-        isIconOnly
-        variant="primary"
-        size="lg"
+      {/* 主按钮用原生 button + 自定义样式：HeroUI Button 的 !important 会跟
+          Tailwind 尺寸 utility 打架，导致圆形 FAB 被它的内置 padding 撑形 */}
+      <button
+        type="button"
         onClick={() => {
           setOpen((v) => !v);
           setStatus(null);
         }}
         aria-label={open ? "收起操作" : "展开操作"}
-        className={`!w-14 !h-14 !rounded-full text-2xl shadow-xl transition-transform ${
+        className={`pointer-events-auto inline-flex items-center justify-center w-14 h-14 rounded-full text-2xl leading-none bg-[color:var(--accent)] text-[color:var(--accent-foreground)] shadow-[0_6px_20px_rgba(0,0,0,0.35)] active:scale-95 transition-transform duration-150 ${
           open ? "rotate-45" : ""
         }`}
       >
         ⚡
-      </Button>
+      </button>
     </div>
   );
 }

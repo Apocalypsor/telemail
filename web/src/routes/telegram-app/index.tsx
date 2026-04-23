@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, extractErrorMessage } from "@/lib/api";
 import { ROUTE_REMINDERS_API_RESOLVE_CONTEXT } from "@/lib/routes";
 import { resolveContextResponseSchema } from "@/lib/schemas";
-import { getTelegram } from "@/lib/tg";
+import { getTelegram, useBackButton } from "@/lib/tg";
 
 /**
  * 入口路由（`/telegram-app/`，对应 BotFather `/newapp` 注册的 Web App URL）。
@@ -18,6 +18,9 @@ import { getTelegram } from "@/lib/tg";
 function RouterPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+
+  // 路由中转页本身不是停留页，不显示 BackButton
+  useBackButton(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,9 +88,8 @@ function RouterPage() {
     );
   }
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
+    <div className="min-h-screen flex items-center justify-center p-6">
       <Spinner size="lg" />
-      <p className="text-sm text-[color:var(--muted)]">加载中…</p>
     </div>
   );
 }
