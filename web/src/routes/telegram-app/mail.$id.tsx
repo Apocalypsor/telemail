@@ -89,7 +89,6 @@ function MailPreviewPage() {
         date={d.meta.date ?? null}
         accountEmail={d.accountEmail}
         webMailUrl={d.webMailUrl}
-        tgMessageLink={d.tgMessageLink}
       />
       {/* MainButton 由 TG 宿主绘制在屏幕底部外，不占页面盒子；正文只需常规边距 */}
       <div className="px-4 py-4 pb-8 break-words">
@@ -103,12 +102,19 @@ function MailPreviewPage() {
         inJunk={d.inJunk}
         inArchive={d.inArchive}
         canArchive={d.canArchive}
+        subject={d.meta.subject ?? null}
+        webMailUrl={d.webMailUrl}
+        tgMessageLink={d.tgMessageLink}
         onChanged={() => qc.invalidateQueries({ queryKey })}
       />
     </>
   );
 }
 
+/**
+ * 邮件 meta 信息头：标题（可点 → 浏览器打开原文） + From/To/Account/Date。
+ * 分享 / 跳 TG 原消息两个动作已移到底部 SecondaryButton，这里不再渲染。
+ */
 function MailMetaHeader({
   subject,
   from,
@@ -116,7 +122,6 @@ function MailMetaHeader({
   date,
   accountEmail,
   webMailUrl,
-  tgMessageLink,
 }: {
   subject: string | null;
   from: string | null;
@@ -124,39 +129,15 @@ function MailMetaHeader({
   date: string | null;
   accountEmail: string | null;
   webMailUrl: string;
-  tgMessageLink: string | null;
 }) {
   if (!subject && !from && !to && !accountEmail && !date) return null;
-  const shareText = subject ? `📧 ${subject}` : "";
 
-  function openExternal(
-    e: React.MouseEvent,
-    url: string,
-    kind: "tg" | "browser",
-  ) {
+  function openInBrowser(e: React.MouseEvent) {
+    if (!webMailUrl) return;
     e.preventDefault();
     const tg = getTelegram();
-    if (kind === "tg" && tg?.openTelegramLink) {
-      tg.openTelegramLink(url);
-      // 某些 TG 客户端不会自动关 Mini App —— 兜底显式 close
-      setTimeout(() => tg.close?.(), 50);
-    } else if (tg?.openLink) {
-      tg.openLink(url);
-    } else {
-      window.open(url, "_blank", "noopener");
-    }
-  }
-
-  function share(e: React.MouseEvent) {
-    e.preventDefault();
-    const url = webMailUrl;
-    if (!url) return;
-    const shareLink =
-      `https://t.me/share/url?url=${encodeURIComponent(url)}` +
-      `&text=${encodeURIComponent(shareText)}`;
-    const tg = getTelegram();
-    if (tg?.openTelegramLink) tg.openTelegramLink(shareLink);
-    else window.open(shareLink, "_blank", "noopener");
+    if (tg?.openLink) tg.openLink(webMailUrl);
+    else window.open(webMailUrl, "_blank", "noopener");
   }
 
   return (
@@ -165,7 +146,7 @@ function MailMetaHeader({
         (webMailUrl ? (
           <a
             href={webMailUrl}
-            onClick={(e) => openExternal(e, webMailUrl, "browser")}
+            onClick={openInBrowser}
             title="在浏览器打开"
             className="block text-[22px] font-semibold break-words text-[color:var(--accent)] mb-1.5 active:opacity-60 no-underline"
           >
@@ -177,27 +158,6 @@ function MailMetaHeader({
             {subject}
           </div>
         ))}
-
-      <div className="flex gap-3 flex-wrap mt-1.5">
-        {tgMessageLink && (
-          <a
-            href={tgMessageLink}
-            onClick={(e) => openExternal(e, tgMessageLink, "tg")}
-            className="text-xs text-[color:var(--accent)] active:opacity-60 no-underline"
-          >
-            💬 跳到 TG 原消息
-          </a>
-        )}
-        {webMailUrl && (
-          <button
-            type="button"
-            onClick={share}
-            className="text-xs text-[color:var(--accent)] active:opacity-60 bg-transparent border-0 p-0 cursor-pointer"
-          >
-            📤 分享
-          </button>
-        )}
-      </div>
 
       {from && (
         <div>

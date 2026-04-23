@@ -49,6 +49,32 @@ export interface TelegramMainButton {
   }) => void;
 }
 
+/** SecondaryButton — Bot API 7.10+ (2024-09)。与 MainButton 并排显示在底部，
+ *  接口和 MainButton 近乎一致，多一个 `position` 参数控位。 */
+export interface TelegramSecondaryButton {
+  text: string;
+  isVisible: boolean;
+  isActive: boolean;
+  isProgressVisible: boolean;
+  setText: (text: string) => void;
+  onClick: (cb: () => void) => void;
+  offClick: (cb: () => void) => void;
+  show: () => void;
+  hide: () => void;
+  enable: () => void;
+  disable: () => void;
+  showProgress: (leaveActive?: boolean) => void;
+  hideProgress: () => void;
+  setParams: (params: {
+    text?: string;
+    color?: string;
+    text_color?: string;
+    is_active?: boolean;
+    is_visible?: boolean;
+    position?: "left" | "right" | "top" | "bottom";
+  }) => void;
+}
+
 export interface TelegramWebApp {
   initData: string;
   initDataUnsafe: {
@@ -75,6 +101,8 @@ export interface TelegramWebApp {
   /** 原生弹窗；按钮数量 <= 3。点击后 cb 拿到按钮 id（未设 id 时是空字符串）。 */
   showPopup?: (params: PopupParams, cb?: (buttonId: string) => void) => void;
   MainButton?: TelegramMainButton;
+  /** Bot API 7.10+ 才有；老客户端是 undefined，useSecondaryButton 会变 no-op */
+  SecondaryButton?: TelegramSecondaryButton;
   BackButton?: {
     show: () => void;
     hide: () => void;
@@ -120,9 +148,9 @@ export function syncThemeFromTelegram(): void {
 /**
  * App 启动时调用一次：ready + expand + 主题。
  *
- * **注意不碰 BackButton / MainButton**。那两个按钮由页面用 `useBackButton` /
- * `useMainButton` 自己声明状态；父组件 hide 会和子组件 show 冲突（React effect
- * 运行顺序是子先于父）。
+ * **注意不碰 BackButton / MainButton / SecondaryButton**。那几个按钮由页面
+ * 自己的 hook 声明状态；父组件 hide 会和子组件 show 冲突（React effect 运行
+ * 顺序是子先于父）。
  */
 export function initTelegramChrome(): void {
   const tg = getTelegram();
@@ -170,44 +198,50 @@ export interface MainButtonConfig {
 }
 
 /**
- * 页面声明 MainButton：
- *   text 有值 → 显示按钮 + 文字 + 绑点击
- *   text 为 undefined → 隐藏按钮
- * 卸载时自动 hide + 摘 handler。
+ * MainButton / SecondaryButton 的公共行为：挂文字 + 启用 / 进度 / 可见性，
+ * 卸载自动 hide + offClick。同一套实现两边共用。
  *
- * **注意**：实现走 `setText` + `enable/disable` + `show/hide` 三段式而不是
- * `setParams`，因为 Android 客户端历史上对 `setParams` 的可见性 / 启用状态有
- * 兼容问题（见 vkruglikov/react-telegram-web-app discussion #69 / 类似 issue
- * 一堆）。三段式是 TG 官方示例的写法，所有客户端都稳。
- *
- * onClick 每次变化都会重新摘旧 handler 绑新的 —— 保证 cb 闭包拿到最新
- * props/state，不会指向陈旧值。
+ * 实现走 `setText` + `enable/disable` + `show/hide` 三段式而不是 `setParams`，
+ * Android 客户端历史上对 `setParams` 的可见性 / 启用状态有兼容问题（见
+ * vkruglikov/react-telegram-web-app discussion #69 / 类似 issue 一堆）。
+ * 三段式是 TG 官方示例的写法，所有客户端都稳。
  */
-export function useMainButton({
-  text,
-  onClick,
-  loading,
-  disabled,
-}: MainButtonConfig): void {
+function useBottomButton(
+  getBtn: () => TelegramMainButton | TelegramSecondaryButton | undefined,
+  { text, onClick, loading, disabled }: MainButtonConfig,
+): void {
   useEffect(() => {
-    const tg = getTelegram();
-    const mb = tg?.MainButton;
-    if (!mb) return;
+    const btn = getBtn();
+    if (!btn) return;
     if (!text) {
-      mb.hide();
+      btn.hide();
       return;
     }
-    mb.setText(text);
-    if (disabled || loading) mb.disable();
-    else mb.enable();
-    if (loading) mb.showProgress(false);
-    else mb.hideProgress();
-    mb.show();
-    mb.onClick(onClick);
+    btn.setText(text);
+    if (disabled || loading) btn.disable();
+    else btn.enable();
+    if (loading) btn.showProgress(false);
+    else btn.hideProgress();
+    btn.show();
+    btn.onClick(onClick);
     return () => {
-      mb.offClick(onClick);
-      mb.hideProgress();
-      mb.hide();
+      btn.offClick(onClick);
+      btn.hideProgress();
+      btn.hide();
     };
-  }, [text, onClick, loading, disabled]);
+  }, [text, onClick, loading, disabled, getBtn]);
+}
+
+// 稳定的取按钮函数：module-level 引用，useBottomButton 的 deps 不会无限变
+const getMainButton = () => getTelegram()?.MainButton;
+const getSecondaryButton = () => getTelegram()?.SecondaryButton;
+
+/** 页面声明 MainButton。详见 `useBottomButton`。 */
+export function useMainButton(config: MainButtonConfig): void {
+  useBottomButton(getMainButton, config);
+}
+
+/** 页面声明 SecondaryButton（Bot API 7.10+）。老客户端无此 API，自动 no-op。 */
+export function useSecondaryButton(config: MainButtonConfig): void {
+  useBottomButton(getSecondaryButton, config);
 }

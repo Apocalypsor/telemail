@@ -1,7 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { api, extractErrorMessage } from "@/lib/api";
 import { okResponseSchema } from "@/lib/schemas";
-import { getTelegram, type PopupButton, useMainButton } from "@/lib/tg";
+import {
+  getTelegram,
+  type PopupButton,
+  useMainButton,
+  useSecondaryButton,
+} from "@/lib/tg";
 
 export interface MailFabProps {
   emailMessageId: string;
@@ -11,6 +16,12 @@ export interface MailFabProps {
   inJunk: boolean;
   inArchive: boolean;
   canArchive: boolean;
+  /** 邮件主题；用于分享时的预设文字 */
+  subject?: string | null;
+  /** 浏览器打开邮件的 URL；用作分享链接。缺失 → 不显示分享入口 */
+  webMailUrl?: string | null;
+  /** 跳到 TG 原消息的 deep link。缺失 → 不显示跳转入口 */
+  tgMessageLink?: string | null;
   /** FAB 动作成功后通知父组件 refetch 预览数据；交给 caller 处理 */
   onChanged?: () => void;
 }
@@ -27,19 +38,32 @@ interface ActionDef {
   id: Action;
   label: string;
   type: PopupButton["type"];
-  /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 FAB 隐藏 */
+  /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 MainButton 隐藏 */
   terminal: boolean;
 }
 
+type ExtraId = "share" | "tg-link";
+
+interface ExtraDef {
+  id: ExtraId;
+  label: string;
+  run: () => void;
+}
+
 /**
- * 邮件预览页的操作入口 —— 用 TG 原生 MainButton + showPopup 做，不渲染任何
- * DOM。组件本身只管状态 + 调 API，UI 全部由 TG 宿主绘制。
+ * 邮件预览页的操作入口 —— 用 TG 原生 MainButton + SecondaryButton +
+ * showPopup 做，**不渲染任何 DOM**。
  *
- *   多个动作可选：MainButton 显示 "⚡ 操作" → 点击弹 showPopup action sheet
- *   仅一个动作（归档状态下的"移出归档"）：MainButton 直接显示该动作，一键完成
+ *   MainButton "⚡ 操作" → popup: 星标 / 归档 / 标垃圾（按邮件状态）
+ *   SecondaryButton     → 分享 + 跳 TG 原消息
+ *     两者都有 → "🔗 更多" → popup
+ *     只有一个 → 按钮直接做那个事
+ *     都没有   → 隐藏
  *
- * 成功后：触觉反馈 + onChanged() 让页面 refetch 数据；操作是终端的（归档 /
- * 删除 / 标垃圾 / 移出归档 / 移回收件箱）就把 MainButton 自己藏掉。
+ * popup 有 3 按钮硬上限，所以邮件状态动作和分享/跳转两组拆在两个原生按钮里。
+ *
+ * 成功后：HapticFeedback + onChanged() refetch 数据；terminal 动作（归档/删除/
+ * 标垃圾/移出归档/移回）成功后 MainButton 自隐藏，SecondaryButton 保持。
  * 失败：showAlert(error)。
  */
 export function MailFab({
@@ -50,6 +74,9 @@ export function MailFab({
   inJunk,
   inArchive,
   canArchive,
+  subject,
+  webMailUrl,
+  tgMessageLink,
   onChanged,
 }: MailFabProps) {
   const [starred, setStarred] = useState(initialStarred);
@@ -61,6 +88,8 @@ export function MailFab({
   // 同时永远拿到最新值，避免 biome 的 useExhaustiveDependencies 和 props 闭包冲突
   const propsRef = useRef({ emailMessageId, accountId, token });
   propsRef.current = { emailMessageId, accountId, token };
+
+  // ─── 邮件状态动作（MainButton） ────────────────────────────────────────
 
   const actions = useMemo<ActionDef[]>(() => {
     if (inArchive) {
@@ -175,7 +204,7 @@ export function MailFab({
     tg.showPopup(
       {
         // title + message 都不能为空：TG 客户端对 message 校验严格，
-        // 空串会让 popup 静默不弹（这就是上一版"按钮点了没反应"的根因）
+        // 空串会让 popup 静默不弹
         title: "邮件操作",
         message: "选择要执行的操作",
         buttons: actions.map<PopupButton>((a) => ({
@@ -185,7 +214,6 @@ export function MailFab({
         })),
       },
       (buttonId) => {
-        // 用户取消（点外面 / swipe down）→ buttonId 是空串
         if (!buttonId) return;
         const a = actions.find((x) => x.id === buttonId);
         if (a) runAction(a.id, a.terminal);
@@ -204,6 +232,80 @@ export function MailFab({
     onClick: handleMainButtonClick,
     loading: pending,
     disabled: pending,
+  });
+
+  // ─── 分享 / 跳 TG 原消息（SecondaryButton） ──────────────────────────────
+
+  const doShare = useCallback(() => {
+    const tg = getTelegram();
+    if (!webMailUrl) return;
+    const shareText = subject ? `📧 ${subject}` : "";
+    const shareLink =
+      `https://t.me/share/url?url=${encodeURIComponent(webMailUrl)}` +
+      `&text=${encodeURIComponent(shareText)}`;
+    if (tg?.openTelegramLink) tg.openTelegramLink(shareLink);
+    else window.open(shareLink, "_blank", "noopener");
+  }, [webMailUrl, subject]);
+
+  const doOpenTg = useCallback(() => {
+    const tg = getTelegram();
+    if (!tgMessageLink) return;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(tgMessageLink);
+      // 某些 TG 客户端跳转后不会自动关 Mini App —— 兜底显式 close
+      setTimeout(() => tg.close?.(), 50);
+    } else {
+      window.open(tgMessageLink, "_blank", "noopener");
+    }
+  }, [tgMessageLink]);
+
+  const extras = useMemo<ExtraDef[]>(() => {
+    const list: ExtraDef[] = [];
+    if (webMailUrl) list.push({ id: "share", label: "📤 分享", run: doShare });
+    if (tgMessageLink)
+      list.push({ id: "tg-link", label: "💬 跳到 TG 原消息", run: doOpenTg });
+    return list;
+  }, [webMailUrl, tgMessageLink, doShare, doOpenTg]);
+
+  const handleSecondaryButtonClick = useCallback(() => {
+    if (extras.length === 0) return;
+    if (extras.length === 1) {
+      extras[0].run();
+      return;
+    }
+    const tg = getTelegram();
+    if (!tg?.showPopup) {
+      extras[0].run();
+      return;
+    }
+    tg.showPopup(
+      {
+        title: "更多",
+        message: "选择要执行的操作",
+        buttons: extras.map<PopupButton>((e) => ({
+          id: e.id,
+          type: "default",
+          text: e.label,
+        })),
+      },
+      (buttonId) => {
+        if (!buttonId) return;
+        const e = extras.find((x) => x.id === buttonId);
+        if (e) e.run();
+      },
+    );
+  }, [extras]);
+
+  const secondaryButtonText =
+    extras.length === 0
+      ? undefined
+      : extras.length === 1
+        ? extras[0].label
+        : "🔗 更多";
+
+  useSecondaryButton({
+    text: secondaryButtonText,
+    onClick: handleSecondaryButtonClick,
   });
 
   // 没渲染任何 DOM —— UI 全在 TG 宿主
