@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
+import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { api, extractErrorMessage } from "@/lib/api";
@@ -43,12 +44,12 @@ const BULK_ACTIONS: Partial<Record<MailListType, BulkAction>> = {
 };
 
 const searchSchema = z.object({
-  cache: z.coerce.boolean().optional(),
+  cache: fallback(z.coerce.boolean().optional(), undefined),
 });
 
 export const Route = createFileRoute("/telegram-app/list/$type")({
   component: MailListPage,
-  validateSearch: searchSchema,
+  validateSearch: zodValidator(searchSchema),
   beforeLoad: ({ params }) => {
     if (!MAIL_LIST_TYPES.includes(params.type as MailListType)) {
       throw notFound();

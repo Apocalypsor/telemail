@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { api, extractErrorMessage } from "@/lib/api";
@@ -15,17 +16,19 @@ import {
 } from "@/lib/schemas";
 import { getTelegram } from "@/lib/tg";
 
+// 三件套任缺其一 → 退化为"所有待提醒"列表模式。用 fallback 吞掉格式错误，
+// 避免脏 URL 让整页崩在 errorComponent。
 const searchSchema = z.object({
-  accountId: z.coerce.number().optional(),
-  emailMessageId: z.string().optional(),
-  token: z.string().optional(),
+  accountId: fallback(z.coerce.number().optional(), undefined),
+  emailMessageId: fallback(z.string().optional(), undefined),
+  token: fallback(z.string().optional(), undefined),
 });
 
 type Search = z.infer<typeof searchSchema>;
 
 export const Route = createFileRoute("/telegram-app/reminders")({
   component: RemindersPage,
-  validateSearch: searchSchema,
+  validateSearch: zodValidator(searchSchema),
 });
 
 const PRESETS: { label: string; mins: number | "tonight20" | "tomorrow9" }[] = [

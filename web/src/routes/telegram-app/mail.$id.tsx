@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { zodValidator } from "@tanstack/zod-adapter";
 import { useEffect } from "react";
 import { z } from "zod";
 import { MailBodyFrame } from "@/components/mail-body-frame";
@@ -9,6 +10,8 @@ import { ROUTE_MINI_APP_API_MAIL } from "@/lib/routes";
 import { mailPreviewResponseSchema } from "@/lib/schemas";
 import { getTelegram } from "@/lib/tg";
 
+// accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
+// folder / back 可选。
 const searchSchema = z.object({
   accountId: z.coerce.number(),
   t: z.string(),
@@ -18,7 +21,7 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/telegram-app/mail/$id")({
   component: MailPreviewPage,
-  validateSearch: searchSchema,
+  validateSearch: zodValidator(searchSchema),
 });
 
 function MailPreviewPage() {
