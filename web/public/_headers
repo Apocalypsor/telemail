@@ -1,0 +1,15 @@
+# Cache 策略：
+#   index.html 永远 revalidate —— 新部署的 asset hash 第一时间被看到，
+#     避免旧 HTML 引用已不存在的旧 chunk 导致 "text/html is not a valid
+#     JavaScript MIME type" 错误。
+#   /assets/* 文件名带 content hash（Vite 自动），内容不变时 URL 也不变，
+#     所以可以长期强缓存 + immutable。
+
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

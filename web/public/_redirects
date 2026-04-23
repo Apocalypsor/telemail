@@ -1,1 +1,6 @@
-/*    /index.html   200
+# SPA 回退：仅限 Mini App 子路由，让 TanStack Router 接管。
+# 其它路径（/assets/*、/favicon.png 等）走 Pages 的文件匹配；缺失
+# 就是真 404，不把 HTML 当 JS 回，避免浏览器拿旧 hash 的 script 请求
+# 被盖成 index.html 解析报错（"text/html is not a valid JavaScript
+# MIME type"）。
+/telegram-app/*   /index.html   200
