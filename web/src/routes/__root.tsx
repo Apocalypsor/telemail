@@ -4,19 +4,13 @@ import {
   Outlet,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { initTelegramChrome } from "@/lib/tg";
 
 interface RouterContext {
   queryClient: QueryClient;
 }
 
 function RootLayout() {
-  useEffect(() => {
-    initTelegramChrome();
-  }, []);
-
-  // 拿当前 pathname 做 key，路由切换时 div 重挂、page-enter 动画重跑
+  // pathname 作 key 让路由切换时 div 重挂，触发 page-enter 动画
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (

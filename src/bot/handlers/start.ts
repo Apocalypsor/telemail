@@ -7,12 +7,9 @@ import {
   rejectUser,
   upsertUser,
 } from "@db/users";
-import {
-  ROUTE_MINI_APP_LIST,
-  ROUTE_MINI_APP_REMINDERS,
-} from "@handlers/hono/routes";
 import { t } from "@i18n";
 import { reportErrorToObservability } from "@utils/observability";
+import { ROUTE_MINI_APP_LIST, ROUTE_MINI_APP_REMINDERS } from "@web/paths";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 import type { Env } from "@/types";

@@ -1,19 +1,10 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryProvider, queryClient } from "@/providers/query";
+import { TelegramProvider } from "@/providers/telegram";
 import { routeTree } from "./routeTree.gen";
 import "./styles/tailwind.css";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 30_000,
-    },
-  },
-});
 
 const router = createRouter({
   routeTree,
@@ -30,10 +21,13 @@ declare module "@tanstack/react-router" {
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("#root missing");
 
+// TelegramProvider 必须最外 —— ready/expand + 主题 CSS 变量要先于任何 UI 渲染。
 createRoot(rootEl).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <TelegramProvider>
+      <QueryProvider>
+        <RouterProvider router={router} />
+      </QueryProvider>
+    </TelegramProvider>
   </StrictMode>,
 );
