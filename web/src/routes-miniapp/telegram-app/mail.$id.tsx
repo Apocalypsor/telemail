@@ -59,19 +59,17 @@ function MailPreviewPage() {
 
   if (q.isLoading) {
     return (
-      <div>
-        <div className="bg-zinc-900 border-b border-zinc-800 px-4 py-4 space-y-2">
-          <Skeleton className="h-6 w-2/3 rounded-md" />
-          <Skeleton className="h-3 w-1/3 rounded-md" />
-          <Skeleton className="h-3 w-1/2 rounded-md" />
-        </div>
-        <div className="px-4 py-4 space-y-3">
+      <article className="max-w-3xl mx-auto px-4 py-6 animate-pulse space-y-4">
+        <Skeleton className="h-9 w-2/3 rounded-md" />
+        <Skeleton className="h-4 w-1/3 rounded-md" />
+        <Skeleton className="h-4 w-1/2 rounded-md" />
+        <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
           <Skeleton className="h-4 w-full rounded-md" />
           <Skeleton className="h-4 w-11/12 rounded-md" />
           <Skeleton className="h-4 w-10/12 rounded-md" />
           <Skeleton className="h-4 w-9/12 rounded-md" />
         </div>
-      </div>
+      </article>
     );
   }
   if (q.isError || !q.data) {
@@ -79,20 +77,37 @@ function MailPreviewPage() {
   }
 
   const d = q.data;
+  const metaRows: [string, string][] = [];
+  if (d.meta.from) metaRows.push(["From", d.meta.from]);
+  if (d.meta.to) metaRows.push(["To", d.meta.to]);
+  if (d.accountEmail) metaRows.push(["Account", d.accountEmail]);
+  if (d.meta.date) metaRows.push(["Date", d.meta.date]);
+
   return (
     <>
-      <MailMetaHeader
-        subject={d.meta.subject ?? null}
-        from={d.meta.from ?? null}
-        to={d.meta.to ?? null}
-        date={d.meta.date ?? null}
-        accountEmail={d.accountEmail}
-        webMailUrl={d.webMailUrl}
-      />
-      {/* MainButton 由 TG 宿主绘制在屏幕底部外，不占页面盒子；正文只需常规边距 */}
-      <div className="px-4 py-4 pb-8 break-words">
-        <MailBodyFrame bodyHtml={d.bodyHtml} />
-      </div>
+      {/* 结构和间距都对齐 web `/mail/:id` —— 正常内容流（不置顶），滚动时
+         subject/meta 跟着走。MailFab 底部 TG 原生按钮代替 web 的 toolbar。 */}
+      <article className="max-w-3xl mx-auto px-4 py-6 break-words">
+        {d.meta.subject && (
+          <Subject subject={d.meta.subject} webMailUrl={d.webMailUrl} />
+        )}
+
+        {metaRows.length > 0 && (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm mb-6">
+            {metaRows.map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="text-zinc-500">{label}</dt>
+                <dd className="text-zinc-300 break-words">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+          <MailBodyFrame bodyHtml={d.bodyHtml} />
+        </div>
+      </article>
+
       <MailFab
         emailMessageId={emailMessageId}
         accountId={search.accountId}
@@ -111,31 +126,24 @@ function MailPreviewPage() {
 }
 
 /**
- * 邮件 meta 信息头：标题（可点 → 浏览器打开原文） + From/To/Account/Date。
- * 分享 / 跳 TG 原消息两个动作已移到底部 SecondaryButton，这里不再渲染。
- *
- * 背景用 zinc-950/80 + backdrop-blur，延续 web 的毛玻璃效果；标题用 emerald
- * 和 web 版 mail.$id 一致。
+ * 邮件标题：结构和 web 的 `<h1>` 一致（text-2xl → text-[32px]，zinc-100，
+ * 不染 emerald）；miniapp 里额外支持点击 → TG 浏览器打开原文链接。
  */
-function MailMetaHeader({
+function Subject({
   subject,
-  from,
-  to,
-  date,
-  accountEmail,
   webMailUrl,
 }: {
-  subject: string | null;
-  from: string | null;
-  to: string | null;
-  date: string | null;
-  accountEmail: string | null;
+  subject: string;
   webMailUrl: string;
 }) {
-  if (!subject && !from && !to && !accountEmail && !date) return null;
+  const className =
+    "text-2xl sm:text-[28px] md:text-[32px] font-semibold tracking-tight leading-tight break-words mb-4 text-zinc-100";
+
+  if (!webMailUrl) {
+    return <h1 className={className}>{subject}</h1>;
+  }
 
   function openInBrowser(e: React.MouseEvent) {
-    if (!webMailUrl) return;
     e.preventDefault();
     const tg = getTelegram();
     if (tg?.openLink) tg.openLink(webMailUrl);
@@ -143,44 +151,16 @@ function MailMetaHeader({
   }
 
   return (
-    <div className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur border-b border-zinc-800/80 px-4 py-3 text-[13px] leading-7 text-zinc-200">
-      {subject &&
-        (webMailUrl ? (
-          <a
-            href={webMailUrl}
-            onClick={openInBrowser}
-            title="在浏览器打开"
-            className="block text-[22px] font-semibold break-words text-emerald-400 mb-1.5 active:opacity-60 no-underline"
-          >
-            {subject}
-            <span className="text-sm opacity-70 ml-1">↗</span>
-          </a>
-        ) : (
-          <div className="text-[22px] font-semibold break-words text-emerald-400 mb-1.5">
-            {subject}
-          </div>
-        ))}
-
-      {from && (
-        <div>
-          <span className="text-zinc-500">From:</span> {from}
-        </div>
-      )}
-      {to && (
-        <div>
-          <span className="text-zinc-500">To:</span> {to}
-        </div>
-      )}
-      {accountEmail && (
-        <div>
-          <span className="text-zinc-500">Account:</span> {accountEmail}
-        </div>
-      )}
-      {date && (
-        <div>
-          <span className="text-zinc-500">Date:</span> {date}
-        </div>
-      )}
-    </div>
+    <h1 className={className}>
+      <a
+        href={webMailUrl}
+        onClick={openInBrowser}
+        title="在浏览器打开"
+        className="no-underline text-inherit active:opacity-60"
+      >
+        {subject}
+        <span className="text-base font-normal opacity-60 ml-2">↗</span>
+      </a>
+    </h1>
   );
 }
