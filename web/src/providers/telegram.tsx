@@ -173,7 +173,11 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   const [tg] = useState<TelegramWebApp | null>(() => getTelegram());
 
   useEffect(() => {
-    if (!tg) return;
+    // TG SDK 无条件加载（web 页面也会跑到这里），但只在真正的 TG session
+    // 里才做 TG-specific 初始化 —— `initData` 非空是 TG 客户端启动的可靠
+    // 信号（浏览器里直接开 `/mail/:id` 这类 web 页时 SDK stub 存在但
+    // `initData` 为空字符串）。
+    if (!tg || !tg.initData) return;
     tg.ready();
     tg.expand();
     tg.disableVerticalSwipes?.();
