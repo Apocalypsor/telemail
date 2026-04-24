@@ -8,8 +8,8 @@ import {
   upsertUser,
 } from "@db/users";
 import { t } from "@i18n";
+import { ROUTE_MINI_APP_LIST, ROUTE_MINI_APP_REMINDERS } from "@page/paths";
 import { reportErrorToObservability } from "@utils/observability";
-import { ROUTE_MINI_APP_LIST, ROUTE_MINI_APP_REMINDERS } from "@web/paths";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 import type { Env } from "@/types";

@@ -17,8 +17,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@web/*": ["./src/*"],
-      "@worker/*": ["../src/*"]
+      "@page/*": ["./src/*"],
+      "@worker/*": ["../worker/*"]
     },
     "types": ["vite/client"]
   },

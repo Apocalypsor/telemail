@@ -170,11 +170,11 @@ dist
 .wrangler/
 
 # Generated Tailwind CSS
-src/assets/tailwind.ts
+worker/assets/tailwind.ts
 
-# TanStack Router auto-generated manifest (regenerated on every web build)
-web/src/routeTree.gen.ts
+# TanStack Router auto-generated manifest (regenerated on every page build)
+page/src/routeTree.gen.ts
 
 # Build artifacts
-web/dist/
+page/dist/
 *.tsbuildinfo

@@ -1,4 +1,3 @@
-import { FAVICON_BASE64 } from "@assets/favicon";
 import auth from "@handlers/hono/auth";
 import miniapp from "@handlers/hono/miniapp";
 import oauth from "@handlers/hono/oauth";
@@ -11,16 +10,8 @@ import type { AppEnv } from "@/types";
 
 const app = new Hono<AppEnv>();
 
-// ─── Favicon ─────────────────────────────────────────────────────────────────
-const faviconBuf = Uint8Array.from(atob(FAVICON_BASE64), (c) =>
-  c.charCodeAt(0),
-);
-app.get("/favicon.png", (c) => {
-  return c.body(faviconBuf, 200, {
-    "Content-Type": "image/png",
-    "Cache-Control": "public, max-age=604800, immutable",
-  });
-});
+// Favicon 由 Pages 直接 serve（`page/public/favicon.png`），Workers Routes
+// 只匹配 `/api/*` + `/oauth/*`，`/favicon.png` 不会到 Worker 这里。
 
 // ─── Error handler ──────────────────────────────────────────────────────────
 app.onError(async (error, c) => {
