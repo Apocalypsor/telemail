@@ -5,10 +5,9 @@
   "license": "AGPL-3.0-or-later",
   "author": "Apocalypsor <chthon605@gmail.com>",
   "scripts": {
-    "build:css": "node scripts/build-css.mjs",
     "build:page": "pnpm --filter telemail-page build",
-    "deploy": "pnpm run build:css && wrangler deploy",
-    "dev": "pnpm run build:css && wrangler dev",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
     "dev:page": "pnpm --filter telemail-page dev",
     "start": "wrangler dev",
     "cf-typegen": "wrangler types",
@@ -22,13 +21,11 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.8",
     "@cloudflare/vitest-pool-workers": "^0.13.3",
-    "@tailwindcss/cli": "^4.2.2",
     "@types/node": "^25.5.0",
     "@types/turndown": "^5.0.6",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",
-    "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
     "vitest": "~4.1.0",
     "wrangler": "^4.80.0"
