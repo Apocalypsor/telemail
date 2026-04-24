@@ -16,3 +16,4 @@
 /mail/*             /            200
 /preview            /            200
 /junk-check         /            200
+/login              /            200
