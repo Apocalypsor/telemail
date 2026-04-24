@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { THEME_COLORS } from "@/styles/theme";
 
 export type PopupButtonType =
   | "default"
@@ -102,6 +103,15 @@ export interface TelegramWebApp {
   exitFullscreen?: () => void;
   /** 判断宿主客户端是否 ≥ 指定 Bot API 版本。 */
   isVersionAtLeast?: (version: string) => boolean;
+  /**
+   * Bot API 6.1+ 支持 "bg_color" / "secondary_bg_color" 主题键；
+   * 6.9+ 额外支持 `#RRGGBB` 字面 hex。
+   */
+  setHeaderColor?: (color: string) => void;
+  /** Bot API 6.1+，hex 从 6.9+ 开始支持。 */
+  setBackgroundColor?: (color: string) => void;
+  /** Bot API 7.10+。 */
+  setBottomBarColor?: (color: string) => void;
   openLink?: (url: string) => void;
   openTelegramLink?: (url: string) => void;
   showConfirm?: (msg: string, cb: (ok: boolean) => void) => void;
@@ -167,6 +177,19 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     tg.ready();
     tg.expand();
     tg.disableVerticalSwipes?.();
+    // 把 TG 客户端绘制的 header / background / bottom-bar 染成我们的 zinc-950
+    // —— 非 fullscreen 模式下 TG 默认会跟客户端 light/dark 主题走，导致标题
+    // 栏或下拉回弹区域漏出浅色。用字面 hex 而不是 "bg_color" 主题键，免得
+    // 跟 TG 自己的主题变量耦合。
+    // 版本要求：setHeaderColor/setBackgroundColor 接受 hex 从 6.9+；
+    // setBottomBarColor 从 7.10+。
+    if (tg.isVersionAtLeast?.("6.9")) {
+      tg.setHeaderColor?.(THEME_COLORS.bg);
+      tg.setBackgroundColor?.(THEME_COLORS.bg);
+    }
+    if (tg.isVersionAtLeast?.("7.10")) {
+      tg.setBottomBarColor?.(THEME_COLORS.bg);
+    }
     if (
       isIPad() &&
       tg.isVersionAtLeast?.("8.0") &&

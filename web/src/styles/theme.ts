@@ -6,6 +6,8 @@
  * 管理，换配色时 theme.css 和本文件一起改。
  */
 export const THEME_COLORS = {
+  /** zinc-950，miniapp 基础背景色（TG header/background/bottom-bar 也染这个） */
+  bg: "#09090b",
   /** emerald-500，accent 主色 */
   accent: "#10b981",
   /** emerald-950，accent 上的文字色（TG MainButton text_color） */
