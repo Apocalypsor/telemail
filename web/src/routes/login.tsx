@@ -1,3 +1,4 @@
+import { Card } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
@@ -29,7 +30,10 @@ function LoginPage() {
   if (search.denied) {
     return (
       <WebLayout subtitle="访问被拒绝">
-        <div className="max-w-md mx-auto mt-16 rounded-xl border border-red-900/50 bg-red-950/30 p-8 text-center">
+        <Card className="max-w-md mx-auto mt-16 bg-red-950/30 border border-red-900/50 p-8 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-500/20 text-3xl mx-auto mb-4">
+            🚫
+          </div>
           <h1 className="text-xl font-semibold text-red-300 mb-3">
             访问被拒绝
           </h1>
@@ -41,20 +45,23 @@ function LoginPage() {
               Telegram ID: {search.uid}
             </p>
           )}
-        </div>
+        </Card>
       </WebLayout>
     );
   }
 
   return (
     <WebLayout subtitle="登录">
-      <div className="max-w-md mx-auto mt-16 rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
+      <Card className="max-w-md mx-auto mt-16 bg-zinc-900 border border-zinc-800 p-8 text-center">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-3xl mx-auto mb-4">
+          🔐
+        </div>
         <h1 className="text-xl font-semibold text-zinc-100 mb-3">请先登录</h1>
         <p className="text-sm text-zinc-500 mb-8 leading-relaxed">
           使用 Telegram 账号登录后才能访问此页面
         </p>
         <LoginWidget returnTo={returnTo} />
-      </div>
+      </Card>
     </WebLayout>
   );
 }

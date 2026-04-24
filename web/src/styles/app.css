@@ -1,14 +1,9 @@
 /**
- * Mini App bundle 样式入口 —— 和 web 同一套 zinc/emerald 固定深色基调，
- * 不跟随 TG 客户端的 light/dark。
+ * 单 bundle 样式入口 —— web 页面和 Mini App 共用。
  *
- * HeroUI 的 Card / Button / Skeleton / Chip 组件消费一组设计 token
- * （`--background`、`--surface`、`--accent`...），这里把它们都映射到
- * `theme.css` 的 zinc/emerald 变量，所有 HeroUI 组件自动跟上新配色，
- * 不用逐个替换组件。
- *
- * `@heroui/styles` 内嵌 `@import "tailwindcss"` + 默认浅色 token 定义；
- * 后面 `:root` 的覆盖生效在它之后。
+ * `@heroui/styles` 内嵌 `@import "tailwindcss"` + HeroUI 默认主题 tokens；
+ * `theme.css` 接着覆盖成我们的 zinc/emerald 固定深色 palette，所有 HeroUI
+ * 组件（Card / Button / Skeleton / Chip / Spinner ...）自动跟皮。
  */
 @import "@heroui/styles";
 @import "./theme.css";
@@ -43,12 +38,15 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  /**
-   * iPad 上 `TelegramProvider` 调 `requestFullscreen()` 进全屏后，TG 客户端
-   * 在顶部绘制浮动 pill + 菜单，这块浮层会盖住 web content。TG 把需要让出
-   * 的像素通过 `--tg-content-safe-area-inset-*` 暴露给页面，body 按这四个
-   * 变量留内边距即可。非全屏时变量不存在，fallback 到 0，没副作用。
-   */
+}
+
+/**
+ * Mini App 在 iPad 上会 `requestFullscreen()`，TG 客户端在顶部绘制浮动
+ * pill + 菜单，通过 `--tg-content-safe-area-inset-top` 暴露给页面。给
+ * body 补 inset 避免内容被盖住。非 Mini App 场景和非全屏时变量不存在，
+ * fallback 0，无影响。
+ */
+body {
   padding-top: var(--tg-content-safe-area-inset-top, 0px);
   padding-bottom: var(--tg-content-safe-area-inset-bottom, 0px);
   padding-left: var(--tg-content-safe-area-inset-left, 0px);

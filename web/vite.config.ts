@@ -8,28 +8,14 @@ import { defineConfig } from "vite";
 const root = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Multi-entry：web 页面 和 Mini App 完全分 bundle（见 docs/AGENTS.md 里 "web
- * split" 约定）。两套 HTML + 两套 `main-*.tsx` + 两套 routeTree + 两份 CSS，
- * 各自独立下载，互不污染彼此的主题 / 全局样式 / SDK。
- *
- * Pages `_redirects` 把 `/telegram-app/*` 重写到 `/miniapp.html`，其余走
- * `index.html`（Pages 默认 `/` fallback）。
+ * 单 entry bundle —— web 页面和 Mini App 共用 `index.html` / `main.tsx`。
+ * Mini App 专属路由 `/telegram-app/*` 和 web 路由共存在一棵 routeTree，
+ * Pages `_redirects` 把所有 SPA 路径都 rewrite 到 `/index.html`。
  */
 export default defineConfig({
   // router 插件必须排在 react 插件之前，才能把 routeTree 的生成和 Fast Refresh 串起来
   plugins: [
-    tanstackRouter({
-      target: "react",
-      autoCodeSplitting: true,
-      routesDirectory: path.resolve(root, "src/routes-web"),
-      generatedRouteTree: path.resolve(root, "src/routeTree.web.gen.ts"),
-    }),
-    tanstackRouter({
-      target: "react",
-      autoCodeSplitting: true,
-      routesDirectory: path.resolve(root, "src/routes-miniapp"),
-      generatedRouteTree: path.resolve(root, "src/routeTree.miniapp.gen.ts"),
-    }),
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
     tailwindcss(),
   ],
@@ -43,12 +29,6 @@ export default defineConfig({
     outDir: "dist",
     sourcemap: true,
     target: "es2022",
-    rollupOptions: {
-      input: {
-        index: path.resolve(root, "index.html"),
-        miniapp: path.resolve(root, "miniapp/index.html"),
-      },
-    },
   },
   server: {
     port: 5173,

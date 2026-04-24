@@ -22,8 +22,8 @@ Run `pnpm cf-typegen` after changing bindings in wrangler.jsonc.
 ## Project layout
 
 - **`src/`** — Cloudflare Worker (Hono): bot webhook, queue consumer, cron, email providers, D1 access, `/api/*` + `/oauth/*` + `/login*` pages. (`/mail/:id`, `/preview`, `/junk-check` HTML 页面在 Pages，不在 Worker。)
-- **`web/`** — Cloudflare Pages frontend (Vite + React 19 + TanStack Router + TanStack Query + ky + zod). pnpm workspace child package `telemail-web`. **Multi-entry**: two independent bundles from one Vite build — `miniapp.html` + `src/main-miniapp.tsx` + `src/routes-miniapp/` (TG SDK, TG 主题, HeroUI) and `index.html` + `src/main-web.tsx` + `src/routes-web/` (固定深色 zinc/emerald，无 TG SDK). Shared code (`api/`, `providers/`, `hooks/`, `components/`, `paths.ts`, `constants.ts`) tree-shaken per entry.
-- **Deployment (方案 A)**: single custom domain, Workers Routes split by path. `example.com/api/*`, `example.com/oauth/*`, `example.com/login*` → Worker; everything else (incl. `/mail/:id`, `/preview`, `/junk-check`, `/telegram-app/*`, `/`) → Pages. Same origin, zero CORS. Pages `_redirects` rewrites `/telegram-app/*` → `/miniapp.html`（其余 → `/index.html`），两套 bundle 物理隔离。`WORKER_URL` and BotFather `/setdomain` point at the root domain.
+- **`web/`** — Cloudflare Pages frontend (Vite + React 19 + TanStack Router + TanStack Query + ky + zod + HeroUI). pnpm workspace child package `telemail-web`. **Single entry**: `index.html` + `src/main.tsx` + `src/routes/` 供 web 页面（`/`、`/mail/:id`、`/preview`、`/junk-check`、`/login`）和 Mini App 路由（`/telegram-app/*`）共享。TG SDK 无条件加载，`TelegramProvider` 在非 TG 上下文下（`initData` 为空）跳过所有 TG 初始化调用。样式统一走 `src/styles/app.css` = `@import "@heroui/styles"` + `./theme.css`（固定深色 zinc/emerald palette，映射到 HeroUI 设计 token）。
+- **Deployment (方案 A)**: single custom domain, Workers Routes split by path. `example.com/api/*`, `example.com/oauth/*` → Worker; everything else (incl. `/mail/:id`, `/preview`, `/junk-check`, `/telegram-app/*`, `/login`, `/`) → Pages。Pages `_redirects` 把所有 SPA 路径 rewrite 到 `/index.html`。`WORKER_URL` and BotFather `/setdomain` point at the root domain.
 
 ## Conventions
 
@@ -40,15 +40,16 @@ Run `pnpm cf-typegen` after changing bindings in wrangler.jsonc.
 - **Disable/enable**: `accounts.disabled` pauses without deleting. Enforced in `services/bridge.ts::processEmailMessage` (queue consumer) + filtered in push renewal / mail-list / `/sync` / `getImapAccounts`.
 - **Cron**: single `* * * * *` trigger. `handleScheduled` (`src/handlers/scheduled.ts`, parallel to `handlers/queue.ts`) dispatches due reminders every minute; `getUTCMinutes() === 0` gates the hourly batch (retry / IMAP bridge health); midnight additionally renews pushes.
 - **Mail preview helpers** (CID inlining, image proxy rewriting, token signing) live in `src/services/mail-preview.ts`.
-- **Mini App** (`web/src/routes-miniapp/telegram-app/`): 专属 bundle，`miniapp.html` 里加载 `telegram-web-app.js` SDK，样式走 `styles/miniapp.css`（HeroUI + TG 主题变量）。
+- **Mini App 路由** (`web/src/routes/telegram-app/`): HeroUI + TG 原生控件（MainButton / SecondaryButton / BackButton），样式跟 web 页共用 zinc/emerald。iPad 上自动 `requestFullscreen()`（Bot API 8.0+），TG 顶栏收成浮动 pill。
   - `/telegram-app/` → `index.tsx` router entry, reads `window.Telegram.WebApp.initDataUnsafe.start_param` (`r_<chat>_<msg>` / `m_<chat>_<msg>`) and navigates.
   - `/telegram-app/reminders` → set/list/cancel reminders.
   - `/telegram-app/mail/$id` → email preview (fetches JSON from `GET /api/mini-app/mail/:id`, renders bodyHtml in sandbox iframe via `MailBodyFrame`, shows `MailFab` for star/archive/trash/junk/unarchive).
   - `/telegram-app/list/$type` → unread/starred/junk/archived lists.
-- **Web 页面** (`web/src/routes-web/`): 独立 bundle，`index.html` 里不加载 TG SDK，样式走 `styles/web.css`（固定深色 zinc/emerald，`html { background: #09090b; color-scheme: dark }` 负责 iOS Safari safe area）。
+- **Web 页面** (`web/src/routes/`，不在 `telegram-app/` 子目录下): 浏览器里直接访问的页面，`WebLayout` 套 sticky emerald wordmark header，HeroUI Card / Button 做现代化外观。
   - `/mail/$id` → 浏览器里看邮件（HMAC token-only auth，不需要 initData）。
-  - `/preview` → HTML → MarkdownV2 预览（session cookie）。
-  - `/junk-check` → 垃圾邮件检测（session cookie）。
+  - `/preview` → HTML → MarkdownV2 预览（session cookie + `useRequireTelegramLogin`）。
+  - `/junk-check` → 垃圾邮件检测（同上）。
+  - `/login` → Telegram Login Widget（denial 态由 Worker callback 302 带 `?denied=1&uid=` 回来）。
   - `/` → Landing 兜底页。
   - **Bot keyboard URLs** (`src/utils/mail-token.ts`, `src/bot/handlers/*`) still point at `/telegram-app/*` — intentional: those are the Mini App URLs registered in BotFather. Pages is configured to serve the SPA at those paths (or redirect from `/` → root). Private chat buttons are inline `web_app` pointing at subpage URLs; group chat uses `t.me/<bot>/<short>?startapp=<feature>_<chat>_<msg>` deep links which land on `/` router.
   - **Auth**: every API call goes through `web/src/lib/api.ts` (ky instance) which injects `X-Telegram-Init-Data`. Worker `requireMiniAppAuth` verifies. No cookies. Mail preview API also checks HMAC token.

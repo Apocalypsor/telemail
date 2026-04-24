@@ -1,3 +1,4 @@
+import { Button, Card, Spinner } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -57,14 +58,20 @@ function PreviewPage() {
               粘贴邮件 HTML，查看处理后发送到 Telegram 的 MarkdownV2 文本
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => mut.mutate()}
-            disabled={mut.isPending || !html.trim()}
-            className="shrink-0 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed self-start sm:self-auto"
+          <Button
+            onPress={() => mut.mutate()}
+            isDisabled={mut.isPending || !html.trim()}
+            className="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold self-start sm:self-auto"
+            size="md"
           >
-            {mut.isPending ? "转换中…" : "转换 →"}
-          </button>
+            {mut.isPending ? (
+              <span className="flex items-center gap-1.5">
+                <Spinner size="sm" /> 转换中…
+              </span>
+            ) : (
+              "转换 →"
+            )}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -105,6 +112,10 @@ function PreviewPage() {
   );
 }
 
+/**
+ * 分栏容器：顶栏 label + subLabel + sideLabel（字符数 / 状态），下面给调用
+ * 者放 textarea 或 pre。用 Card overflow-hidden 统一圆角 + 边框。
+ */
 function Pane({
   label,
   subLabel,
@@ -117,8 +128,8 @@ function Pane({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900">
+    <Card className="bg-zinc-900 border border-zinc-800 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-950/30">
         <div className="flex items-baseline gap-2">
           <span className="text-[11px] font-semibold tracking-widest text-emerald-500">
             {label}
@@ -130,6 +141,6 @@ function Pane({
       <div className="p-4 min-h-72 sm:min-h-96 lg:min-h-[480px]">
         {children}
       </div>
-    </div>
+    </Card>
   );
 }

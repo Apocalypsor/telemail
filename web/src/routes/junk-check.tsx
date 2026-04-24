@@ -1,3 +1,4 @@
+import { Button, Card, Chip, Spinner } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -49,6 +50,9 @@ function JunkCheckPage() {
     );
   }
 
+  const inputClass =
+    "w-full px-3 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm outline-none focus:border-emerald-500 placeholder:text-zinc-600 transition-colors";
+
   return (
     <WebLayout subtitle="垃圾邮件检测">
       <section className="max-w-2xl mx-auto space-y-6">
@@ -61,7 +65,7 @@ function JunkCheckPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+        <Card className="bg-zinc-900 border border-zinc-800 p-5 space-y-4">
           <div>
             <label
               htmlFor="subject-input"
@@ -75,7 +79,7 @@ function JunkCheckPage() {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="邮件主题（可选）"
-              className="w-full px-3 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm outline-none focus:border-emerald-500 placeholder:text-zinc-600 transition-colors"
+              className={inputClass}
             />
           </div>
           <div>
@@ -90,29 +94,35 @@ function JunkCheckPage() {
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="粘贴邮件正文内容…"
-              className="w-full min-h-[200px] px-3 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm resize-y outline-none focus:border-emerald-500 placeholder:text-zinc-600 transition-colors"
+              className={`${inputClass} min-h-[200px] resize-y`}
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => mut.mutate()}
-            disabled={mut.isPending || !body.trim()}
-            className="w-full px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          <Button
+            onPress={() => mut.mutate()}
+            isDisabled={mut.isPending || !body.trim()}
+            fullWidth
+            className="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold"
           >
-            {mut.isPending ? "检测中…" : "开始检测"}
-          </button>
-        </div>
+            {mut.isPending ? (
+              <span className="flex items-center gap-1.5">
+                <Spinner size="sm" /> 检测中…
+              </span>
+            ) : (
+              "开始检测"
+            )}
+          </Button>
+        </Card>
 
         {error && (
-          <div className="rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+          <Card className="bg-red-950/30 border border-red-900/50 p-4 text-sm text-red-400">
             {error}
-          </div>
+          </Card>
         )}
         {result?.error && (
-          <div className="rounded-xl border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
+          <Card className="bg-red-950/30 border border-red-900/50 p-4 text-sm text-red-400">
             错误：{result.error}
-          </div>
+          </Card>
         )}
         {hasValidResult && <ResultCard result={result} />}
       </section>
@@ -134,11 +144,11 @@ function ResultCard({
   const isJunk = result.isJunk;
 
   return (
-    <div
-      className={`rounded-xl border overflow-hidden ${
+    <Card
+      className={`overflow-hidden ${
         isJunk
-          ? "border-red-900/60 bg-red-950/20"
-          : "border-emerald-900/60 bg-emerald-950/20"
+          ? "bg-red-950/20 border border-red-900/60"
+          : "bg-emerald-950/20 border border-emerald-900/60"
       }`}
     >
       <div className="px-5 py-4 flex items-center justify-between">
@@ -165,7 +175,7 @@ function ResultCard({
         </div>
       </div>
 
-      {/* confidence bar */}
+      {/* confidence bar —— HeroUI Progress 样式化成本比纯 div 高，直接画 */}
       <div className="px-5 pb-3">
         <div className="h-1.5 rounded-full bg-zinc-900 overflow-hidden">
           <div
@@ -182,12 +192,13 @@ function ResultCard({
           {result.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {result.tags.map((tag) => (
-                <span
+                <Chip
                   key={tag}
-                  className="px-2.5 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-xs text-zinc-300"
+                  size="sm"
+                  className="bg-zinc-800 border border-zinc-700 text-zinc-300"
                 >
                   {tag}
-                </span>
+                </Chip>
               ))}
             </div>
           )}
@@ -198,6 +209,6 @@ function ResultCard({
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
