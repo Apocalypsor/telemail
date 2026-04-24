@@ -1,17 +1,18 @@
-# SPA 回退：前端拥有的 UI 路径回到对应 entry HTML，让 TanStack Router 接管。
+# SPA 回退：前端拥有的 UI 路径回到对应 entry，让 TanStack Router 接管。
 # `/assets/*`、`/favicon.png` 等不在规则里，缺失走真 404（不被盖成 HTML，
 # 避免浏览器拿旧 hash 的 script 请求报 "text/html is not a valid JavaScript
 # MIME type"）。
 #
 # 两套 bundle 物理隔离：
-#   /telegram-app/* → /miniapp/  （由 dist/miniapp/index.html 服务，含 TG SDK）
-#   其余             → /index.html（纯暗色 web，不加载 TG SDK）
+#   /telegram-app/* → /miniapp/   （由 dist/miniapp/index.html 服务，含 TG SDK）
+#   其余             → /            （由 dist/index.html 服务，纯暗色 web，不加载 TG SDK）
 #
-# 注意：rewrite target 写成 `/miniapp/`（带尾斜杠的目录形式）而不是
-# `/miniapp.html`，CF Pages 的 pretty-URL 会把 `.html` 后缀剥成 extensionless
-# 路径并 301 重定向，反而打断 200 rewrite。
+# 注意：rewrite target 不能沾 `.html`。CF Pages 的 pretty-URL 会把 `.html`
+# 后缀剥成 extensionless 路径并 301 重定向，打断 200 rewrite，URL 在浏览器里
+# 跳到 `/`，落到 landing 页。所以一律用目录形式（`/`、`/miniapp/`），靠
+# Pages 默认的 directory-index 拿对应的 index.html。
 /telegram-app       /miniapp/    200
 /telegram-app/*     /miniapp/    200
-/mail/*             /index.html  200
-/preview            /index.html  200
-/junk-check         /index.html  200
+/mail/*             /            200
+/preview            /            200
+/junk-check         /            200
