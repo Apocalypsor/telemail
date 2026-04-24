@@ -127,10 +127,12 @@ function WebMailPage() {
           onChanged={() => qc.invalidateQueries({ queryKey })}
         />
 
-        {/* 正文用 Card overflow-hidden 把 iframe 四角切成圆角 */}
-        <Card className="mt-6 border border-zinc-800 bg-zinc-900 overflow-hidden">
+        {/* 正文直接包在原生 div 里 —— HeroUI Card 默认带内边距，iframe 会
+            被推出圆角之外。用 overflow-hidden + rounded-xl 把四角切齐。
+            结构和 miniapp `telegram-app/mail.$id.tsx` 完全一致。 */}
+        <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
           <MailBodyFrame bodyHtml={d.bodyHtml} />
-        </Card>
+        </div>
       </article>
     </WebLayout>
   );

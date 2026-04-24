@@ -1,4 +1,4 @@
-import { buildEmailKeyboard } from "@bot/keyboards";
+import { buildEmailKeyboard, buildInitialEmailKeyboard } from "@bot/keyboards";
 import { getAccountById } from "@db/accounts";
 import {
   deleteFailedEmail,
@@ -210,9 +210,12 @@ export async function deliverEmailToTelegram(
 
   const hasLlm = !!(env.LLM_API_URL && env.LLM_API_KEY && env.LLM_MODEL);
 
-  // 投递流程：先裸发消息（无 keyboard）→ 拿到 sentMessageId → 建完整键盘 →
-  // setReplyMarkup。这样群聊和私聊只有一条路径，群聊不再有"先 web 链接、LLM
-  // 完成后切 Mini App"的中间态。
+  // 投递流程：先带"最小键盘"（仅刷新）发消息 → 拿到 sentMessageId → 建
+  // 完整键盘 → setReplyMarkup 升级。首发就挂刷新键是保底 —— 完整键盘要求
+  // tgMessageId 才能构造群聊 Mini App deep link，只能后补；如果后补那步
+  // failed，`.catch(() => {})` 会把错误吞掉，用户就永远看不到任何键盘。
+  // 有了这个初始刷新键，至少还能手动 refresh 触发重建。
+  const initialKeyboard = buildInitialEmailKeyboard();
   let sentMessageId: number;
   if (hasAttachments) {
     sentMessageId = await sendWithAttachments(
@@ -220,9 +223,15 @@ export async function deliverEmailToTelegram(
       chatId,
       text,
       email.attachments || [],
+      initialKeyboard,
     );
   } else {
-    sentMessageId = await sendTextMessage(tgToken, chatId, text);
+    sentMessageId = await sendTextMessage(
+      tgToken,
+      chatId,
+      text,
+      initialKeyboard,
+    );
   }
 
   const inserted = await putMessageMapping(env.DB, {
