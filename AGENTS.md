@@ -1,6 +1,13 @@
 # Cloudflare Workers
 
-> Before committing, run `pnpm check` (Biome) and `pnpm typecheck` (tsc). Fix ALL errors. Do NOT use `biome-ignore`. Update AGENTS.md and README.md if needed.
+> Before committing, run `pnpm check` (Biome) and `pnpm typecheck` (tsc). Fix ALL errors. Do NOT use `biome-ignore`. Update AGENTS.md / README.md / `docs/*` if needed.
+
+User-facing docs are split:
+
+- `README.md` —— landing, stack, architecture overview, bot commands
+- `docs/DEVELOPMENT.md` —— local dev commands + flow
+- `docs/DEPLOYMENT.md` —— end-to-end CF deploy (GCP / MS Entra / D1 / KV / Queue / Worker + Pages)
+- `docs/ENVIRONMENT.md` —— secrets / bindings / cron / D1 schema reference
 
 Your knowledge of Cloudflare Workers APIs may be outdated. Retrieve current docs before any Workers/KV/D1/Queues task: <https://developers.cloudflare.com/workers/>
 

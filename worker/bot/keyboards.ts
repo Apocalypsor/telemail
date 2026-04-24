@@ -24,6 +24,19 @@ async function getCachedBotUsername(env: Env): Promise<string | null> {
 
 // ── 邮件信息键盘（星标 / 查看原文）─────────────────────────────────────────
 
+/**
+ * 第一次发送邮件时挂的最小键盘 —— 只带一个刷新键。
+ *
+ * `buildEmailKeyboard` 要求 `tgMessageId` 才能构造群聊 Mini App deep link，
+ * 但 send 之前我们没有 tgMessageId。所以投递流程是：先裸发（带这个初始
+ * 键盘）→ 拿到 sentMessageId → `buildEmailKeyboard` + `setReplyMarkup`
+ * 升级成完整键盘。万一升级那步失败，用户至少还有刷新键能手动触发重建
+ * （`bot/handlers/refresh.ts` 会跑 `refreshEmail`，最终再打一遍完整键盘）。
+ */
+export function buildInitialEmailKeyboard(): InlineKeyboard {
+  return new InlineKeyboard().text(t("keyboards:mail.refresh"), "refresh");
+}
+
 function addCoreButtons(
   kb: InlineKeyboard,
   starred: boolean,
