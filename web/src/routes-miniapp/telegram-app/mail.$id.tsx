@@ -126,8 +126,10 @@ function MailPreviewPage() {
 }
 
 /**
- * 邮件标题：结构和 web 的 `<h1>` 一致（text-2xl → text-[32px]，zinc-100，
- * 不染 emerald）；miniapp 里额外支持点击 → TG 浏览器打开原文链接。
+ * 邮件标题：结构沿用 web 的 `<h1>` 尺寸（text-2xl → text-[32px]）和布局，
+ * 但 miniapp 这里 subject 是个实实在在的 link（点击 → TG 浏览器打开原文）。
+ * 为了让用户看出来可点，标题染 emerald 并带下划线，再加个 `↗` 图标；
+ * 无 webMailUrl 时退化成 web 同款的纯 zinc-100 h1。
  */
 function Subject({
   subject,
@@ -136,11 +138,11 @@ function Subject({
   subject: string;
   webMailUrl: string;
 }) {
-  const className =
-    "text-2xl sm:text-[28px] md:text-[32px] font-semibold tracking-tight leading-tight break-words mb-4 text-zinc-100";
+  const baseClass =
+    "text-2xl sm:text-[28px] md:text-[32px] font-semibold tracking-tight leading-tight break-words mb-4";
 
   if (!webMailUrl) {
-    return <h1 className={className}>{subject}</h1>;
+    return <h1 className={`${baseClass} text-zinc-100`}>{subject}</h1>;
   }
 
   function openInBrowser(e: React.MouseEvent) {
@@ -151,15 +153,15 @@ function Subject({
   }
 
   return (
-    <h1 className={className}>
+    <h1 className={baseClass}>
       <a
         href={webMailUrl}
         onClick={openInBrowser}
         title="在浏览器打开"
-        className="no-underline text-inherit active:opacity-60"
+        className="text-emerald-400 underline decoration-emerald-500/40 decoration-2 underline-offset-4 active:opacity-60"
       >
         {subject}
-        <span className="text-base font-normal opacity-60 ml-2">↗</span>
+        <span className="text-base font-normal opacity-70 ml-2">↗</span>
       </a>
     </h1>
   );
