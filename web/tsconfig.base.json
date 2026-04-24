@@ -20,6 +20,7 @@
       "@web/*": ["./src/*"],
       "@worker/*": ["../src/*"]
     },
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "composite": true
   }
 }
