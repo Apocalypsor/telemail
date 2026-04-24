@@ -40,21 +40,21 @@
     "types": ["./worker-configuration.d.ts", "node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@utils/*": ["./src/utils/*"],
-      "@services/*": ["./src/services/*"],
-      "@providers": ["./src/providers"],
-      "@providers/*": ["./src/providers/*"],
-      "@bot/*": ["./src/bot/*"],
-      "@db/*": ["./src/db/*"],
-      "@handlers/*": ["./src/handlers/*"],
-      "@components/*": ["./src/components/*"],
-      "@assets/*": ["./src/assets/*"],
-      "@i18n": ["./src/i18n"],
-      "@i18n/*": ["./src/i18n/*"],
-      "@web/*": ["./web/src/*"]
+      "@/*": ["./worker/*"],
+      "@utils/*": ["./worker/utils/*"],
+      "@services/*": ["./worker/services/*"],
+      "@providers": ["./worker/providers"],
+      "@providers/*": ["./worker/providers/*"],
+      "@bot/*": ["./worker/bot/*"],
+      "@db/*": ["./worker/db/*"],
+      "@handlers/*": ["./worker/handlers/*"],
+      "@components/*": ["./worker/components/*"],
+      "@assets/*": ["./worker/assets/*"],
+      "@i18n": ["./worker/i18n"],
+      "@i18n/*": ["./worker/i18n/*"],
+      "@page/*": ["./page/src/*"]
     }
   },
   "exclude": ["test"],
-  "include": ["worker-configuration.d.ts", "src/**/*.ts", "src/**/*.tsx"]
+  "include": ["worker-configuration.d.ts", "worker/**/*.ts", "worker/**/*.tsx"]
 }

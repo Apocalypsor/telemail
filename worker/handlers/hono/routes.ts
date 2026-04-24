@@ -6,7 +6,7 @@ export const ROUTE_PREVIEW_API = "/api/preview";
 export const ROUTE_CORS_PROXY = "/api/cors-proxy";
 
 // ── Auth routes ──────────────────────────────────────────────────────────────
-// `/login` 页面本身由 Pages 提供（web/src/routes-web/login.tsx），TG Login
+// `/login` 页面本身由 Pages 提供（page/src/routes/login.tsx），TG Login
 // Widget 把 auth 数据 POST/GET 到 callback（Worker 端），验签 + 写 D1 + 下
 // session cookie。callback 放在 `/api/*` 下以便 Workers Routes 一条
 // `/api/*` 规则就能命中，不需要单独给 `/login/callback` 开路由。
@@ -28,7 +28,7 @@ export const ROUTE_OAUTH_SETUP = `/oauth/:${PARAM_PROVIDER}`;
 export const ROUTE_OAUTH_START = `/oauth/:${PARAM_PROVIDER}/start`;
 export const ROUTE_OAUTH_CALLBACK = `/oauth/:${PARAM_PROVIDER}/callback`;
 
-// Page routes for /preview /junk-check /mail/:id 已搬到 Pages（web/src/paths.ts），
+// Page routes for /preview /junk-check /mail/:id 已搬到 Pages（page/src/paths.ts），
 // 这里只保留 API endpoints。
 export const ROUTE_JUNK_CHECK_API = "/api/junk-check";
 // GET mail preview JSON —— token-only auth，Web 和 Mini App 共用
@@ -41,7 +41,7 @@ export const ROUTE_MAIL_ARCHIVE = "/api/mail/:id/archive";
 export const ROUTE_MAIL_UNARCHIVE = "/api/mail/:id/unarchive";
 
 // ── Mini App ─────────────────────────────────────────────────────────────────
-// UI 页面路径（/telegram-app/*）属于 web，定义在 web/src/paths.ts。
+// UI 页面路径（/telegram-app/*）属于 page，定义在 page/src/paths.ts。
 // 本文件只管 Worker 自己定义的 API endpoints。
 export const ROUTE_MINI_APP_API_LIST = "/api/mini-app/list/:type";
 export const ROUTE_MINI_APP_API_MARK_ALL_READ =

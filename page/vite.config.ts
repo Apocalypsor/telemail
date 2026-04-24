@@ -22,7 +22,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(root, "src"),
-      "@worker": path.resolve(root, "../src"),
+      "@worker": path.resolve(root, "../worker"),
     },
   },
   build: {

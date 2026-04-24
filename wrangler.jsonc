@@ -5,7 +5,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "telemail",
-  "main": "src/index.ts",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-02-19",
   "observability": {
     "enabled": true

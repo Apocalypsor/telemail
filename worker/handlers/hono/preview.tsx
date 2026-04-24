@@ -111,7 +111,7 @@ async function resolveMailAction<B extends MailActionBody = MailActionBody>(
 }
 
 // ─── HTML 格式化预览工具 ─────────────────────────────────────────────────────
-// 页面 /preview 已搬到 Pages（web/src/routes/preview.tsx），只留 API。
+// 页面 /preview 已搬到 Pages（page/src/routes/preview.tsx），只留 API。
 
 preview.post(ROUTE_PREVIEW_API, loginGuard, async (c) => {
   const { html } = await c.req.json<{ html?: string }>();
@@ -146,7 +146,7 @@ preview.post(ROUTE_JUNK_CHECK_API, loginGuard, async (c) => {
 });
 
 // ─── 邮件操作 API ────────────────────────────────────────────────────────────
-// 邮件内容预览页 /mail/:id 已搬到 Pages（web/src/routes/mail.$id.tsx），通过
+// 邮件内容预览页 /mail/:id 已搬到 Pages（page/src/routes/mail.$id.tsx），通过
 // GET /api/mail/:id 拿 JSON。Worker 只保留下面这些 POST action。
 
 // 邮件预览 JSON API：Web 和 Mini App 的 mail preview 页都调这个。
