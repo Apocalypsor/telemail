@@ -169,9 +169,6 @@ dist
 !.env.example
 .wrangler/
 
-# Generated Tailwind CSS
-worker/assets/tailwind.ts
-
 # TanStack Router auto-generated manifest (regenerated on every page build)
 page/src/routeTree.gen.ts
 

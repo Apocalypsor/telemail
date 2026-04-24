@@ -13,16 +13,15 @@ Your knowledge of Cloudflare Workers APIs may be outdated. Retrieve current docs
 
 ## Commands
 
-| Command           | Purpose                                                 |
-| ----------------- | ------------------------------------------------------- |
-| `pnpm dev`        | Build CSS + wrangler dev (Worker, port 8787)            |
-| `pnpm dev:page`   | Vite dev server for `page/` (port 5173, proxies /api)   |
-| `pnpm deploy`     | Build CSS + deploy Worker to Cloudflare                 |
+| Command           | Purpose                                                  |
+| ----------------- | -------------------------------------------------------- |
+| `pnpm dev`        | `wrangler dev` (Worker, port 8787)                       |
+| `pnpm dev:page`   | Vite dev server for `page/` (port 5173, proxies /api)    |
+| `pnpm deploy`     | `wrangler deploy` (deploy Worker to Cloudflare)          |
 | `pnpm build:page` | Build React SPA (`page/` → `page/dist`, deploy to Pages) |
-| `pnpm check`      | Lint + format check (Biome, root + page)                |
-| `pnpm typecheck`  | Worker tsc + page tsc                                   |
-| `pnpm cf-typegen` | Generate TypeScript types from wrangler.jsonc           |
-| `pnpm build:css`  | Generate Tailwind CSS (worker/assets/tailwind.ts)       |
+| `pnpm check`      | Lint + format check (Biome, root + page)                 |
+| `pnpm typecheck`  | Worker tsc + page tsc                                    |
+| `pnpm cf-typegen` | Generate TypeScript types from wrangler.jsonc            |
 
 Run `pnpm cf-typegen` after changing bindings in wrangler.jsonc.
 

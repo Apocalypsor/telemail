@@ -111,8 +111,6 @@ pnpm wrangler secret put GMAIL_PUSH_SECRET
 pnpm deploy
 ```
 
-自动先跑 `build:css` 生成 Tailwind CSS，再 `wrangler deploy`。
-
 ### 5.1 设置 Telegram Webhook
 
 ```sh

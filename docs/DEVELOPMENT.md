@@ -11,9 +11,8 @@
 
 ```sh
 # 后端（Worker）
-pnpm dev        # build:css + wrangler dev（本地 127.0.0.1:8787）
-pnpm deploy     # build:css + wrangler deploy
-pnpm build:css  # 单独生成 Tailwind CSS（输出到 worker/assets/tailwind.ts）
+pnpm dev        # wrangler dev（本地 127.0.0.1:8787）
+pnpm deploy     # wrangler deploy
 pnpm cf-typegen # 根据 wrangler.jsonc 重新生成 worker-configuration.d.ts
 pnpm migrate    # 应用 D1 migrations 到远端
 
