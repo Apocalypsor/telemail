@@ -119,6 +119,10 @@ export const whoamiResponseSchema = z.object({
 });
 export type Whoami = z.infer<typeof whoamiResponseSchema>;
 
+export const botInfoResponseSchema = z.object({
+  botUsername: z.string(),
+});
+
 // ─── Generic { ok, error? } ─────────────────────────────────────────────────
 
 export const okResponseSchema = z.object({

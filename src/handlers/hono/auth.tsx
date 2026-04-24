@@ -1,9 +1,9 @@
 import { getBotInfo } from "@bot/index";
-import { LoginDeniedPage, LoginPage } from "@components/web/login";
 import { getUserByTelegramId, upsertUser } from "@db/users";
 import {
   ROUTE_LOGIN,
   ROUTE_LOGIN_CALLBACK,
+  ROUTE_PUBLIC_BOT_INFO,
   ROUTE_SESSION_WHOAMI,
 } from "@handlers/hono/routes";
 import {
@@ -44,14 +44,21 @@ auth.get(ROUTE_SESSION_WHOAMI, async (c) => {
   return c.json({ error: "Unauthorized" }, 401);
 });
 
-auth.get(ROUTE_LOGIN, async (c) => {
-  const returnTo = c.req.query("return_to") || "/";
+/**
+ * 公开接口 —— 登录页 SPA 在挂载时拉 bot username 用来渲染 TG Login Widget。
+ * bot username 不是 secret，不需要鉴权。
+ */
+auth.get(ROUTE_PUBLIC_BOT_INFO, async (c) => {
   const botInfo = await getBotInfo(c.env);
-  return c.html(
-    <LoginPage botUsername={botInfo.username} returnTo={returnTo} />,
-  );
+  return c.json({ botUsername: botInfo.username });
 });
 
+/**
+ * TG Login Widget 的回调 —— 登录页（Pages 的 /login）里 widget 用 GET 带
+ * query 跳过来。验签成功 + 已 approved → 下 session cookie，302 回 `returnTo`；
+ * 未 approved → 302 到 `/login?denied=1`（Pages SPA 显示拒绝态）；其他错误
+ * 用普通 text 兜底（这些都是不该发生的情况，SPA 上看到自然回到登录页重试）。
+ */
 auth.get(ROUTE_LOGIN_CALLBACK, async (c) => {
   const { id, first_name, last_name, username, photo_url, auth_date, hash } =
     c.req.query() as Record<string, string>;
@@ -85,7 +92,8 @@ auth.get(ROUTE_LOGIN_CALLBACK, async (c) => {
   if (!isAdmin) {
     const user = await getUserByTelegramId(c.env.DB, id);
     if (!user?.approved) {
-      return c.html(<LoginDeniedPage />, 403);
+      const denyUrl = `${ROUTE_LOGIN}?denied=1&uid=${encodeURIComponent(id)}`;
+      return c.redirect(denyUrl);
     }
   }
 

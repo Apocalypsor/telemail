@@ -6,8 +6,15 @@ export const ROUTE_PREVIEW_API = "/api/preview";
 export const ROUTE_CORS_PROXY = "/api/cors-proxy";
 
 // ── Auth routes ──────────────────────────────────────────────────────────────
+// `/login` 页面本身由 Pages 提供（web/src/routes-web/login.tsx），TG Login
+// Widget 把 auth 数据 POST/GET 到 callback（Worker 端），验签 + 写 D1 + 下
+// session cookie。callback 放在 `/api/*` 下以便 Workers Routes 一条
+// `/api/*` 规则就能命中，不需要单独给 `/login/callback` 开路由。
 export const ROUTE_LOGIN = "/login";
-export const ROUTE_LOGIN_CALLBACK = "/login/callback";
+export const ROUTE_LOGIN_CALLBACK = "/api/login/callback";
+// 登录页挂载时拉一下 bot username（TG Login Widget 需要 data-telegram-login
+// 属性），不敏感，不要鉴权。
+export const ROUTE_PUBLIC_BOT_INFO = "/api/public/bot-info";
 // Session status probe —— 非 Mini App 的 web 页（/preview, /junk-check）在挂载
 // 时调这个检查登录；200 = 已登录 + approved，401 = 跳登录页。
 export const ROUTE_SESSION_WHOAMI = "/api/session/whoami";
