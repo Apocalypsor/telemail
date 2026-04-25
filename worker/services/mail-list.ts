@@ -104,6 +104,92 @@ export function getPreviewFolder(
   return LIST_DEFS[type].previewFolder;
 }
 
+/**
+ * 跨该用户所有启用账号搜索邮件（Mini App 🔍 入口）。结果形状跟 `MailListResult`
+ * 几乎一致，但没有副作用（搜索是只读的，不需要 sync star / 清 mapping）。
+ * 命中 TG 已投递过的邮件会带 tgChatId/tgMessageId（前端可链接回 TG 消息）；
+ * junk/archive 里的命中或没投递过的没有 mapping，链接字段缺省即可。
+ */
+export interface MailSearchResult {
+  query: string;
+  results: MailListAccountResult[];
+  total: number;
+}
+
+export async function searchMail(
+  env: Env,
+  userId: string,
+  query: string,
+): Promise<MailSearchResult> {
+  const trimmed = query.trim();
+  const accounts = (await getOwnAccounts(env.DB, userId)).filter(
+    (a) => !a.disabled,
+  );
+
+  const results: MailListAccountResult[] = await Promise.all(
+    accounts.map(async (account): Promise<MailListAccountResult> => {
+      try {
+        const provider = getEmailProvider(account, env);
+        const msgs = await provider.searchMessages(trimmed, MAX_PER_ACCOUNT);
+        if (msgs.length === 0)
+          return {
+            accountId: account.id,
+            accountEmail: account.email,
+            items: [],
+            total: 0,
+          };
+
+        const mappings = await getMappingsByEmailIds(
+          env.DB,
+          account.id,
+          msgs.map((m) => m.id),
+        );
+        const mappingMap = new Map(
+          mappings.map((m) => [m.email_message_id, m]),
+        );
+
+        const items: MailListEmailItem[] = await Promise.all(
+          msgs.map(async (msg) => {
+            const mapping = mappingMap.get(msg.id);
+            return {
+              id: msg.id,
+              title: mapping?.short_summary || msg.subject || null,
+              token: await generateMailTokenById(
+                env.ADMIN_SECRET,
+                msg.id,
+                account.id,
+              ),
+              tgChatId: mapping?.tg_chat_id,
+              tgMessageId: mapping?.tg_message_id,
+            };
+          }),
+        );
+
+        return {
+          accountId: account.id,
+          accountEmail: account.email,
+          items,
+          total: msgs.length,
+        };
+      } catch (err) {
+        await reportErrorToObservability(env, "bot.search_failed", err, {
+          accountId: account.id,
+        });
+        return {
+          accountId: account.id,
+          accountEmail: account.email,
+          items: [],
+          total: 0,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    }),
+  );
+
+  const total = results.reduce((sum, r) => sum + r.total, 0);
+  return { query: trimmed, results, total };
+}
+
 /** 拉取 user 所有启用账号的邮件列表 + 生成共享访问 token + 收集副作用 */
 export async function getMailList(
   env: Env,

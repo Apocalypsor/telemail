@@ -49,6 +49,8 @@ export const ROUTE_MINI_APP_API_LIST = "/api/mini-app/list/:type";
 export const ROUTE_MINI_APP_API_MARK_ALL_READ =
   "/api/mini-app/mark-all-as-read";
 export const ROUTE_MINI_APP_API_TRASH_ALL_JUNK = "/api/mini-app/trash-all-junk";
+// 跨账号邮件搜索：?q=<query> —— 调用方在 Mini App 搜索页输入关键词。
+export const ROUTE_MINI_APP_API_SEARCH = "/api/mini-app/search";
 // API 路径继续按功能命名（reminder API 不会被复用到其他功能）
 export const ROUTE_REMINDERS_API = "/api/reminders";
 export const ROUTE_REMINDERS_API_ITEM = "/api/reminders/:id";

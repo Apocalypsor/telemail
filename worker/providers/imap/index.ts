@@ -203,6 +203,21 @@ export class ImapProvider extends EmailProvider {
     return messages ?? [];
   }
 
+  async searchMessages(
+    query: string,
+    maxResults: number = 20,
+  ): Promise<EmailListItem[]> {
+    const resp = await callBridge(this.env, "POST", "/api/search", {
+      accountId: this.account.id,
+      query,
+      maxResults,
+    });
+    const { messages } = (await resp.json()) as {
+      messages: { id: string; subject?: string }[];
+    };
+    return messages ?? [];
+  }
+
   async markAsJunk(messageId: string) {
     await callBridge(this.env, "POST", "/api/mark-as-junk", {
       accountId: this.account.id,

@@ -70,6 +70,14 @@ export const bulkActionResponseSchema = z.object({
   failed: z.number(),
 });
 
+// ─── Search API (GET /api/mini-app/search?q=...) ────────────────────────────
+
+export const mailSearchResponseSchema = z.object({
+  query: z.string(),
+  results: z.array(mailListAccountResultSchema),
+  total: z.number(),
+});
+
 // ─── Mail preview API (新增：GET /api/mini-app/mail/:id) ─────────────────────
 
 export const mailMetaSchema = z.object({

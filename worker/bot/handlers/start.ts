@@ -8,7 +8,11 @@ import {
   upsertUser,
 } from "@db/users";
 import { t } from "@i18n";
-import { ROUTE_MINI_APP_LIST, ROUTE_MINI_APP_REMINDERS } from "@page/paths";
+import {
+  ROUTE_MINI_APP_LIST,
+  ROUTE_MINI_APP_REMINDERS,
+  ROUTE_MINI_APP_SEARCH,
+} from "@page/paths";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
@@ -33,7 +37,8 @@ function mainMenuKeyboard(admin: boolean, env: Env): InlineKeyboard {
       .webApp(
         t("keyboards:menu.reminders"),
         `${base}${ROUTE_MINI_APP_REMINDERS}`,
-      );
+      )
+      .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
   } else {
     kb.row()
       .text(t("keyboards:menu.unread"), "unread")

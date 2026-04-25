@@ -56,6 +56,16 @@ export abstract class EmailProvider {
   abstract listStarred(maxResults?: number): Promise<EmailListItem[]>;
   abstract listJunk(maxResults?: number): Promise<EmailListItem[]>;
   abstract listArchived(maxResults?: number): Promise<EmailListItem[]>;
+  /**
+   * 跨文件夹按用户输入搜索邮件 —— Mini App 🔍 入口的统一调用面。
+   * 不同 provider 的语义有差异：Gmail 用 `q=` 全文检索；Outlook 用 `$search`
+   * KQL；IMAP 走 bridge 的 `SEARCH TEXT`（headers + body）。空 / 仅空白
+   * 输入由调用方过滤，子类不需要再防御。
+   */
+  abstract searchMessages(
+    query: string,
+    maxResults?: number,
+  ): Promise<EmailListItem[]>;
   abstract markAsJunk(messageId: string): Promise<void>;
   abstract moveToInbox(messageId: string): Promise<string>;
   /** 把邮件从归档文件夹移回收件箱，返回新 messageId（Gmail 不变，IMAP/Outlook 会换） */

@@ -18,6 +18,7 @@ import { requireMiniAppAuth } from "@handlers/hono/middleware";
 import {
   ROUTE_MINI_APP_API_LIST,
   ROUTE_MINI_APP_API_MARK_ALL_READ,
+  ROUTE_MINI_APP_API_SEARCH,
   ROUTE_MINI_APP_API_TRASH_ALL_JUNK,
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
@@ -25,7 +26,7 @@ import {
   ROUTE_REMINDERS_API_RESOLVE_CONTEXT,
 } from "@handlers/hono/routes";
 import { getEmailProvider, PROVIDERS } from "@providers";
-import { getMailList, isMailListType } from "@services/mail-list";
+import { getMailList, isMailListType, searchMail } from "@services/mail-list";
 import {
   markAllAsRead,
   refreshEmailKeyboardAfterReminderChange,
@@ -207,6 +208,19 @@ miniapp.post(ROUTE_MINI_APP_API_MARK_ALL_READ, async (c) => {
 miniapp.post(ROUTE_MINI_APP_API_TRASH_ALL_JUNK, async (c) => {
   const userId = c.get("userId");
   const result = await trashAllJunkEmails(c.env, userId);
+  return c.json(result);
+});
+
+// 跨账号邮件搜索 —— 结果形状跟 list API 一样，前端可复用渲染。
+// 鉴权由 `/api/mini-app/*` 中间件 (`requireMiniAppAuth`) 完成；只搜当前用户
+// 自己 enabled 的账号，所以无需额外授权检查。
+miniapp.get(ROUTE_MINI_APP_API_SEARCH, async (c) => {
+  const userId = c.get("userId");
+  const q = (c.req.query("q") ?? "").trim();
+  if (!q) return c.json({ error: "缺少搜索关键词" }, 400);
+  if (q.length > 200) return c.json({ error: "关键词过长" }, 400);
+
+  const result = await searchMail(c.env, userId, q);
   return c.json(result);
 });
 

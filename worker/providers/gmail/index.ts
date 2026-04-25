@@ -372,6 +372,13 @@ export class GmailProvider extends EmailProvider {
     return this.listByQuery(token, `in:spam`, maxResults);
   }
 
+  async searchMessages(query: string, maxResults: number = 20) {
+    const token = await this.token();
+    // Gmail `q=` 直接吃用户原文（支持 from:/subject:/has: 等高级语法），
+    // 用 encodeURIComponent 走 URL；空匹配会被 list 接口拒绝，调用方过滤。
+    return this.listByQuery(token, encodeURIComponent(query), maxResults);
+  }
+
   async listArchived(maxResults: number = 20) {
     const labelId = this.account.archive_folder;
     if (!labelId) return [];

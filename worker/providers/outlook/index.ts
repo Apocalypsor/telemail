@@ -371,6 +371,18 @@ export class OutlookProvider extends EmailProvider {
     return data.value.map((m) => ({ id: m.id, subject: m.subject }));
   }
 
+  async searchMessages(query: string, maxResults: number = 20) {
+    // Graph `$search` 用 KQL：双引号包住整个 query 走全文检索（subject + body + from + ...）。
+    // 注：$search 不能与 $filter / $orderby 同用 —— 所以这里没法限定文件夹，是全 mailbox 范围。
+    const escaped = query.replace(/"/g, '\\"');
+    const data = await graphGet<GraphMessageList>(
+      await this.token(),
+      `/me/messages?$search=${encodeURIComponent(`"${escaped}"`)}&$select=id,subject&$top=${maxResults}`,
+    );
+    if (!data.value) return [];
+    return data.value.map((m) => ({ id: m.id, subject: m.subject }));
+  }
+
   async markAsJunk(messageId: string) {
     await graphPost(await this.token(), `/me/messages/${messageId}/move`, {
       destinationId: "JunkEmail",
