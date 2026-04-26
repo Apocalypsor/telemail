@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { ROUTE_MAIL_API } from "@worker/handlers/hono/routes";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { api } from "@/api/client";
 import { mailPreviewResponseSchema } from "@/api/schemas";
@@ -10,6 +11,22 @@ import { MailBodyFrame } from "@/components/mail-body-frame";
 import { MailFab } from "@/components/mail-fab";
 import { useBackButton } from "@/hooks/use-back-button";
 import { getTelegram } from "@/providers/telegram";
+
+/**
+ * 桌面 client (macos / tdesktop) 自动把 Mini App URL 抛给系统浏览器：用
+ * `WebApp.openLink` 在 Safari/Chrome 打开等价的 `/mail/:id` web 路由（HMAC
+ * token 鉴权，不依赖 initData），然后 `WebApp.close()` 关掉 Mini App。
+ *
+ * 只在 TG context 内（`initData` 非空）+ 桌面平台触发。移动端 / 浏览器直接
+ * 访问的，正常渲染 Mini App。
+ */
+const DESKTOP_PLATFORMS = new Set(["macos", "tdesktop"]);
+
+function shouldRedirectToBrowser(): boolean {
+  const tg = getTelegram();
+  if (!tg || !tg.initData || !tg.platform) return false;
+  return DESKTOP_PLATFORMS.has(tg.platform);
+}
 
 // accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
 // folder / back 可选。
@@ -30,6 +47,21 @@ function MailPreviewPage() {
   const search = Route.useSearch();
   const qc = useQueryClient();
 
+  // 桌面 client：抛给系统浏览器、关掉 Mini App。state 初始化时同步判定，避免
+  // 第一帧闪 Mini App 内容再切换。
+  const [redirecting] = useState(shouldRedirectToBrowser);
+  useEffect(() => {
+    if (!redirecting) return;
+    const tg = getTelegram();
+    if (!tg) return;
+    const webUrl = window.location.href.replace(
+      "/telegram-app/mail/",
+      "/mail/",
+    );
+    tg.openLink?.(webUrl);
+    tg.close?.();
+  }, [redirecting]);
+
   const queryKey = [
     "mail-preview",
     emailMessageId,
@@ -39,6 +71,7 @@ function MailPreviewPage() {
 
   const q = useQuery({
     queryKey,
+    enabled: !redirecting,
     queryFn: async () => {
       const url = ROUTE_MAIL_API.replace(
         ":id",
@@ -57,6 +90,13 @@ function MailPreviewPage() {
   // BackButton：URL 带 ?back= 时显示并跳回该 URL；没有就隐藏（从 bot 按钮直接进来）
   useBackButton(search.back);
 
+  if (redirecting) {
+    return (
+      <div className="p-6 text-center text-sm text-zinc-500">
+        正在浏览器中打开…
+      </div>
+    );
+  }
   if (q.isLoading) {
     return (
       <article className="max-w-3xl mx-auto px-4 py-6 animate-pulse space-y-4">
