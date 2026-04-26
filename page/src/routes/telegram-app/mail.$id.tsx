@@ -124,6 +124,9 @@ function MailPreviewPage() {
         inJunk={d.inJunk}
         inArchive={d.inArchive}
         canArchive={d.canArchive}
+        subject={d.meta.subject ?? null}
+        webMailUrl={d.webMailUrl}
+        tgMessageLink={d.tgMessageLink}
         useProxy={useProxy}
         onToggleProxy={() => setUseProxy((v) => !v)}
         onChanged={() => qc.invalidateQueries({ queryKey })}
