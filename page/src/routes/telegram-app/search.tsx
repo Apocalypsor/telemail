@@ -2,10 +2,10 @@ import { Skeleton, Spinner } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
+import { ROUTE_MINI_APP_API_SEARCH } from "@worker/handlers/hono/routes";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { api } from "@/api/client";
-import { ROUTE_MINI_APP_API_SEARCH } from "@/api/routes";
 import { mailSearchResponseSchema } from "@/api/schemas";
 import { useBackButton } from "@/hooks/use-back-button";
 

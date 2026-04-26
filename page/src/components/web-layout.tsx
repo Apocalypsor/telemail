@@ -1,8 +1,8 @@
 import { Dropdown } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
+import { ROUTE_SESSION_LOGOUT } from "@worker/handlers/hono/routes";
 import type { ReactNode } from "react";
 import { api } from "@/api/client";
-import { ROUTE_SESSION_LOGOUT } from "@/api/routes";
 import { loginUrlForCurrentPath, useSession } from "@/hooks/use-session";
 
 /**

@@ -2,10 +2,13 @@ import { Card } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
+import {
+  ROUTE_LOGIN_CALLBACK,
+  ROUTE_PUBLIC_BOT_INFO,
+} from "@worker/handlers/hono/routes";
 import { useEffect, useRef } from "react";
 import { z } from "zod";
 import { api } from "@/api/client";
-import { ROUTE_LOGIN_CALLBACK, ROUTE_PUBLIC_BOT_INFO } from "@/api/routes";
 import { botInfoResponseSchema } from "@/api/schemas";
 import { WebLayout } from "@/components/web-layout";
 

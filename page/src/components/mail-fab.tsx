@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { api, extractErrorMessage } from "@/api/client";
+import { api } from "@/api/client";
 import { okResponseSchema } from "@/api/schemas";
+import { extractErrorMessage } from "@/api/utils";
 import { useMainButton, useSecondaryButton } from "@/hooks/use-bottom-button";
 import { getTelegram, type PopupButton } from "@/providers/telegram";
 import { THEME_COLORS } from "@/styles/theme";

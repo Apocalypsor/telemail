@@ -1,14 +1,14 @@
 import { Button, Card, Chip, Spinner } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { ROUTE_JUNK_CHECK_API } from "@worker/handlers/hono/routes";
 import { useState } from "react";
+import { api } from "@/api/client";
+import { junkCheckResponseSchema } from "@/api/schemas";
 import {
-  api,
   extractErrorMessage,
   redirectToLoginOnUnauthorized,
-} from "@/api/client";
-import { ROUTE_JUNK_CHECK_API } from "@/api/routes";
-import { junkCheckResponseSchema } from "@/api/schemas";
+} from "@/api/utils";
 import { SessionGatePlaceholder } from "@/components/session-gate-placeholder";
 import { WebLayout } from "@/components/web-layout";
 import { useRequireTelegramLogin } from "@/hooks/use-require-telegram-login";
