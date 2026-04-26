@@ -1,5 +1,6 @@
 import { Dropdown } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { ROUTE_SESSION_LOGOUT } from "@worker/handlers/hono/routes";
 import type { ReactNode } from "react";
 import { api } from "@/api/client";
@@ -21,16 +22,17 @@ export function WebLayout({
 }) {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-      <header className="sticky top-0 z-20 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-20 bg-zinc-950/80 backdrop-blur">
+        <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-baseline gap-3 min-w-0">
-            <span className="text-lg font-semibold tracking-tight text-emerald-400">
+            <Link
+              to="/"
+              className="text-lg font-semibold tracking-tight text-emerald-400 hover:text-emerald-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 rounded"
+            >
               Telemail
-            </span>
+            </Link>
             {subtitle && (
-              <span className="text-sm text-zinc-500 truncate">
-                · {subtitle}
-              </span>
+              <span className="text-sm text-zinc-500 truncate">{subtitle}</span>
             )}
           </div>
           <AuthStatus />
@@ -91,7 +93,7 @@ function AuthStatus() {
         <span className="inline-flex w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 items-center justify-center text-[11px] font-semibold text-emerald-300">
           {initial}
         </span>
-        <span className="hidden sm:inline max-w-[120px] truncate">{first}</span>
+        <span className="hidden sm:inline max-w-30 truncate">{first}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 12 12"
@@ -107,7 +109,7 @@ function AuthStatus() {
       </Dropdown.Trigger>
       <Dropdown.Popover
         placement="bottom end"
-        className="bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl shadow-black/40 min-w-[140px] p-1"
+        className="bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl shadow-black/40 min-w-35 p-1"
       >
         <Dropdown.Menu
           aria-label="账户菜单"
@@ -119,7 +121,7 @@ function AuthStatus() {
         >
           <Dropdown.Item
             id="logout"
-            className="px-3 py-1.5 rounded-md text-sm text-zinc-100 data-[hovered]:bg-zinc-800 data-[focused]:bg-zinc-800 data-[disabled]:text-zinc-500 data-[disabled]:bg-transparent outline-none cursor-pointer transition-colors"
+            className="px-3 py-1.5 rounded-md text-sm text-zinc-100 data-hovered:bg-zinc-800 data-focused:bg-zinc-80 data-disabled:text-zinc-500 data-disabled:bg-transparent outline-none cursor-pointer transition-colors"
           >
             {logoutMut.isPending ? "登出中…" : "登出"}
           </Dropdown.Item>
