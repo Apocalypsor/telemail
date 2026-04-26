@@ -38,5 +38,6 @@ export default {
     privateOnly: "/secrets 仅限私聊使用（避免在群里泄漏）",
     title: "🔑 Secrets",
     webhookUrlLabel: "Webhook URL（直接 setWebhook 用）",
+    autoDeleteHint: "_本消息将在 {{seconds}} 秒后自动删除_",
   },
 };

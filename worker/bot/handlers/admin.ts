@@ -164,7 +164,39 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
         `\`${codeEsc(url)}\``,
       );
     }
-    return ctx.reply(lines.join("\n"), { parse_mode: "MarkdownV2" });
+
+    const autoDeleteSeconds = 60;
+    lines.push(
+      ``,
+      t("admin:secrets.autoDeleteHint", { seconds: autoDeleteSeconds }),
+    );
+
+    const sent = await ctx.reply(lines.join("\n"), {
+      parse_mode: "MarkdownV2",
+    });
+
+    // 60 秒后自动删除：bot 自己的回复 + 用户发的 /secrets 命令本身。
+    // 依赖 webhook 注入的 env.waitUntil（handlers/hono/telegram.tsx）；
+    // 失败一律吞掉（消息可能已被手动删除 / 权限丢失）。
+    env.waitUntil?.(
+      new Promise<void>((resolve) => {
+        setTimeout(async () => {
+          try {
+            await ctx.api.deleteMessage(sent.chat.id, sent.message_id);
+          } catch {
+            // ignore
+          }
+          if (ctx.message) {
+            try {
+              await ctx.api.deleteMessage(ctx.chat.id, ctx.message.message_id);
+            } catch {
+              // ignore
+            }
+          }
+          resolve();
+        }, autoDeleteSeconds * 1000);
+      }),
+    );
   });
 
   // Admin operations menu
