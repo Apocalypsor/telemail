@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["./worker-configuration.d.ts", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@utils/*": ["./utils/*"],
+      "@services/*": ["./services/*"],
+      "@providers": ["./providers"],
+      "@providers/*": ["./providers/*"],
+      "@bot/*": ["./bot/*"],
+      "@db/*": ["./db/*"],
+      "@handlers/*": ["./handlers/*"],
+      "@components/*": ["./components/*"],
+      "@i18n": ["./i18n"],
+      "@i18n/*": ["./i18n/*"],
+      "@page/*": ["../page/src/*"]
+    }
+  },
+  "include": ["worker-configuration.d.ts", "**/*.ts", "**/*.tsx"]
+}

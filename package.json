@@ -5,44 +5,29 @@
   "license": "AGPL-3.0-or-later",
   "author": "Apocalypsor <chthon605@gmail.com>",
   "scripts": {
-    "build:page": "pnpm --filter telemail-page build",
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
+    "dev:worker": "pnpm --filter telemail-worker dev",
+    "typegen:worker": "pnpm --filter telemail-worker typegen",
+    "migrate:worker": "pnpm --filter telemail-worker migrate",
+    "deploy:worker": "pnpm --filter telemail-worker deploy",
     "dev:page": "pnpm --filter telemail-page dev",
-    "start": "wrangler dev",
-    "cf-typegen": "wrangler types",
-    "migrate": "wrangler d1 migrations apply gmail-tg-bridge --remote",
-    "typecheck": "tsc --noEmit && pnpm --filter telemail-page typecheck",
+    "build:page": "pnpm --filter telemail-page build",
     "check": "biome check --no-errors-on-unmatched --files-ignore-unknown=true",
+    "typecheck": "pnpm -r typecheck",
     "prepare": "husky",
     "skills:install": "pnpm dlx skills experimental_install && ln -sf ../.agents/skills .claude/",
     "skills:update": "pnpm dlx skills update"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.8",
-    "@cloudflare/vitest-pool-workers": "^0.13.3",
     "@types/node": "^25.5.0",
-    "@types/turndown": "^5.0.6",
+    "typescript": "^5.9.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.1",
-    "typescript": "^5.9.3",
-    "vitest": "~4.1.0",
     "wrangler": "^4.80.0"
   },
   "lint-staged": {
     "*": [
       "biome check --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
-  },
-  "dependencies": {
-    "grammy": "^1.41.1",
-    "hono": "^4.12.14",
-    "i18next": "^26.0.1",
-    "ky": "^1.14.3",
-    "linkedom": "^0.18.12",
-    "postal-mime": "^2.7.4",
-    "turndown": "^7.2.2",
-    "workers-observability-hub": "^1.0.3"
   }
 }

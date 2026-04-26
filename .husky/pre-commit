@@ -1,2 +1,2 @@
-pnpm tsc --noEmit
+pnpm typecheck
 pnpm lint-staged

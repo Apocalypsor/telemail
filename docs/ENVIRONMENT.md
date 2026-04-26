@@ -60,7 +60,7 @@
 
 ## Cloudflare Bindings
 
-`wrangler.jsonc` 里声明，`pnpm cf-typegen` 把类型同步到 `worker-configuration.d.ts`。
+`worker/wrangler.jsonc` 里声明，`pnpm typegen:worker` 把类型同步到 `worker/worker-configuration.d.ts`。
 
 | Binding       | 类型    | 用途                                                                 |
 | ------------- | ------- | -------------------------------------------------------------------- |

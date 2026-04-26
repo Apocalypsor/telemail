@@ -61,6 +61,8 @@ gcloud pubsub subscriptions create gmail-push-sub \
 
 ## 4. Cloudflare 资源
 
+> 下面所有 `pnpm wrangler …` 命令需要在 `worker/` 子包目录里执行（wrangler 只装在该子包），或者从仓库根用 `pnpm --filter telemail-worker exec wrangler …`。`wrangler.jsonc` 也在 `worker/` 下。
+
 ### 4.1 D1 数据库
 
 ```sh

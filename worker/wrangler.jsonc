@@ -3,9 +3,9 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "telemail",
-  "main": "worker/index.ts",
+  "main": "index.ts",
   "compatibility_date": "2026-02-19",
   "observability": {
     "enabled": true
