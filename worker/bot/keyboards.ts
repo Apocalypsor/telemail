@@ -2,7 +2,6 @@ import { getBotInfo } from "@bot/index";
 import { countPendingRemindersForEmail } from "@db/reminders";
 import { t } from "@i18n";
 import {
-  buildMiniAppMailUrl,
   buildMiniAppRemindersUrl,
   buildWebMailUrl,
   generateMailTokenById,
@@ -81,24 +80,34 @@ export async function buildEmailKeyboard(
   const remindBtn = remindLabel(reminderCount);
   const viewLabel = t("keyboards:mail.viewOriginal");
 
-  // 私聊：直接用 Mini App URL（web_app inline button 仅私聊有效）
+  // 👁 查看原文统一走 `url` 按钮指向 /mail/:id —— macOS desktop 在系统默认浏览器
+  // （Safari/Chrome）打开；iOS/Android 在 TG 内置浏览器打开（不跳出 TG，但不
+  // 是 Mini App 全屏 webview）。该路由用 HMAC token 鉴权，不依赖 initData，
+  // 浏览器/in-app browser 里都是完整功能。
+  // ⏰ 提醒按钮仍走 Mini App —— 设提醒是个交互流程，需要 TG context。
+  const webMailUrl = buildWebMailUrl(
+    base,
+    emailMessageId,
+    accountId,
+    mailToken,
+  );
+
+  // 私聊：⏰ 用 `web_app`（仅私聊有效）；👁 用 `url`
   if (!chatId.startsWith("-")) {
     kb.row()
       .webApp(
         remindBtn,
         buildMiniAppRemindersUrl(base, emailMessageId, accountId, mailToken),
       )
-      .webApp(
-        viewLabel,
-        buildMiniAppMailUrl(base, emailMessageId, accountId, mailToken),
-      );
+      .url(viewLabel, webMailUrl);
     return kb;
   }
 
-  // 群聊：走 `t.me/<bot>/<short>?startapp=<feature>_<chat>_<msg>` deep link
+  // 群聊：⏰ 走 `t.me/<bot>/<short>?startapp=<feature>_<chat>_<msg>` deep link
+  // （web_app 在群里无效，退化成 deep link 拉起 Mini App）；👁 仍是 `url`
   // getBotInfo 在 module 顶层做了 isolate-scope memoize，跟 webhook 入口
   // 共享同一份缓存，这里不会触发额外 KV read。cache miss + Telegram API
-  // getMe 失败时退化为 null —— 群聊降级成裸 web 链接，而不是整条键盘构建
+  // getMe 失败时退化为 null —— 群聊降级成只剩 👁 链接，而不是整条键盘构建
   // 炸掉。
   const shortName = env.TG_MINI_APP_SHORT_NAME;
   const username = shortName
@@ -107,15 +116,11 @@ export async function buildEmailKeyboard(
         .catch(() => null)
     : null;
   if (shortName && username) {
-    const deepLink = (feature: "r" | "m") =>
-      `https://t.me/${username}/${shortName}?startapp=${feature}_${chatId}_${tgMessageId}`;
-    kb.row().url(remindBtn, deepLink("r")).url(viewLabel, deepLink("m"));
+    const remindDeepLink = `https://t.me/${username}/${shortName}?startapp=r_${chatId}_${tgMessageId}`;
+    kb.row().url(remindBtn, remindDeepLink).url(viewLabel, webMailUrl);
     return kb;
   }
   // 未配 Mini App short name：只给 web 预览链接（群聊无 ⏰ 能力）
-  kb.row().url(
-    viewLabel,
-    buildWebMailUrl(base, emailMessageId, accountId, mailToken),
-  );
+  kb.row().url(viewLabel, webMailUrl);
   return kb;
 }
