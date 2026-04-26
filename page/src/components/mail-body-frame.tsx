@@ -41,9 +41,17 @@ export function MailBodyFrame({ bodyHtml }: { bodyHtml: string }) {
             img.addEventListener("error", resize);
           }
         });
-        if (doc.documentElement) {
+        // 慢网兜底：所有 subresource (img/css/font) 都加载完后再测一次。
+        // contentWindow 的 load 比 iframe 的 onLoad 触发更晚 —— iframe load
+        // 在 srcdoc DOM parse 完就 fire，contentWindow load 等所有外部资源
+        // 完成。两个事件都接，覆盖各种边界。
+        f?.contentWindow?.addEventListener("load", resize);
+        // ResizeObserver 必须观察 body —— documentElement (<html>) 在 iframe
+        // 里默认尺寸 = iframe viewport，不会因为内部内容生长而变化，观察它
+        // 永远不 fire；body 才会随内容（图片加载、字体替换）实际增高。
+        if (doc.body) {
           const ro = new ResizeObserver(resize);
-          ro.observe(doc.documentElement);
+          ro.observe(doc.body);
           observers.push(ro);
         }
       } catch {
