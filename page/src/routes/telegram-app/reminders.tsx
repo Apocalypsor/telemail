@@ -1,6 +1,6 @@
 import { Skeleton, Spinner } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import {
   ROUTE_REMINDERS_API,
@@ -74,6 +74,7 @@ function presetToDate(kind: (typeof PRESETS)[number]["mins"]): Date {
 
 function RemindersPage() {
   const search: Search = Route.useSearch();
+  const navigate = useNavigate();
   const listOnly = !search.accountId || !search.emailMessageId || !search.token;
 
   const qc = useQueryClient();
@@ -191,12 +192,16 @@ function RemindersPage() {
 
   function openMail() {
     if (listOnly) return;
-    const back = encodeURIComponent(
-      window.location.pathname + window.location.search,
-    );
-    window.location.href =
-      `/telegram-app/mail/${encodeURIComponent(search.emailMessageId ?? "")}` +
-      `?accountId=${search.accountId}&t=${encodeURIComponent(search.token ?? "")}&back=${back}`;
+    const back = window.location.pathname + window.location.search;
+    navigate({
+      to: "/telegram-app/mail/$id",
+      params: { id: search.emailMessageId ?? "" },
+      search: {
+        accountId: search.accountId ?? 0,
+        t: search.token ?? "",
+        back,
+      },
+    });
   }
 
   const minDate = ymd(new Date());

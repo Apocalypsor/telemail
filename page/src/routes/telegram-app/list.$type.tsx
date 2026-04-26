@@ -1,6 +1,6 @@
 import { Skeleton, Spinner } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import {
   ROUTE_MINI_APP_API_LIST,
@@ -17,6 +17,7 @@ import {
   mailListTypeSchema,
 } from "@/api/schemas";
 import { extractErrorMessage } from "@/api/utils";
+import { AccountBox } from "@/components/account-box";
 import { MAIL_LIST_TITLES, MAIL_LIST_TYPES } from "@/constants";
 import { useBackButton } from "@/hooks/use-back-button";
 import { getTelegram } from "@/providers/telegram";
@@ -60,6 +61,7 @@ function MailListPage() {
   const { type: typeParam } = Route.useParams();
   const type = mailListTypeSchema.parse(typeParam);
   const bulk = BULK_ACTIONS[type];
+  const navigate = useNavigate();
 
   // 列表页从 bot 按钮直接进来，没有上一级，不显示 BackButton
   useBackButton(undefined);
@@ -123,11 +125,17 @@ function MailListPage() {
   }
 
   function openMail(id: string, accountId: number, token: string) {
-    const back = encodeURIComponent(
-      window.location.pathname + window.location.search,
-    );
-    const folder = folderHint ? `&folder=${folderHint}` : "";
-    window.location.href = `/telegram-app/mail/${encodeURIComponent(id)}?accountId=${accountId}&t=${encodeURIComponent(token)}${folder}&back=${back}`;
+    const back = window.location.pathname + window.location.search;
+    navigate({
+      to: "/telegram-app/mail/$id",
+      params: { id },
+      search: {
+        accountId,
+        t: token,
+        ...(folderHint ? { folder: folderHint } : {}),
+        back,
+      },
+    });
   }
 
   const data = listQuery.data;
@@ -240,36 +248,6 @@ function MailListPage() {
           );
         })
       )}
-    </div>
-  );
-}
-
-function AccountBox({
-  label,
-  count,
-  errored,
-  children,
-}: {
-  label: string;
-  count?: number;
-  errored?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-      <div
-        className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[13px] bg-zinc-950/30 border-b border-zinc-800 ${
-          errored ? "text-red-400" : "text-zinc-400"
-        }`}
-      >
-        <span className="truncate font-medium">{label}</span>
-        {count != null && (
-          <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold">
-            {count}
-          </span>
-        )}
-      </div>
-      {children}
     </div>
   );
 }

@@ -1,8 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { api } from "@/api/client";
-import { okResponseSchema } from "@/api/schemas";
-import { extractErrorMessage } from "@/api/utils";
+import { useCallback, useMemo } from "react";
 import { useMainButton, useSecondaryButton } from "@/hooks/use-bottom-button";
+import { type MailAction, useMailActions } from "@/hooks/use-mail-actions";
 import { getTelegram, type PopupButton } from "@/providers/telegram";
 import { THEME_COLORS } from "@/styles/theme";
 
@@ -24,16 +22,8 @@ export interface MailFabProps {
   onChanged?: () => void;
 }
 
-type Action =
-  | "toggle-star"
-  | "archive"
-  | "unarchive"
-  | "trash"
-  | "mark-as-junk"
-  | "move-to-inbox";
-
 interface ActionDef {
-  id: Action;
+  id: MailAction;
   label: string;
   type: PopupButton["type"];
   /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 MainButton 隐藏 */
@@ -78,15 +68,13 @@ export function MailFab({
   tgMessageLink,
   onChanged,
 }: MailFabProps) {
-  const [starred, setStarred] = useState(initialStarred);
-  const [pending, setPending] = useState(false);
-  /** 终端动作完成后为 true，MainButton 自动隐藏 */
-  const [done, setDone] = useState(false);
-
-  // props 塞 ref：runAction 里只从 ref 读，就不用在 useCallback deps 里列它们，
-  // 同时永远拿到最新值，避免 biome 的 useExhaustiveDependencies 和 props 闭包冲突
-  const propsRef = useRef({ emailMessageId, accountId, token });
-  propsRef.current = { emailMessageId, accountId, token };
+  const { starred, done, pending, run } = useMailActions({
+    emailMessageId,
+    accountId,
+    token,
+    initialStarred,
+    onChanged,
+  });
 
   // ─── 邮件状态动作（MainButton） ────────────────────────────────────────
 
@@ -149,55 +137,37 @@ export function MailFab({
     return list;
   }, [inArchive, inJunk, canArchive, starred]);
 
-  const runAction = useCallback(
-    async (action: Action, isTerminal: boolean) => {
+  /**
+   * 跑一个动作，处理 TG 端的 Haptic + 错误 alert。useMailActions 的 hook
+   * 已经管 starred/done/pending 状态和 onChanged 回调，这里只负责 TG 特有的
+   * 反馈 UI。toggle-star 用 hook 当前 starred 计算下一态。
+   */
+  const runWithFeedback = useCallback(
+    async (action: MailAction) => {
       const tg = getTelegram();
-      const p = propsRef.current;
-      setPending(true);
-      try {
-        const body: Record<string, unknown> = {
-          accountId: p.accountId,
-          token: p.token,
-        };
-        if (action === "toggle-star") body.starred = !starred;
-        const raw = await api
-          .post(`api/mail/${encodeURIComponent(p.emailMessageId)}/${action}`, {
-            json: body,
-          })
-          .json();
-        const res = okResponseSchema.parse(raw);
-        if (res.ok) {
-          tg?.HapticFeedback?.notificationOccurred("success");
-          if (action === "toggle-star") setStarred(!starred);
-          if (isTerminal) setDone(true);
-          onChanged?.();
-        } else {
-          tg?.HapticFeedback?.notificationOccurred("error");
-          tg?.showAlert?.(res.error ?? "操作失败");
-        }
-      } catch (e) {
+      const starredNext = action === "toggle-star" ? !starred : undefined;
+      const r = await run(action, starredNext);
+      if (r.ok) {
+        tg?.HapticFeedback?.notificationOccurred("success");
+      } else {
         tg?.HapticFeedback?.notificationOccurred("error");
-        tg?.showAlert?.(await extractErrorMessage(e));
-      } finally {
-        setPending(false);
+        tg?.showAlert?.(r.error ?? "操作失败");
       }
     },
-    [starred, onChanged],
+    [run, starred],
   );
 
   const handleMainButtonClick = useCallback(() => {
     if (actions.length === 0) return;
     if (actions.length === 1) {
       // 单动作：MainButton 直接执行，不走 popup
-      const a = actions[0];
-      runAction(a.id, a.terminal);
+      runWithFeedback(actions[0].id);
       return;
     }
     const tg = getTelegram();
     if (!tg?.showPopup) {
       // 兜底（极老的 TG 客户端没 showPopup）：直接跑第一个动作
-      const a = actions[0];
-      runAction(a.id, a.terminal);
+      runWithFeedback(actions[0].id);
       return;
     }
     tg.showPopup(
@@ -215,10 +185,10 @@ export function MailFab({
       (buttonId) => {
         if (!buttonId) return;
         const a = actions.find((x) => x.id === buttonId);
-        if (a) runAction(a.id, a.terminal);
+        if (a) runWithFeedback(a.id);
       },
     );
-  }, [actions, runAction]);
+  }, [actions, runWithFeedback]);
 
   const mainButtonText = done
     ? undefined

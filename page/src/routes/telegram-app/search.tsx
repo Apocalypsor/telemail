@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { api } from "@/api/client";
 import { mailSearchResponseSchema } from "@/api/schemas";
+import { extractErrorMessage } from "@/api/utils";
+import { AccountBox } from "@/components/account-box";
 import { useBackButton } from "@/hooks/use-back-button";
 
 // 查询字串放 URL，目的有二：
@@ -60,14 +62,31 @@ function SearchPage() {
   }
 
   function openMail(id: string, accountId: number, token: string) {
-    const back = encodeURIComponent(
-      window.location.pathname + window.location.search,
-    );
-    window.location.href = `/telegram-app/mail/${encodeURIComponent(id)}?accountId=${accountId}&t=${encodeURIComponent(token)}&back=${back}`;
+    const back = window.location.pathname + window.location.search;
+    navigate({
+      to: "/telegram-app/mail/$id",
+      params: { id },
+      search: { accountId, t: token, back },
+    });
   }
 
   const data = searchQuery.data;
-  const errMsg = searchQuery.error ? extractErrorSync(searchQuery.error) : null;
+  // 用 async extractErrorMessage 拉响应 body 里的 `error` 字段（比裸 message
+  // 信息量大得多）。结果存 state 里，error 变化时刷新。
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!searchQuery.error) {
+      setErrMsg(null);
+      return;
+    }
+    let cancelled = false;
+    extractErrorMessage(searchQuery.error).then((msg) => {
+      if (!cancelled) setErrMsg(msg);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery.error]);
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
@@ -166,44 +185,6 @@ function SearchPage() {
           );
         })
       )}
-    </div>
-  );
-}
-
-// useQuery 错误同步取一个能渲染的字符串。HTTPError body 解析需要 async，
-// 这里暂时只读 message —— ky 错误对象的 .message 已经包含 status + URL，
-// 对调试足够；要看后端 error 字段可以打开网络面板。
-function extractErrorSync(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
-}
-
-function AccountBox({
-  label,
-  count,
-  errored,
-  children,
-}: {
-  label: string;
-  count?: number;
-  errored?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-      <div
-        className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[13px] bg-zinc-950/30 border-b border-zinc-800 ${
-          errored ? "text-red-400" : "text-zinc-400"
-        }`}
-      >
-        <span className="truncate font-medium">{label}</span>
-        {count != null && (
-          <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold">
-            {count}
-          </span>
-        )}
-      </div>
-      {children}
     </div>
   );
 }

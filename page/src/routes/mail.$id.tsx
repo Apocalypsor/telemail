@@ -1,15 +1,15 @@
 import { Button, Card, Chip, Skeleton } from "@heroui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { ROUTE_MAIL_API } from "@worker/handlers/hono/routes";
 import { useState } from "react";
 import { z } from "zod";
 import { api } from "@/api/client";
-import { mailPreviewResponseSchema, okResponseSchema } from "@/api/schemas";
-import { extractErrorMessage } from "@/api/utils";
+import { mailPreviewResponseSchema } from "@/api/schemas";
 import { MailBodyFrame } from "@/components/mail-body-frame";
 import { WebLayout } from "@/components/web-layout";
+import { type MailAction, useMailActions } from "@/hooks/use-mail-actions";
 import { useSession } from "@/hooks/use-session";
 
 const searchSchema = z.object({
@@ -23,21 +23,15 @@ export const Route = createFileRoute("/mail/$id")({
   validateSearch: zodValidator(searchSchema),
 });
 
-type Action =
-  | "toggle-star"
-  | "archive"
-  | "unarchive"
-  | "trash"
-  | "mark-as-junk"
-  | "move-to-inbox";
-
 function WebMailPage() {
   const { id: emailMessageId } = Route.useParams();
   const search = Route.useSearch();
   const qc = useQueryClient();
 
+  // Cache key 和 Mini App `/telegram-app/mail/$id` 共用 —— 同一个 API
+  // (`ROUTE_MAIL_API`)，shape 相同，本来就该共享缓存。
   const queryKey = [
-    "web-mail-preview",
+    "mail-preview",
     emailMessageId,
     search.accountId,
     search.folder,
@@ -153,54 +147,31 @@ interface ToolbarProps {
 
 function WebMailToolbar(props: ToolbarProps) {
   const session = useSession();
-  const [starred, setStarred] = useState(props.starred);
-  const [done, setDone] = useState(false);
   const [msg, setMsg] = useState<{ text: string; kind: "ok" | "error" } | null>(
     null,
   );
 
-  const mut = useMutation({
-    mutationFn: async ({
-      action,
-      starredNext,
-    }: {
-      action: Action;
-      starredNext?: boolean;
-    }) => {
-      const body: Record<string, unknown> = {
-        accountId: props.accountId,
-        token: props.token,
-      };
-      if (starredNext !== undefined) body.starred = starredNext;
-      const raw = await api
-        .post(
-          `api/mail/${encodeURIComponent(props.emailMessageId)}/${action}`,
-          { json: body },
-        )
-        .json();
-      return { action, starredNext, res: okResponseSchema.parse(raw) };
-    },
-    onSuccess: ({ action, starredNext, res }) => {
-      if (!res.ok) {
-        setMsg({ text: res.error ?? "操作失败", kind: "error" });
-        return;
-      }
-      setMsg({ text: res.message ?? "操作成功", kind: "ok" });
-      if (action === "toggle-star" && starredNext !== undefined) {
-        setStarred(starredNext);
-      } else {
-        setDone(true);
-      }
-      props.onChanged();
-    },
-    onError: async (err) => {
-      setMsg({ text: await extractErrorMessage(err), kind: "error" });
-    },
+  const {
+    starred,
+    done,
+    pending,
+    run: runAction,
+  } = useMailActions({
+    emailMessageId: props.emailMessageId,
+    accountId: props.accountId,
+    token: props.token,
+    initialStarred: props.starred,
+    onChanged: props.onChanged,
   });
 
-  function run(action: Action, starredNext?: boolean) {
+  async function run(action: MailAction, starredNext?: boolean) {
     setMsg(null);
-    mut.mutate({ action, starredNext });
+    const r = await runAction(action, starredNext);
+    setMsg(
+      r.ok
+        ? { text: r.message ?? "操作成功", kind: "ok" }
+        : { text: r.error ?? "操作失败", kind: "error" },
+    );
   }
 
   // 邮件操作需要 Telegram 登录（session cookie）—— Worker 的
@@ -209,7 +180,7 @@ function WebMailToolbar(props: ToolbarProps) {
   // 链接进 `/login`，回来后 session 就有了，toolbar 自然出现。
   if (!session.data) return null;
 
-  const isDisabled = done || mut.isPending;
+  const isDisabled = done || pending;
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
@@ -261,7 +232,7 @@ function WebMailToolbar(props: ToolbarProps) {
           />
         </>
       )}
-      {msg && !mut.isPending && (
+      {msg && !pending && (
         <Chip
           className={
             msg.kind === "error"
