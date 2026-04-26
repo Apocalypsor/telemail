@@ -52,8 +52,9 @@ Run `pnpm typegen:worker` after changing bindings in `worker/wrangler.jsonc`.
 - **Mini App 路由** (`page/src/routes/telegram-app/`): HeroUI + TG 原生控件（MainButton / SecondaryButton / BackButton），样式跟 web 页共用 zinc/emerald。iPad 上自动 `requestFullscreen()`（Bot API 8.0+），TG 顶栏收成浮动 pill。
   - `/telegram-app/` → `index.tsx` router entry, reads `window.Telegram.WebApp.initDataUnsafe.start_param` (`r_<chat>_<msg>` / `m_<chat>_<msg>`) and navigates.
   - `/telegram-app/reminders` → set/list/cancel reminders.
-  - `/telegram-app/mail/$id` → email preview (fetches JSON from `GET /api/mini-app/mail/:id`, renders bodyHtml in sandbox iframe via `MailBodyFrame`, shows `MailFab` for star/archive/trash/junk/unarchive).
+  - `/telegram-app/mail/$id` → email preview (fetches JSON from `GET /api/mail/:id` —— token-only auth, shared with web `/mail/$id`; renders bodyHtml in sandbox iframe via `MailBodyFrame`, shows `MailFab` for star/archive/trash/junk/unarchive).
   - `/telegram-app/list/$type` → unread/starred/junk/archived lists.
+  - `/telegram-app/search` → cross-account 邮件搜索（关键词 / 发件人 / 主题；Gmail / Outlook 走原生搜索语法）。
 - **Web 页面** (`page/src/routes/`，不在 `telegram-app/` 子目录下): 浏览器里直接访问的页面，`WebLayout` 套 sticky emerald wordmark header，HeroUI Card / Button 做现代化外观。
   - `/mail/$id` → 浏览器里看邮件（HMAC token-only auth，不需要 initData）。
   - `/preview` → HTML → MarkdownV2 预览（session cookie + `useRequireTelegramLogin`）。
@@ -62,7 +63,9 @@ Run `pnpm typegen:worker` after changing bindings in `worker/wrangler.jsonc`.
   - `/` → Landing 兜底页。
   - **Bot keyboard URLs** (`worker/utils/mail-token.ts`, `worker/bot/handlers/*`) still point at `/telegram-app/*` — intentional: those are the Mini App URLs registered in BotFather. Pages is configured to serve the SPA at those paths (or redirect from `/` → root). Private chat buttons are inline `web_app` pointing at subpage URLs; group chat uses `t.me/<bot>/<short>?startapp=<feature>_<chat>_<msg>` deep links which land on `/` router.
   - **Auth**: every API call goes through `page/src/api/client.ts` (ky instance) which injects `X-Telegram-Init-Data` when in TG context. Worker `requireMiniAppAuth` verifies. Session cookie for browser pages. Mail preview API also checks HMAC token.
-  - **Cross-package imports**: `page/tsconfig.json` + `page/vite.config.ts` alias `@worker/*` → `../worker/*`. Page imports types (`import type`) and pure-string route constants (from `@worker/handlers/hono/routes`, zero-dep file) directly. Don't pull in worker code with side effects / runtime deps from page.
+  - **Cross-package imports**: `page/tsconfig.json` + `page/vite.config.ts` alias `@worker/*` → `../worker/*`; `worker/tsconfig.json` alias `@page/*` → `../page/src/*`. Both directions only carry pure-string constants / types — never runtime code:
+    - Page → Worker: types (`import type`) and route constants from `@worker/handlers/hono/routes` (zero-dep file).
+    - Worker → Page: Mini App route paths from `@page/paths` (used by bot keyboards in `worker/bot/handlers/start.ts` / `mail-list.ts` to build `web_app` URLs).
 - **Email keyboard**: `buildEmailKeyboard` requires `tgMessageId`, so `deliverEmailToTelegram` sends the message naked, inserts `message_map`, then builds the keyboard and attaches it via `setReplyMarkup` — one code path for private + group. All other rebuild sites (refresh, toggle-star, reminder change, junk cancel) already have `tgMessageId`.
 - **Reminders**: entry is exclusively through the ⏰ button on email messages (no `/remind` command). Auth on every API: `X-Telegram-Init-Data` via `utils/tg-init-data.ts::verifyTgInitData` + `users.approved`. Group deep-link resolve-context also checks `account.telegram_user_id === current user` (only the account owner can set reminders). Cron sends with `reply_parameters` so the reminder threads under the original email even if deleted.
   Setup: `WORKER_URL` env, BotFather `/setdomain`, `/newapp` to register the Mini App (so `?startapp=` works for group deep links).

@@ -93,7 +93,7 @@ pnpm wrangler queues create gmail-tg-queue
 
 ### 4.4 Secrets
 
-所有 secret 的用途和"哪些必填 / 哪些可选"见 [environment.md](./environment.md)。最小集：
+所有 secret 的用途和"哪些必填 / 哪些可选"见 [ENVIRONMENT.md](./ENVIRONMENT.md)。最小集：
 
 ```sh
 pnpm wrangler secret put TELEGRAM_BOT_TOKEN
@@ -110,7 +110,7 @@ pnpm wrangler secret put GMAIL_PUSH_SECRET
 ## 5. Worker 部署
 
 ```sh
-pnpm deploy
+pnpm deploy:worker
 ```
 
 ### 5.1 设置 Telegram Webhook

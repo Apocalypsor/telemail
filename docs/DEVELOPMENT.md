@@ -51,7 +51,12 @@ pnpm typecheck
 
 ## 类型共享
 
-`page/tsconfig.json` + `page/vite.config.ts` 的 `@worker/*` 别名指向 `../worker/*`。Page 只做 `import type` 引用 Worker 的类型 / 路径常量（`page/src/api/routes.ts` re-export 自 `worker/handlers/hono/routes.ts`），不把 Worker 运行时 deps 拖进前端 bundle。
+两个子包通过 tsconfig + vite 别名互引，但只走纯字符串常量 / 类型，从不跨包拖运行时代码。
+
+- `page/tsconfig.json` + `page/vite.config.ts` 配 `@worker/*` → `../worker/*`：page 用 `import type` 引 worker 类型，从 `@worker/handlers/hono/routes`（零 import 的纯字符串常量文件）按需 import API 路径常量。
+- `worker/tsconfig.json` 配 `@page/*` → `../page/src/*`：worker bot handlers（`bot/handlers/start.ts`、`mail-list.ts`）从 `@page/paths` import Mini App UI 路径常量，用来拼 `web_app` 按钮 URL。
+
+不要从 page 拉 worker 里有副作用 / 运行时 deps 的代码，会被 Vite 打进前端 bundle；反向同理。
 
 ## 测试
 
