@@ -67,10 +67,20 @@ export function MailBodyFrame({ bodyHtml }: { bodyHtml: string }) {
     // 的图片、字体替换等可能改 layout 的尾声情况）。
     f.addEventListener("load", resize);
     window.addEventListener("resize", resize);
+    // 低频 poll 兜底：单张 hung image (cors-proxy 超时 / 源站不响应) 会让
+    // ResizeObserver / load / img.onload 这些事件信号全部不 fire，iframe
+    // 卡在那张图加载之前的高度。前 30 秒每秒强制 resize 一次，覆盖
+    // 一切事件驱动信号失效的极端情况。
+    let pollCount = 0;
+    const pollId = window.setInterval(() => {
+      resize();
+      if (++pollCount >= 30) window.clearInterval(pollId);
+    }, 1000);
     return () => {
       doc?.removeEventListener("DOMContentLoaded", setup);
       f.removeEventListener("load", resize);
       window.removeEventListener("resize", resize);
+      window.clearInterval(pollId);
       for (const o of observers) o.disconnect();
     };
   }, []);
