@@ -61,6 +61,11 @@ export function MailBodyFrame({ bodyHtml }: { bodyHtml: string }) {
 
     f.addEventListener("load", onLoad);
     window.addEventListener("resize", resize);
+    // srcdoc 是同步处理的：iframe 的 load 事件可能在 React commit 完、
+    // useEffect 跑到这里之前就已经 fire 了。错过了那次事件 → resize 永远
+    // 不会跑，iframe 卡在浏览器默认 ~150px。这里检查 readyState，已经
+    // complete 的话立刻手动跑一次 onLoad。
+    if (f.contentDocument?.readyState === "complete") onLoad();
     return () => {
       f.removeEventListener("load", onLoad);
       window.removeEventListener("resize", resize);
