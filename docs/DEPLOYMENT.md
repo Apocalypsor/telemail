@@ -14,7 +14,7 @@
 安装依赖：
 
 ```sh
-pnpm install
+bun install
 ```
 
 ## 2. Google Cloud（Gmail）
@@ -61,24 +61,24 @@ gcloud pubsub subscriptions create gmail-push-sub \
 
 ## 4. Cloudflare 资源
 
-> 下面所有 `pnpm wrangler …` 命令需要在 `worker/` 子包目录里执行（wrangler 只装在该子包），或者从仓库根用 `pnpm --filter telemail-worker exec wrangler …`。`wrangler.jsonc` 也在 `worker/` 下。
+> 下面所有 `bun wrangler …` 命令需要在 `worker/` 子包目录里执行（wrangler 只装在该子包），或者从仓库根用 `bun --filter telemail-worker exec wrangler …`。`wrangler.jsonc` 也在 `worker/` 下。
 
 ### 4.1 D1 数据库
 
 ```sh
-pnpm wrangler d1 create gmail-tg-bridge
+bun wrangler d1 create gmail-tg-bridge
 ```
 
 把返回的 `database_id` 填入 `wrangler.jsonc` 中 `d1_databases[0].database_id`。然后从仓库根跑：
 
 ```sh
-pnpm migrate:worker:remote
+bun migrate:worker:remote
 ```
 
 ### 4.2 KV 命名空间
 
 ```sh
-pnpm wrangler kv namespace create EMAIL_KV
+bun wrangler kv namespace create EMAIL_KV
 ```
 
 返回的 `id` 填入 `wrangler.jsonc` 中 `kv_namespaces[0].id`。用途：access_token 缓存、消息去重、OAuth state。
@@ -86,7 +86,7 @@ pnpm wrangler kv namespace create EMAIL_KV
 ### 4.3 Queue
 
 ```sh
-pnpm wrangler queues create gmail-tg-queue
+bun wrangler queues create gmail-tg-queue
 ```
 
 `wrangler.jsonc` 中已经配好 producer / consumer 绑定。Queue 用于串行处理邮件，内置重试。
@@ -96,21 +96,21 @@ pnpm wrangler queues create gmail-tg-queue
 所有 secret 的用途和"哪些必填 / 哪些可选"见 [ENVIRONMENT.md](./ENVIRONMENT.md)。最小集：
 
 ```sh
-pnpm wrangler secret put TELEGRAM_BOT_TOKEN
-pnpm wrangler secret put ADMIN_TELEGRAM_ID
-pnpm wrangler secret put ADMIN_SECRET
-pnpm wrangler secret put TELEGRAM_WEBHOOK_SECRET
+bun wrangler secret put TELEGRAM_BOT_TOKEN
+bun wrangler secret put ADMIN_TELEGRAM_ID
+bun wrangler secret put ADMIN_SECRET
+bun wrangler secret put TELEGRAM_WEBHOOK_SECRET
 # Gmail
-pnpm wrangler secret put GMAIL_CLIENT_ID
-pnpm wrangler secret put GMAIL_CLIENT_SECRET
-pnpm wrangler secret put GMAIL_PUBSUB_TOPIC
-pnpm wrangler secret put GMAIL_PUSH_SECRET
+bun wrangler secret put GMAIL_CLIENT_ID
+bun wrangler secret put GMAIL_CLIENT_SECRET
+bun wrangler secret put GMAIL_PUBSUB_TOPIC
+bun wrangler secret put GMAIL_PUSH_SECRET
 ```
 
 ## 5. Worker 部署
 
 ```sh
-pnpm deploy:worker
+bun deploy:worker
 ```
 
 ### 5.1 设置 Telegram Webhook
@@ -142,10 +142,26 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 
 ### 6.1 创建 Pages 项目
 
-1. Cloudflare Pages 创建项目，接入 Git 仓库
-2. **Build command**: `corepack enable && pnpm install --filter telemail-page && pnpm --filter telemail-page build`
-3. **Build output directory**: `page/dist`
-4. 绑定自定义域名（和 Worker 同域）
+> 推荐用 Direct Upload + GitHub Actions 推（见下文 §8 CI/CD），不要再走 Pages 的 Git integration —— 否则 Actions 推 + CF 自动 build 会双跑撞车。如果之前接过 Git，去 Pages 项目 Settings → Builds & deployments 里把 "Build with Git" 关掉。
+
+首次创建 Pages 项目（用 wrangler 一行就行）：
+
+```sh
+bun build:page
+bun wrangler pages project create telemail-web --production-branch=main
+bun wrangler pages deploy page/dist --project-name=telemail-web --branch=main
+```
+
+或者在 Cloudflare 控制台手动创建。**项目名约定**：
+
+| 资源 | CF 项目名 | 来源 |
+| --- | --- | --- |
+| Worker | `telemail` | `worker/wrangler.jsonc` 里的 `name` 字段 |
+| Pages | `telemail-web` | `.github/workflows/ci.yml` 里 `--project-name` |
+
+要改 Pages 项目名的话，workflow 文件里 `deploy-page` / `preview-page` 两处 `--project-name` 都要同步改。
+
+绑定自定义域名（和 Worker 同域）：Pages 项目 → Custom domains → 加自定义域。
 
 ### 6.2 配置 Workers Routes
 
@@ -168,8 +184,8 @@ BotFather：
 Worker 的 `WORKER_URL` 和 `TG_MINI_APP_SHORT_NAME` secret 分别填 `https://example.com` 和刚才的 short name：
 
 ```sh
-pnpm wrangler secret put WORKER_URL
-pnpm wrangler secret put TG_MINI_APP_SHORT_NAME
+bun wrangler secret put WORKER_URL
+bun wrangler secret put TG_MINI_APP_SHORT_NAME
 ```
 
 ## 7. 添加邮箱账号
@@ -182,3 +198,43 @@ pnpm wrangler secret put TG_MINI_APP_SHORT_NAME
 4. 授权成功后自动创建 webhook 订阅，新邮件实时推送到 Telegram
 
 后续 Cron Trigger 会自动维护：每分钟分发到期提醒；每小时检查 IMAP 中间件健康并重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
+
+## 8. CI/CD（GitHub Actions）
+
+`.github/workflows/ci.yml` 配了一个 workflow，6 个 job：
+
+| 触发                | CI 跑                                       | 按 path filter 跑的 deploy job                                                                                                          |
+| ------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `pull_request`      | biome check + typecheck + build page        | `worker/**` 变了 → `preview-worker`（`wrangler versions upload`，不接生产流量）<br/>`page/**` 变了 → `preview-page`（CF Pages preview deployment） |
+| `push` to `main`    | 同上                                        | `worker/**` 变了 → `deploy-worker`（生产部署）<br/>`page/**` 变了 → `deploy-page`（生产部署）                                              |
+| `workflow_dispatch` | 同上 + 把当前 branch 当 main 处理           | 同 push 行为                                                                                                                            |
+
+Path filter（`dorny/paths-filter`）：只在对应子包文件变了才部署；改 docs / `.github/` / `biome.json` 等纯 tooling 只跑 CI，不跑任何 deploy。**根 `package.json` 和 `bun.lock` 改了两边都跑**（根 devDeps 是 wrangler / typescript / biome 等共享构建依赖，lockfile 变意味着某个子包 dep 解析结果变了）。
+
+部署 job 都复用 CI 阶段构建出的 `page/dist`（artifact 上传 / 下载，省一次重 build）。生产 deploy 走 `bun deploy:worker` / `bun wrangler pages deploy ... --branch=main`，Pages 全程走 Direct Upload，不再用 CF 的 Git integration。
+
+### 8.1 配置 Repo Secrets
+
+去 GitHub repo → **Settings → Secrets and variables → Actions** 加：
+
+| Secret                  | 来源                                                                 |
+| ----------------------- | -------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | CF dashboard → My Profile → API Tokens → Create。权限至少：Account → Workers Scripts:Edit + Pages:Edit + Workers KV:Edit + D1:Edit + Queues:Edit |
+| `CLOUDFLARE_ACCOUNT_ID` | CF dashboard 任意 Worker 详情页右下角，或 Account Home 右侧            |
+
+### 8.2 关掉 Pages 的 Git Integration（如果之前接过）
+
+Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Disable。否则 push 到 main 时 CF Pages 会自己再 build 一次，跟 Actions 撞车，最后哪个先到看时机。Direct Upload 模式下 Pages 项目仍然存在，只是不再被 CF 主动 build —— 由 Actions 通过 wrangler 推。
+
+### 8.3 PR Preview URL 在哪看
+
+- **Worker preview**：Actions 跑完 `preview-worker` job，日志里有一行 `Worker Version Preview URL: https://<version-id>-telemail.<account>.workers.dev`。也可以去 CF dashboard → Worker → Deployments → Versions 找到对应 PR 的 message
+- **Pages preview**：Actions 跑完 `preview-page` job，日志里有 `https://<deployment-id>.telemail.pages.dev` + 分支 alias `https://<sanitized-branch>.telemail.pages.dev`。CF dashboard → Pages → 项目 → Deployments 也能看到，commit hash 和 PR 标题作为 message 一起标注
+
+> Worker preview 是「version」概念，**不接生产 routes 的流量**，只能通过 preview URL 直访。要真在生产路由上用 PR 的版本，需要手动在 dashboard 做 version override / gradual rollout。
+
+### 8.4 跳过 deploy
+
+- 改 docs / 根配置 / `.github/`：path filter 自然过滤，根本不会触发 deploy job
+- 改 worker/ 但不想这次部署：commit message 带 `[skip ci]` 跳过整个 workflow（CI 也不跑，不推荐），或者改完先 PR 走 preview 看效果再 squash
+- 改 worker/ 和 page/ 都改了：两个 deploy job 并行跑，互不依赖
