@@ -1,0 +1,45 @@
+# Build context = repo root（middleware/docker-compose.yml 指定）。
+# Dockerfile 用 explicit COPY，所以这里主要是为了减小发往 daemon 的 context 体积。
+
+**/node_modules
+.git
+.github
+.husky
+.agents
+.claude
+.zed
+.vscode
+
+# secrets / local-only
+**/.env
+!**/.env.example
+**/.dev.vars*
+!**/.dev.vars.example
+
+# build outputs
+**/dist
+**/.wrangler
+**/server
+**/*.tsbuildinfo
+page/src/routeTree.gen.ts
+
+# 跟 middleware build 无关的子包源码（Dockerfile 只 COPY middleware/src）
+worker/src
+worker/scripts
+worker/migrations
+worker/i18n
+worker/index.ts
+worker/handlers
+worker/services
+worker/providers
+worker/db
+worker/bot
+worker/utils
+page/src
+page/public
+page/index.html
+
+# docs
+docs
+*.md
+LICENSE

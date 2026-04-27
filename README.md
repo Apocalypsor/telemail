@@ -4,7 +4,7 @@
 
 - **Gmail**：Google Cloud Pub/Sub 推送通知实时接收
 - **Outlook**：Microsoft Graph webhook 订阅实时接收
-- **IMAP**：外部 IMAP Bridge 中间件轮询接收（私有项目，不包含在本仓库中）
+- **IMAP**：内置 IMAP Bridge 中间件（`middleware/`），通过 IMAP IDLE 实时推送
 
 ## 技术栈
 

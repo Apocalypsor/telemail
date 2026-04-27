@@ -1,6 +1,7 @@
 .agents/
 .claude/skills
 **/.DS_Store
+**/*.bun-build
 
 # Logs
 
@@ -176,3 +177,4 @@ page/src/routeTree.gen.ts
 # Build artifacts
 page/dist/
 *.tsbuildinfo
+middleware/server

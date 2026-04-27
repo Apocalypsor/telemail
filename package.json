@@ -6,7 +6,8 @@
   "author": "Apocalypsor <chthon605@gmail.com>",
   "workspaces": [
     "worker",
-    "page"
+    "page",
+    "middleware"
   ],
   "scripts": {
     "dev:worker": "bun --filter telemail-worker dev",
@@ -18,6 +19,9 @@
     "deploy:worker": "bun --filter telemail-worker deploy",
     "dev:page": "bun --filter telemail-page dev",
     "build:page": "bun --filter telemail-page build",
+    "dev:middleware": "bun --filter telemail-middleware dev",
+    "start:middleware": "bun --filter telemail-middleware start",
+    "build:middleware": "bun --filter telemail-middleware build",
     "check": "biome check --no-errors-on-unmatched --files-ignore-unknown=true",
     "typecheck": "bun --filter '*' typecheck",
     "prepare": "husky",

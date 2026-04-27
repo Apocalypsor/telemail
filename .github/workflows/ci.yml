@@ -11,6 +11,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   changes:
     name: Detect changes
@@ -27,11 +31,13 @@ jobs:
             worker:
               - 'worker/**'
               - 'package.json'
-              - 'bun.lock'
             page:
               - 'page/**'
               - 'package.json'
-              - 'bun.lock'
+            middleware:
+              - 'middleware/**'
+              - 'package.json'
+              - '.dockerignore'
 
   ci:
     name: Lint
@@ -41,10 +47,12 @@ jobs:
       - uses: ./.github/actions/setup-bun
       - name: Biome check
         run: bun check
-      - name: Typecheck (worker + page)
+      - name: Typecheck (worker + page + middleware)
         run: bun typecheck
       - name: Build page
         run: bun build:page
+      - name: Build middleware (compile sanity)
+        run: bun build:middleware
       - uses: actions/upload-artifact@v7
         with:
           name: page-dist
@@ -155,3 +163,42 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ─── Middleware (Docker, GHCR) ─────────────────────────────────────────────
+
+  docker-middleware:
+    name: Docker build / push (middleware)
+    needs: [ci, changes]
+    if: needs.changes.outputs.middleware == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: docker-middleware-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/telemail-middleware
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short,enable={{is_default_branch}}
+            type=ref,event=pr
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: middleware/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=middleware
+          cache-to: type=gha,scope=middleware,mode=max

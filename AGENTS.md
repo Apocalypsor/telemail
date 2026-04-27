@@ -9,32 +9,36 @@ User-facing docs are split:
 - `docs/DEPLOYMENT.md` —— end-to-end CF deploy (GCP / MS Entra / D1 / KV / Queue / Worker + Pages) + CI/CD section
 - `docs/ENVIRONMENT.md` —— secrets / bindings / cron / D1 schema reference
 
-CI/CD: `.github/workflows/ci.yml` —— always runs Biome + typecheck + page build. Path-based deploy via `dorny/paths-filter`:
-- `worker/**` OR root `package.json` / `bun.lock` changed → worker deploy (root deps affect both)
-- `page/**` OR root `package.json` / `bun.lock` changed → page deploy
+CI/CD: `.github/workflows/ci.yml` —— always runs Biome + typecheck + page build + middleware compile sanity. Path-based deploy via `dorny/paths-filter` (filter intentionally **excludes** `bun.lock` to avoid one workspace's dep changes triggering siblings):
+- `worker/**` OR root `package.json` changed → worker deploy
+- `page/**` OR root `package.json` changed → page deploy
+- `middleware/**` OR root `package.json` OR `.dockerignore` changed → docker build (PR: just verify; main: build + push `ghcr.io/apocalypsor/telemail-middleware:latest` + `:sha-<short>` to GHCR via `GITHUB_TOKEN`)
 - PR triggers preview (`wrangler versions upload` for worker / `wrangler pages deploy --branch=<head-ref>` for page); push to main triggers production
 - pure tooling/docs changes (docs/, .github/, biome.json) → CI runs, no deploy
-Required repo secrets: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`. Pages does NOT use the CF dashboard Git integration — Direct Upload via wrangler from Actions only. CF resource names: Worker = `telemail` (from `worker/wrangler.jsonc`), Pages = `telemail-web` (pinned in `.github/workflows/ci.yml` `--project-name`; change there + in deploy section's project create command if you rename). Bun setup + cache + `bun install --frozen-lockfile` is consolidated into the composite action `.github/actions/setup-bun` (used by all 5 install-needing jobs); cache key is `bun-<os>-<hash bun.lock>` against `~/.bun/install/cache`.
+Required repo secrets: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` (CF deploy). GHCR push uses built-in `GITHUB_TOKEN` + workflow-level `permissions: packages: write`. Pages does NOT use the CF dashboard Git integration — Direct Upload via wrangler from Actions only. Resource names: Worker = `telemail` (from `worker/wrangler.jsonc`), CF Pages = `telemail-web` (pinned in workflow `--project-name`), GHCR image = `ghcr.io/<repo-owner>/telemail-middleware`. Bun setup + cache + `bun install --frozen-lockfile` consolidated into composite action `.github/actions/setup-bun` (used by 5 install-needing jobs; docker-middleware uses docker buildx instead with GHA layer cache `cache-from/to: type=gha,scope=middleware`).
 
 Your knowledge of Cloudflare Workers APIs may be outdated. Retrieve current docs before any Workers/KV/D1/Queues task: <https://developers.cloudflare.com/workers/>
 
 ## Commands
 
-Root is pure orchestration (workspaces: `worker/` + `page/`). All commands run from repo root unless noted.
+Root is pure orchestration (workspaces: `worker/` + `page/` + `middleware/`). All commands run from repo root unless noted.
 
 | Command                       | Purpose                                                  |
 | ----------------------------- | -------------------------------------------------------- |
 | `bun dev:worker`             | `wrangler dev` (Worker, port 8787)                       |
 | `bun dev:page`               | Vite dev server for `page/` (port 5173, proxies /api)    |
+| `bun dev:middleware`         | `bun --watch src/index.ts` for IMAP bridge (port 3000)   |
 | `bun dev:cookie`             | Sign a local `tg_session` cookie from `worker/.dev.vars` |
 | `bun dev:seed`               | Seed `ADMIN_TELEGRAM_ID` into local D1 `users` (admin row) |
 | `bun deploy:worker`          | `wrangler deploy` (deploy Worker to Cloudflare)          |
 | `bun build:page`             | Build React SPA (`page/` → `page/dist`, deploy to Pages) |
+| `bun build:middleware`       | `bun build --compile` → single `middleware/server` binary |
+| `bun start:middleware`       | Run middleware locally (no watch, no compile)            |
 | `bun migrate:worker:remote`  | Apply D1 migrations (remote)                             |
 | `bun migrate:worker:local`   | Apply D1 migrations (local miniflare)                    |
 | `bun typegen:worker`         | Generate `worker-configuration.d.ts` from wrangler.jsonc |
 | `bun check`                  | Biome lint + format (single config covers all packages)  |
-| `bun typecheck`              | tsc on worker + page (`bun --filter '*' typecheck`)      |
+| `bun typecheck`              | tsc on all 3 workspaces (`bun --filter '*' typecheck`)   |
 
 Run `bun typegen:worker` after changing bindings in `worker/wrangler.jsonc`.
 
@@ -42,6 +46,7 @@ Run `bun typegen:worker` after changing bindings in `worker/wrangler.jsonc`.
 
 - **`worker/`** — Cloudflare Worker (Hono): bot webhook, queue consumer, cron, email providers, D1 access, `/api/*` + `/oauth/*` endpoints. bun workspace child package `telemail-worker`. Owns `wrangler.jsonc`, `worker-configuration.d.ts`, `migrations/`, `tsconfig.json`. (`/mail/:id`, `/preview`, `/junk-check`, `/login` HTML 页面在 Pages，不在 Worker。)
 - **`page/`** — Cloudflare Pages frontend (Vite + React 19 + TanStack Router + TanStack Query + ky + zod + HeroUI). bun workspace child package `telemail-page`. **Single entry**: `index.html` + `src/main.tsx` + `src/routes/` 供 web 页面（`/`、`/mail/:id`、`/preview`、`/junk-check`、`/login`）和 Mini App 路由（`/telegram-app/*`）共享。TG SDK 无条件加载，`TelegramProvider` 在非 TG 上下文下（`initData` 为空）跳过所有 TG 初始化调用。样式统一走 `src/styles/app.css` = `@import "@heroui/styles"` + `./theme.css`（固定深色 zinc/emerald palette，映射到 HeroUI 设计 token）。
+- **`middleware/`** — IMAP bridge (Bun runtime, Elysia + ImapFlow + Redis). bun workspace child package `telemail-middleware`. **Not deployed to Cloudflare** —— 用 Docker 跑在用户自己的服务器上，CI 把镜像推到 `ghcr.io/apocalypsor/telemail-middleware`（`:latest` + `:sha-<short>` tags），用户服务器 `docker compose pull && up -d` 拉取。Worker 通过 `IMAP_BRIDGE_URL` + `IMAP_BRIDGE_SECRET` 调用 middleware，反向代理到端口 3000。`bun build --compile` 出单个 `server` binary 进 distroless 镜像，runtime 不带 node_modules。Docker build context = repo root（不是 middleware/），Dockerfile 第一阶段 COPY 三个 workspace package.json + 根 bun.lock + middleware src，`bun install --filter telemail-middleware` 只装 middleware deps。
 - **Deployment (方案 A)**: single custom domain, Workers Routes split by path. `example.com/api/*`, `example.com/oauth/*` → Worker; everything else (incl. `/mail/:id`, `/preview`, `/junk-check`, `/telegram-app/*`, `/login`, `/`) → Pages。Pages `_redirects` 把所有 SPA 路径 rewrite 到 `/index.html`。`WORKER_URL` and BotFather `/setdomain` point at the root domain.
 
 ## Conventions
@@ -79,3 +84,23 @@ Run `bun typegen:worker` after changing bindings in `worker/wrangler.jsonc`.
 - **Email keyboard**: `buildEmailKeyboard` requires `tgMessageId`, so `deliverEmailToTelegram` sends the message naked, inserts `message_map`, then builds the keyboard and attaches it via `setReplyMarkup` — one code path for private + group. All other rebuild sites (refresh, toggle-star, reminder change, junk cancel) already have `tgMessageId`.
 - **Reminders**: entry is exclusively through the ⏰ button on email messages (no `/remind` command). Auth on every API: `X-Telegram-Init-Data` via `utils/tg-init-data.ts::verifyTgInitData` + `users.approved`. Group deep-link resolve-context also checks `account.telegram_user_id === current user` (only the account owner can set reminders). Cron sends with `reply_parameters` so the reminder threads under the original email even if deleted.
   Setup: `WORKER_URL` env, BotFather `/setdomain`, `/newapp` to register the Mini App (so `?startapp=` works for group deep links).
+
+## IMAP middleware gotchas (`middleware/`)
+
+Bun + Elysia + ImapFlow + (optional) Redis. The Worker side just talks to the bridge over HTTP via `IMAP_BRIDGE_URL` + `IMAP_BRIDGE_SECRET`; everything below is internal to the middleware service.
+
+- **Redis is optional**: when `REDIS_URL` is set, `lastUid` per account is persisted so processed UIDs survive restarts. Without Redis, falls back to in-memory only.
+- **Periodic refresh** (`REFRESH_INTERVAL_MS`, 5 min): each client is closed and reconnected to prevent IDLE stalls on servers like iCloud. Cleanly replaces the client without triggering the reconnect delay.
+- **Reconnect is manual**: ImapFlow does not auto-reconnect. The `close` event triggers `scheduleReconnect` → wait `RECONNECT_DELAY_MS` (3s) → fresh `ImapFlow` instance. A per-account timer guard prevents stacking reconnects.
+- **Stale client guard**: event handlers capture the `ImapFlow` client reference at registration and ignore events from replaced clients — preserve this when adding new handlers.
+- **Health endpoint is deliberately unauthenticated**: returns only `{ ok, total, usable }` counts. Never add account details — it would expose email addresses.
+
+ImapFlow specifics ([Configuration](https://imapflow.com/docs/guides/configuration/) · [Basic Usage](https://imapflow.com/docs/guides/basic-usage/) · [Fetching](https://imapflow.com/docs/guides/fetching-messages/) · [Searching](https://imapflow.com/docs/guides/searching/)):
+
+- **Auto-IDLE**: ImapFlow enters IDLE automatically after 15s of inactivity and sends `DONE` before any other command. Do not manage IDLE manually — select a mailbox and listen for events.
+- **No-IDLE fallback**: we pass `missingIdleCommand: "STATUS"`. Default `NOOP` relies on the server pushing untagged `EXISTS` (unreliable); `SELECT` has a known loop issue. The `exists` event fires in both modes, so business logic is unchanged.
+- **Never run IMAP commands inside a `fetch()` iterator** — causes deadlock. `fetchNewMessages` only fires HTTP notifications from the loop.
+- **Always use UIDs**: pass `{ uid: true }` to fetch/search. UIDs are stable across sessions, sequence numbers are not.
+- **Lock discipline**: always acquire via `getMailboxLock()` and release in `finally`.
+- **Special-use flags**: use `\Inbox`, `\Sent`, `\Drafts`, `\Trash`, `\Junk`, `\Archive` from `client.list()` instead of hardcoded folder names.
+- **Wire protocol is Message-Id only**: every bridge endpoint takes `rfcMessageId` (never a UID). UIDs are per-folder and can't address a moved message, so the worker-side API is fully Message-Id based. Internally each op does `SEARCH HEADER "Message-Id" "<id>"` in the relevant folder to resolve the UID, then issues the real IMAP command. Listings (`/unread`, `/starred`, `/junk`, `/list-folder`) return `id = envelope.messageId`; emails without a Message-Id header are skipped. The push notification payload is `{ accountId, rfcMessageId }` — `fetchNewMessages` pulls envelope alongside UID for this.
