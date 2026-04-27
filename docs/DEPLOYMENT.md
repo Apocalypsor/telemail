@@ -9,7 +9,7 @@
 - 接收消息的 Telegram Chat ID（每个邮箱账号可配置不同的 Chat）
 - **Gmail**：启用了 Gmail API 的 [Google Cloud](https://console.cloud.google.com) 项目
 - **Outlook**：[Microsoft Entra ID](https://entra.microsoft.com) 应用注册
-- **IMAP**：外部 IMAP Bridge 中间件（私有项目，可选）
+- **IMAP**：内置 IMAP Bridge（`middleware/`，docker 部署，可选，见 §6.4）
 
 安装依赖：
 
@@ -61,7 +61,7 @@ gcloud pubsub subscriptions create gmail-push-sub \
 
 ## 4. Cloudflare 资源
 
-> 下面所有 `bun wrangler …` 命令需要在 `worker/` 子包目录里执行（wrangler 只装在该子包），或者从仓库根用 `bun --filter telemail-worker exec wrangler …`。`wrangler.jsonc` 也在 `worker/` 下。
+> wrangler 装在仓库根 devDeps，所以 `bun wrangler …` 在仓库任何地方都能跑。`wrangler.jsonc` 在 `worker/` 下，wrangler 默认从 cwd 找它，所以下面的 `wrangler d1` / `wrangler kv` / `wrangler queues` / `wrangler secret` 命令都建议在 `worker/` 目录跑。或者从根加 `--config worker/wrangler.jsonc`。
 
 ### 4.1 D1 数据库
 
@@ -262,40 +262,60 @@ docker compose pull && docker compose up -d
 
 ## 8. CI/CD（GitHub Actions）
 
-`.github/workflows/ci.yml` 配了一个 workflow，6 个 job：
+`.github/workflows/ci.yml` 一个 workflow，8 个 job。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` / `middleware` 三个 boolean，后续 deploy / preview / docker job 按这三个 flag + 事件类型决定跑不跑。
 
-| 触发                | CI 跑                                       | 按 path filter 跑的 deploy job                                                                                                          |
-| ------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `pull_request`      | biome check + typecheck + build page        | `worker/**` 变了 → `preview-worker`（`wrangler versions upload`，不接生产流量）<br/>`page/**` 变了 → `preview-page`（CF Pages preview deployment） |
-| `push` to `main`    | 同上                                        | `worker/**` 变了 → `deploy-worker`（生产部署）<br/>`page/**` 变了 → `deploy-page`（生产部署）                                              |
-| `workflow_dispatch` | 同上 + 把当前 branch 当 main 处理           | 同 push 行为                                                                                                                            |
+### 8.1 行为矩阵
 
-Path filter（`dorny/paths-filter`）：只在对应子包文件变了才部署；改 docs / `.github/` / `biome.json` 等纯 tooling 只跑 CI，不跑任何 deploy。**根 `package.json` 和 `bun.lock` 改了两边都跑**（根 devDeps 是 wrangler / typescript / biome 等共享构建依赖，lockfile 变意味着某个子包 dep 解析结果变了）。
+| 触发 | 跑什么 |
+| --- | --- |
+| `pull_request` | CI 总跑（biome + typecheck + build page + build middleware）<br/>`worker/**` 变 → `preview-worker`（`wrangler versions upload`，输出 preview URL，不接生产流量）<br/>`page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>`middleware/**` 变 → `docker-middleware` 仅 build 验证（不 push）<br/>**`preview-comment`** sticky comment 把上面三个的 URL / 状态贴到 PR |
+| `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`、pages `wrangler pages deploy --branch=main`、docker 多 arch 镜像 push 到 GHCR `:latest` + `:sha-<short>` |
+| `workflow_dispatch` on `main` | **强制**三个 deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 / 镜像重 push |
+| `workflow_dispatch` on 其他 branch | 仅 CI |
 
-部署 job 都复用 CI 阶段构建出的 `page/dist`（artifact 上传 / 下载，省一次重 build）。生产 deploy 走 `bun deploy:worker` / `bun wrangler pages deploy ... --branch=main`，Pages 全程走 Direct Upload，不再用 CF 的 Git integration。
+Path filter 故意**不含** `bun.lock`：免得 middleware 改个 dep 牵连 worker / page 重部署。子包 `package.json` 已被各自 `**` 范围 cover；根 `package.json` 同时影响 worker / page（共享 devDeps）。
 
-### 8.1 配置 Repo Secrets
+### 8.2 配置 Repo Secrets
 
-去 GitHub repo → **Settings → Secrets and variables → Actions** 加：
+GitHub repo → **Settings → Secrets and variables → Actions** 加：
 
-| Secret                  | 来源                                                                 |
-| ----------------------- | -------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`  | CF dashboard → My Profile → API Tokens → Create。权限至少：Account → Workers Scripts:Edit + Pages:Edit + Workers KV:Edit + D1:Edit + Queues:Edit |
-| `CLOUDFLARE_ACCOUNT_ID` | CF dashboard 任意 Worker 详情页右下角，或 Account Home 右侧            |
+| Secret | 来源 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | CF dashboard → My Profile → API Tokens → Create。权限至少：Account → Workers Scripts:Edit + Pages:Edit + Workers KV:Edit + D1:Edit + Queues:Edit |
+| `CLOUDFLARE_ACCOUNT_ID` | CF dashboard 任意 Worker 详情页右下角 |
 
-### 8.2 关掉 Pages 的 Git Integration（如果之前接过）
+GHCR push 用内置 `GITHUB_TOKEN`（workflow 顶部 `permissions: packages: write` 已配），不需要额外 secret。Public repo → 镜像默认 public。
 
-Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Disable。否则 push 到 main 时 CF Pages 会自己再 build 一次，跟 Actions 撞车，最后哪个先到看时机。Direct Upload 模式下 Pages 项目仍然存在，只是不再被 CF 主动 build —— 由 Actions 通过 wrangler 推。
+### 8.3 资源命名
 
-### 8.3 PR Preview URL 在哪看
+| 资源 | 名字 | 改名要动哪 |
+| --- | --- | --- |
+| Worker | `telemail` | `worker/wrangler.jsonc` 的 `name` |
+| Pages 项目 | `telemail-web` | `.github/workflows/ci.yml` 里的 `--project-name`（出现 2 次）|
+| GHCR 镜像 | `ghcr.io/<owner>/telemail-middleware` | workflow `metadata-action` 的 `images:`（owner 自动跟 GitHub repo） |
 
-- **Worker preview**：Actions 跑完 `preview-worker` job，日志里有一行 `Worker Version Preview URL: https://<version-id>-telemail.<account>.workers.dev`。也可以去 CF dashboard → Worker → Deployments → Versions 找到对应 PR 的 message
-- **Pages preview**：Actions 跑完 `preview-page` job，日志里有 `https://<deployment-id>.telemail.pages.dev` + 分支 alias `https://<sanitized-branch>.telemail.pages.dev`。CF dashboard → Pages → 项目 → Deployments 也能看到，commit hash 和 PR 标题作为 message 一起标注
+### 8.4 关掉 Pages 的 Git Integration（如果之前接过）
 
-> Worker preview 是「version」概念，**不接生产 routes 的流量**，只能通过 preview URL 直访。要真在生产路由上用 PR 的版本，需要手动在 dashboard 做 version override / gradual rollout。
+Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Disable。否则 push 到 main 时 CF Pages 会自己再 build 一次，跟 Actions 撞车。
 
-### 8.4 跳过 deploy
+### 8.5 PR Preview URL 在哪看
 
-- 改 docs / 根配置 / `.github/`：path filter 自然过滤，根本不会触发 deploy job
-- 改 worker/ 但不想这次部署：commit message 带 `[skip ci]` 跳过整个 workflow（CI 也不跑，不推荐），或者改完先 PR 走 preview 看效果再 squash
-- 改 worker/ 和 page/ 都改了：两个 deploy job 并行跑，互不依赖
+`preview-comment` job 会在 PR 上发 / 更新一条 sticky comment，列出三个资源的 URL 或状态：
+
+```
+| Resource           | URL / Status |
+| 🔧 Worker version  | https://<id>-telemail.<account>.workers.dev |
+| 📄 Pages preview   | https://<id>.telemail-web.pages.dev |
+| 📄 Pages alias     | https://<sanitized-branch>.telemail-web.pages.dev |
+| 🐳 Middleware      | ✅ build OK (no push on PR) |
+```
+
+跳过 / 失败的资源会显示 `_(unchanged)_` / `❌ failed`。同一个 PR 反复 push 评论会**原地更新**，不刷屏。
+
+> Worker preview 是「version」概念 —— 拿到 preview URL 直访能测，但**不接生产 routes 的流量**。要在生产路由上用 PR 的版本，得手动在 dashboard 做 version override / gradual rollout。
+
+### 8.6 跳过 deploy
+
+- 改 docs / 根配置 / `.github/`：path filter 自然过滤，不触发 deploy
+- 整个 workflow 都不想跑：commit message 带 `[skip ci]`
+- 改 worker 和 page 都改了：两个 deploy 并行跑，互不依赖

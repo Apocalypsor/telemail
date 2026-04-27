@@ -1,106 +1,67 @@
-# Cloudflare Workers
+# Telemail — Agent Guide
 
-> Before committing, run `bun check` (Biome) and `bun typecheck` (tsc). Fix ALL errors. Do NOT use `biome-ignore`. Update AGENTS.md / README.md / `docs/*` if needed.
+> **Before commit**: `bun check` (Biome) and `bun typecheck` (tsc). Fix all errors. Don't use `biome-ignore`. Update `README.md` / `docs/*` when you change behavior they describe.
 
-User-facing docs are split:
+User-facing docs:
 
-- `README.md` —— landing, stack, architecture overview, bot commands
-- `docs/DEVELOPMENT.md` —— local dev commands + flow
-- `docs/DEPLOYMENT.md` —— end-to-end CF deploy (GCP / MS Entra / D1 / KV / Queue / Worker + Pages) + CI/CD section
-- `docs/ENVIRONMENT.md` —— secrets / bindings / cron / D1 schema reference
+- `README.md` — landing, stack, architecture
+- `docs/DEVELOPMENT.md` — local dev commands + flow
+- `docs/DEPLOYMENT.md` — end-to-end CF deploy + IMAP middleware deploy + CI/CD section
+- `docs/ENVIRONMENT.md` — secrets / bindings / D1 schema reference
 
-CI/CD: `.github/workflows/ci.yml` —— always runs Biome + typecheck + page build + middleware compile sanity. Path-based deploy via `dorny/paths-filter` (filter intentionally **excludes** `bun.lock` to avoid one workspace's dep changes triggering siblings):
-- `worker/**` OR root `package.json` changed → worker deploy
-- `page/**` OR root `package.json` changed → page deploy
-- `middleware/**` OR root `package.json` OR `.dockerignore` changed → docker build (PR: just verify; main: build + push `ghcr.io/apocalypsor/telemail-middleware:latest` + `:sha-<short>` to GHCR via `GITHUB_TOKEN`)
-- PR triggers preview (`wrangler versions upload` for worker / `wrangler pages deploy --branch=<head-ref>` for page); push to main triggers production
-- pure tooling/docs changes (docs/, .github/, biome.json) → CI runs, no deploy
-Required repo secrets: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` (CF deploy). GHCR push uses built-in `GITHUB_TOKEN` + workflow-level `permissions: packages: write`. Pages does NOT use the CF dashboard Git integration — Direct Upload via wrangler from Actions only. Resource names: Worker = `telemail` (from `worker/wrangler.jsonc`), CF Pages = `telemail-web` (pinned in workflow `--project-name`), GHCR image = `ghcr.io/<repo-owner>/telemail-middleware`. Bun setup + cache + `bun install --frozen-lockfile` consolidated into composite action `.github/actions/setup-bun` (used by 5 install-needing jobs; docker-middleware uses docker buildx instead with GHA layer cache `cache-from/to: type=gha,scope=middleware`).
+Cloudflare API knowledge may be stale — fetch <https://developers.cloudflare.com/workers/> before any Workers/KV/D1/Queues task.
 
-Your knowledge of Cloudflare Workers APIs may be outdated. Retrieve current docs before any Workers/KV/D1/Queues task: <https://developers.cloudflare.com/workers/>
+## Workspaces (bun monorepo)
+
+- **`worker/`** (`telemail-worker`) — Cloudflare Worker (Hono): bot webhook, queue consumer, cron, email providers, D1, `/api/*` + `/oauth/*`. Owns `wrangler.jsonc`, `migrations/`.
+- **`page/`** (`telemail-page`) — Cloudflare Pages SPA (Vite + React 19 + TanStack Router/Query + HeroUI + ky + zod). Single entry serves both browser web pages (`/mail/$id`, `/preview`, `/junk-check`, `/login`, `/`) and Mini App routes (`/telegram-app/*`).
+- **`middleware/`** (`telemail-middleware`) — IMAP bridge (Bun + Elysia + ImapFlow + optional Redis). NOT on Cloudflare. Built into a single `bun build --compile` binary, packaged as a multi-arch docker image pushed to `ghcr.io/apocalypsor/telemail-middleware`. User runs it on their own server (`docker compose pull && up -d`); Worker calls it via `IMAP_BRIDGE_URL` + `IMAP_BRIDGE_SECRET`.
+
+**Deployment topology**: single custom domain, Workers Routes split by path. `example.com/api/*` + `/oauth/*` → Worker; everything else → Pages (`telemail-web` project). Same origin, zero CORS.
+
+**CI/CD** (`.github/workflows/ci.yml`): `dorny/paths-filter` decides which deploy jobs run. PRs get preview deployments (Worker version + Pages preview branch + docker build-only) and a sticky comment on the PR with URLs. `push to main` → production deploys. `workflow_dispatch` on main → forces all three deploys regardless of path filter. CF resource names: Worker `telemail`, Pages `telemail-web`, GHCR `ghcr.io/<owner>/telemail-middleware`. Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (GHCR uses `GITHUB_TOKEN`).
 
 ## Commands
 
-Root is pure orchestration (workspaces: `worker/` + `page/` + `middleware/`). All commands run from repo root unless noted.
+Read the `scripts` blocks in:
+- root [`package.json`](./package.json) — orchestration (`dev:worker`, `build:page`, `deploy:worker`, etc.) — root scripts forward to subpackages via `bun --filter <pkg> <script>`
+- [`worker/package.json`](./worker/package.json) — wrangler / D1 scripts called by root
+- [`page/package.json`](./page/package.json) — vite + tsr scripts called by root
+- [`middleware/package.json`](./middleware/package.json) — bun runtime / `bun build --compile` scripts called by root
 
-| Command                       | Purpose                                                  |
-| ----------------------------- | -------------------------------------------------------- |
-| `bun dev:worker`             | `wrangler dev` (Worker, port 8787)                       |
-| `bun dev:page`               | Vite dev server for `page/` (port 5173, proxies /api)    |
-| `bun dev:middleware`         | `bun --watch src/index.ts` for IMAP bridge (port 3000)   |
-| `bun dev:cookie`             | Sign a local `tg_session` cookie from `worker/.dev.vars` |
-| `bun dev:seed`               | Seed `ADMIN_TELEGRAM_ID` into local D1 `users` (admin row) |
-| `bun deploy:worker`          | `wrangler deploy` (deploy Worker to Cloudflare)          |
-| `bun build:page`             | Build React SPA (`page/` → `page/dist`, deploy to Pages) |
-| `bun build:middleware`       | `bun build --compile` → single `middleware/server` binary |
-| `bun start:middleware`       | Run middleware locally (no watch, no compile)            |
-| `bun migrate:worker:remote`  | Apply D1 migrations (remote)                             |
-| `bun migrate:worker:local`   | Apply D1 migrations (local miniflare)                    |
-| `bun typegen:worker`         | Generate `worker-configuration.d.ts` from wrangler.jsonc |
-| `bun check`                  | Biome lint + format (single config covers all packages)  |
-| `bun typecheck`              | tsc on all 3 workspaces (`bun --filter '*' typecheck`)   |
-
-Run `bun typegen:worker` after changing bindings in `worker/wrangler.jsonc`.
-
-## Project layout
-
-- **`worker/`** — Cloudflare Worker (Hono): bot webhook, queue consumer, cron, email providers, D1 access, `/api/*` + `/oauth/*` endpoints. bun workspace child package `telemail-worker`. Owns `wrangler.jsonc`, `worker-configuration.d.ts`, `migrations/`, `tsconfig.json`. (`/mail/:id`, `/preview`, `/junk-check`, `/login` HTML 页面在 Pages，不在 Worker。)
-- **`page/`** — Cloudflare Pages frontend (Vite + React 19 + TanStack Router + TanStack Query + ky + zod + HeroUI). bun workspace child package `telemail-page`. **Single entry**: `index.html` + `src/main.tsx` + `src/routes/` 供 web 页面（`/`、`/mail/:id`、`/preview`、`/junk-check`、`/login`）和 Mini App 路由（`/telegram-app/*`）共享。TG SDK 无条件加载，`TelegramProvider` 在非 TG 上下文下（`initData` 为空）跳过所有 TG 初始化调用。样式统一走 `src/styles/app.css` = `@import "@heroui/styles"` + `./theme.css`（固定深色 zinc/emerald palette，映射到 HeroUI 设计 token）。
-- **`middleware/`** — IMAP bridge (Bun runtime, Elysia + ImapFlow + Redis). bun workspace child package `telemail-middleware`. **Not deployed to Cloudflare** —— 用 Docker 跑在用户自己的服务器上，CI 把镜像推到 `ghcr.io/apocalypsor/telemail-middleware`（`:latest` + `:sha-<short>` tags），用户服务器 `docker compose pull && up -d` 拉取。Worker 通过 `IMAP_BRIDGE_URL` + `IMAP_BRIDGE_SECRET` 调用 middleware，反向代理到端口 3000。`bun build --compile` 出单个 `server` binary 进 distroless 镜像，runtime 不带 node_modules。Docker build context = repo root（不是 middleware/），Dockerfile 第一阶段 COPY 三个 workspace package.json + 根 bun.lock + middleware src，`bun install --filter telemail-middleware` 只装 middleware deps。
-- **Deployment (方案 A)**: single custom domain, Workers Routes split by path. `example.com/api/*`, `example.com/oauth/*` → Worker; everything else (incl. `/mail/:id`, `/preview`, `/junk-check`, `/telegram-app/*`, `/login`, `/`) → Pages。Pages `_redirects` 把所有 SPA 路径 rewrite 到 `/index.html`。`WORKER_URL` and BotFather `/setdomain` point at the root domain.
+All commands run from repo root. Pre-commit must pass `bun check` (Biome) + `bun typecheck` (tsc on all 3 workspaces).
 
 ## Conventions
 
 - **Layering**: `worker/handlers/` only do routing / auth / req-resp shaping; business logic lives in `worker/services/` or on a provider method.
-- **Helpers**: if a helper is used by only ONE file, keep it file-private next to its caller. If used by MULTIPLE files, lift it to the nearest `utils/` dir — `worker/utils/` for cross-cutting helpers, `worker/bot/utils/` / `worker/providers/<p>/utils.ts` for layer-scoped ones. Same goes for deduping: if you spot the same logic copy-pasted in two places (HMAC signing, OAuth refresh, etc.), extract it rather than keeping both.
-- **Shared types**: shared interfaces / types go in `worker/types.ts` (cross-cutting) or a colocated `types.ts` (module-scoped, e.g. `providers/types.ts`, `providers/outlook/types.ts`). Don't inline reusable types into handlers/services.
-- **Error reporting**: use `reportErrorToObservability()`, not `console.error`.
-- **Email providers**: abstract class in `worker/providers/base.ts`, shared interfaces in `worker/providers/types.ts`, barrel in `worker/providers/index.ts` (exports `PROVIDERS`, `getEmailProvider`, `accountCanArchive`). Each concrete provider (`gmail/`, `outlook/`, `imap/`) has its own `index.ts` class + `utils.ts` + optional `types.ts`.
-- **Provider polymorphism**: never branch on `account.type` outside `providers/`. Per-provider differences live on the class — static metadata (`displayName`, `oauth`, `canArchive`), instance methods (fetch / list / archive / push / `resolveMessageState` / `onPersistedChange`), and `static registerRoutes(app)` for webhooks (so adding a provider needs no handler wiring).
-- **IMAP message ids = RFC 822 Message-Id** (not per-folder UID). The bridge API takes `rfcMessageId` and `SEARCH HEADER Message-Id`s to resolve the current UID. Emails without Message-Id are dropped. Gmail/Outlook keep native ids.
-- **Archive**: `provider.archiveMessage(messageId)` + `accountCanArchive(account)`. Gmail requires the user to pick a label (stored in `accounts.archive_folder` + `accounts.archive_folder_name`); without it `canArchive()` returns false.
-- **State reconciliation**: all "remote → TG" syncs funnel through `reconcileMessageState` (`services/message-actions.ts`), which uses `provider.resolveMessageState` and either removes the TG msg (non-inbox) or syncs star/pin (inbox).
-- **Star pin**: ⭐ email ↔ pinned TG msg. Single entry point: `syncStarPinState` in `services/message-actions.ts`. A `pin-cleanup` handler deletes TG's "Bot pinned" service messages.
-- **Disable/enable**: `accounts.disabled` pauses without deleting. Enforced in `services/bridge.ts::processEmailMessage` (queue consumer) + filtered in push renewal / mail-list / `/sync` / `getImapAccounts`.
-- **Cron**: single `* * * * *` trigger. `handleScheduled` (`worker/handlers/scheduled.ts`, parallel to `handlers/queue.ts`) dispatches due reminders every minute; `getUTCMinutes() === 0` gates the hourly batch (retry / IMAP bridge health); midnight additionally renews pushes.
-- **Mail preview helpers** (CID inlining, image proxy rewriting, token signing) live in `worker/services/mail-preview.ts`.
-- **Mini App 路由** (`page/src/routes/telegram-app/`): HeroUI + TG 原生控件（MainButton / SecondaryButton / BackButton），样式跟 web 页共用 zinc/emerald。iPad 上自动 `requestFullscreen()`（Bot API 8.0+），TG 顶栏收成浮动 pill。
-  - `/telegram-app/` → `index.tsx` router entry, reads `window.Telegram.WebApp.initDataUnsafe.start_param` (`r_<chat>_<msg>` / `m_<chat>_<msg>`) and navigates.
-  - `/telegram-app/reminders` → set/list/cancel reminders.
-  - `/telegram-app/mail/$id` → email preview (fetches JSON from `GET /api/mail/:id` —— token-only auth, shared with web `/mail/$id`; renders body in sandbox iframe via `MailBodyFrame`, shows `MailFab` for star/archive/trash/junk/unarchive). API 返回 `bodyHtml`（CORS 代理改写过，默认渲染）+ `bodyHtmlRaw`（未改写原始 HTML），父路由 hold `useProxy` state 传给 `MailBodyFrame`；切换入口：web 在 `WebMailToolbar` 里和「标记为垃圾」并排的「🖼 图片代理 开/关」按钮，miniapp 在 `MailFab` 的 SecondaryButton extras 里（单独 extra → 按钮直接 toggle，跟 share/跳 TG 共存 → 「🔗 更多」popup 选）。所有平台（含 macOS / Telegram Desktop）一律在 Mini App 内打开，不再做桌面 → 浏览器跳转。
-  - `/telegram-app/list/$type` → unread/starred/junk/archived lists.
-  - `/telegram-app/search` → cross-account 邮件搜索（关键词 / 发件人 / 主题；Gmail / Outlook 走原生搜索语法）。
-- **Web 页面** (`page/src/routes/`，不在 `telegram-app/` 子目录下): 浏览器里直接访问的页面，`WebLayout` 套 sticky emerald wordmark header，HeroUI Card / Button 做现代化外观。
-  - `/mail/$id` → 浏览器里看邮件（HMAC token-only auth，不需要 initData）。
-  - `/preview` → HTML → MarkdownV2 预览（session cookie + `useRequireTelegramLogin`）。
-  - `/junk-check` → 垃圾邮件检测（同上）。
-  - `/login` → Telegram Login Widget（denial 态由 Worker callback 302 带 `?denied=1&uid=` 回来）。
-  - `/` → Landing 兜底页。
-  - **Bot keyboard URLs** (`worker/utils/mail-token.ts`, `worker/bot/handlers/*`) still point at `/telegram-app/*` — intentional: those are the Mini App URLs registered in BotFather. Pages is configured to serve the SPA at those paths (or redirect from `/` → root). Private chat buttons are inline `web_app` pointing at subpage URLs; group chat uses `t.me/<bot>/<short>?startapp=<feature>_<chat>_<msg>` deep links which land on `/` router.
-  - **Auth**: every API call goes through `page/src/api/client.ts` (ky instance) which injects `X-Telegram-Init-Data` when in TG context. Worker `requireMiniAppAuth` verifies. Session cookie for browser pages. Mail preview API also checks HMAC token.
-  - **Cross-package imports**: `page/tsconfig.json` + `page/vite.config.ts` alias `@worker/*` → `../worker/*`; `worker/tsconfig.json` alias `@page/*` → `../page/src/*`. Both directions only carry pure-string constants / types — never runtime code:
-    - Page → Worker: types (`import type`) and route constants from `@worker/handlers/hono/routes` (zero-dep file).
-    - Worker → Page: Mini App route paths from `@page/paths` (used by bot keyboards in `worker/bot/handlers/start.ts` / `mail-list.ts` to build `web_app` URLs).
-- **Email keyboard**: `buildEmailKeyboard` requires `tgMessageId`, so `deliverEmailToTelegram` sends the message naked, inserts `message_map`, then builds the keyboard and attaches it via `setReplyMarkup` — one code path for private + group. All other rebuild sites (refresh, toggle-star, reminder change, junk cancel) already have `tgMessageId`.
-- **Reminders**: entry is exclusively through the ⏰ button on email messages (no `/remind` command). Auth on every API: `X-Telegram-Init-Data` via `utils/tg-init-data.ts::verifyTgInitData` + `users.approved`. Group deep-link resolve-context also checks `account.telegram_user_id === current user` (only the account owner can set reminders). Cron sends with `reply_parameters` so the reminder threads under the original email even if deleted.
-  Setup: `WORKER_URL` env, BotFather `/setdomain`, `/newapp` to register the Mini App (so `?startapp=` works for group deep links).
+- **Helpers**: file-private if used in ONE file, lift to nearest `utils/` if used in multiple. Same for dedup — extract HMAC signing / OAuth refresh / etc. instead of copy-pasting.
+- **Shared types**: `worker/types.ts` (cross-cutting) or colocated `types.ts` (module-scoped, e.g. `providers/types.ts`). Never inline reusable types into handlers/services.
+- **Error reporting**: `reportErrorToObservability()`, never `console.error`.
+- **Email providers**: abstract class in `worker/providers/base.ts`, barrel in `worker/providers/index.ts` (`PROVIDERS`, `getEmailProvider`, `accountCanArchive`). Each provider (`gmail/`, `outlook/`, `imap/`) has its own `index.ts` + `utils.ts` + optional `types.ts`. **Never branch on `account.type` outside `providers/`** — per-provider differences live on the class (static metadata, instance methods, `static registerRoutes(app)` for webhooks).
+- **IMAP message ids = RFC 822 Message-Id** (not per-folder UID). The bridge API takes `rfcMessageId` everywhere; UIDs are per-folder and can't address moved messages. Emails without Message-Id are dropped. Gmail/Outlook keep their native ids.
+- **Archive**: `provider.archiveMessage(id)` + `accountCanArchive(account)`. Gmail needs the user to pick a label (`accounts.archive_folder`); without it `canArchive()` returns false.
+- **State reconciliation**: all "remote → TG" syncs funnel through `reconcileMessageState` (`services/message-actions.ts`).
+- **Star pin**: ⭐ email ↔ pinned TG msg via `syncStarPinState` in `services/message-actions.ts`. A `pin-cleanup` handler deletes "Bot pinned" service messages.
+- **Disable/enable**: `accounts.disabled` pauses without deleting. Enforced in `services/bridge.ts::processEmailMessage` + filtered in push renewal / mail-list / `/sync` / `getImapAccounts`.
+- **Cron**: single `* * * * *` trigger. Reminders dispatch every minute; `getUTCMinutes() === 0` gates hourly batch (LLM retry / IMAP bridge health); midnight renews pushes.
+- **Email keyboard**: `buildEmailKeyboard` requires `tgMessageId`, so `deliverEmailToTelegram` sends naked → inserts `message_map` → builds keyboard → `setReplyMarkup`. Single code path for private + group.
+- **Reminders**: only entry is the ⏰ button on email messages. Auth: `X-Telegram-Init-Data` + `users.approved`; group deep-link also checks `account.telegram_user_id === current user`. Cron sends with `reply_parameters` so the reminder threads under the original email.
+- **Cross-package imports**: `page/` aliases `@worker/*` → `../worker/*`; `worker/` aliases `@page/*` → `../page/src/*`. Both directions carry **only pure-string constants / types** — never runtime code. Page → Worker pulls API path constants from `@worker/handlers/hono/routes` (zero-dep file). Worker → Page pulls Mini App URL paths from `@page/paths`.
+- **Auth flows**: every page-side API call goes through `page/src/api/client.ts` (ky) which injects `X-Telegram-Init-Data` when in TG context. Worker `requireMiniAppAuth` verifies. Browser pages use a session cookie. Mail preview API also accepts an HMAC token.
 
 ## IMAP middleware gotchas (`middleware/`)
 
-Bun + Elysia + ImapFlow + (optional) Redis. The Worker side just talks to the bridge over HTTP via `IMAP_BRIDGE_URL` + `IMAP_BRIDGE_SECRET`; everything below is internal to the middleware service.
+- **Redis is optional**: `REDIS_URL` set → `lastUid` per account survives restarts; otherwise in-memory only.
+- **Periodic refresh** (`REFRESH_INTERVAL_MS`, 5 min): close + reconnect each client to prevent IDLE stalls (e.g. iCloud).
+- **Reconnect is manual**: ImapFlow does not auto-reconnect. `close` event → `scheduleReconnect` → wait `RECONNECT_DELAY_MS` (3s) → fresh `ImapFlow`. Per-account timer guard prevents stacking.
+- **Stale client guard**: event handlers capture the `ImapFlow` ref at registration and ignore events from replaced clients — preserve this when adding handlers.
+- **Health endpoint stays unauthenticated**: returns only `{ ok, total, usable }` counts. Never expose email addresses.
 
-- **Redis is optional**: when `REDIS_URL` is set, `lastUid` per account is persisted so processed UIDs survive restarts. Without Redis, falls back to in-memory only.
-- **Periodic refresh** (`REFRESH_INTERVAL_MS`, 5 min): each client is closed and reconnected to prevent IDLE stalls on servers like iCloud. Cleanly replaces the client without triggering the reconnect delay.
-- **Reconnect is manual**: ImapFlow does not auto-reconnect. The `close` event triggers `scheduleReconnect` → wait `RECONNECT_DELAY_MS` (3s) → fresh `ImapFlow` instance. A per-account timer guard prevents stacking reconnects.
-- **Stale client guard**: event handlers capture the `ImapFlow` client reference at registration and ignore events from replaced clients — preserve this when adding new handlers.
-- **Health endpoint is deliberately unauthenticated**: returns only `{ ok, total, usable }` counts. Never add account details — it would expose email addresses.
+ImapFlow specifics ([docs](https://imapflow.com/docs/guides/basic-usage/)):
 
-ImapFlow specifics ([Configuration](https://imapflow.com/docs/guides/configuration/) · [Basic Usage](https://imapflow.com/docs/guides/basic-usage/) · [Fetching](https://imapflow.com/docs/guides/fetching-messages/) · [Searching](https://imapflow.com/docs/guides/searching/)):
-
-- **Auto-IDLE**: ImapFlow enters IDLE automatically after 15s of inactivity and sends `DONE` before any other command. Do not manage IDLE manually — select a mailbox and listen for events.
-- **No-IDLE fallback**: we pass `missingIdleCommand: "STATUS"`. Default `NOOP` relies on the server pushing untagged `EXISTS` (unreliable); `SELECT` has a known loop issue. The `exists` event fires in both modes, so business logic is unchanged.
-- **Never run IMAP commands inside a `fetch()` iterator** — causes deadlock. `fetchNewMessages` only fires HTTP notifications from the loop.
-- **Always use UIDs**: pass `{ uid: true }` to fetch/search. UIDs are stable across sessions, sequence numbers are not.
-- **Lock discipline**: always acquire via `getMailboxLock()` and release in `finally`.
-- **Special-use flags**: use `\Inbox`, `\Sent`, `\Drafts`, `\Trash`, `\Junk`, `\Archive` from `client.list()` instead of hardcoded folder names.
-- **Wire protocol is Message-Id only**: every bridge endpoint takes `rfcMessageId` (never a UID). UIDs are per-folder and can't address a moved message, so the worker-side API is fully Message-Id based. Internally each op does `SEARCH HEADER "Message-Id" "<id>"` in the relevant folder to resolve the UID, then issues the real IMAP command. Listings (`/unread`, `/starred`, `/junk`, `/list-folder`) return `id = envelope.messageId`; emails without a Message-Id header are skipped. The push notification payload is `{ accountId, rfcMessageId }` — `fetchNewMessages` pulls envelope alongside UID for this.
+- **Auto-IDLE**: enters IDLE after 15s, sends `DONE` before any other command. Don't manage IDLE manually.
+- **No-IDLE fallback**: we pass `missingIdleCommand: "STATUS"` (default `NOOP` is unreliable, `SELECT` loops).
+- **Never run IMAP commands inside a `fetch()` iterator** — deadlock.
+- **Always pass `{ uid: true }`** to fetch/search. UIDs are stable across sessions; sequence numbers are not.
+- **Lock discipline**: `getMailboxLock()` and release in `finally`.
+- **Special-use flags**: `\Inbox`, `\Sent`, `\Drafts`, `\Trash`, `\Junk`, `\Archive` from `client.list()`, never hardcoded folder names.

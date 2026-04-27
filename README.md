@@ -19,10 +19,12 @@
 
 单自定义域名，Cloudflare Workers Routes 按路径分流：
 
-- `example.com/api/*`、`/oauth/*` → Worker（`wrangler deploy`）
-- 其它 UI 路径（`/`、`/mail/*`、`/preview`、`/junk-check`、`/login`、`/telegram-app/*`）→ Pages（Git 接入，自动部署 `page/dist`）
+- `example.com/api/*`、`/oauth/*` → Worker
+- 其它 UI 路径（`/`、`/mail/*`、`/preview`、`/junk-check`、`/login`、`/telegram-app/*`）→ Pages
 
 同源零 CORS；前端 ky 用相对路径调 `/api/*`，Worker 端 `X-Telegram-Init-Data` 头验签。
+
+CI/CD（`.github/workflows/ci.yml`）：push to `main` → 按 path filter 自动部署改动的 workspace（worker `wrangler deploy` / page `wrangler pages deploy --branch=main` / middleware 多 arch docker 镜像 push 到 GHCR）。PR 自动出 preview deploys（worker version preview URL + Pages preview branch + docker build-only），URL 会 sticky comment 到 PR 上。
 
 ## 文档
 

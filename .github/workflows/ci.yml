@@ -75,15 +75,17 @@ jobs:
     concurrency:
       group: deploy-worker-prod
       cancel-in-progress: false
+    outputs:
+      url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-bun
-      - name: Wrangler deploy
-        run: bun deploy:worker --message="$COMMIT_MSG"
-        env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: cloudflare/wrangler-action@v3
+        id: deploy
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy --message=${{ github.sha }}
 
   preview-worker:
     name: Preview Worker (PR version)
@@ -95,16 +97,17 @@ jobs:
     concurrency:
       group: preview-worker-${{ github.event.number }}
       cancel-in-progress: true
+    outputs:
+      url: ${{ steps.upload.outputs.deployment-url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-bun
-      - name: Wrangler versions upload
-        run: |
-          bun --filter telemail-worker deploy:version \
-            --message="PR #${{ github.event.number }} @ ${{ github.event.pull_request.head.sha }}"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: cloudflare/wrangler-action@v3
+        id: upload
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: versions upload --message=PR-${{ github.event.number }}-${{ github.event.pull_request.head.sha }}
 
   # ─── Pages ─────────────────────────────────────────────────────────────────
 
@@ -121,24 +124,21 @@ jobs:
     concurrency:
       group: deploy-page-prod
       cancel-in-progress: false
+    outputs:
+      url: ${{ steps.deploy.outputs.deployment-url }}
+      alias_url: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-bun
       - uses: actions/download-artifact@v8
         with:
           name: page-dist
           path: page/dist
-      - name: Wrangler pages deploy
-        run: |
-          bun wrangler pages deploy page/dist \
-            --project-name=telemail-web \
-            --branch=main \
-            --commit-hash="$GITHUB_SHA" \
-            --commit-message="$COMMIT_MSG"
-        env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: cloudflare/wrangler-action@v3
+        id: deploy
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy page/dist --project-name=telemail-web --branch=main --commit-hash=${{ github.sha }}
 
   preview-page:
     name: Preview Pages (PR)
@@ -150,23 +150,21 @@ jobs:
     concurrency:
       group: preview-page-${{ github.event.number }}
       cancel-in-progress: true
+    outputs:
+      url: ${{ steps.deploy.outputs.deployment-url }}
+      alias_url: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-bun
       - uses: actions/download-artifact@v8
         with:
           name: page-dist
           path: page/dist
-      - name: Wrangler pages deploy (preview)
-        run: |
-          bun wrangler pages deploy page/dist \
-            --project-name=telemail-web \
-            --branch=${{ github.head_ref }} \
-            --commit-hash=${{ github.event.pull_request.head.sha }} \
-            --commit-message="PR #${{ github.event.number }}: ${{ github.event.pull_request.title }}"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: cloudflare/wrangler-action@v3
+        id: deploy
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy page/dist --project-name=telemail-web --branch=${{ github.head_ref }} --commit-hash=${{ github.event.pull_request.head.sha }}
 
   # ─── Middleware (Docker, GHCR) ─────────────────────────────────────────────
 
@@ -210,3 +208,58 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=middleware
           cache-to: type=gha,scope=middleware,mode=max
+
+  # ─── PR preview comment ────────────────────────────────────────────────────
+
+  preview-comment:
+    name: Comment PR with preview URLs
+    needs: [changes, preview-worker, preview-page, docker-middleware]
+    if: |
+      always() &&
+      github.event_name == 'pull_request' &&
+      (
+        needs.preview-worker.result != 'skipped' ||
+        needs.preview-page.result != 'skipped' ||
+        needs.docker-middleware.result != 'skipped'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/github-script@v8
+        env:
+          MODE: preview
+          NEEDS: ${{ toJSON(needs) }}
+        with:
+          script: |
+            const fn = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/post-comment.cjs`);
+            await fn({ github, context });
+
+  # ─── main commit comment ───────────────────────────────────────────────────
+
+  deploy-comment:
+    name: Comment commit with deploy URLs
+    needs: [changes, deploy-worker, deploy-page, docker-middleware]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (
+        needs.deploy-worker.result != 'skipped' ||
+        needs.deploy-page.result != 'skipped' ||
+        needs.docker-middleware.result != 'skipped'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/github-script@v8
+        env:
+          MODE: deploy
+          NEEDS: ${{ toJSON(needs) }}
+        with:
+          script: |
+            const fn = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/post-comment.cjs`);
+            await fn({ github, context });
