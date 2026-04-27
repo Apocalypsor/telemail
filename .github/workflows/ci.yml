@@ -66,9 +66,11 @@ jobs:
     name: Deploy Worker (production)
     needs: [ci, changes]
     if: |
-      needs.changes.outputs.worker == 'true' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' &&
+      (
+        (github.event_name == 'push' && needs.changes.outputs.worker == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-worker-prod
@@ -110,9 +112,11 @@ jobs:
     name: Deploy Pages (production)
     needs: [ci, changes]
     if: |
-      needs.changes.outputs.page == 'true' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' &&
+      (
+        (github.event_name == 'push' && needs.changes.outputs.page == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-page-prod
@@ -169,7 +173,9 @@ jobs:
   docker-middleware:
     name: Docker build / push (middleware)
     needs: [ci, changes]
-    if: needs.changes.outputs.middleware == 'true'
+    if: |
+      needs.changes.outputs.middleware == 'true' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     concurrency:
       group: docker-middleware-${{ github.ref }}
@@ -179,7 +185,9 @@ jobs:
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: |
+          github.ref == 'refs/heads/main' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -197,7 +205,7 @@ jobs:
           context: .
           file: middleware/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          push: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=middleware
