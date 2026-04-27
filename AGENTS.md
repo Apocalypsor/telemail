@@ -6,8 +6,15 @@ User-facing docs are split:
 
 - `README.md` —— landing, stack, architecture overview, bot commands
 - `docs/DEVELOPMENT.md` —— local dev commands + flow
-- `docs/DEPLOYMENT.md` —— end-to-end CF deploy (GCP / MS Entra / D1 / KV / Queue / Worker + Pages)
+- `docs/DEPLOYMENT.md` —— end-to-end CF deploy (GCP / MS Entra / D1 / KV / Queue / Worker + Pages) + CI/CD section
 - `docs/ENVIRONMENT.md` —— secrets / bindings / cron / D1 schema reference
+
+CI/CD: `.github/workflows/ci.yml` —— always runs Biome + typecheck + page build. Path-based deploy via `dorny/paths-filter`:
+- `worker/**` OR root `package.json` / `bun.lock` changed → worker deploy (root deps affect both)
+- `page/**` OR root `package.json` / `bun.lock` changed → page deploy
+- PR triggers preview (`wrangler versions upload` for worker / `wrangler pages deploy --branch=<head-ref>` for page); push to main triggers production
+- pure tooling/docs changes (docs/, .github/, biome.json) → CI runs, no deploy
+Required repo secrets: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`. Pages does NOT use the CF dashboard Git integration — Direct Upload via wrangler from Actions only. CF resource names: Worker = `telemail` (from `worker/wrangler.jsonc`), Pages = `telemail-web` (pinned in `.github/workflows/ci.yml` `--project-name`; change there + in deploy section's project create command if you rename).
 
 Your knowledge of Cloudflare Workers APIs may be outdated. Retrieve current docs before any Workers/KV/D1/Queues task: <https://developers.cloudflare.com/workers/>
 

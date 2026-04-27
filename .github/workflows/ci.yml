@@ -1,0 +1,177 @@
+name: CI / CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      worker: ${{ steps.filter.outputs.worker }}
+      page: ${{ steps.filter.outputs.page }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            worker:
+              - 'worker/**'
+              - 'package.json'
+              - 'bun.lock'
+            page:
+              - 'page/**'
+              - 'package.json'
+              - 'bun.lock'
+
+  ci:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Biome check
+        run: bun check
+      - name: Typecheck (worker + page)
+        run: bun typecheck
+      - name: Build page
+        run: bun build:page
+      - uses: actions/upload-artifact@v7
+        with:
+          name: page-dist
+          path: page/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  # ─── Worker ────────────────────────────────────────────────────────────────
+
+  deploy-worker:
+    name: Deploy Worker (production)
+    needs: [ci, changes]
+    if: |
+      needs.changes.outputs.worker == 'true' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-worker-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Wrangler deploy
+        run: bun deploy:worker --message="$COMMIT_MSG"
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  preview-worker:
+    name: Preview Worker (PR version)
+    needs: [ci, changes]
+    if: |
+      needs.changes.outputs.worker == 'true' &&
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-worker-${{ github.event.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Wrangler versions upload
+        run: |
+          bun --filter telemail-worker deploy:version \
+            --message="PR #${{ github.event.number }} @ ${{ github.event.pull_request.head.sha }}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ─── Pages ─────────────────────────────────────────────────────────────────
+
+  deploy-page:
+    name: Deploy Pages (production)
+    needs: [ci, changes]
+    if: |
+      needs.changes.outputs.page == 'true' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-page-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: page-dist
+          path: page/dist
+      - name: Wrangler pages deploy
+        run: |
+          bun wrangler pages deploy page/dist \
+            --project-name=telemail-web \
+            --branch=main \
+            --commit-hash="$GITHUB_SHA" \
+            --commit-message="$COMMIT_MSG"
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  preview-page:
+    name: Preview Pages (PR)
+    needs: [ci, changes]
+    if: |
+      needs.changes.outputs.page == 'true' &&
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-page-${{ github.event.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: page-dist
+          path: page/dist
+      - name: Wrangler pages deploy (preview)
+        run: |
+          bun wrangler pages deploy page/dist \
+            --project-name=telemail-web \
+            --branch=${{ github.head_ref }} \
+            --commit-hash=${{ github.event.pull_request.head.sha }} \
+            --commit-message="PR #${{ github.event.number }}: ${{ github.event.pull_request.title }}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
