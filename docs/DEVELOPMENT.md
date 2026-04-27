@@ -2,10 +2,11 @@
 
 ## 目录结构
 
-仓库根是 bun workspace 容器（只放编排脚本 + biome / husky），两个子包：
+仓库根是 bun workspace 容器（只放编排脚本 + biome / husky），三个子包：
 
 - **`worker/`** —— Cloudflare Worker（Hono）。bun workspace 子包 `telemail-worker`。Bot webhook、queue consumer、cron、email providers、D1 / KV 访问、`/api/*` + `/oauth/*` 端点。`wrangler.jsonc`、`worker-configuration.d.ts`、`migrations/`、`tsconfig.json` 都在这里。
 - **`page/`** —— Cloudflare Pages 前端（Vite + React 19 + TanStack Router + TanStack Query + HeroUI）。bun workspace 子包 `telemail-page`。web 页面（`/`、`/mail/:id`、`/preview`、`/junk-check`、`/login`）和 Mini App 路由（`/telegram-app/*`）共用同一个 `index.html` + `main.tsx`。
+- **`middleware/`** —— IMAP bridge（Bun runtime + Elysia + ImapFlow + Redis）。bun workspace 子包 `telemail-middleware`。**不部署到 Cloudflare**，docker 跑在自己服务器上（Worker 不能保持 IMAP IDLE 长连接）。`bun build --compile` 出单文件 `server` binary，distroless 镜像。详见 `middleware/AGENTS.md` 和 `docs/DEPLOYMENT.md §6.4`。
 
 ## 命令
 
@@ -23,13 +24,18 @@ bun migrate:worker:local  # 应用 D1 migrations 到本地 miniflare D1
 bun dev:page              # Vite dev server (127.0.0.1:5173)，/api/* 自动代理到本地 Worker
 bun build:page            # 构建到 page/dist
 
+# IMAP Middleware（如果要在本地测 IMAP bridge）
+bun dev:middleware        # bun --watch src/index.ts，listen 在 :3000
+bun build:middleware      # bun build --compile → middleware/server 单文件 binary
+bun start:middleware      # 不 watch / 不重 compile，直接跑
+
 # 本地登录辅助（详见下面"本地测 web 登录页"）
 bun dev:cookie            # 用 .dev.vars 里的 ADMIN_SECRET 签 session cookie
 bun dev:seed              # 把 ADMIN_TELEGRAM_ID 写入本地 D1 users 表
 
 # 共用
 bun check                 # Biome lint + 格式检查（pre-commit 自动触发，覆盖全仓库）
-bun typecheck             # bun --filter "*" typecheck（worker tsc + page tsc）
+bun typecheck             # bun --filter "*" typecheck（worker + page + middleware）
 ```
 
 也可以直接进子包跑（worker 包里 `bun dev` / `bun deploy` 等是无前缀短名）。

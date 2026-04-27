@@ -188,6 +188,67 @@ bun wrangler secret put WORKER_URL
 bun wrangler secret put TG_MINI_APP_SHORT_NAME
 ```
 
+## 6.4 部署 IMAP Middleware（可选，仅当要接 IMAP 账号时）
+
+IMAP 账号走自己服务器上的桥接服务（Cloudflare Workers 不能保持 IMAP IDLE 长连接）。Middleware 在 `middleware/` 子包，docker 部署，**镜像由 CI 推到 `ghcr.io/apocalypsor/telemail-middleware`**（main 上 push 自动构建 + push `:latest` 和 `:sha-<short>` 两个 tag），服务器只 pull 不 build。
+
+### 准备
+
+- 一台 Linux 服务器 + Docker & Docker Compose
+- 反向代理（Caddy / nginx）+ TLS，把 `middleware.example.com` 转到 `127.0.0.1:3000`
+- GitHub repo 是 public 的话 GHCR 镜像默认也是 public，server 直接 pull 就行；private repo 要先在服务器 `docker login ghcr.io -u <user>` 用 PAT 登录
+
+### 首次部署
+
+只把 `middleware/docker-compose.yml` + `middleware/.env.example` 拷到服务器（不需要整个 repo，docker-compose 只 pull GHCR 镜像不 build）：
+
+```sh
+mkdir telemail-middleware && cd telemail-middleware
+curl -O https://raw.githubusercontent.com/Apocalypsor/telemail/main/middleware/docker-compose.yml
+curl -O https://raw.githubusercontent.com/Apocalypsor/telemail/main/middleware/.env.example
+mv .env.example .env
+# 编辑 .env：BRIDGE_SECRET=$(openssl rand -hex 32)，TELEMAIL_URL=https://example.com
+docker compose up -d
+```
+
+`docker-compose.yml` 同时有 `image:` 和 `build:` 段：服务器无源码 → 走 `image: ghcr.io/...`（`pull_policy: always`）；本地开发有源码 → `docker compose build` 强制本地编。
+
+### 反向代理（Caddy 例）
+
+```text
+middleware.example.com {
+    reverse_proxy localhost:3000
+}
+```
+
+### 配置 Worker
+
+把 middleware 的 URL + 密钥告诉 Worker：
+
+```sh
+bun wrangler secret put IMAP_BRIDGE_URL          # https://middleware.example.com
+bun wrangler secret put IMAP_BRIDGE_SECRET       # 和 middleware/.env 里 BRIDGE_SECRET 一致
+```
+
+### 健康检查
+
+```sh
+curl https://middleware.example.com/api/health
+# {"ok":true,"total":2,"usable":2}
+```
+
+故意不带鉴权，只暴露 `{ ok, total, usable }` 三个数字（不返回邮箱地址等）。
+
+### 更新
+
+每次 main 更新 `middleware/**`，CI 会自动重 build 镜像 push 到 GHCR。服务器拉新版：
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+固定到某个 commit（不想跟 latest 滚动）就把 `image:` 改成 `ghcr.io/apocalypsor/telemail-middleware:sha-<short>`。
+
 ## 7. 添加邮箱账号
 
 通过 Telegram Bot 管理：

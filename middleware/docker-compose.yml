@@ -1,0 +1,42 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  telemail-middleware:
+    # 生产：CI 把镜像推到 GHCR，服务器 docker compose pull && up -d 拉取。
+    # 本地开发：没有 image 时 docker compose 会自动用 build 段从源码编。
+    # context = repo root（不是 middleware/）—— bun workspace 子包，
+    # Dockerfile 需要 root package.json + bun.lock 才能解析依赖
+    image: ghcr.io/apocalypsor/telemail-middleware:latest
+    build:
+      context: ..
+      dockerfile: middleware/Dockerfile
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    # 只绑定到 localhost，由前端反向代理（nginx/caddy）对外暴露
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  redis-data:
