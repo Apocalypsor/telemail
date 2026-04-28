@@ -19,6 +19,7 @@
     "deploy:worker": "bun --filter telemail-worker deploy",
     "dev:page": "bun --filter telemail-page dev",
     "build:page": "bun --filter telemail-page build",
+    "deploy:page": "bun --filter telemail-page deploy",
     "dev:middleware": "bun --filter telemail-middleware dev",
     "start:middleware": "bun --filter telemail-middleware start",
     "build:middleware": "bun --filter telemail-middleware build",
