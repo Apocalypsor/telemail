@@ -22,6 +22,7 @@ jobs:
     outputs:
       worker: ${{ steps.filter.outputs.worker }}
       page: ${{ steps.filter.outputs.page }}
+      middleware: ${{ steps.filter.outputs.middleware }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
