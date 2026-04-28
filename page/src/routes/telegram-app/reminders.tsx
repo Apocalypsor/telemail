@@ -75,28 +75,13 @@ function dateLabel(d: Date): DateLabel {
   const md = `${d.getMonth() + 1}月${d.getDate()}日`;
   const wd = WEEKDAYS[d.getDay()];
   if (dayDiff === 0)
-    return {
-      primary: "今天",
-      secondary: `${md} · ${wd}`,
-      isToday: true,
-      isPast: false,
-    };
+    return { primary: "今天", secondary: md, isToday: true, isPast: false };
   if (dayDiff === 1)
-    return {
-      primary: "明天",
-      secondary: `${md} · ${wd}`,
-      isToday: false,
-      isPast: false,
-    };
+    return { primary: "明天", secondary: md, isToday: false, isPast: false };
   if (dayDiff > 1 && dayDiff < 7)
     return { primary: wd, secondary: md, isToday: false, isPast: false };
   if (dayDiff < 0)
-    return {
-      primary: "已过",
-      secondary: `${md} · ${wd}`,
-      isToday: false,
-      isPast: true,
-    };
+    return { primary: "已过", secondary: md, isToday: false, isPast: true };
   return { primary: md, secondary: wd, isToday: false, isPast: false };
 }
 
@@ -515,6 +500,18 @@ function AddSection({
   );
 }
 
+// Flat row union: the timeline alternates date headers and items, but they all
+// share the same column layout so a single rail can bridge through both.
+type TimelineRow =
+  | { kind: "date"; key: string; date: Date; count: number }
+  | { kind: "item"; key: string; reminder: Reminder };
+
+// mt-3 (12px) between adjacent items / between a date and its first item;
+// mt-6 (24px) before a new date section. The rail's bottom segment extends
+// `-nextGap` so it lands exactly on the next row's top.
+const GAP_TO_DATE = 24;
+const GAP_DEFAULT = 12;
+
 function TimelineList({
   listOnly,
   reminders,
@@ -535,7 +532,7 @@ function TimelineList({
       <div className="space-y-3">
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex gap-3 items-start">
-            <Skeleton className="w-12 h-4 rounded mt-3.5 shrink-0" />
+            <Skeleton className="w-24 h-4 rounded mt-3.5 shrink-0" />
             <div className="w-4 shrink-0 flex justify-center pt-5">
               <Skeleton className="w-3 h-3 rounded-full" />
             </div>
@@ -565,82 +562,134 @@ function TimelineList({
   const groups = groupRemindersByDate(reminders);
   const now = Date.now();
 
+  const rows: TimelineRow[] = [];
+  for (const g of groups) {
+    rows.push({
+      kind: "date",
+      key: `d-${g.date.toISOString()}`,
+      date: g.date,
+      count: g.items.length,
+    });
+    for (const it of g.items) {
+      rows.push({ kind: "item", key: `i-${it.id}`, reminder: it });
+    }
+  }
+
   return (
-    <div className="space-y-7">
-      {groups.map((group) => (
-        <TimelineGroup
-          key={group.date.toISOString()}
-          date={group.date}
-          items={group.items}
-          listOnly={listOnly}
-          now={now}
-          deletingId={deletingId}
-          onDelete={onDelete}
-          onOpenMail={onOpenMail}
-        />
-      ))}
+    <div>
+      {rows.map((row, idx) => {
+        const isFirst = idx === 0;
+        const isLast = idx === rows.length - 1;
+        const next = rows[idx + 1];
+        const nextGap = next?.kind === "date" ? GAP_TO_DATE : GAP_DEFAULT;
+        const marginClass = isFirst
+          ? ""
+          : row.kind === "date"
+            ? "mt-6"
+            : "mt-3";
+
+        if (row.kind === "date") {
+          return (
+            <TimelineDateRow
+              key={row.key}
+              date={row.date}
+              count={row.count}
+              isFirst={isFirst}
+              isLast={isLast}
+              nextGap={nextGap}
+              className={marginClass}
+            />
+          );
+        }
+        return (
+          <TimelineItem
+            key={row.key}
+            it={row.reminder}
+            listOnly={listOnly}
+            isFirst={isFirst}
+            isLast={isLast}
+            nextGap={nextGap}
+            now={now}
+            isDeleting={deletingId === row.reminder.id}
+            onOpen={() => onOpenMail(row.reminder)}
+            onDelete={() => onDelete(row.reminder.id)}
+            className={marginClass}
+          />
+        );
+      })}
     </div>
   );
 }
 
-function TimelineGroup({
+function TimelineDateRow({
   date,
-  items,
-  listOnly,
-  now,
-  deletingId,
-  onDelete,
-  onOpenMail,
+  count,
+  isFirst,
+  isLast,
+  nextGap,
+  className,
 }: {
   date: Date;
-  items: Reminder[];
-  listOnly: boolean;
-  now: number;
-  deletingId: number | null;
-  onDelete: (id: number) => void;
-  onOpenMail: (r: Reminder) => void;
+  count: number;
+  isFirst: boolean;
+  isLast: boolean;
+  nextGap: number;
+  className: string;
 }) {
   const label = dateLabel(date);
-
   const chipClass = label.isToday
     ? "bg-emerald-500 text-emerald-950 font-semibold"
     : label.isPast
       ? "bg-zinc-800 text-zinc-400 border border-zinc-700"
       : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
+  const dotColor = label.isToday
+    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+    : label.isPast
+      ? "bg-zinc-600"
+      : "bg-emerald-400";
 
+  // Chip (size=sm) is 24px tall → center at y=12px from row top. We anchor
+  // the rail dot and right-side divider to that y so chip + dot + divider
+  // line up across the row, with the secondary date hanging below the chip.
   return (
-    <section>
-      <div className="flex items-center gap-2 mb-3 px-1">
+    <div className={`flex gap-3 items-start ${className}`}>
+      <div className="w-16 shrink-0 flex flex-col items-end gap-1">
         <Chip size="sm" className={chipClass}>
           {label.primary}
         </Chip>
         {label.secondary && (
-          <span className="text-[11px] text-zinc-500 tracking-wide">
+          <div className="text-[11px] text-zinc-500 leading-tight tabular-nums">
             {label.secondary}
-          </span>
+          </div>
         )}
-        <div className="flex-1 h-px bg-gradient-to-r from-zinc-800 to-transparent" />
-        <span className="text-[11px] text-zinc-600 tabular-nums">
-          {items.length} 项
-        </span>
       </div>
 
-      <div className="space-y-3">
-        {items.map((it, idx) => (
-          <TimelineItem
-            key={it.id}
-            it={it}
-            listOnly={listOnly}
-            isFirst={idx === 0}
-            isLast={idx === items.length - 1}
-            now={now}
-            isDeleting={deletingId === it.id}
-            onOpen={() => onOpenMail(it)}
-            onDelete={() => onDelete(it.id)}
+      <div className="relative w-4 shrink-0 self-stretch">
+        {!isFirst && (
+          <div
+            className="absolute left-1/2 -translate-x-px top-0 w-px bg-zinc-800"
+            style={{ height: "12px" }}
           />
-        ))}
+        )}
+        {!isLast && (
+          <div
+            className="absolute left-1/2 -translate-x-px w-px bg-zinc-800"
+            style={{ top: "12px", bottom: `-${nextGap}px` }}
+          />
+        )}
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full ring-4 ring-zinc-950 z-10 ${dotColor}`}
+          style={{ top: "7px" }}
+        />
       </div>
-    </section>
+
+      <div className="flex-1 min-w-0 flex items-center gap-2 h-6">
+        <div className="flex-1 h-px bg-gradient-to-r from-zinc-700 to-transparent" />
+        <span className="text-[11px] text-zinc-600 tabular-nums">
+          {count} 项
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -649,19 +698,23 @@ function TimelineItem({
   listOnly,
   isFirst,
   isLast,
+  nextGap,
   now,
   isDeleting,
   onOpen,
   onDelete,
+  className,
 }: {
   it: Reminder;
   listOnly: boolean;
   isFirst: boolean;
   isLast: boolean;
+  nextGap: number;
   now: number;
   isDeleting: boolean;
   onOpen: () => void;
   onDelete: () => void;
+  className: string;
 }) {
   const d = new Date(it.remind_at);
   const time = hm(d);
@@ -672,17 +725,12 @@ function TimelineItem({
   const canOpen = Boolean(
     listOnly && it.account_id && it.email_message_id && it.mail_token,
   );
-  const isOnly = isFirst && isLast;
 
-  const railStyle: CSSProperties = isFirst
-    ? { top: "26px", bottom: "-12px" }
-    : isLast
-      ? { top: 0, height: "26px" }
-      : { top: 0, bottom: "-12px" };
+  const bottomStyle: CSSProperties = { top: "26px", bottom: `-${nextGap}px` };
 
   return (
-    <article className="flex gap-3 items-start">
-      <div className="w-12 shrink-0 pt-3.5 text-right">
+    <article className={`flex gap-3 items-start ${className}`}>
+      <div className="w-16 shrink-0 pt-3.5 text-right">
         <div
           className={`text-[15px] font-semibold tabular-nums leading-tight ${
             isOverdue ? "text-zinc-500" : "text-zinc-100"
@@ -693,10 +741,13 @@ function TimelineItem({
       </div>
 
       <div className="relative w-4 shrink-0 self-stretch">
-        {!isOnly && (
+        {!isFirst && (
+          <div className="absolute left-1/2 -translate-x-px top-0 h-[26px] w-px bg-zinc-800" />
+        )}
+        {!isLast && (
           <div
             className="absolute left-1/2 -translate-x-px w-px bg-zinc-800"
-            style={railStyle}
+            style={bottomStyle}
           />
         )}
         <div
