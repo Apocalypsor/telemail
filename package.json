@@ -23,6 +23,7 @@
     "start:middleware": "bun --filter telemail-middleware start",
     "build:middleware": "bun --filter telemail-middleware build",
     "check": "biome check --no-errors-on-unmatched --files-ignore-unknown=true",
+    "check:wrangler": "bun --filter '*' check:wrangler",
     "typecheck": "bun --filter '*' typecheck",
     "prepare": "husky",
     "skills:install": "bunx skills experimental_install && ln -sf ../.agents/skills .claude/",

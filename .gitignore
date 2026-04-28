@@ -178,3 +178,7 @@ page/src/routeTree.gen.ts
 page/dist/
 *.tsbuildinfo
 middleware/server
+
+# wrangler.jsonc 是 templated（containing CF account IDs）—— 由 wrangler.example.jsonc
+# 走 envsubst 生成（local: 手动 cp + 替换；CI: 走 CF_D1_DATABASE_ID / CF_KV_NAMESPACE_ID secrets）
+worker/wrangler.jsonc

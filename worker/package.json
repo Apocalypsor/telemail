@@ -13,6 +13,7 @@
     "migrate:remote": "wrangler d1 migrations apply gmail-tg-bridge --remote",
     "deploy": "wrangler deploy",
     "deploy:version": "wrangler versions upload",
+    "check:wrangler": "bun scripts/check-wrangler-template.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

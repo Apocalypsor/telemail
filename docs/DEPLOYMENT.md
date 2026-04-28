@@ -62,6 +62,8 @@ gcloud pubsub subscriptions create gmail-push-sub \
 ## 4. Cloudflare 资源
 
 > wrangler 装在仓库根 devDeps，所以 `bun wrangler …` 在仓库任何地方都能跑。`wrangler.jsonc` 在 `worker/` 下，wrangler 默认从 cwd 找它，所以下面的 `wrangler d1` / `wrangler kv` / `wrangler queues` / `wrangler secret` 命令都建议在 `worker/` 目录跑。或者从根加 `--config worker/wrangler.jsonc`。
+>
+> ⚠️ **`worker/wrangler.jsonc` 是 gitignored 的**，由 `worker/wrangler.example.jsonc` 经 `envsubst` 生成（CF 账号专属 ID 不入库）。**首次本地 setup**：`cp worker/wrangler.example.jsonc worker/wrangler.jsonc` 然后把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成下面 §4.1 / §4.2 拿到的真实 ID。CI 自动走 envsubst（详见 §8.2）。
 
 ### 4.1 D1 数据库
 
@@ -69,7 +71,7 @@ gcloud pubsub subscriptions create gmail-push-sub \
 bun wrangler d1 create gmail-tg-bridge
 ```
 
-把返回的 `database_id` 填入 `wrangler.jsonc` 中 `d1_databases[0].database_id`。然后从仓库根跑：
+把返回的 `database_id` 填入 `worker/wrangler.jsonc` 中 `d1_databases[0].database_id`（替换占位符 `${D1_DATABASE_ID}`），同时把这个 UUID 加到 GitHub repo secrets 里叫 `CF_D1_DATABASE_ID`（CI 用）。然后从仓库根跑：
 
 ```sh
 bun migrate:worker:remote
@@ -81,7 +83,7 @@ bun migrate:worker:remote
 bun wrangler kv namespace create EMAIL_KV
 ```
 
-返回的 `id` 填入 `wrangler.jsonc` 中 `kv_namespaces[0].id`。用途：access_token 缓存、消息去重、OAuth state。
+返回的 `id` 填入 `worker/wrangler.jsonc` 中 `kv_namespaces[0].id`（替换 `${KV_NAMESPACE_ID}`），同时加到 GitHub repo secrets 里叫 `CF_KV_NAMESPACE_ID`。用途：access_token 缓存、消息去重、OAuth state。
 
 ### 4.3 Queue
 
@@ -283,6 +285,10 @@ GitHub repo → **Settings → Secrets and variables → Actions** 加：
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | CF dashboard → My Profile → API Tokens → Create。权限至少：Account → Workers Scripts:Edit + Pages:Edit + Workers KV:Edit + D1:Edit + Queues:Edit |
 | `CLOUDFLARE_ACCOUNT_ID` | CF dashboard 任意 Worker 详情页右下角 |
+| `CF_D1_DATABASE_ID` | `bun wrangler d1 create gmail-tg-bridge` 返回的 UUID（也填入本地 `worker/wrangler.jsonc`） |
+| `CF_KV_NAMESPACE_ID` | `bun wrangler kv namespace create EMAIL_KV` 返回的 hex（同上） |
+
+`worker/wrangler.jsonc` 是 gitignored 的 templated 文件 —— `deploy-worker` / `preview-worker` job 在跑 wrangler 之前会先 `envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc`，把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成上面两个 secrets。
 
 GHCR push 用内置 `GITHUB_TOKEN`（workflow 顶部 `permissions: packages: write` 已配），不需要额外 secret。Public repo → 镜像默认 public。
 

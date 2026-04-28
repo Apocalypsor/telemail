@@ -81,6 +81,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun
+      # wrangler.jsonc 是 gitignored 的 templated 文件，envsubst 从
+      # wrangler.example.jsonc 生成：占位符 ${D1_DATABASE_ID} / ${KV_NAMESPACE_ID}
+      # 由 repo secrets 填入
+      - name: Generate wrangler.jsonc
+        env:
+          D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
+          KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+        run: envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc
       - uses: cloudflare/wrangler-action@v3
         id: deploy
         with:
@@ -105,6 +113,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun
+      - name: Generate wrangler.jsonc
+        env:
+          D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
+          KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+        run: envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc
       - uses: cloudflare/wrangler-action@v3
         id: upload
         with:

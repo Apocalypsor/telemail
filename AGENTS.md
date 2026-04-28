@@ -13,7 +13,7 @@ Cloudflare API knowledge may be stale — fetch <https://developers.cloudflare.c
 
 ## Workspaces (bun monorepo)
 
-- **`worker/`** (`telemail-worker`) — Cloudflare Worker (Hono): bot webhook, queue consumer, cron, email providers, D1, `/api/*` + `/oauth/*`. Owns `wrangler.jsonc`, `migrations/`.
+- **`worker/`** (`telemail-worker`) — Cloudflare Worker (Hono): bot webhook, queue consumer, cron, email providers, D1, `/api/*` + `/oauth/*`. Owns `wrangler.example.jsonc` (committed template) + `migrations/`. Real `wrangler.jsonc` is gitignored — generated locally by copy + manual edit, generated in CI by `envsubst < wrangler.example.jsonc > wrangler.jsonc` using `CF_D1_DATABASE_ID` + `CF_KV_NAMESPACE_ID` secrets.
 - **`page/`** (`telemail-page`) — Cloudflare Pages SPA (Vite + React 19 + TanStack Router/Query + HeroUI + ky + zod). Single entry serves both browser web pages (`/mail/$id`, `/preview`, `/junk-check`, `/login`, `/`) and Mini App routes (`/telegram-app/*`).
 - **`middleware/`** (`telemail-middleware`) — IMAP bridge (Bun + Elysia + ImapFlow + optional Redis). NOT on Cloudflare. Built into a single `bun build --compile` binary, packaged as a multi-arch docker image pushed to `ghcr.io/apocalypsor/telemail-middleware`. User runs it on their own server (`docker compose pull && up -d`); Worker calls it via `IMAP_BRIDGE_URL` + `IMAP_BRIDGE_SECRET`.
 

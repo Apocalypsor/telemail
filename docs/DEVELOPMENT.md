@@ -1,5 +1,19 @@
 # 本地开发
 
+## 首次 setup
+
+`worker/wrangler.jsonc` **是 gitignored 的**（含 CF 账号专属 ID）。clone 后第一次跑：
+
+```sh
+cp worker/wrangler.example.jsonc worker/wrangler.jsonc
+# 编辑 wrangler.jsonc，把 ${D1_DATABASE_ID} / ${KV_NAMESPACE_ID} 换成
+# bun wrangler d1 create / kv namespace create 返回的真实 ID
+bun typegen:worker            # 重新生成 worker-configuration.d.ts
+bun install
+```
+
+CI 自己走 `envsubst` 用 repo secrets 生成 `wrangler.jsonc`，本地不需要装 envsubst。
+
 ## 目录结构
 
 仓库根是 bun workspace 容器，三个子包：

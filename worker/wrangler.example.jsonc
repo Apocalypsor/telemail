@@ -1,14 +1,34 @@
 /**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
+ * Wrangler config template — committed; the real `wrangler.jsonc` is
+ * gitignored and generated locally / in CI from this file.
+ *
+ * Local dev:
+ *   1. `cp worker/wrangler.example.jsonc worker/wrangler.jsonc`
+ *   2. Replace `${D1_DATABASE_ID}` and `${KV_NAMESPACE_ID}` with the IDs
+ *      `bun wrangler d1 create gmail-tg-bridge` /
+ *      `bun wrangler kv namespace create EMAIL_KV` returned.
+ *   3. Run `bun typegen:worker` to regenerate `worker-configuration.d.ts`.
+ *
+ * CI (`.github/workflows/ci.yml`):
+ *   `envsubst < wrangler.example.jsonc > wrangler.jsonc` runs before any
+ *   wrangler invocation, fed by `CF_D1_DATABASE_ID` + `CF_KV_NAMESPACE_ID`
+ *   repo secrets.
+ *
+ * Wrangler reference: https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "telemail",
   "main": "index.ts",
-  "compatibility_date": "2026-02-19",
+  "compatibility_date": "2026-04-21",
   "observability": {
-    "enabled": true
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false
+    }
   },
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
@@ -19,26 +39,26 @@
   /**
    * D1 Database — 多账号信息（email / chat_id / refresh_token / history_id）
    * 先运行: bun wrangler d1 create gmail-tg-bridge
-   * 然后把返回的 database_id 填入下方
+   * 然后把返回的 database_id 填入 ${D1_DATABASE_ID}（local: 直接替换；CI: 走 secrets）
    * 再运行: bun wrangler d1 migrations apply gmail-tg-bridge
    */
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "gmail-tg-bridge",
-      "database_id": "ed82b3d6-e172-43d6-a9cd-896269dc9b33",
+      "database_id": "${D1_DATABASE_ID}",
       "migrations_dir": "migrations"
     }
   ],
   /**
    * KV Namespace — access_token 缓存、消息去重、OAuth state
    * 先运行: bun wrangler kv namespace create EMAIL_KV
-   * 然后把返回的 id 填入下方
+   * 然后把返回的 id 填入 ${KV_NAMESPACE_ID}
    */
   "kv_namespaces": [
     {
       "binding": "EMAIL_KV",
-      "id": "69833c83d492434484afcdf4825bb462"
+      "id": "${KV_NAMESPACE_ID}"
     }
   ],
   /**
