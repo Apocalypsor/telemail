@@ -1,6 +1,6 @@
+import { auth } from "@plugins/auth";
+import { imap } from "@plugins/imap";
 import { Elysia } from "elysia";
-import { auth } from "../../plugins/auth";
-import { imap } from "../../plugins/imap";
 import { AccountBody, AccountMessageBody, ListBody } from "./model";
 
 export const junkController = new Elysia({ name: "controller.junk" })

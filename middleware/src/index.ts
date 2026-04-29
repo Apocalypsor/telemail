@@ -4,12 +4,12 @@ const ts = () => new Date().toISOString();
 console.log = (...args: unknown[]) => _log(ts(), ...args);
 console.error = (...args: unknown[]) => _err(ts(), ...args);
 
+import { connectionManager } from "@imap";
+import { junkController } from "@modules/junk/index";
+import { mailController } from "@modules/mail/index";
+import { syncController } from "@modules/sync/index";
 import { Elysia } from "elysia";
-import { config } from "./config";
-import { junkController } from "./modules/junk/index";
-import { mailController } from "./modules/mail/index";
-import { syncController } from "./modules/sync/index";
-import { connectionManager } from "./utils/imap-connection";
+import { config } from "@/config";
 
 const app = new Elysia({ prefix: "/api" })
   .onError(({ error }) => {

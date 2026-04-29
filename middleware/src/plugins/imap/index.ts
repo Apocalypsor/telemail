@@ -1,148 +1,22 @@
+import { connectionManager } from "@imap";
 import { Elysia } from "elysia";
+import type {
+  FolderHint,
+  LocateResult,
+  MessageSummary,
+  SearchResultMessage,
+} from "./types";
 import {
-  type ActiveConnection,
-  connectionManager,
-} from "../utils/imap-connection";
-
-const findSpecialFolder = async (
-  conn: ActiveConnection,
-  specialUse: string,
-  nameMatches: string[],
-): Promise<string | null> => {
-  const mailboxes = await conn.client.list();
-  const box =
-    mailboxes.find((m) => m.specialUse === specialUse) ??
-    mailboxes.find((m) => nameMatches.includes(m.name.toLowerCase()));
-  return box?.path ?? null;
-};
-
-const findJunkFolder = (conn: ActiveConnection) =>
-  findSpecialFolder(conn, "\\Junk", ["junk", "junk email", "spam"]);
-
-const findTrashFolder = (conn: ActiveConnection) =>
-  findSpecialFolder(conn, "\\Trash", [
-    "trash",
-    "deleted items",
-    "deleted messages",
-    "bin",
-  ]);
-
-const findArchiveFolder = (conn: ActiveConnection) =>
-  findSpecialFolder(conn, "\\Archive", [
-    "archive",
-    "archives",
-    "all mail",
-    "[gmail]/all mail",
-  ]);
-
-/**
- * 解析归档目标文件夹：
- * 1. 调用方显式指定 → 用指定的
- * 2. 否则查 `\Archive` special-use / 常见名字
- * 3. 都没有 → fallback 到字面量 "Archive"
- */
-async function resolveArchiveFolder(
-  conn: ActiveConnection,
-  explicit: string | undefined,
-): Promise<string> {
-  if (explicit) return explicit;
-  return (await findArchiveFolder(conn)) ?? "Archive";
-}
-
-/**
- * 在 `folder` 里按 RFC 822 Message-Id 搜 UID。多条匹配时取最新（UID 最大）。
- * 没找到返回 null；folder 不存在 / 无权限 → 抛错由调用方处理。
- */
-async function findUidByMessageId(
-  conn: ActiveConnection,
-  folder: string,
-  rfcMessageId: string,
-): Promise<number | null> {
-  const lock = await conn.client.getMailboxLock(folder);
-  try {
-    const hits = await conn.client.search(
-      { header: { "message-id": rfcMessageId } },
-      { uid: true },
-    );
-    if (!Array.isArray(hits) || hits.length === 0) return null;
-    return (hits as number[]).sort((a, b) => b - a)[0];
-  } finally {
-    lock.release();
-  }
-}
-
-/** 在候选文件夹里依次按 Message-Id 搜索，返回命中的 `{folder, uid}` 或 null */
-async function locateMessage(
-  conn: ActiveConnection,
-  rfcMessageId: string,
-  folders: string[],
-): Promise<{ folder: string; uid: number } | null> {
-  for (const folder of folders) {
-    const uid = await findUidByMessageId(conn, folder, rfcMessageId);
-    if (uid !== null) return { folder, uid };
-  }
-  return null;
-}
-
-/**
- * `fetchEmail` 要在哪些文件夹里找 Message-Id —— 不同 hint 给出不同候选顺序。
- * 顺序决定了命中速度 + 歧义（同一 Message-Id 极少数情况会在 All Mail + INBOX
- * 同时存在，hint 让调用方主导选哪封）。
- */
-async function resolveFetchCandidates(
-  conn: ActiveConnection,
-  folderHint: "inbox" | "junk" | "archive" | undefined,
-  archiveFolder: string | undefined,
-): Promise<string[]> {
-  const junk = async () => (await findJunkFolder(conn)) ?? undefined;
-  const archive = () => resolveArchiveFolder(conn, archiveFolder);
-
-  switch (folderHint) {
-    case "archive":
-      return [await archive()];
-    case "junk": {
-      const j = await junk();
-      return j ? [j, "INBOX"] : ["INBOX"];
-    }
-    default: {
-      const j = await junk();
-      return j ? ["INBOX", j] : ["INBOX"];
-    }
-  }
-}
-
-async function searchAndFetch(
-  conn: ActiveConnection,
-  folder: string,
-  searchQuery: Record<string, unknown>,
-  maxResults: number,
-): Promise<{ id: string; subject?: string }[]> {
-  const lock = await conn.client.getMailboxLock(folder);
-  try {
-    const result = await conn.client.search(searchQuery, { uid: true });
-    if (!result || !Array.isArray(result)) return [];
-    const uids = (result as number[])
-      .sort((a: number, b: number) => b - a)
-      .slice(0, maxResults);
-    if (uids.length === 0) return [];
-
-    const range = uids.join(",");
-    const fetched = await conn.client.fetchAll(
-      range,
-      { envelope: true },
-      { uid: true },
-    );
-    // 无 Message-Id 的邮件（罕见）直接跳过 —— 没法跨 folder 追踪，后续 action 也做不了
-    return fetched
-      .filter((msg) => !!msg.envelope?.messageId)
-      .map((msg) => ({
-        id: msg.envelope?.messageId as string,
-        subject: msg.envelope?.subject ?? undefined,
-      }));
-  } finally {
-    lock.release();
-  }
-}
+  findJunkFolder,
+  findTrashFolder,
+  resolveArchiveFolder,
+  resolveFetchCandidates,
+} from "./utils/folders";
+import {
+  findUidByMessageId,
+  locateMessage,
+  searchAndFetch,
+} from "./utils/search";
 
 const Imap = {
   /**
@@ -223,7 +97,7 @@ const Imap = {
   async fetchEmail(
     accountId: number,
     rfcMessageId: string,
-    folderHint?: "inbox" | "junk" | "archive",
+    folderHint?: FolderHint,
     archiveFolder?: string,
   ): Promise<string> {
     const conn = connectionManager.requireConnection(accountId, "fetchEmail");
@@ -266,7 +140,7 @@ const Imap = {
   async listUnread(
     accountId: number,
     maxResults: number = 20,
-  ): Promise<{ id: string; subject?: string }[]> {
+  ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listUnread");
     return searchAndFetch(conn, "INBOX", { seen: false }, maxResults);
   },
@@ -274,7 +148,7 @@ const Imap = {
   async listStarred(
     accountId: number,
     maxResults: number = 20,
-  ): Promise<{ id: string; subject?: string }[]> {
+  ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listStarred");
     return searchAndFetch(conn, "INBOX", { flagged: true }, maxResults);
   },
@@ -282,7 +156,7 @@ const Imap = {
   async listJunk(
     accountId: number,
     maxResults: number = 20,
-  ): Promise<{ id: string; subject?: string }[]> {
+  ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listJunk");
     const junkPath = await findJunkFolder(conn);
     if (!junkPath) return [];
@@ -299,7 +173,7 @@ const Imap = {
     accountId: number,
     query: string,
     maxResults: number = 20,
-  ): Promise<{ id: string; subject?: string; from?: string; date?: string }[]> {
+  ): Promise<SearchResultMessage[]> {
     const conn = connectionManager.requireConnection(accountId, "search");
     const trimmed = query.trim();
     if (!trimmed) return [];
@@ -314,12 +188,7 @@ const Imap = {
       .filter((f): f is string => !!f)
       .filter((f, i, arr) => arr.indexOf(f) === i);
 
-    const all: {
-      id: string;
-      subject?: string;
-      from?: string;
-      date?: string;
-    }[] = [];
+    const all: SearchResultMessage[] = [];
     for (const folder of folders) {
       const lock = await conn.client.getMailboxLock(folder);
       try {
@@ -366,7 +235,7 @@ const Imap = {
 
     // 同一 Message-Id 可能在 INBOX + Gmail All Mail 同时出现，按 id 去重保留首条。
     const seen = new Set<string>();
-    const dedup: typeof all = [];
+    const dedup: SearchResultMessage[] = [];
     for (const m of all) {
       if (seen.has(m.id)) continue;
       seen.add(m.id);
@@ -380,7 +249,7 @@ const Imap = {
     accountId: number,
     folder: string | undefined,
     maxResults: number = 20,
-  ): Promise<{ id: string; subject?: string }[]> {
+  ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listFolder");
     const resolved = await resolveArchiveFolder(conn, folder);
     // 文件夹不存在时返回空（避免 getMailboxLock 抛错导致请求失败）
@@ -564,10 +433,7 @@ const Imap = {
     accountId: number,
     rfcMessageId: string,
     archiveFolder?: string,
-  ): Promise<{
-    location: "inbox" | "junk" | "archive" | "deleted";
-    starred?: boolean;
-  }> {
+  ): Promise<LocateResult> {
     const conn = connectionManager.requireConnection(accountId, "locate");
 
     // INBOX —— 命中就顺带读星标状态

@@ -1,6 +1,6 @@
+import { connectionManager } from "@imap";
+import { auth } from "@plugins/auth";
 import { Elysia } from "elysia";
-import { auth } from "../../plugins/auth";
-import { connectionManager } from "../../utils/imap-connection";
 
 export const syncController = new Elysia({ name: "controller.sync" })
   .get("/health", ({ set }) => {
