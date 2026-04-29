@@ -91,6 +91,7 @@ export function ReminderTimeline({
   loading,
   deletingId,
   onDelete,
+  onEdit,
   onOpenMail,
 }: {
   listOnly: boolean;
@@ -98,6 +99,7 @@ export function ReminderTimeline({
   loading: boolean;
   deletingId: number | null;
   onDelete: (id: number) => void;
+  onEdit: (id: number) => void;
   onOpenMail: (r: Reminder) => void;
 }) {
   // groupRemindersByDate 和 rows 拼装只依赖 reminders；reminders 没变就别重算。
@@ -191,6 +193,7 @@ export function ReminderTimeline({
             isDeleting={deletingId === row.reminder.id}
             onOpen={() => onOpenMail(row.reminder)}
             onDelete={() => onDelete(row.reminder.id)}
+            onEdit={() => onEdit(row.reminder.id)}
             className={marginClass}
           />
         );
@@ -281,6 +284,7 @@ function ItemRow({
   isDeleting,
   onOpen,
   onDelete,
+  onEdit,
   className,
 }: {
   it: Reminder;
@@ -292,6 +296,7 @@ function ItemRow({
   isDeleting: boolean;
   onOpen: () => void;
   onDelete: () => void;
+  onEdit: () => void;
   className: string;
 }) {
   const d = new Date(it.remind_at);
@@ -343,12 +348,12 @@ function ItemRow({
       <div className="flex-1 min-w-0">
         <Card
           it={it}
-          listOnly={listOnly}
           canOpen={canOpen}
           isOverdue={isOverdue}
           isDeleting={isDeleting}
           onOpen={onOpen}
           onDelete={onDelete}
+          onEdit={onEdit}
         />
       </div>
     </article>
@@ -357,42 +362,40 @@ function ItemRow({
 
 function Card({
   it,
-  listOnly,
   canOpen,
   isOverdue,
   isDeleting,
   onOpen,
   onDelete,
+  onEdit,
 }: {
   it: Reminder;
-  listOnly: boolean;
   canOpen: boolean;
   isOverdue: boolean;
   isDeleting: boolean;
   onOpen: () => void;
   onDelete: () => void;
+  onEdit: () => void;
 }) {
-  const showEmail = listOnly && Boolean(it.email_summary || it.email_subject);
-  const hasText = it.text.trim().length > 0;
+  // 内容显示优先级 fallback：备注 > short_summary > 邮件 subject。
+  // 取第一个非空，仅显示一行；都为空则 italic 占位。
+  const text = it.text.trim();
+  const display = text
+    ? { icon: "📝", value: text }
+    : it.email_summary
+      ? { icon: "📧", value: it.email_summary }
+      : it.email_subject
+        ? { icon: "📧", value: it.email_subject }
+        : null;
 
   const inner = (
     <>
-      {showEmail && (
-        <div className="flex gap-1.5 items-start text-[13px] leading-relaxed text-zinc-300 break-words">
-          <span className="shrink-0">📧</span>
-          <span className="flex-1">{it.email_summary || it.email_subject}</span>
+      {display ? (
+        <div className="flex gap-1.5 items-start text-[15px] leading-relaxed break-words text-zinc-100">
+          <span className="shrink-0">{display.icon}</span>
+          <span className="flex-1">{display.value}</span>
         </div>
-      )}
-      {hasText && (
-        <div
-          className={`text-[15px] leading-relaxed break-words text-zinc-100 ${
-            showEmail ? "mt-1.5" : ""
-          }`}
-        >
-          {it.text}
-        </div>
-      )}
-      {!showEmail && !hasText && (
+      ) : (
         <div className="text-sm text-zinc-500 italic">无备注</div>
       )}
       {canOpen && (
@@ -421,19 +424,30 @@ function Card({
         <div className="p-3.5 pr-12">{inner}</div>
       )}
 
-      <button
-        type="button"
-        onClick={onDelete}
-        disabled={isDeleting}
-        aria-label="删除提醒"
-        className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center text-zinc-500 hover:bg-zinc-800 hover:text-red-400 active:bg-zinc-700 transition-colors disabled:opacity-40"
-      >
-        {isDeleting ? (
-          <Spinner size="sm" />
-        ) : (
-          <span className="text-sm">🗑</span>
-        )}
-      </button>
+      {/* 按钮竖排：✏️ 在上，🗑 在下，靠右贴边。listOnly 与否都用同一布局 */}
+      <div className="absolute top-1.5 right-1.5 flex flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="编辑提醒"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-500 hover:bg-zinc-800 hover:text-emerald-300 active:bg-zinc-700 transition-colors"
+        >
+          <span className="text-sm">✏️</span>
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={isDeleting}
+          aria-label="删除提醒"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-500 hover:bg-zinc-800 hover:text-red-400 active:bg-zinc-700 transition-colors disabled:opacity-40"
+        >
+          {isDeleting ? (
+            <Spinner size="sm" />
+          ) : (
+            <span className="text-sm">🗑</span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

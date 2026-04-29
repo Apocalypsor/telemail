@@ -157,16 +157,11 @@ export function getInitData(): string {
   return getTelegram()?.initData ?? "";
 }
 
-/**
- * iPad 嗅探 —— TG `tg.platform` 对 iPhone / iPad 都返回 `"ios"`，只能靠
- * UA + touch 区分。iPadOS 13+ 默认伪装成 Mac UA，所以加一个 touch 兜底。
- */
-function isIPad(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  if (/iPad/.test(ua)) return true;
-  if (/Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1) return true;
-  return false;
+/** Mobile = iOS（iPhone / iPad 都报 "ios"）+ Android + Android X。
+ *  桌面 / web 客户端 fullscreen 不适用，会被 TG 自动 reject。 */
+function isMobilePlatform(tg: TelegramWebApp): boolean {
+  const p = tg.platform;
+  return p === "ios" || p === "android" || p === "android_x";
 }
 
 const TelegramContext = createContext<TelegramWebApp | null>(null);
@@ -177,9 +172,10 @@ const TelegramContext = createContext<TelegramWebApp | null>(null);
 // Mini App 永远走 zinc/emerald 固定深色（和 web 一致），不跟 TG 客户端的
 // light/dark，所以不再监听 themeChanged。
 //
-// 仅 iPad 请求 Bot API 8.0 的 `requestFullscreen()`：TG 客户端会收起常规
-// 标题栏，换成顶部的浮动 pill + 菜单，和 BotFather 的 chrome 观感一致。
-// iPhone 和桌面 TG 保持传统标题栏。老客户端没这方法自动跳过。
+// 移动端（iOS / Android）请求 Bot API 8.0 的 `requestFullscreen()`：TG 客户端
+// 会收起常规标题栏，换成顶部的浮动 pill + 菜单 —— 手机屏幕小，多挤出 ~50px 给
+// 内容用。CSS 通过 `--tg-content-safe-area-inset-top` 给 body 加 padding 避免
+// 浮动 chrome 盖内容。桌面 / web 平台无此 API，老客户端没这方法，自动跳过。
 export function TelegramProvider({ children }: { children: ReactNode }) {
   const [tg] = useState<TelegramWebApp | null>(() => getTelegram());
 
@@ -206,7 +202,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       tg.setBottomBarColor?.(THEME_COLORS.bg);
     }
     if (
-      isIPad() &&
+      isMobilePlatform(tg) &&
       tg.isVersionAtLeast?.("8.0") &&
       tg.requestFullscreen &&
       !tg.isFullscreen

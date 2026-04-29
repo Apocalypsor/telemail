@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import {
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
 } from "@worker/handlers/hono/routes";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { api } from "@/api/client";
 import {
@@ -47,6 +47,7 @@ export const Route = createFileRoute("/telegram-app/reminders/")({
 
 function RemindersPage() {
   const search: Search = Route.useSearch();
+  const navigate = useNavigate();
   const navigateToMail = useNavigateToMail();
   const listOnly = !search.accountId || !search.emailMessageId || !search.token;
 
@@ -133,10 +134,14 @@ function RemindersPage() {
         .json();
       const parsed = okResponseSchema.parse(data);
       if (!parsed.ok) throw new Error(parsed.error || "保存失败");
-      return parsed;
+      return { ...parsed, savedAt: dt };
     },
-    onSuccess: () => {
-      setStatus({ msg: "✅ 已设定提醒", kind: "ok" });
+    onSuccess: ({ savedAt }) => {
+      const wall = formatInTz(savedAt, tz);
+      setStatus({
+        msg: `✅ 已设置提醒：${wall.ymd} ${wall.hm}`,
+        kind: "ok",
+      });
       setText("");
       const next = formatInTz(new Date(Date.now() + 60_000), tz);
       setDate(next.ymd);
@@ -150,6 +155,13 @@ function RemindersPage() {
     },
   });
 
+  // 状态消息 4 秒自动消失（仅 ok 态；error 留着等用户手动 retry 看完）
+  useEffect(() => {
+    if (status?.kind !== "ok") return;
+    const t = setTimeout(() => setStatus(null), 4000);
+    return () => clearTimeout(t);
+  }, [status]);
+
   const deleteMut = useMutation({
     mutationFn: async (id: number) => {
       await api
@@ -160,6 +172,19 @@ function RemindersPage() {
     onError: async (err) =>
       setStatus({ msg: await extractErrorMessage(err), kind: "error" }),
   });
+
+  // 删除前要求确认 —— TG `showConfirm` 走原生 modal；老客户端 / 浏览器
+  // fallback 到 window.confirm。
+  function confirmDelete(id: number) {
+    const tg = getTelegram();
+    const msg = "确定删除这条提醒？";
+    const run = () => {
+      setStatus(null);
+      deleteMut.mutate(id);
+    };
+    if (tg?.showConfirm) tg.showConfirm(msg, (ok) => ok && run());
+    else if (window.confirm(msg)) run();
+  }
 
   function applyPreset(idx: number) {
     const target = presetToDate(PRESETS[idx].mins, tz);
@@ -198,6 +223,19 @@ function RemindersPage() {
         )}
       </header>
 
+      {status && (
+        <output
+          aria-live="polite"
+          className={`block rounded-lg border px-4 py-2.5 text-sm font-medium ${
+            status.kind === "error"
+              ? "border-red-900/60 bg-red-950/40 text-red-300"
+              : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+          }`}
+        >
+          {status.msg}
+        </output>
+      )}
+
       {!listOnly && (
         <ReminderEmailCard
           subject={emailCtx.data?.subject ?? null}
@@ -225,7 +263,6 @@ function RemindersPage() {
           tzLabel={tz}
           activePreset={activePreset}
           saving={createMut.isPending}
-          status={status}
           onDateChange={setDate}
           onTimeChange={setTime}
           onTextChange={setText}
@@ -243,7 +280,15 @@ function RemindersPage() {
         reminders={reminders}
         loading={remindersQuery.isLoading}
         deletingId={deleteMut.isPending ? (deleteMut.variables ?? null) : null}
-        onDelete={(id) => deleteMut.mutate(id)}
+        onDelete={confirmDelete}
+        onEdit={(id) => {
+          const back = window.location.pathname + window.location.search;
+          navigate({
+            to: "/telegram-app/reminders/edit/$id",
+            params: { id: String(id) },
+            search: { back },
+          });
+        }}
         onOpenMail={(r) => {
           if (!r.account_id || !r.email_message_id || !r.mail_token) return;
           navigateToMail(r.account_id, r.email_message_id, r.mail_token);

@@ -25,6 +25,10 @@ export const remindersListResponseSchema = z.object({
   reminders: z.array(reminderSchema),
 });
 
+export const reminderResponseSchema = z.object({
+  reminder: reminderSchema,
+});
+
 export const emailContextResponseSchema = z.object({
   subject: z.string().nullable(),
   accountEmail: z.string().nullable(),

@@ -4,7 +4,7 @@ import { PRESETS } from "../-utils/presets";
 import { DEVICE_TZ_VALUE, TZ_GROUPS } from "../-utils/tz";
 
 /** "新建提醒" 表单：日期/时间 + 时区下拉 + 快捷 preset + 备注 + 保存。
- *  纯展示组件，状态由 caller 管。 */
+ *  纯展示组件，状态由 caller 管。成功 / 失败提示渲染在 page 级 banner，不在这里。 */
 export function ReminderAddSection({
   date,
   time,
@@ -14,7 +14,6 @@ export function ReminderAddSection({
   tzLabel,
   activePreset,
   saving,
-  status,
   onDateChange,
   onTimeChange,
   onTextChange,
@@ -32,7 +31,6 @@ export function ReminderAddSection({
   tzLabel: string;
   activePreset: number | null;
   saving: boolean;
-  status: { msg: string; kind: "ok" | "error" } | null;
   onDateChange: (v: string) => void;
   onTimeChange: (v: string) => void;
   onTextChange: (v: string) => void;
@@ -137,16 +135,6 @@ export function ReminderAddSection({
       >
         {saving ? <Spinner size="sm" /> : "保存提醒"}
       </button>
-
-      {status && (
-        <div
-          className={`text-sm text-center ${
-            status.kind === "error" ? "text-red-400" : "text-emerald-400"
-          }`}
-        >
-          {status.msg}
-        </div>
-      )}
 
       <div className="text-xs text-zinc-500">
         时间按 <span className="text-zinc-300">{tzLabel}</span> 解释

@@ -114,6 +114,24 @@ export async function getReminderById(
     .first<Reminder>();
 }
 
+/** 编辑某用户的待发送提醒（只能改时间和备注；邮件上下文不变）。
+ *  WHERE 双重约束：不允许改别人的，sent_at IS NULL 防止改已发送的。 */
+export async function updatePendingReminder(
+  db: D1Database,
+  telegramUserId: string,
+  id: number,
+  patch: { text: string; remindAtIso: string },
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE reminders SET text = ?, remind_at = ?
+       WHERE id = ? AND telegram_user_id = ? AND sent_at IS NULL`,
+    )
+    .bind(patch.text, patch.remindAtIso, id, telegramUserId)
+    .run();
+  return result.meta.changes > 0;
+}
+
 /** 删除某用户的待发送提醒（不允许删别人的，所以 WHERE 双重约束） */
 export async function deletePendingReminder(
   db: D1Database,

@@ -14,6 +14,7 @@ import {
   listPendingReminders,
   listPendingRemindersForEmail,
   type Reminder,
+  updatePendingReminder,
 } from "@db/reminders";
 import { requireMiniAppAuth } from "@handlers/hono/middleware";
 import {
@@ -462,6 +463,55 @@ miniapp.post(ROUTE_REMINDERS_API, async (c) => {
     ).catch(() => {}),
   );
   return c.json({ ok: true, id });
+});
+
+// ─── API: 取单个提醒（编辑页加载用） ─────────────────────────────────────────
+// 复用 enrichReminders 给单条加 mail_token + email_summary，让编辑页顶部的邮件
+// 卡片可以点击跳邮件预览。
+
+miniapp.get(ROUTE_REMINDERS_API_ITEM, async (c) => {
+  const userId = c.get("userId");
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0)
+    return c.json({ error: "Invalid id" }, 400);
+  const reminder = await getReminderById(c.env.DB, id);
+  if (!reminder || reminder.telegram_user_id !== userId)
+    return c.json({ error: "未找到提醒" }, 404);
+  const [enriched] = await enrichReminders(c, [reminder]);
+  return c.json({ reminder: enriched });
+});
+
+// ─── API: 编辑（只允许改 text + remind_at；邮件上下文不变） ──────────────────
+
+miniapp.patch(ROUTE_REMINDERS_API_ITEM, async (c) => {
+  const userId = c.get("userId");
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0)
+    return c.json({ ok: false, error: "Invalid id" }, 400);
+
+  const body = await c.req
+    .json<{ text?: string; remind_at?: string }>()
+    .catch(() => null);
+  if (!body) return c.json({ ok: false, error: "请求格式错误" }, 400);
+
+  const text = (body.text ?? "").trim();
+  if (text.length > REMINDER_TEXT_MAX)
+    return c.json(
+      { ok: false, error: `备注超过 ${REMINDER_TEXT_MAX} 字` },
+      400,
+    );
+  const ts = Date.parse((body.remind_at ?? "").trim());
+  if (Number.isNaN(ts))
+    return c.json({ ok: false, error: "时间格式错误" }, 400);
+  if (ts <= Date.now() - 30_000)
+    return c.json({ ok: false, error: "提醒时间需在未来" }, 400);
+
+  const ok = await updatePendingReminder(c.env.DB, userId, id, {
+    text,
+    remindAtIso: new Date(ts).toISOString(),
+  });
+  if (!ok) return c.json({ ok: false, error: "未找到提醒" }, 404);
+  return c.json({ ok: true });
 });
 
 // ─── API: 删除 ───────────────────────────────────────────────────────────────
