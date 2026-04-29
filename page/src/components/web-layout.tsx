@@ -1,10 +1,10 @@
+import { api } from "@api/client";
 import { Dropdown } from "@heroui/react";
+import { loginUrlForCurrentPath, useSession } from "@hooks/use-session";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ROUTE_SESSION_LOGOUT } from "@worker/handlers/hono/routes";
 import type { ReactNode } from "react";
-import { api } from "@/api/client";
-import { loginUrlForCurrentPath, useSession } from "@/hooks/use-session";
 
 /**
  * 非 Mini App 的 web 页面共用的外壳 —— 固定深色、zinc/emerald。顶栏左边

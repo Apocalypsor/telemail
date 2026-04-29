@@ -1,5 +1,5 @@
+import { getInitData } from "@providers/telegram";
 import ky from "ky";
-import { getInitData } from "@/providers/telegram";
 
 /**
  * 共享 ky 实例：所有 API 调用自动带 `X-Telegram-Init-Data` 头，后端

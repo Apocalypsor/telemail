@@ -1,7 +1,7 @@
 import { Chip } from "@heroui/react";
+import { type MailAction, useMailActions } from "@hooks/use-mail-actions";
+import { useSession } from "@hooks/use-session";
 import { useState } from "react";
-import { type MailAction, useMailActions } from "@/hooks/use-mail-actions";
-import { useSession } from "@/hooks/use-session";
 import { AccentButton } from "./accent-button";
 
 /** Web 版邮件 toolbar：星标 / 归档 / 标垃圾 / 图片代理切换。

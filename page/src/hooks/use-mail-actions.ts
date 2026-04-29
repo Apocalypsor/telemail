@@ -1,7 +1,7 @@
+import { api } from "@api/client";
+import { okResponseSchema } from "@api/schemas";
+import { extractErrorMessage } from "@api/utils";
 import { useCallback, useRef, useState } from "react";
-import { api } from "@/api/client";
-import { okResponseSchema } from "@/api/schemas";
-import { extractErrorMessage } from "@/api/utils";
 
 /**
  * 邮件预览页能触发的服务端动作。和 worker `routes.ts` 里 ROUTE_MAIL_*

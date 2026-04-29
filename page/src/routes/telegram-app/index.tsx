@@ -1,12 +1,12 @@
+import { api } from "@api/client";
+import { resolveContextResponseSchema } from "@api/schemas";
+import { extractErrorMessage } from "@api/utils";
 import { Spinner } from "@heroui/react";
+import { useBackButton } from "@hooks/use-back-button";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
 import { ROUTE_REMINDERS_API_RESOLVE_CONTEXT } from "@worker/handlers/hono/routes";
 import { useEffect, useState } from "react";
-import { api } from "@/api/client";
-import { resolveContextResponseSchema } from "@/api/schemas";
-import { extractErrorMessage } from "@/api/utils";
-import { useBackButton } from "@/hooks/use-back-button";
 
 /**
  * 入口路由（`/telegram-app/`，对应 BotFather `/newapp` 注册的 Web App URL）。

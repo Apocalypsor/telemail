@@ -1,8 +1,8 @@
+import { api } from "@api/client";
+import { type Whoami, whoamiResponseSchema } from "@api/schemas";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_SESSION_WHOAMI } from "@worker/handlers/hono/routes";
 import { HTTPError, type KyResponse } from "ky";
-import { api } from "@/api/client";
-import { type Whoami, whoamiResponseSchema } from "@/api/schemas";
 
 /**
  * 查一下当前浏览器有没有有效 session cookie（已登录 + approved）。

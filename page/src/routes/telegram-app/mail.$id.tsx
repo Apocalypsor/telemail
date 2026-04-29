@@ -1,17 +1,17 @@
+import { api } from "@api/client";
+import { mailPreviewResponseSchema } from "@api/schemas";
+import { MailBodyFrame } from "@components/mail-body-frame";
+import { MailFab } from "@components/mail-fab";
+import { MailMeta } from "@components/mail-meta";
 import { Skeleton } from "@heroui/react";
+import { useBackButton } from "@hooks/use-back-button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
+import { openExternalLink } from "@utils/tg";
 import { ROUTE_MAIL_API } from "@worker/handlers/hono/routes";
 import { useCallback, useState } from "react";
 import { z } from "zod";
-import { api } from "@/api/client";
-import { mailPreviewResponseSchema } from "@/api/schemas";
-import { MailBodyFrame } from "@/components/mail-body-frame";
-import { MailFab } from "@/components/mail-fab";
-import { MailMeta } from "@/components/mail-meta";
-import { useBackButton } from "@/hooks/use-back-button";
-import { openExternalLink } from "@/utils/tg";
 
 // accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
 // folder / back 可选。

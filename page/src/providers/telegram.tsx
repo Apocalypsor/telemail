@@ -1,3 +1,4 @@
+import { THEME_COLORS } from "@styles/theme";
 import {
   bindViewportCssVars,
   disableVerticalSwipes,
@@ -22,7 +23,6 @@ import {
   setMiniAppHeaderColor,
 } from "@telegram-apps/sdk-react";
 import { type ReactNode, useEffect } from "react";
-import { THEME_COLORS } from "@/styles/theme";
 
 /** Raw initData 头给 ky 用（`api/client.ts` 注入到 `X-Telegram-Init-Data`）。
  *  非 TG 环境下 SDK 抛 `LaunchParamsRetrieveError`，吞掉返回空串。 */

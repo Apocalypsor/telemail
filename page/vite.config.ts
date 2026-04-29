@@ -22,6 +22,14 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(root, "src"),
+      "@api": path.resolve(root, "src/api"),
+      "@components": path.resolve(root, "src/components"),
+      "@hooks": path.resolve(root, "src/hooks"),
+      "@providers": path.resolve(root, "src/providers"),
+      "@routes": path.resolve(root, "src/routes"),
+      "@styles": path.resolve(root, "src/styles"),
+      "@utils": path.resolve(root, "src/utils"),
+      "@page": path.resolve(root, "src"),
       "@worker": path.resolve(root, "../worker"),
     },
   },

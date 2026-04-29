@@ -1,6 +1,6 @@
+import { WebLayout } from "@components/web-layout";
 import { Button, Card } from "@heroui/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { WebLayout } from "@/components/web-layout";
 
 /**
  * 域名根 `/`：Telemail 是一个 Telegram Mini App，入口在 TG bot 内部。

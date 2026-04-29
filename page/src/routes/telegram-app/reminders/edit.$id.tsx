@@ -1,4 +1,10 @@
+import { api } from "@api/client";
+import { okResponseSchema, reminderResponseSchema } from "@api/schemas";
+import { extractErrorMessage } from "@api/utils";
 import { Spinner } from "@heroui/react";
+import { useBackButton } from "@hooks/use-back-button";
+import { useNavigateToMail } from "@hooks/use-navigate-to-mail";
+import { INPUT_CLASS } from "@styles/inputs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createFileRoute,
@@ -6,16 +12,10 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
+import { notifyHaptic } from "@utils/tg";
 import { ROUTE_REMINDERS_API } from "@worker/handlers/hono/routes";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import { api } from "@/api/client";
-import { okResponseSchema, reminderResponseSchema } from "@/api/schemas";
-import { extractErrorMessage } from "@/api/utils";
-import { useBackButton } from "@/hooks/use-back-button";
-import { useNavigateToMail } from "@/hooks/use-navigate-to-mail";
-import { INPUT_CLASS } from "@/styles/inputs";
-import { notifyHaptic } from "@/utils/tg";
 import { ReminderEmailCard } from "./-components/email-card";
 import {
   DEVICE_TZ_VALUE,

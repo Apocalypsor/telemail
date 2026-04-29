@@ -1,3 +1,6 @@
+import { api } from "@api/client";
+import { botInfoResponseSchema } from "@api/schemas";
+import { WebLayout } from "@components/web-layout";
 import { Card } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -8,9 +11,6 @@ import {
 } from "@worker/handlers/hono/routes";
 import { useEffect, useRef } from "react";
 import { z } from "zod";
-import { api } from "@/api/client";
-import { botInfoResponseSchema } from "@/api/schemas";
-import { WebLayout } from "@/components/web-layout";
 
 // `return_to` 登陆成功后跳回的路径（默认 `/`）。
 // `denied=1` + `uid` 由 Worker callback 在用户未 approved 时带过来，页面展示

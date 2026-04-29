@@ -1,17 +1,17 @@
+import { api } from "@api/client";
+import { mailSearchResponseSchema } from "@api/schemas";
+import { extractErrorMessage } from "@api/utils";
+import { MailListByAccount } from "@components/mail-list-by-account";
 import { Skeleton, Spinner } from "@heroui/react";
+import { useBackButton } from "@hooks/use-back-button";
+import { useNavigateToMail } from "@hooks/use-navigate-to-mail";
+import { INPUT_CLASS } from "@styles/inputs";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { ROUTE_MINI_APP_API_SEARCH } from "@worker/handlers/hono/routes";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { api } from "@/api/client";
-import { mailSearchResponseSchema } from "@/api/schemas";
-import { extractErrorMessage } from "@/api/utils";
-import { MailListByAccount } from "@/components/mail-list-by-account";
-import { useBackButton } from "@/hooks/use-back-button";
-import { useNavigateToMail } from "@/hooks/use-navigate-to-mail";
-import { INPUT_CLASS } from "@/styles/inputs";
 
 // 查询字串放 URL，目的有二：
 // 1) 搜索状态可被浏览器 / TG WebView 历史保留 —— 点击邮件后回退能回到带结果的搜索页

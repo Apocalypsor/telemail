@@ -1,5 +1,5 @@
+import type { MailListAccountResult, MailListItem } from "@api/schemas";
 import type { ReactNode } from "react";
-import type { MailListAccountResult, MailListItem } from "@/api/schemas";
 import { AccountBox } from "./account-box";
 
 /** 邮件列表按账号分组渲染 —— `list.$type` / `search` 两个页面都按"账号 →

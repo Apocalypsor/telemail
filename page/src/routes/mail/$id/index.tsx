@@ -1,3 +1,8 @@
+import { api } from "@api/client";
+import { mailPreviewResponseSchema } from "@api/schemas";
+import { MailBodyFrame } from "@components/mail-body-frame";
+import { MailMeta } from "@components/mail-meta";
+import { WebLayout } from "@components/web-layout";
 import { Card, Skeleton } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -5,11 +10,6 @@ import { zodValidator } from "@tanstack/zod-adapter";
 import { ROUTE_MAIL_API } from "@worker/handlers/hono/routes";
 import { useState } from "react";
 import { z } from "zod";
-import { api } from "@/api/client";
-import { mailPreviewResponseSchema } from "@/api/schemas";
-import { MailBodyFrame } from "@/components/mail-body-frame";
-import { MailMeta } from "@/components/mail-meta";
-import { WebLayout } from "@/components/web-layout";
 import { WebMailToolbar } from "./-components/web-toolbar";
 
 const searchSchema = z.object({

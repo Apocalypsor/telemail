@@ -1,16 +1,13 @@
+import { api } from "@api/client";
+import { junkCheckResponseSchema } from "@api/schemas";
+import { extractErrorMessage, redirectToLoginOnUnauthorized } from "@api/utils";
+import { SessionGatedWebLayout } from "@components/session-gated-web-layout";
 import { Button, Card, Spinner } from "@heroui/react";
+import { INPUT_CLASS } from "@styles/inputs";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ROUTE_JUNK_CHECK_API } from "@worker/handlers/hono/routes";
 import { useState } from "react";
-import { api } from "@/api/client";
-import { junkCheckResponseSchema } from "@/api/schemas";
-import {
-  extractErrorMessage,
-  redirectToLoginOnUnauthorized,
-} from "@/api/utils";
-import { SessionGatedWebLayout } from "@/components/session-gated-web-layout";
-import { INPUT_CLASS } from "@/styles/inputs";
 import { ResultCard } from "./-components/result-card";
 
 export const Route = createFileRoute("/junk-check/")({

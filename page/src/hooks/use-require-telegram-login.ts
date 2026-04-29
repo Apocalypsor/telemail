@@ -1,6 +1,6 @@
+import type { Whoami } from "@api/schemas";
+import { loginUrlForCurrentPath, useSession } from "@hooks/use-session";
 import { useEffect } from "react";
-import type { Whoami } from "@/api/schemas";
-import { loginUrlForCurrentPath, useSession } from "@/hooks/use-session";
 
 /**
  * Web 页面（/preview, /junk-check）进门闸：`useSession` 返 null 时立即

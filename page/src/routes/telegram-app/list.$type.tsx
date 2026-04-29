@@ -1,7 +1,19 @@
+import { api } from "@api/client";
+import {
+  bulkActionResponseSchema,
+  type MailListType,
+  mailListResponseSchema,
+  mailListTypeSchema,
+} from "@api/schemas";
+import { extractErrorMessage } from "@api/utils";
+import { MailListByAccount } from "@components/mail-list-by-account";
 import { Skeleton, Spinner } from "@heroui/react";
+import { useBackButton } from "@hooks/use-back-button";
+import { useNavigateToMail } from "@hooks/use-navigate-to-mail";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
+import { confirmPopup, notifyHaptic } from "@utils/tg";
 import {
   ROUTE_MINI_APP_API_LIST,
   ROUTE_MINI_APP_API_MARK_ALL_READ,
@@ -9,19 +21,7 @@ import {
 } from "@worker/handlers/hono/routes";
 import { useMemo, useState } from "react";
 import { z } from "zod";
-import { api } from "@/api/client";
-import {
-  bulkActionResponseSchema,
-  type MailListType,
-  mailListResponseSchema,
-  mailListTypeSchema,
-} from "@/api/schemas";
-import { extractErrorMessage } from "@/api/utils";
-import { MailListByAccount } from "@/components/mail-list-by-account";
 import { MAIL_LIST_TITLES, MAIL_LIST_TYPES } from "@/constants";
-import { useBackButton } from "@/hooks/use-back-button";
-import { useNavigateToMail } from "@/hooks/use-navigate-to-mail";
-import { confirmPopup, notifyHaptic } from "@/utils/tg";
 
 interface BulkAction {
   label: string;

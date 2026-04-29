@@ -1,4 +1,4 @@
-import type { MailPreviewResponse } from "@/api/schemas";
+import type { MailPreviewResponse } from "@api/schemas";
 
 /** 邮件 meta 块（From / To / Account / Date）。web `/mail/$id` 和 miniapp
  *  `/telegram-app/mail/$id` 两边渲染一字不差，统一这一份。 */
