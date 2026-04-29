@@ -208,6 +208,21 @@ async function applyReminderSideEffects(
   })();
 
   await Promise.allSettled([starP, pinP]);
+
+  // 重建键盘 —— addStar 之后再读一次 isStarred，让 ⭐ 按钮反映新状态。
+  // 这也兜底 markSentAndRefresh 那次和 addStar 的竞态：last refresh wins。
+  // 重投递场景下 mapping 已被刷新到新 tg_message_id，refresh 自动找到新 mapping。
+  await refreshEmailKeyboardAfterReminderChange(
+    env,
+    account,
+    emailMessageId,
+  ).catch((err) =>
+    reportErrorToObservability(env, "reminders.refresh_keyboard_failed", err, {
+      reminderId: r.id,
+      accountId,
+      emailMessageId,
+    }),
+  );
 }
 
 /** 把邮件重新投递到 TG 聊天。先删旧 mapping 防止 `(chat_id, email_message_id,
