@@ -1,6 +1,10 @@
 import { Spinner } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { ROUTE_REMINDERS_API } from "@worker/handlers/hono/routes";
 import { useEffect, useMemo, useState } from "react";
@@ -35,6 +39,7 @@ function EditReminderPage() {
   const search = Route.useSearch();
   const id = Number(idParam);
   const navigate = useNavigate();
+  const router = useRouter();
   const navigateToMail = useNavigateToMail();
   const qc = useQueryClient();
 
@@ -76,11 +81,14 @@ function EditReminderPage() {
   }, [reminderQuery.data, tz, initialized]);
 
   function goBack() {
-    if (search.back) window.location.href = search.back;
+    // SPA 导航 —— 走硬刷新会跟 BackButton cleanup postMessage 跑赢比赛
+    if (search.back) router.history.push(search.back);
     else navigate({ to: "/telegram-app/reminders", search: {} });
   }
 
-  useBackButton(search.back ?? "/telegram-app/reminders");
+  // 只有真的从某页跳进来才显示 BackButton；直接打开 edit 页（深链 / 刷新丢
+  // search.back）时不显示，让 TG 全屏的原生 ✕ 关闭按钮露出来
+  useBackButton(search.back);
 
   const updateMut = useMutation({
     mutationFn: async () => {
@@ -154,7 +162,7 @@ function EditReminderPage() {
         </output>
       )}
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
         <div>
           <label
             htmlFor="edit-date"
@@ -241,7 +249,7 @@ function EditReminderPage() {
               updateMut.mutate();
             }}
             disabled={!initialized || updateMut.isPending}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-colors disabled:opacity-40 flex items-center justify-center"
+            className="flex-1 px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-[colors,transform] duration-100 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100 flex items-center justify-center"
           >
             {updateMut.isPending ? <Spinner size="sm" /> : "保存"}
           </button>

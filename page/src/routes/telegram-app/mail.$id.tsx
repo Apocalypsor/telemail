@@ -81,7 +81,7 @@ function MailPreviewPage() {
         <Skeleton className="h-9 w-2/3 rounded-md" />
         <Skeleton className="h-4 w-1/3 rounded-md" />
         <Skeleton className="h-4 w-1/2 rounded-md" />
-        <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
+        <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
           <Skeleton className="h-4 w-full rounded-md" />
           <Skeleton className="h-4 w-11/12 rounded-md" />
           <Skeleton className="h-4 w-10/12 rounded-md" />
@@ -107,7 +107,7 @@ function MailPreviewPage() {
 
         <MailMeta meta={d.meta} accountEmail={d.accountEmail} />
 
-        <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-[inset_0_8px_16px_-12px_rgba(0,0,0,0.5)]">
           <MailBodyFrame
             bodyHtml={d.bodyHtml}
             bodyHtmlRaw={d.bodyHtmlRaw}

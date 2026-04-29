@@ -171,7 +171,7 @@ function MailListPage() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3"
+              className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3"
             >
               <Skeleton className="h-4 w-1/3 rounded-md" />
               <Skeleton className="h-3 w-full rounded-md" />
@@ -180,11 +180,11 @@ function MailListPage() {
           ))}
         </div>
       ) : isError ? (
-        <div className="rounded-xl border border-red-900/50 bg-red-950/30 p-10 text-center text-sm text-red-400">
+        <div className="rounded-2xl border border-red-900/50 bg-red-950/30 p-10 text-center text-sm text-red-400">
           查询失败
         </div>
       ) : !data?.total ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-10 text-center text-sm text-zinc-500">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-10 text-center text-sm text-zinc-500">
           暂无邮件
         </div>
       ) : (

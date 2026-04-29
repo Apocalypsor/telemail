@@ -41,7 +41,7 @@ export function ReminderAddSection({
   const inputClass = `text-[15px] ${INPUT_CLASS}`;
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
       <div>
         <label
           htmlFor="when-date"
@@ -133,7 +133,7 @@ export function ReminderAddSection({
         type="button"
         onClick={onSave}
         disabled={saving}
-        className="w-full px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+        className="w-full px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-[colors,transform] duration-100 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center"
       >
         {saving ? <Spinner size="sm" /> : "保存提醒"}
       </button>

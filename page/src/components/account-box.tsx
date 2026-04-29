@@ -14,7 +14,7 @@ export function AccountBox({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
       <div
         className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[13px] bg-zinc-950/30 border-b border-zinc-800 ${
           errored ? "text-red-400" : "text-zinc-400"

@@ -99,7 +99,7 @@ function SearchPage() {
         <button
           type="submit"
           disabled={searchQuery.isFetching || !input.trim()}
-          className="px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center min-w-[68px]"
+          className="px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-[colors,transform] duration-100 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center min-w-[68px]"
         >
           {searchQuery.isFetching ? <Spinner size="sm" /> : "搜索"}
         </button>
@@ -121,7 +121,7 @@ function SearchPage() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3"
+              className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3"
             >
               <Skeleton className="h-4 w-1/3 rounded-md" />
               <Skeleton className="h-3 w-full rounded-md" />
@@ -130,7 +130,7 @@ function SearchPage() {
           ))}
         </div>
       ) : !data ? null : !data.total ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-10 text-center text-sm text-zinc-500">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-10 text-center text-sm text-zinc-500">
           无匹配邮件
         </div>
       ) : (

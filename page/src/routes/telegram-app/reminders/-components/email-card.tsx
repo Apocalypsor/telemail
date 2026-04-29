@@ -18,7 +18,7 @@ export function ReminderEmailCard({
     <button
       type="button"
       onClick={onClick}
-      className="block w-full text-left rounded-xl border border-zinc-800 border-l-4 border-l-emerald-500 bg-zinc-900 p-4 hover:bg-zinc-900/80 active:bg-zinc-900/60 transition-colors cursor-pointer"
+      className="block w-full text-left rounded-2xl border border-zinc-800 border-l-4 border-l-emerald-500 bg-zinc-900 p-4 hover:bg-zinc-900/80 active:bg-zinc-900/60 transition-colors cursor-pointer"
     >
       {loading ? (
         <div className="space-y-2">

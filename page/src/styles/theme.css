@@ -58,7 +58,7 @@
 @keyframes page-enter {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -67,7 +67,19 @@
 }
 
 [data-page-enter] {
-  animation: page-enter 120ms ease-out both;
+  animation: page-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Junk-check ResultCard 圆环弧度 mount 动画。从空（dashoffset = circumference）
+ * 滚到目标 offset（由内联 --final-offset 给）。CSS keyframe 用 inline custom
+ * property 这种 pattern 在所有 evergreen 浏览器都稳。 */
+@keyframes gauge-arc {
+  from {
+    stroke-dashoffset: var(--circumference);
+  }
+  to {
+    stroke-dashoffset: var(--final-offset);
+  }
 }
 
 /* ── html / body 基础 ───────────────────────────────────────────────────── */
@@ -94,4 +106,42 @@ body,
 
 * {
   box-sizing: border-box;
+}
+
+/* 把 native <input type=date|time|datetime-local|month|week> 在桌面浏览器上的
+ * webkit 日历 / 时钟 indicator 染成跟暗主题一致的色（默认是黑色 SVG 在深色
+ * 背景下几乎看不见）。手机上 native 的 wheel 选择器更佳，CSS 不影响 mobile。 */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+input[type="date"]:hover::-webkit-calendar-picker-indicator,
+input[type="time"]:hover::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+input[type="month"]:hover::-webkit-calendar-picker-indicator,
+input[type="week"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+}
+
+/* native input 占位字符（输入未填时的 mm/dd/yyyy 灰字）让它跟我们的
+ * placeholder:text-zinc-600 对齐 */
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="time"]::-webkit-datetime-edit-fields-wrapper {
+  color: var(--text-primary);
+}
+
+input[type="date"]:not(:focus):not(
+    [data-filled]
+  )::-webkit-datetime-edit-fields-wrapper,
+input[type="time"]:not(:focus):not(
+    [data-filled]
+  )::-webkit-datetime-edit-fields-wrapper {
+  color: var(--text-faint);
 }

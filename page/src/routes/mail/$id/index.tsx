@@ -117,7 +117,7 @@ function WebMailPage() {
         {/* 正文直接包在原生 div 里 —— HeroUI Card 默认带内边距，iframe 会
             被推出圆角之外。用 overflow-hidden + rounded-xl 把四角切齐。
             结构和 miniapp `telegram-app/mail.$id.tsx` 完全一致。 */}
-        <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-[inset_0_8px_16px_-12px_rgba(0,0,0,0.5)]">
           <MailBodyFrame
             bodyHtml={d.bodyHtml}
             bodyHtmlRaw={d.bodyHtmlRaw}
