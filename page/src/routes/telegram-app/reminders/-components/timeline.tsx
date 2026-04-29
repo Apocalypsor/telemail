@@ -402,10 +402,8 @@ function Card({
   );
 
   return (
-    // min-h 保证两个竖排按钮（✏️ 32 + gap 2 + 🗑 32 + top-1.5 6 ≈ 72px）在
-    // 单行备注的卡片里也装得下，否则 🗑 会溢出到卡片下方
     <div
-      className={`relative rounded-xl border transition-colors min-h-[72px] ${
+      className={`relative rounded-xl border transition-colors min-h-20 ${
         isOverdue
           ? "border-zinc-800/70 bg-zinc-900/60"
           : "border-zinc-800 bg-zinc-900"
