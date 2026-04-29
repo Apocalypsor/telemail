@@ -1,5 +1,6 @@
 # Telemail — Agent Guide
 
+> **Commit only when explicitly asked.** Don't auto-commit after finishing a task — wait for the user to say so.
 > **Before commit**: `bun check` (Biome) + `bun typecheck` (tsc) from repo root. Don't use `biome-ignore`. Update `README.md` / `docs/*` when you change behavior they describe.
 
 User-facing docs: `README.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
