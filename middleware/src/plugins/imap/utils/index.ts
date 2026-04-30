@@ -10,9 +10,4 @@ export {
   resolveArchiveFolder,
   resolveFetchCandidates,
 } from "./folders";
-export {
-  findUidByMessageId,
-  locateMessage,
-  normalizeMessageIdForSearch,
-  searchAndFetch,
-} from "./search";
+export { findUidByMessageId, locateMessage, searchAndFetch } from "./search";
