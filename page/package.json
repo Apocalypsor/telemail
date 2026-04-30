@@ -18,7 +18,6 @@
     "@heroui/styles": "^3.0.3",
     "@tanstack/react-query": "^5.100.5",
     "@tanstack/react-router": "^1.168.24",
-    "elysia": "^1.4.28",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },

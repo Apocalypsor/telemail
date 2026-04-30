@@ -4,9 +4,9 @@ import { validateSearch } from "@page/api/utils";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailMeta } from "@page/components/mail-meta";
 import { WebLayout } from "@page/components/web-layout";
+import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { t } from "elysia";
 import { useState } from "react";
 import { WebMailToolbar } from "./-components/web-toolbar";
 

@@ -22,6 +22,19 @@ export default defineConfig({
     outDir: "dist",
     sourcemap: true,
     target: "es2022",
+    rollupOptions: {
+      output: {
+        // 把 vendor 拆分成独立 chunk —— 1) 主入口瘦身（避开 500KB 告警），
+        // 2) 业务代码改动不再 bust vendor cache（typebox / heroui / react 版本不动就一直命中）
+        manualChunks: {
+          react: ["react", "react-dom"],
+          tanstack: ["@tanstack/react-router", "@tanstack/react-query"],
+          heroui: ["@heroui/react", "@heroui/styles"],
+          typebox: ["@sinclair/typebox"],
+          telegram: ["@telegram-apps/sdk-react"],
+        },
+      },
+    },
   },
   server: {
     port: 5173,

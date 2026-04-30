@@ -6,10 +6,10 @@ import { MAIL_LIST_TITLES, MAIL_LIST_TYPES } from "@page/constants";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { useNavigateToMail } from "@page/hooks/use-navigate-to-mail";
 import { confirmPopup, notifyHaptic } from "@page/utils/tg";
+import { Type as t } from "@sinclair/typebox";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import type { MailListType } from "@worker/api/modules/miniapp/model";
-import { t } from "elysia";
 import { useMemo, useState } from "react";
 
 interface BulkAction {

@@ -2,9 +2,9 @@ import { Card } from "@heroui/react";
 import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
 import { WebLayout } from "@page/components/web-layout";
+import { Type as t } from "@sinclair/typebox";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { t } from "elysia";
 import { useEffect, useRef } from "react";
 
 // `return_to` 登陆成功后跳回的路径（默认 `/`）。

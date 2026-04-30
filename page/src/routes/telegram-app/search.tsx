@@ -5,9 +5,9 @@ import { MailListByAccount } from "@page/components/mail-list-by-account";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { useNavigateToMail } from "@page/hooks/use-navigate-to-mail";
 import { INPUT_CLASS } from "@page/styles/inputs";
+import { Type as t } from "@sinclair/typebox";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { t } from "elysia";
 import { useEffect, useState } from "react";
 
 // 查询字串放 URL，目的有二：

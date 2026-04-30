@@ -5,13 +5,13 @@ import { useBackButton } from "@page/hooks/use-back-button";
 import { useNavigateToMail } from "@page/hooks/use-navigate-to-mail";
 import { INPUT_CLASS } from "@page/styles/inputs";
 import { notifyHaptic } from "@page/utils/tg";
+import { Type as t } from "@sinclair/typebox";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createFileRoute,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { t } from "elysia";
 import { useEffect, useMemo, useState } from "react";
 import { ReminderEmailCard } from "./-components/email-card";
 import {

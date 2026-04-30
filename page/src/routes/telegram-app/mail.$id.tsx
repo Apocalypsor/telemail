@@ -6,9 +6,9 @@ import { MailFab } from "@page/components/mail-fab";
 import { MailMeta } from "@page/components/mail-meta";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { openExternalLink } from "@page/utils/tg";
+import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { t } from "elysia";
 import { useCallback, useState } from "react";
 
 // accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
