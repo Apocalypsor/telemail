@@ -1,12 +1,12 @@
+import { MAX_BODY_CHARS, MAX_LINKS } from "@worker/constants";
 import {
   escapeMdV2,
   findLongestValidMdV2Prefix,
   markdownToMdV2,
-} from "@utils/markdown-v2";
+} from "@worker/utils/markdown-v2";
 import { parseHTML } from "linkedom";
 import type { Address } from "postal-mime";
 import TurndownService from "turndown";
-import { MAX_BODY_CHARS, MAX_LINKS } from "@/constants";
 
 const utf8Decoder = new TextDecoder("utf-8", {
   fatal: false,

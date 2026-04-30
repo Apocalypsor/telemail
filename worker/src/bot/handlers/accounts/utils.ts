@@ -1,11 +1,11 @@
-import { isAdmin } from "@bot/utils/auth";
-import { formatUserName } from "@bot/utils/formatters";
-import { getAuthorizedAccount } from "@db/accounts";
-import { getUserByTelegramId } from "@db/users";
-import { t } from "@i18n";
-import { PROVIDERS } from "@providers";
+import { isAdmin } from "@worker/bot/utils/auth";
+import { formatUserName } from "@worker/bot/utils/formatters";
+import { getAuthorizedAccount } from "@worker/db/accounts";
+import { getUserByTelegramId } from "@worker/db/users";
+import { t } from "@worker/i18n";
+import { PROVIDERS } from "@worker/providers";
+import type { Account, Env } from "@worker/types";
 import { InlineKeyboard } from "grammy";
-import type { Account, Env } from "@/types";
 
 /**
  * 解析账号所有者名称用于详情页 owner 行：

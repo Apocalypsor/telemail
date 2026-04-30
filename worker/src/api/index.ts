@@ -1,12 +1,12 @@
-import { authController } from "@api/modules/auth";
-import { mailController } from "@api/modules/mail";
-import { miniAppController } from "@api/modules/miniapp";
-import { oauthController } from "@api/modules/oauth";
-import { corsProxyController, previewController } from "@api/modules/preview";
-import { providersController } from "@api/modules/providers";
-import { remindersController } from "@api/modules/reminders";
-import { telegramController } from "@api/modules/telegram";
-import { reportErrorToObservability } from "@utils/observability";
+import { authController } from "@worker/api/modules/auth";
+import { mailController } from "@worker/api/modules/mail";
+import { miniAppController } from "@worker/api/modules/miniapp";
+import { oauthController } from "@worker/api/modules/oauth";
+import { previewController } from "@worker/api/modules/preview";
+import { providersController } from "@worker/api/modules/providers";
+import { remindersController } from "@worker/api/modules/reminders";
+import { telegramController } from "@worker/api/modules/telegram";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import { Elysia } from "elysia";
 import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
 
@@ -47,7 +47,6 @@ export const app = new Elysia({ adapter: CloudflareAdapter, name: "telemail" })
   .use(providersController)
   .use(oauthController)
   .use(previewController)
-  .use(corsProxyController)
   .use(mailController)
   .use(miniAppController)
   .use(remindersController)

@@ -1,15 +1,19 @@
 import {
   accountDetailKeyboard,
   accountDetailText,
-} from "@bot/utils/formatters";
-import { setArchiveFolder } from "@db/accounts";
-import { putOAuthBotMsg } from "@db/kv";
-import { t } from "@i18n";
-import { type GmailProvider, getEmailProvider, PROVIDERS } from "@providers";
-import { reportErrorToObservability } from "@utils/observability";
+} from "@worker/bot/utils/formatters";
+import { setArchiveFolder } from "@worker/db/accounts";
+import { putOAuthBotMsg } from "@worker/db/kv";
+import { t } from "@worker/i18n";
+import {
+  type GmailProvider,
+  getEmailProvider,
+  PROVIDERS,
+} from "@worker/providers";
+import type { Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 import { resolveAccount, resolveOwnerName } from "./utils";
 
 /** 注册 OAuth / push renew / archive 标签管理类回调。 */

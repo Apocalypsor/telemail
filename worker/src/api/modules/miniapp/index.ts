@@ -1,9 +1,22 @@
-import { authMiniApp } from "@api/plugins/auth-miniapp";
-import { cf } from "@api/plugins/cf";
-import { getCachedMailList, putCachedMailList } from "@db/kv";
-import { getMailList, isMailListType, searchMail } from "@utils/mail-list";
-import { markAllAsRead, trashAllJunkEmails } from "@utils/message-actions";
-import { Elysia, t } from "elysia";
+import { authMiniApp } from "@worker/api/plugins/auth-miniapp";
+import { cf } from "@worker/api/plugins/cf";
+import { getCachedMailList, putCachedMailList } from "@worker/db/kv";
+import {
+  getMailList,
+  isMailListType,
+  searchMail,
+} from "@worker/utils/mail-list";
+import {
+  markAllAsRead,
+  trashAllJunkEmails,
+} from "@worker/utils/message-actions";
+import { Elysia, type UnwrapSchema } from "elysia";
+import {
+  ListParams,
+  ListQuery,
+  type MailListResponse,
+  SearchQuery,
+} from "./model";
 
 /**
  * Mini App 通用 API:
@@ -28,11 +41,9 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
       const useCache = query.cache === "true";
       if (useCache) {
         const cached = await getCachedMailList(env.EMAIL_KV, userId, type);
-        if (cached)
-          return new Response(cached, {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          });
+        if (cached) {
+          return JSON.parse(cached) as UnwrapSchema<typeof MailListResponse>;
+        }
       }
 
       const result = await getMailList(env, userId, type);
@@ -41,23 +52,22 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
           Promise.allSettled(result.pendingSideEffects.map((t) => t())),
         );
       }
-      const json = JSON.stringify({
+      const payload = {
         type: result.type,
         results: result.results,
         total: result.total,
-      });
+      };
       executionCtx.waitUntil(
-        putCachedMailList(env.EMAIL_KV, userId, type, json).catch(() => {}),
+        putCachedMailList(
+          env.EMAIL_KV,
+          userId,
+          type,
+          JSON.stringify(payload),
+        ).catch(() => {}),
       );
-      return new Response(json, {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
+      return payload;
     },
-    {
-      params: t.Object({ type: t.String() }),
-      query: t.Object({ cache: t.Optional(t.String()) }),
-    },
+    { params: ListParams, query: ListQuery },
   )
 
   .post("/api/mini-app/mark-all-as-read", async ({ env, userId }) => {
@@ -76,5 +86,5 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
       if (q.length > 200) return status(400, { error: "关键词过长" });
       return await searchMail(env, userId, q);
     },
-    { query: t.Object({ q: t.Optional(t.String()) }) },
+    { query: SearchQuery },
   );

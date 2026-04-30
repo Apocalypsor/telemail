@@ -1,5 +1,5 @@
-import { hmacSha256Hex, timingSafeEqual } from "@utils/hash";
-import { SESSION_TTL, TG_AUTH_MAX_AGE } from "@/constants";
+import { SESSION_TTL, TG_AUTH_MAX_AGE } from "@worker/constants";
+import { hmacSha256Hex, timingSafeEqual } from "@worker/utils/hash";
 
 // ── Telegram Login Widget ───────────────────────────────────────────────────
 

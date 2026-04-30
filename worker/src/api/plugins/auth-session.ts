@@ -1,7 +1,7 @@
-import { getUserByTelegramId } from "@db/users";
-import { verifySessionCookie } from "@utils/session";
+import { SESSION_COOKIE_NAME } from "@worker/constants";
+import { getUserByTelegramId } from "@worker/db/users";
+import { verifySessionCookie } from "@worker/utils/session";
 import { Elysia, status } from "elysia";
-import { SESSION_COOKIE_NAME } from "@/constants";
 import { cf } from "./cf";
 
 /**

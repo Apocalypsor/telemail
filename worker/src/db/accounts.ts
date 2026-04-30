@@ -1,4 +1,4 @@
-import type { Account, AccountType } from "@/types";
+import type { Account, AccountType } from "@worker/types";
 
 export async function getAllAccounts(db: D1Database): Promise<Account[]> {
   const { results } = await db

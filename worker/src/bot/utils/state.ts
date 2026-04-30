@@ -1,4 +1,4 @@
-import type { Env } from "@/types";
+import type { Env } from "@worker/types";
 
 const BOT_STATE_TTL = 300; // 5 minutes
 

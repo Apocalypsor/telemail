@@ -1,15 +1,15 @@
-import { getAllAccounts } from "@db/accounts";
-import type { EmailProvider } from "@providers/base";
-import { GmailProvider } from "@providers/gmail";
-import { ImapProvider } from "@providers/imap";
-import { OutlookProvider } from "@providers/outlook";
-import type { EmailProviderClass } from "@providers/types";
-import { type Account, AccountType, type Env } from "@/types";
+import { getAllAccounts } from "@worker/db/accounts";
+import type { EmailProvider } from "@worker/providers/base";
+import { GmailProvider } from "@worker/providers/gmail";
+import { ImapProvider } from "@worker/providers/imap";
+import { OutlookProvider } from "@worker/providers/outlook";
+import type { EmailProviderClass } from "@worker/providers/types";
+import { type Account, AccountType, type Env } from "@worker/types";
 
-export { EmailProvider } from "@providers/base";
-export { GmailProvider } from "@providers/gmail";
-export { ImapProvider } from "@providers/imap";
-export { OutlookProvider } from "@providers/outlook";
+export { EmailProvider } from "@worker/providers/base";
+export { GmailProvider } from "@worker/providers/gmail";
+export { ImapProvider } from "@worker/providers/imap";
+export { OutlookProvider } from "@worker/providers/outlook";
 export type {
   EmailListItem,
   EmailProviderClass,
@@ -17,7 +17,7 @@ export type {
   OAuthProviderConfig,
   OAuthTokenResponse,
   PreviewContent,
-} from "@providers/types";
+} from "@worker/providers/types";
 
 /**
  * AccountType → provider class 的唯一映射。新增 provider 在这加一行。

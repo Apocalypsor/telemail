@@ -1,4 +1,4 @@
-import type { TelegramUser } from "@/types";
+import type { TelegramUser } from "@worker/types";
 
 /** 登录时 upsert 用户信息（approved 仅在首次 INSERT 时设置，UPDATE 不覆盖） */
 export async function upsertUser(

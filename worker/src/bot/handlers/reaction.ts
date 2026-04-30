@@ -1,7 +1,7 @@
-import { markAsReadByMessage } from "@utils/message-actions";
-import { reportErrorToObservability } from "@utils/observability";
+import type { Env } from "@worker/types";
+import { markAsReadByMessage } from "@worker/utils/message-actions";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
-import type { Env } from "@/types";
 
 /** 任意 emoji reaction → 标记 Gmail 已读（同时支持群组和频道） */
 export function registerReactionHandler(bot: Bot, env: Env) {

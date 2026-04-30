@@ -1,12 +1,12 @@
-import { http } from "@clients/http";
-import { HTTPError } from "ky";
+import { http } from "@worker/clients/http";
 import {
   TG_API_BASE,
   TG_CAPTION_LIMIT,
   TG_MEDIA_GROUP_LIMIT,
   TG_MSG_LIMIT,
-} from "@/constants";
-import type { Attachment } from "@/types";
+} from "@worker/constants";
+import type { Attachment } from "@worker/types";
+import { HTTPError } from "ky";
 
 export { TG_CAPTION_LIMIT, TG_MSG_LIMIT };
 
@@ -111,9 +111,13 @@ export async function editTextMessage(
 
 function attToBlob(att: Attachment): Blob {
   const mime = att.mimeType || "application/octet-stream";
-  return typeof att.content === "string"
-    ? new Blob([new TextEncoder().encode(att.content)], { type: mime })
-    : new Blob([att.content], { type: mime });
+  // Cast through unknown：Workers runtime 的 ArrayBufferLike 跟 page tsconfig
+  // lib (DOM) 里的 BlobPart 不严格相容，运行时一致。
+  const part =
+    typeof att.content === "string"
+      ? new TextEncoder().encode(att.content)
+      : att.content;
+  return new Blob([part as unknown as ArrayBuffer], { type: mime });
 }
 
 /**

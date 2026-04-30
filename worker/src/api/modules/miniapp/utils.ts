@@ -1,10 +1,13 @@
-import { getAccountById } from "@db/accounts";
-import { getCachedMailData, putCachedMailData } from "@db/kv";
-import { getMappingsByEmailIds } from "@db/message-map";
-import type { Reminder } from "@db/reminders";
-import { getEmailProvider, PROVIDERS } from "@providers";
-import { generateMailTokenById, verifyMailTokenById } from "@utils/mail-token";
-import type { Account, Env } from "@/types";
+import { getAccountById } from "@worker/db/accounts";
+import { getCachedMailData, putCachedMailData } from "@worker/db/kv";
+import { getMappingsByEmailIds } from "@worker/db/message-map";
+import type { Reminder } from "@worker/db/reminders";
+import { getEmailProvider, PROVIDERS } from "@worker/providers";
+import type { Account, Env } from "@worker/types";
+import {
+  generateMailTokenById,
+  verifyMailTokenById,
+} from "@worker/utils/mail-token";
 
 export type EnrichedReminder = Reminder & {
   mail_token: string | null;

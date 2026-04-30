@@ -1,9 +1,9 @@
-import { getBotCommandsVersion, putBotCommandsVersion } from "@db/kv";
-import { t } from "@i18n";
-import { memoizeAsync } from "@utils/memoize";
+import { getBotCommandsVersion, putBotCommandsVersion } from "@worker/db/kv";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
+import { memoizeAsync } from "@worker/utils/memoize";
 import { Api } from "grammy";
 import type { BotCommand } from "grammy/types";
-import type { Env } from "@/types";
 
 // 修改 BOT_COMMANDS / ADMIN_COMMANDS 后更新此版本号，会自动 setMyCommands 同步
 const BOT_COMMANDS_VERSION = 10;

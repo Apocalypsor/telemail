@@ -1,11 +1,11 @@
-import { app } from "@api";
-import type { RequestWithCtx } from "@api/plugins/cf";
-import { handleQueueBatch } from "@handlers/queue";
-import { handleScheduled } from "@handlers/scheduled";
-import type { Env, QueueMessage } from "@/types";
+import { app } from "@worker/api";
+import type { RequestWithCtx } from "@worker/api/plugins/cf";
+import { handleQueueBatch } from "@worker/handlers/queue";
+import { handleScheduled } from "@worker/handlers/scheduled";
+import type { Env, QueueMessage } from "@worker/types";
 
-export type { App } from "@api";
-export type { Env } from "@/types";
+export type { App } from "@worker/api";
+export type { Env } from "@worker/types";
 
 export default {
   /**

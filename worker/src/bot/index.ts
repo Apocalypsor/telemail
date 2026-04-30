@@ -1,25 +1,25 @@
-import { registerAccountHandlers } from "@bot/handlers/accounts";
-import { registerAdminHandlers } from "@bot/handlers/admin";
-import { registerArchiveHandler } from "@bot/handlers/archive";
-import { registerInputHandler } from "@bot/handlers/input";
-import { registerJunkHandler } from "@bot/handlers/junk";
-import { registerMailListHandlers } from "@bot/handlers/mail-list";
-import { registerPinCleanupHandler } from "@bot/handlers/pin-cleanup";
-import { registerReactionHandler } from "@bot/handlers/reaction";
-import { registerRefreshHandler } from "@bot/handlers/refresh";
-import { registerStarHandler } from "@bot/handlers/star";
-import { registerStartHandlers } from "@bot/handlers/start";
-import { registerSyncHandler } from "@bot/handlers/sync";
-import { registerPrivateOnlyCommandGuard } from "@bot/utils/auth";
-import { getCachedBotInfo, putCachedBotInfo } from "@db/kv";
-import { t } from "@i18n";
-import { memoizeAsync } from "@utils/memoize";
-import { reportErrorToObservability } from "@utils/observability";
+import { registerAccountHandlers } from "@worker/bot/handlers/accounts";
+import { registerAdminHandlers } from "@worker/bot/handlers/admin";
+import { registerArchiveHandler } from "@worker/bot/handlers/archive";
+import { registerInputHandler } from "@worker/bot/handlers/input";
+import { registerJunkHandler } from "@worker/bot/handlers/junk";
+import { registerMailListHandlers } from "@worker/bot/handlers/mail-list";
+import { registerPinCleanupHandler } from "@worker/bot/handlers/pin-cleanup";
+import { registerReactionHandler } from "@worker/bot/handlers/reaction";
+import { registerRefreshHandler } from "@worker/bot/handlers/refresh";
+import { registerStarHandler } from "@worker/bot/handlers/star";
+import { registerStartHandlers } from "@worker/bot/handlers/start";
+import { registerSyncHandler } from "@worker/bot/handlers/sync";
+import { registerPrivateOnlyCommandGuard } from "@worker/bot/utils/auth";
+import { getCachedBotInfo, putCachedBotInfo } from "@worker/db/kv";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
+import { memoizeAsync } from "@worker/utils/memoize";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import { Api, Bot } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
-import type { Env } from "@/types";
 
-export { syncBotCommands } from "@bot/commands";
+export { syncBotCommands } from "@worker/bot/commands";
 
 /**
  * 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存。

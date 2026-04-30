@@ -1,15 +1,15 @@
-import { http } from "@clients/http";
+import { http } from "@worker/clients/http";
 import {
   getAccountById,
   updateAccountEmail,
   updateRefreshToken,
-} from "@db/accounts";
+} from "@worker/db/accounts";
 import {
   deleteOAuthState,
   getOAuthState,
   putCachedAccessToken,
   putOAuthState,
-} from "@db/kv";
+} from "@worker/db/kv";
 import type {
   EmailListItem,
   MessageState,
@@ -18,12 +18,12 @@ import type {
   OAuthProviderConfig,
   OAuthTokenResponse,
   PreviewContent,
-} from "@providers/types";
-import { formatAddress, wrapPlainText } from "@utils/format";
-import { buildCidMapFromAttachments } from "@utils/mail-html";
-import { reportErrorToObservability } from "@utils/observability";
+} from "@worker/providers/types";
+import type { Account, Env } from "@worker/types";
+import { formatAddress, wrapPlainText } from "@worker/utils/format";
+import { buildCidMapFromAttachments } from "@worker/utils/mail-html";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
-import type { Account, Env } from "@/types";
 
 export abstract class EmailProvider {
   protected account: Account;

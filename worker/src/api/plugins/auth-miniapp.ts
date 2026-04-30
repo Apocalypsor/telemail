@@ -1,5 +1,5 @@
-import { getUserByTelegramId } from "@db/users";
-import { verifyTgInitData } from "@utils/tg-init-data";
+import { getUserByTelegramId } from "@worker/db/users";
+import { verifyTgInitData } from "@worker/utils/tg-init-data";
 import { Elysia } from "elysia";
 import { cf } from "./cf";
 

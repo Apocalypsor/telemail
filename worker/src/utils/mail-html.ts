@@ -1,6 +1,5 @@
 import { createHmac } from "node:crypto";
-import { ROUTE_CORS_PROXY } from "@api/routes";
-import { timingSafeEqual } from "@utils/hash";
+import { timingSafeEqual } from "@worker/utils/hash";
 import type { Attachment } from "postal-mime";
 
 // ─── CID 内联图片 ────────────────────────────────────────────────────────────
@@ -54,7 +53,7 @@ export function verifyProxySignature(
 function proxied(url: string, secret: string): string {
   if (!/^https?:\/\//i.test(url)) return url;
   const sig = signProxyUrl(secret, url);
-  return `${ROUTE_CORS_PROXY}?url=${encodeURIComponent(url)}&sig=${sig}`;
+  return `/api/cors-proxy?url=${encodeURIComponent(url)}&sig=${sig}`;
 }
 
 /** 用 HTMLRewriter 将 HTML 中所有外部资源 URL 改写为经由 CORS 代理 */

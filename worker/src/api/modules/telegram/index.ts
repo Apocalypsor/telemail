@@ -1,6 +1,6 @@
-import { cf } from "@api/plugins/cf";
-import { createBot, getBotInfo, syncBotCommands } from "@bot/index";
-import { timingSafeEqual } from "@utils/hash";
+import { cf } from "@worker/api/plugins/cf";
+import { createBot, getBotInfo, syncBotCommands } from "@worker/bot/index";
+import { timingSafeEqual } from "@worker/utils/hash";
 import { Elysia } from "elysia";
 import type { Update } from "grammy/types";
 import { WebhookBody, WebhookQuery } from "./model";

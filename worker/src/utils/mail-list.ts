@@ -1,17 +1,20 @@
-import { getOwnAccounts } from "@db/accounts";
-import { getMappingsByEmailIds, type MessageMapping } from "@db/message-map";
+import { getOwnAccounts } from "@worker/db/accounts";
+import {
+  getMappingsByEmailIds,
+  type MessageMapping,
+} from "@worker/db/message-map";
 import {
   type EmailListItem,
   type EmailProvider,
   getEmailProvider,
-} from "@providers";
-import { generateMailTokenById } from "@utils/mail-token";
+} from "@worker/providers";
+import type { Account, Env } from "@worker/types";
+import { generateMailTokenById } from "@worker/utils/mail-token";
 import {
   deleteJunkMappings,
   syncStarButtonsForMappings,
-} from "@utils/message-actions";
-import { reportErrorToObservability } from "@utils/observability";
-import type { Account, Env } from "@/types";
+} from "@worker/utils/message-actions";
+import { reportErrorToObservability } from "@worker/utils/observability";
 
 const MAIL_LIST_TYPES = ["unread", "starred", "junk", "archived"] as const;
 export type MailListType = (typeof MAIL_LIST_TYPES)[number];

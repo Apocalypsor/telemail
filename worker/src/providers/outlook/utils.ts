@@ -1,7 +1,11 @@
-import { http } from "@clients/http";
-import { refreshAccessToken } from "@providers/utils";
-import { MS_GRAPH_API, MS_MAIL_SCOPE, MS_OAUTH_TOKEN_URL } from "@/constants";
-import type { Account, Env } from "@/types";
+import { http } from "@worker/clients/http";
+import {
+  MS_GRAPH_API,
+  MS_MAIL_SCOPE,
+  MS_OAUTH_TOKEN_URL,
+} from "@worker/constants";
+import { refreshAccessToken } from "@worker/providers/utils";
+import type { Account, Env } from "@worker/types";
 
 /** 用 refresh_token 换 access_token（KV 缓存，共用 base.ts 的实现） */
 export async function getAccessToken(

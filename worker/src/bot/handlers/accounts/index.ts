@@ -1,18 +1,18 @@
-import { isAdmin } from "@bot/utils/auth";
+import { isAdmin } from "@worker/bot/utils/auth";
 import {
   accountDetailKeyboard,
   accountDetailText,
-} from "@bot/utils/formatters";
-import { clearBotState } from "@bot/utils/state";
+} from "@worker/bot/utils/formatters";
+import { clearBotState } from "@worker/bot/utils/state";
 import {
   getAllAccounts,
   getOwnAccounts,
   getVisibleAccounts,
-} from "@db/accounts";
-import { getUserByTelegramId } from "@db/users";
-import { t } from "@i18n";
+} from "@worker/db/accounts";
+import { getUserByTelegramId } from "@worker/db/users";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
 import type { Bot } from "grammy";
-import type { Env } from "@/types";
 import { registerAddCallbacks } from "./add";
 import { registerAuthCallbacks } from "./auth";
 import { registerEditCallbacks } from "./edit";

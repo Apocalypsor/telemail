@@ -1,9 +1,9 @@
-import { retryAllFailedEmails } from "@handlers/queue/bridge";
-import { dispatchDueReminders } from "@handlers/scheduled/reminders";
-import { renewAllPush } from "@providers";
-import { checkImapBridgeHealth } from "@providers/imap";
-import { reportErrorToObservability } from "@utils/observability";
-import type { Env } from "@/types";
+import { retryAllFailedEmails } from "@worker/handlers/queue/bridge";
+import { dispatchDueReminders } from "@worker/handlers/scheduled/reminders";
+import { renewAllPush } from "@worker/providers";
+import { checkImapBridgeHealth } from "@worker/providers/imap";
+import type { Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 
 export async function handleScheduled(
   event: ScheduledEvent,

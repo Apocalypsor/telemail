@@ -1,8 +1,8 @@
-import { refreshEmail } from "@handlers/queue/bridge";
-import { t } from "@i18n";
-import { reportErrorToObservability } from "@utils/observability";
+import { refreshEmail } from "@worker/handlers/queue/bridge";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
-import type { Env } from "@/types";
 
 /** 刷新邮件 inline button callback */
 export function registerRefreshHandler(bot: Bot, env: Env) {

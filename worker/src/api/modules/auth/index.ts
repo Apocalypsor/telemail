@@ -1,21 +1,15 @@
-import { cf } from "@api/plugins/cf";
-import { getBotInfo } from "@bot/index";
-import { getUserByTelegramId, upsertUser } from "@db/users";
+import { cf } from "@worker/api/plugins/cf";
+import { getBotInfo } from "@worker/bot/index";
+import { SESSION_COOKIE_NAME } from "@worker/constants";
+import { getUserByTelegramId, upsertUser } from "@worker/db/users";
 import {
   generateSessionCookie,
   type TelegramLoginData,
   verifySessionCookie,
   verifyTelegramLogin,
-} from "@utils/session";
+} from "@worker/utils/session";
 import { Elysia } from "elysia";
-import { SESSION_COOKIE_NAME } from "@/constants";
-import {
-  BotInfoResponse,
-  ErrorResponse,
-  LoginCallbackQuery,
-  OkResponse,
-  WhoamiResponse,
-} from "./model";
+import { LoginCallbackQuery } from "./model";
 
 /**
  * Auth controller —— web 登录页相关 API：
@@ -28,54 +22,42 @@ export const authController = new Elysia({ name: "controller.auth" })
   .use(cf)
 
   // Session whoami
-  .get(
-    "/api/session/whoami",
-    async ({ env, cookie, status }) => {
-      const sessionValue = cookie[SESSION_COOKIE_NAME]?.value as
-        | string
-        | undefined;
-      if (!sessionValue) return status(401, { error: "Unauthorized" });
+  .get("/api/session/whoami", async ({ env, cookie, status }) => {
+    const sessionValue = cookie[SESSION_COOKIE_NAME]?.value as
+      | string
+      | undefined;
+    if (!sessionValue) return status(401, { error: "Unauthorized" });
 
-      const telegramId = await verifySessionCookie(
-        env.ADMIN_SECRET,
-        sessionValue,
-      );
-      if (!telegramId) return status(401, { error: "Unauthorized" });
+    const telegramId = await verifySessionCookie(
+      env.ADMIN_SECRET,
+      sessionValue,
+    );
+    if (!telegramId) return status(401, { error: "Unauthorized" });
 
-      const isAdmin = telegramId === env.ADMIN_TELEGRAM_ID;
-      const user = await getUserByTelegramId(env.DB, telegramId);
-      if (!user || (!user.approved && !isAdmin)) {
-        return status(401, { error: "Unauthorized" });
-      }
-      return {
-        telegramId,
-        isAdmin,
-        firstName: user.first_name,
-        username: user.username,
-      };
-    },
-    { response: { 200: WhoamiResponse, 401: ErrorResponse } },
-  )
+    const isAdmin = telegramId === env.ADMIN_TELEGRAM_ID;
+    const user = await getUserByTelegramId(env.DB, telegramId);
+    if (!user || (!user.approved && !isAdmin)) {
+      return status(401, { error: "Unauthorized" });
+    }
+    return {
+      telegramId,
+      isAdmin,
+      firstName: user.first_name,
+      username: user.username,
+    };
+  })
 
   // Logout
-  .post(
-    "/api/session/logout",
-    ({ cookie }) => {
-      cookie[SESSION_COOKIE_NAME].remove();
-      return { ok: true as const };
-    },
-    { response: OkResponse },
-  )
+  .post("/api/session/logout", ({ cookie }) => {
+    cookie[SESSION_COOKIE_NAME].remove();
+    return { ok: true };
+  })
 
   // Public bot info
-  .get(
-    "/api/public/bot-info",
-    async ({ env }) => {
-      const botInfo = await getBotInfo(env);
-      return { botUsername: botInfo.username };
-    },
-    { response: BotInfoResponse },
-  )
+  .get("/api/public/bot-info", async ({ env }) => {
+    const botInfo = await getBotInfo(env);
+    return { botUsername: botInfo.username };
+  })
 
   // TG Login callback
   .get(

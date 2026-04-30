@@ -1,25 +1,25 @@
-import { cleanupAndDeleteAccount } from "@bot/utils/account";
-import { isAdmin } from "@bot/utils/auth";
+import { cleanupAndDeleteAccount } from "@worker/bot/utils/account";
+import { isAdmin } from "@worker/bot/utils/auth";
 import {
   accountDetailKeyboard,
   accountDetailText,
   formatUserName,
-} from "@bot/utils/formatters";
-import { clearBotState, setBotState } from "@bot/utils/state";
+} from "@worker/bot/utils/formatters";
+import { clearBotState, setBotState } from "@worker/bot/utils/state";
 import {
   getAuthorizedAccount,
   getOwnAccounts,
   getVisibleAccounts,
   setAccountDisabled,
   updateAccount,
-} from "@db/accounts";
-import { getAllUsers, getUserByTelegramId } from "@db/users";
-import { t } from "@i18n";
-import { getEmailProvider } from "@providers";
-import { reportErrorToObservability } from "@utils/observability";
+} from "@worker/db/accounts";
+import { getAllUsers, getUserByTelegramId } from "@worker/db/users";
+import { t } from "@worker/i18n";
+import { getEmailProvider } from "@worker/providers";
+import type { Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 import { accountListKeyboard, resolveAccount, resolveOwnerName } from "./utils";
 
 /** 注册编辑 / 删除类回调：

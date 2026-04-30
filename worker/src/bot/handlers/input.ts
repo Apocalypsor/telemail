@@ -1,16 +1,20 @@
-import { isAdmin } from "@bot/utils/auth";
-import { clearBotState, getBotState, setBotState } from "@bot/utils/state";
+import { isAdmin } from "@worker/bot/utils/auth";
+import {
+  clearBotState,
+  getBotState,
+  setBotState,
+} from "@worker/bot/utils/state";
 import {
   createImapAccount,
   getAuthorizedAccount,
   updateAccount,
-} from "@db/accounts";
-import { t } from "@i18n";
-import { syncAccounts } from "@providers/imap";
-import { reportErrorToObservability } from "@utils/observability";
+} from "@worker/db/accounts";
+import { t } from "@worker/i18n";
+import { syncAccounts } from "@worker/providers/imap";
+import type { Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 
 /**
  * 处理文本消息输入（用于添加/编辑账号的多步骤交互）。

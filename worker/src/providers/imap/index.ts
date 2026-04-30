@@ -1,20 +1,29 @@
-import { getAccountById } from "@db/accounts";
-import { EmailProvider } from "@providers/base";
-import { callBridge, syncAccounts } from "@providers/imap/utils";
-import type { EmailListItem, MessageState } from "@providers/types";
-import { base64ToArrayBuffer } from "@utils/base64url";
-import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@/constants";
-import { type Env, QueueMessageType } from "@/types";
+import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@worker/constants";
+import { getAccountById } from "@worker/db/accounts";
+import { EmailProvider } from "@worker/providers/base";
+import {
+  bridgeCall,
+  bridgeClient,
+  syncAccounts,
+} from "@worker/providers/imap/utils";
+import type { EmailListItem, MessageState } from "@worker/providers/types";
+import { type Env, QueueMessageType } from "@worker/types";
+import { base64ToArrayBuffer } from "@worker/utils/base64url";
 
 export {
   checkImapBridgeHealth,
   syncAccounts,
-} from "@providers/imap/utils";
+} from "@worker/providers/imap/utils";
 
 /**
  * IMAP provider —— 所有 `messageId` 参数都是 RFC 822 Message-Id（全局唯一，跨 folder
  * 稳定）。不是 IMAP UID。middleware 会按 `SEARCH HEADER Message-Id` 在相关 folder
  * 里找到当前 UID 再操作。
+ *
+ * Bridge 通信走 Eden treaty —— 所有 path / body / response 都从
+ * `@middleware/index` 自动推导，middleware 那边改 schema 这里立刻报错。
+ * Treaty 配 `throwHttpError: true`，非 2xx 直接抛 `EdenFetchError`，
+ * 调用方拿到的是 success branch（`data` 是响应类型）。
  */
 export class ImapProvider extends EmailProvider {
   static displayName = "IMAP";
@@ -57,8 +66,12 @@ export class ImapProvider extends EmailProvider {
 
   // ─── Message actions ──────────────────────────────────────────────────
 
+  private get bridge() {
+    return bridgeClient(this.env);
+  }
+
   async markAsRead(messageId: string) {
-    await callBridge(this.env, "POST", "/api/flag", {
+    await this.bridge.api.flag.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       flag: IMAP_FLAG_SEEN,
@@ -67,7 +80,7 @@ export class ImapProvider extends EmailProvider {
   }
 
   async addStar(messageId: string) {
-    await callBridge(this.env, "POST", "/api/flag", {
+    await this.bridge.api.flag.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       flag: IMAP_FLAG_FLAGGED,
@@ -76,7 +89,7 @@ export class ImapProvider extends EmailProvider {
   }
 
   async removeStar(messageId: string) {
-    await callBridge(this.env, "POST", "/api/flag", {
+    await this.bridge.api.flag.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       flag: IMAP_FLAG_FLAGGED,
@@ -85,21 +98,23 @@ export class ImapProvider extends EmailProvider {
   }
 
   async isStarred(messageId: string) {
-    const resp = await callBridge(this.env, "POST", "/api/is-starred", {
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-    });
-    const { starred } = (await resp.json()) as { starred: boolean };
-    return starred;
+    const data = await bridgeCall(
+      this.bridge.api["is-starred"].post({
+        accountId: this.account.id,
+        rfcMessageId: messageId,
+      }),
+    );
+    return data.starred;
   }
 
   async isJunk(messageId: string) {
-    const resp = await callBridge(this.env, "POST", "/api/is-junk", {
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-    });
-    const { junk } = (await resp.json()) as { junk: boolean };
-    return junk;
+    const data = await bridgeCall(
+      this.bridge.api["is-junk"].post({
+        accountId: this.account.id,
+        rfcMessageId: messageId,
+      }),
+    );
+    return data.junk;
   }
 
   /**
@@ -109,94 +124,88 @@ export class ImapProvider extends EmailProvider {
    * 不吞 error —— bridge 瞬时不可达就直接抛给 `reconcileMessageState`，不会误删 TG。
    */
   async resolveMessageState(messageId: string): Promise<MessageState> {
-    const resp = await callBridge(this.env, "POST", "/api/locate", {
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-      // 用户自定义的归档文件夹路径；bridge 没配就自动探测 \Archive special-use
-      archiveFolder: this.account.archive_folder ?? undefined,
-    });
-    const body = (await resp.json()) as {
-      location: "inbox" | "junk" | "archive" | "deleted";
-      starred?: boolean;
-    };
-    if (body.location === "inbox") {
-      return { location: "inbox", starred: body.starred ?? false };
+    const data = await bridgeCall(
+      this.bridge.api.locate.post({
+        accountId: this.account.id,
+        rfcMessageId: messageId,
+        // 用户自定义的归档文件夹路径；bridge 没配就自动探测 \Archive special-use
+        archiveFolder: this.account.archive_folder ?? undefined,
+      }),
+    );
+    if (data.location === "inbox") {
+      return { location: "inbox", starred: data.starred ?? false };
     }
-    return { location: body.location };
+    return { location: data.location };
   }
 
   async listUnread(maxResults: number = 20) {
-    const resp = await callBridge(this.env, "POST", "/api/unread", {
-      accountId: this.account.id,
-      maxResults,
-    });
-    const { messages } = (await resp.json()) as {
-      messages: { id: string; subject?: string }[];
-    };
-    return messages ?? [];
+    const data = await bridgeCall(
+      this.bridge.api.unread.post({
+        accountId: this.account.id,
+        maxResults,
+      }),
+    );
+    return data.messages ?? [];
   }
 
   async listStarred(maxResults: number = 20) {
-    const resp = await callBridge(this.env, "POST", "/api/starred", {
-      accountId: this.account.id,
-      maxResults,
-    });
-    const { messages } = (await resp.json()) as {
-      messages: { id: string; subject?: string }[];
-    };
-    return messages ?? [];
+    const data = await bridgeCall(
+      this.bridge.api.starred.post({
+        accountId: this.account.id,
+        maxResults,
+      }),
+    );
+    return data.messages ?? [];
   }
 
   async listJunk(maxResults: number = 20) {
-    const resp = await callBridge(this.env, "POST", "/api/junk", {
-      accountId: this.account.id,
-      maxResults,
-    });
-    const { messages } = (await resp.json()) as {
-      messages: { id: string; subject?: string }[];
-    };
-    return messages ?? [];
+    const data = await bridgeCall(
+      this.bridge.api.junk.post({
+        accountId: this.account.id,
+        maxResults,
+      }),
+    );
+    return data.messages ?? [];
   }
 
   async listArchived(maxResults: number = 20): Promise<EmailListItem[]> {
-    const resp = await callBridge(this.env, "POST", "/api/list-folder", {
-      accountId: this.account.id,
-      folder: this.account.archive_folder ?? undefined,
-      maxResults,
-    });
-    const { messages } = (await resp.json()) as {
-      messages: { id: string; subject?: string }[];
-    };
-    return messages ?? [];
+    const data = await bridgeCall(
+      this.bridge.api["list-folder"].post({
+        accountId: this.account.id,
+        folder: this.account.archive_folder ?? undefined,
+        maxResults,
+      }),
+    );
+    return data.messages ?? [];
   }
 
   async searchMessages(
     query: string,
     maxResults: number = 20,
   ): Promise<EmailListItem[]> {
-    const resp = await callBridge(this.env, "POST", "/api/search", {
-      accountId: this.account.id,
-      query,
-      maxResults,
-    });
-    const { messages } = (await resp.json()) as {
-      messages: { id: string; subject?: string; from?: string }[];
-    };
-    return messages ?? [];
+    const data = await bridgeCall(
+      this.bridge.api.search.post({
+        accountId: this.account.id,
+        query,
+        maxResults,
+      }),
+    );
+    return data.messages ?? [];
   }
 
   async markAllAsRead(_maxResults?: number) {
     // IMAP 一条 STORE +\Seen 就把整 INBOX 未读全标了，maxResults 在这里被忽略 ——
     // bridge 会 SEARCH UNSEEN 拿全部未读 UID 一起 STORE，没有 partial-failure 概念。
-    const resp = await callBridge(this.env, "POST", "/api/mark-all-read", {
-      accountId: this.account.id,
-    });
-    const { count } = (await resp.json()) as { count: number };
-    return { success: count, failed: 0 };
+    const data = await bridgeCall(
+      this.bridge.api["mark-all-read"].post({
+        accountId: this.account.id,
+      }),
+    );
+    return { success: data.count, failed: 0 };
   }
 
   async markAsJunk(messageId: string) {
-    await callBridge(this.env, "POST", "/api/mark-as-junk", {
+    await this.bridge.api["mark-as-junk"].post({
       accountId: this.account.id,
       rfcMessageId: messageId,
     });
@@ -207,7 +216,7 @@ export class ImapProvider extends EmailProvider {
    * 保持 abstract signature（Outlook/Gmail 会换 id）的 `Promise<string>`。
    */
   async moveToInbox(messageId: string): Promise<string> {
-    await callBridge(this.env, "POST", "/api/move-to-inbox", {
+    await this.bridge.api["move-to-inbox"].post({
       accountId: this.account.id,
       rfcMessageId: messageId,
     });
@@ -215,7 +224,7 @@ export class ImapProvider extends EmailProvider {
   }
 
   async unarchiveMessage(messageId: string): Promise<string> {
-    await callBridge(this.env, "POST", "/api/unarchive", {
+    await this.bridge.api.unarchive.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       archiveFolder: this.account.archive_folder ?? undefined,
@@ -224,14 +233,14 @@ export class ImapProvider extends EmailProvider {
   }
 
   async trashMessage(messageId: string) {
-    await callBridge(this.env, "POST", "/api/trash", {
+    await this.bridge.api.trash.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
     });
   }
 
   async archiveMessage(messageId: string) {
-    await callBridge(this.env, "POST", "/api/archive", {
+    await this.bridge.api.archive.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       // 只在用户明确配置过时传；否则让 bridge 自动探测 \Archive special-use
@@ -240,11 +249,12 @@ export class ImapProvider extends EmailProvider {
   }
 
   async trashAllJunk() {
-    const resp = await callBridge(this.env, "POST", "/api/trash-all-junk", {
-      accountId: this.account.id,
-    });
-    const { count } = (await resp.json()) as { count: number };
-    return count;
+    const data = await bridgeCall(
+      this.bridge.api["trash-all-junk"].post({
+        accountId: this.account.id,
+      }),
+    );
+    return data.count;
   }
 
   /** 通过 IMAP bridge 拉取单封邮件原文，返回 ArrayBuffer */
@@ -252,17 +262,18 @@ export class ImapProvider extends EmailProvider {
     messageId: string,
     folder?: "inbox" | "junk" | "archive",
   ): Promise<ArrayBuffer> {
-    const resp = await callBridge(this.env, "POST", "/api/fetch", {
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-      folder,
-      // archive folder 路径只在 hint 为 archive 时有意义
-      archiveFolder:
-        folder === "archive"
-          ? (this.account.archive_folder ?? undefined)
-          : undefined,
-    });
-    const { rawEmail } = (await resp.json()) as { rawEmail: string };
-    return base64ToArrayBuffer(rawEmail);
+    const data = await bridgeCall(
+      this.bridge.api.fetch.post({
+        accountId: this.account.id,
+        rfcMessageId: messageId,
+        folder,
+        // archive folder 路径只在 hint 为 archive 时有意义
+        archiveFolder:
+          folder === "archive"
+            ? (this.account.archive_folder ?? undefined)
+            : undefined,
+      }),
+    );
+    return base64ToArrayBuffer(data.rawEmail);
   }
 }

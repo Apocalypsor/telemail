@@ -1,8 +1,8 @@
-import { formatUserName } from "@bot/utils/formatters";
-import { countFailedEmails, type FailedEmail } from "@db/failed-emails";
-import { t } from "@i18n";
+import { formatUserName } from "@worker/bot/utils/formatters";
+import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
+import { t } from "@worker/i18n";
+import type { Env, TelegramUser } from "@worker/types";
 import { InlineKeyboard } from "grammy";
-import type { Env, TelegramUser } from "@/types";
 
 export function userListText(users: TelegramUser[]): string {
   if (users.length === 0) return t("admin:users.noUsers");

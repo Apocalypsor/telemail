@@ -1,5 +1,8 @@
-import { buildEmailKeyboard, buildInitialEmailKeyboard } from "@bot/keyboards";
-import { analyzeEmail, type EmailAnalysis } from "@clients/llm";
+import {
+  buildEmailKeyboard,
+  buildInitialEmailKeyboard,
+} from "@worker/bot/keyboards";
+import { analyzeEmail, type EmailAnalysis } from "@worker/clients/llm";
 import {
   deleteMessage,
   editMessageCaption,
@@ -9,33 +12,37 @@ import {
   setReplyMarkup,
   TG_CAPTION_LIMIT,
   TG_MSG_LIMIT,
-} from "@clients/telegram";
-import { getAccountById } from "@db/accounts";
+} from "@worker/clients/telegram";
+import { MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE } from "@worker/constants";
+import { getAccountById } from "@worker/db/accounts";
 import {
   deleteFailedEmail,
   type FailedEmail,
   getAllFailedEmails,
   putFailedEmail,
-} from "@db/failed-emails";
+} from "@worker/db/failed-emails";
 import {
   getMessageMapping,
   type MessageMapping,
   putMessageMapping,
   updateShortSummary,
-} from "@db/message-map";
-import { t } from "@i18n";
-import { accountCanArchive, getEmailProvider } from "@providers";
-import type { MessageLocation } from "@providers/types";
-import { formatBody, htmlToMarkdown, toTelegramMdV2 } from "@utils/format";
-import { escapeMdV2, wrapExpandableQuote } from "@utils/markdown-v2";
+} from "@worker/db/message-map";
+import { t } from "@worker/i18n";
+import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import type { MessageLocation } from "@worker/providers/types";
+import type { Account, EmailQueueMessage, Env } from "@worker/types";
+import {
+  formatBody,
+  htmlToMarkdown,
+  toTelegramMdV2,
+} from "@worker/utils/format";
+import { escapeMdV2, wrapExpandableQuote } from "@worker/utils/markdown-v2";
 import {
   reconcileMessageState,
   syncStarPinState,
-} from "@utils/message-actions";
-import { reportErrorToObservability } from "@utils/observability";
+} from "@worker/utils/message-actions";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
-import { MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE } from "@/constants";
-import type { Account, EmailQueueMessage, Env } from "@/types";
 
 // ---------------------------------------------------------------------------
 // 私有 helper

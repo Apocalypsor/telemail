@@ -2,11 +2,12 @@ import {
   enrichReminders,
   lookupEmailContext,
   resolveEmailContext,
-} from "@api/modules/miniapp/utils";
-import { authMiniApp } from "@api/plugins/auth-miniapp";
-import { cf } from "@api/plugins/cf";
-import { getAccountById } from "@db/accounts";
-import { getMessageMapping } from "@db/message-map";
+} from "@worker/api/modules/miniapp/utils";
+import { authMiniApp } from "@worker/api/plugins/auth-miniapp";
+import { cf } from "@worker/api/plugins/cf";
+import { REMINDER_PER_USER_LIMIT, REMINDER_TEXT_MAX } from "@worker/constants";
+import { getAccountById } from "@worker/db/accounts";
+import { getMessageMapping } from "@worker/db/message-map";
 import {
   countPendingReminders,
   createReminder,
@@ -15,11 +16,10 @@ import {
   listPendingReminders,
   listPendingRemindersForEmail,
   updatePendingReminder,
-} from "@db/reminders";
-import { generateMailTokenById } from "@utils/mail-token";
-import { refreshEmailKeyboardAfterReminderChange } from "@utils/message-actions";
+} from "@worker/db/reminders";
+import { generateMailTokenById } from "@worker/utils/mail-token";
+import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
 import { Elysia } from "elysia";
-import { REMINDER_PER_USER_LIMIT, REMINDER_TEXT_MAX } from "@/constants";
 import {
   CreateBody,
   EmailContextQuery,

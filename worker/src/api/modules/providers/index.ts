@@ -1,11 +1,15 @@
-import { cf } from "@api/plugins/cf";
+import { cf } from "@worker/api/plugins/cf";
 import {
   requireGmailPushSecret,
   requireImapBridgeBearer,
-} from "@api/plugins/secrets";
-import { getImapAccounts } from "@db/accounts";
-import { GmailProvider, ImapProvider, OutlookProvider } from "@providers";
-import { timingSafeEqual } from "@utils/hash";
+} from "@worker/api/plugins/secrets";
+import { getImapAccounts } from "@worker/db/accounts";
+import {
+  GmailProvider,
+  ImapProvider,
+  OutlookProvider,
+} from "@worker/providers";
+import { timingSafeEqual } from "@worker/utils/hash";
 import { Elysia } from "elysia";
 import { OutlookPushQuery, PushBody } from "./model";
 

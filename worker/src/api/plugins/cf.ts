@@ -1,6 +1,6 @@
 import { env as cfEnv } from "cloudflare:workers";
+import type { Env } from "@worker/types";
 import { Elysia } from "elysia";
-import type { Env } from "@/types";
 
 /**
  * 把 Cloudflare Workers 的 (request, env, ctx) 注入到 Elysia context：

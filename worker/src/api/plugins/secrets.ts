@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "@utils/hash";
+import { timingSafeEqual } from "@worker/utils/hash";
 import { Elysia } from "elysia";
 import { cf } from "./cf";
 

@@ -1,9 +1,9 @@
-import { getAccountById } from "@db/accounts";
-import { getCachedMailData, putCachedMailData } from "@db/kv";
-import { getEmailProvider, PROVIDERS } from "@providers";
-import { proxyImages, replaceCidReferences } from "@utils/mail-html";
-import { verifyMailTokenById } from "@utils/mail-token";
-import type { Account, Env, MailMeta } from "@/types";
+import { getAccountById } from "@worker/db/accounts";
+import { getCachedMailData, putCachedMailData } from "@worker/db/kv";
+import { getEmailProvider, PROVIDERS } from "@worker/providers";
+import type { Account, Env, MailMeta } from "@worker/types";
+import { proxyImages, replaceCidReferences } from "@worker/utils/mail-html";
+import { verifyMailTokenById } from "@worker/utils/mail-token";
 
 /**
  * (emailMessageId, accountId, token) 三元组校验 —— GET 预览页和 POST 动作

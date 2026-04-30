@@ -1,5 +1,13 @@
-import { http } from "@clients/http";
-import { getAccountById } from "@db/accounts";
+import { http } from "@worker/clients/http";
+import {
+  MS_GRAPH_API,
+  MS_GRAPH_API_BETA,
+  MS_MAIL_SCOPE,
+  MS_OAUTH_AUTHORIZE_URL,
+  MS_OAUTH_TOKEN_URL,
+  MS_SUBSCRIPTION_LIFETIME_MINUTES,
+} from "@worker/constants";
+import { getAccountById } from "@worker/db/accounts";
 import {
   deleteMsSubscription,
   getCachedOutlookFolderIds,
@@ -9,9 +17,12 @@ import {
   putCachedOutlookFolderIds,
   putMsSubscription,
   refreshMsSubAccountMapping,
-} from "@db/kv";
-import { EmailProvider } from "@providers/base";
-import type { GraphMessage, GraphMessageList } from "@providers/outlook/types";
+} from "@worker/db/kv";
+import { EmailProvider } from "@worker/providers/base";
+import type {
+  GraphMessage,
+  GraphMessageList,
+} from "@worker/providers/outlook/types";
 import {
   fetchRawMime,
   getAccessToken,
@@ -19,19 +30,15 @@ import {
   graphGet,
   graphPatch,
   graphPost,
-} from "@providers/outlook/utils";
-import type { MessageState } from "@providers/types";
-import { reportErrorToObservability } from "@utils/observability";
-import { HTTPError } from "ky";
+} from "@worker/providers/outlook/utils";
+import type { MessageState } from "@worker/providers/types";
 import {
-  MS_GRAPH_API,
-  MS_GRAPH_API_BETA,
-  MS_MAIL_SCOPE,
-  MS_OAUTH_AUTHORIZE_URL,
-  MS_OAUTH_TOKEN_URL,
-  MS_SUBSCRIPTION_LIFETIME_MINUTES,
-} from "@/constants";
-import { type EmailQueueMessage, type Env, QueueMessageType } from "@/types";
+  type EmailQueueMessage,
+  type Env,
+  QueueMessageType,
+} from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
+import { HTTPError } from "ky";
 
 export class OutlookProvider extends EmailProvider {
   static displayName = "Outlook";

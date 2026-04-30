@@ -1,11 +1,11 @@
-import { cf } from "@api/plugins/cf";
+import { html } from "@elysiajs/html";
+import { cf } from "@worker/api/plugins/cf";
 import {
   accountDetailKeyboard,
   accountDetailText,
-} from "@bot/utils/formatters";
-import { getAccountById } from "@db/accounts";
-import { deleteOAuthBotMsg, getOAuthBotMsg } from "@db/kv";
-import { Html, html } from "@elysiajs/html";
+} from "@worker/bot/utils/formatters";
+import { getAccountById } from "@worker/db/accounts";
+import { deleteOAuthBotMsg, getOAuthBotMsg } from "@worker/db/kv";
 import { Elysia } from "elysia";
 import { Api } from "grammy";
 import {
@@ -16,14 +16,15 @@ import {
 import { OAuthAccountQuery, OAuthParams } from "./model";
 import { resolveOAuth } from "./utils";
 
-// `Html` 必须在 scope —— jsxFactory 编译成 `Html.createElement(...)`。
-void Html;
-
 /**
  * OAuth flow 三个 HTML 页：
  *  - GET /oauth/:provider          说明 + redirect URI 提示页
  *  - GET /oauth/:provider/start    302 到 Google/MS authorize 页
  *  - GET /oauth/:provider/callback OAuth 回调，写 refresh_token，编辑 bot 消息，渲染成功页
+ *
+ * `./components` 里渲染函数已经直接调 `Html.createElement` 输出 HTML 字符串，
+ * 不走 JSX 语法 —— page 那边 tsconfig 的 jsx 设置和 worker 这里的 jsxFactory
+ * 是冲突的，纯函数调用的写法跨包共享类型不会撞。
  */
 export const oauthController = new Elysia({ name: "controller.oauth" })
   .use(html())
@@ -46,13 +47,11 @@ export const oauthController = new Elysia({ name: "controller.oauth" })
       startUrl.searchParams.set("account", String(account.id));
       const callbackUrl = `${url.origin}${url.pathname}/callback`;
 
-      return (
-        <OAuthSetupPage
-          startUrl={startUrl.toString()}
-          callbackUrl={callbackUrl}
-          accountEmail={account.email || `Account #${account.id}`}
-        />
-      );
+      return OAuthSetupPage({
+        startUrl: startUrl.toString(),
+        callbackUrl,
+        accountEmail: account.email || `Account #${account.id}`,
+      });
     },
     { params: OAuthParams, query: OAuthAccountQuery },
   )
@@ -83,7 +82,7 @@ export const oauthController = new Elysia({ name: "controller.oauth" })
       const result = await oauth.processOAuthCallback(request, env);
       if (!result.ok) {
         set.status = result.status;
-        return <OAuthErrorPage title={result.title} detail={result.detail} />;
+        return OAuthErrorPage({ title: result.title, detail: result.detail });
       }
 
       // 尝试更新 bot 中的授权消息（best-effort）
@@ -106,14 +105,12 @@ export const oauthController = new Elysia({ name: "controller.oauth" })
         await deleteOAuthBotMsg(env.EMAIL_KV, result.accountId);
       }
 
-      return (
-        <OAuthCallbackPage
-          refreshToken={result.refreshToken}
-          scope={result.scope}
-          expiresIn={result.expiresIn}
-          accountEmail={result.accountEmail}
-        />
-      );
+      return OAuthCallbackPage({
+        refreshToken: result.refreshToken,
+        scope: result.scope,
+        expiresIn: result.expiresIn,
+        accountEmail: result.accountEmail,
+      });
     },
     { params: OAuthParams },
   );

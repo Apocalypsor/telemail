@@ -1,11 +1,14 @@
-import { deleteAccount, getOwnAccounts } from "@db/accounts";
-import { deleteFailedEmailsByAccountId } from "@db/failed-emails";
-import { deleteCachedAccessToken, deleteCachedOutlookFolderIds } from "@db/kv";
-import { deleteMappingsByAccountId } from "@db/message-map";
-import { deleteUser } from "@db/users";
-import { getEmailProvider } from "@providers";
-import { reportErrorToObservability } from "@utils/observability";
-import type { Account, Env } from "@/types";
+import { deleteAccount, getOwnAccounts } from "@worker/db/accounts";
+import { deleteFailedEmailsByAccountId } from "@worker/db/failed-emails";
+import {
+  deleteCachedAccessToken,
+  deleteCachedOutlookFolderIds,
+} from "@worker/db/kv";
+import { deleteMappingsByAccountId } from "@worker/db/message-map";
+import { deleteUser } from "@worker/db/users";
+import { getEmailProvider } from "@worker/providers";
+import type { Account, Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 
 /** 清理并删除单个邮箱账号（停止 watch/subscription + 删除关联数据 + 删除 DB 记录） */
 export async function cleanupAndDeleteAccount(

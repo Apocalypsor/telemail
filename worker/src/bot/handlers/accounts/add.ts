@@ -1,12 +1,16 @@
-import { clearBotState, getBotState, setBotState } from "@bot/utils/state";
-import { createAccount } from "@db/accounts";
-import { putOAuthBotMsg } from "@db/kv";
-import { t } from "@i18n";
-import { PROVIDERS } from "@providers";
-import { reportErrorToObservability } from "@utils/observability";
+import {
+  clearBotState,
+  getBotState,
+  setBotState,
+} from "@worker/bot/utils/state";
+import { createAccount } from "@worker/db/accounts";
+import { putOAuthBotMsg } from "@worker/db/kv";
+import { t } from "@worker/i18n";
+import { PROVIDERS } from "@worker/providers";
+import type { AccountType, Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { AccountType, Env } from "@/types";
 
 /** 注册新增账号流程的回调：
  *  - add / addme — 输入 chat_id 步骤入口

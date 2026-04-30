@@ -1,14 +1,14 @@
-import { getBotInfo } from "@bot/index";
-import { countPendingRemindersForEmail } from "@db/reminders";
-import { t } from "@i18n";
+import { getBotInfo } from "@worker/bot/index";
+import { countPendingRemindersForEmail } from "@worker/db/reminders";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
 import {
   buildMiniAppMailUrl,
   buildMiniAppRemindersUrl,
   buildWebMailUrl,
   generateMailTokenById,
-} from "@utils/mail-token";
+} from "@worker/utils/mail-token";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 
 // ── 邮件信息键盘（星标 / 查看原文）─────────────────────────────────────────
 

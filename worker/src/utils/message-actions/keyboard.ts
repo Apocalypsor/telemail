@@ -1,9 +1,12 @@
-import { buildEmailKeyboard } from "@bot/keyboards";
-import { setReplyMarkup } from "@clients/telegram";
-import { getMappingsByEmailIds, type MessageMapping } from "@db/message-map";
-import { accountCanArchive, getEmailProvider } from "@providers";
-import { reportErrorToObservability } from "@utils/observability";
-import type { Account, Env } from "@/types";
+import { buildEmailKeyboard } from "@worker/bot/keyboards";
+import { setReplyMarkup } from "@worker/clients/telegram";
+import {
+  getMappingsByEmailIds,
+  type MessageMapping,
+} from "@worker/db/message-map";
+import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import type { Account, Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import { syncStarPinState } from "./reconcile";
 
 /** 用最新的 reminder count 重建邮件 keyboard 并 setReplyMarkup。

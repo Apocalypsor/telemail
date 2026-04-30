@@ -1,4 +1,4 @@
-import { hmacSha256Hex, timingSafeEqual } from "@utils/hash";
+import { hmacSha256Hex, timingSafeEqual } from "@worker/utils/hash";
 
 /** 生成基于 accountId 的邮件查看链接 HMAC-SHA256 token（32 字符截断） */
 export async function generateMailTokenById(

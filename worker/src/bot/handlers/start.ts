@@ -1,22 +1,22 @@
-import { helpText } from "@bot/commands";
-import { isAdmin } from "@bot/utils/auth";
-import { formatUserName } from "@bot/utils/formatters";
-import {
-  approveUser,
-  getUserByTelegramId,
-  rejectUser,
-  upsertUser,
-} from "@db/users";
-import { t } from "@i18n";
 import {
   ROUTE_MINI_APP_LIST,
   ROUTE_MINI_APP_REMINDERS,
   ROUTE_MINI_APP_SEARCH,
 } from "@page/paths";
-import { reportErrorToObservability } from "@utils/observability";
+import { helpText } from "@worker/bot/commands";
+import { isAdmin } from "@worker/bot/utils/auth";
+import { formatUserName } from "@worker/bot/utils/formatters";
+import {
+  approveUser,
+  getUserByTelegramId,
+  rejectUser,
+  upsertUser,
+} from "@worker/db/users";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 
 /** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/用户管理。
  *  /start 默认私聊，inline web_app 按钮在私聊有效；没配 WORKER_URL 时回退

@@ -1,8 +1,8 @@
-import { http } from "@clients/http";
-import { getCachedAccessToken, putCachedAccessToken } from "@db/kv";
-import type { OAuthTokenResponse } from "@providers/types";
+import { http } from "@worker/clients/http";
+import { getCachedAccessToken, putCachedAccessToken } from "@worker/db/kv";
+import type { OAuthTokenResponse } from "@worker/providers/types";
+import type { Account, Env } from "@worker/types";
 import { HTTPError } from "ky";
-import type { Account, Env } from "@/types";
 
 /**
  * 用 refresh_token 交换 access_token（KV 缓存，按账号隔离）。

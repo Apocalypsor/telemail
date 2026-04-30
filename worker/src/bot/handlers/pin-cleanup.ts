@@ -1,5 +1,5 @@
+import type { Env } from "@worker/types";
 import type { Bot } from "grammy";
-import type { Env } from "@/types";
 
 /**
  * TG 对 pinChatMessage 即使带 `disable_notification: true` 也会产生一条「Bot pinned

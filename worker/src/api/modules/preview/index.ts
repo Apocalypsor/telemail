@@ -1,69 +1,29 @@
-import { authSession } from "@api/plugins/auth-session";
-import { cf } from "@api/plugins/cf";
-import { http } from "@clients/http";
-import { analyzeEmail } from "@clients/llm";
-import { formatBody } from "@utils/format";
-import { verifyProxySignature } from "@utils/mail-html";
+import { authSession } from "@worker/api/plugins/auth-session";
+import { cf } from "@worker/api/plugins/cf";
+import { http } from "@worker/clients/http";
+import { analyzeEmail } from "@worker/clients/llm";
+import { MAX_BODY_CHARS } from "@worker/constants";
+import { formatBody } from "@worker/utils/format";
+import { verifyProxySignature } from "@worker/utils/mail-html";
 import { Elysia } from "elysia";
 import { HTTPError } from "ky";
-import { MAX_BODY_CHARS } from "@/constants";
-import {
-  JunkCheckBody,
-  PreviewBody,
-  PreviewResponse,
-  ProxyQuery,
-} from "./model";
+import { JunkCheckBody, PreviewBody, ProxyQuery } from "./model";
 
 /**
  * 预览类工具：HTML 格式化预览 + 垃圾邮件检测 + CORS 代理。
- *  - /api/preview, /api/junk-check 走 session cookie 鉴权（web 工具页用）
- *  - /api/cors-proxy 走 ADMIN_SECRET 签名校验（邮件正文图片代理）
+ *
+ *  - GET  /api/cors-proxy    ADMIN_SECRET 签名校验（邮件正文里远端图片绕跨域）
+ *  - POST /api/preview       session cookie 鉴权（web 工具页）
+ *  - POST /api/junk-check    session cookie 鉴权（web 工具页）
+ *
+ * 路由排在 `.use(authSession)` 之前的不走 session check，之后的都走 ——
+ * Elysia 的 plugin 顺序就是 guard 边界。
  */
 export const previewController = new Elysia({ name: "controller.preview" })
-
-  // HTML 格式化预览
-  .use(authSession)
-  .post(
-    "/api/preview",
-    ({ body }) => {
-      const html = body.html;
-      if (!html) return { result: "", length: 0 };
-      const result = formatBody(undefined, html, MAX_BODY_CHARS);
-      return { result, length: result.length };
-    },
-    { body: PreviewBody, response: PreviewResponse },
-  )
-
-  // 垃圾邮件检测
-  .post(
-    "/api/junk-check",
-    async ({ env, body, status }) => {
-      if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL)
-        return status(500, { error: "LLM not configured" });
-      const result = await analyzeEmail(
-        env.LLM_API_URL,
-        env.LLM_API_KEY,
-        env.LLM_MODEL,
-        body.subject ?? "",
-        body.body ?? "",
-      );
-      return {
-        isJunk: result.isJunk,
-        junkConfidence: result.junkConfidence,
-        summary: result.summary,
-        tags: result.tags,
-      };
-    },
-    { body: JunkCheckBody },
-  );
-
-/**
- * CORS proxy —— 邮件正文里的远端图片走它绕过跨域。URL + sig 由
- * `verifyProxySignature` 用 ADMIN_SECRET 校验。**不走 session auth** —— 邮件
- * 预览页（Pages SPA）渲染图片时浏览器直接发 GET。
- */
-export const corsProxyController = new Elysia({ name: "controller.cors-proxy" })
   .use(cf)
+
+  // CORS proxy —— 邮件预览页（Pages SPA）渲染图片时浏览器直接发 GET。
+  // url + sig 由 verifyProxySignature 用 ADMIN_SECRET 校验，不需要登录态。
   .get(
     "/api/cors-proxy",
     async ({ env, query, status }) => {
@@ -89,4 +49,42 @@ export const corsProxyController = new Elysia({ name: "controller.cors-proxy" })
       }
     },
     { query: ProxyQuery },
+  )
+
+  // ─── 以下路由都要 session cookie ───────────────────────────────────
+  .use(authSession)
+
+  // HTML → MarkdownV2 预览
+  .post(
+    "/api/preview",
+    ({ body }) => {
+      const html = body.html;
+      if (!html) return { result: "", length: 0 };
+      const result = formatBody(undefined, html, MAX_BODY_CHARS);
+      return { result, length: result.length };
+    },
+    { body: PreviewBody },
+  )
+
+  // 垃圾邮件检测
+  .post(
+    "/api/junk-check",
+    async ({ env, body, status }) => {
+      if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL)
+        return status(500, { error: "LLM not configured" });
+      const result = await analyzeEmail(
+        env.LLM_API_URL,
+        env.LLM_API_KEY,
+        env.LLM_MODEL,
+        body.subject ?? "",
+        body.body ?? "",
+      );
+      return {
+        isJunk: result.isJunk,
+        junkConfidence: result.junkConfidence,
+        summary: result.summary,
+        tags: result.tags,
+      };
+    },
+    { body: JunkCheckBody },
   );

@@ -1,25 +1,21 @@
-import { authAny } from "@api/plugins/auth-any";
-import { cf } from "@api/plugins/cf";
-import { buildEmailKeyboard } from "@bot/keyboards";
-import { buildTgMessageLink, setReplyMarkup } from "@clients/telegram";
-import { getMappingsByEmailIds } from "@db/message-map";
-import { deliverEmailToTelegram } from "@handlers/queue/bridge";
-import { accountCanArchive, getEmailProvider } from "@providers";
-import { buildWebMailUrl } from "@utils/mail-token";
+import { authAny } from "@worker/api/plugins/auth-any";
+import { cf } from "@worker/api/plugins/cf";
+import { buildEmailKeyboard } from "@worker/bot/keyboards";
+import { buildTgMessageLink, setReplyMarkup } from "@worker/clients/telegram";
+import { getMappingsByEmailIds } from "@worker/db/message-map";
+import { deliverEmailToTelegram } from "@worker/handlers/queue/bridge";
+import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import { buildWebMailUrl } from "@worker/utils/mail-token";
 import {
   cleanupTgForEmail,
   markEmailAsRead,
   syncStarPinState,
-} from "@utils/message-actions";
-import { reportErrorToObservability } from "@utils/observability";
+} from "@worker/utils/message-actions";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import { Elysia } from "elysia";
 import {
   MailActionBody,
-  MailErrorResponse,
-  MailGetErrorResponse,
   MailGetQuery,
-  MailGetResponse,
-  MailMutationResponse,
   MailParams,
   MailToggleStarBody,
 } from "./model";
@@ -90,17 +86,7 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
       tgMessageLink,
     };
   },
-  {
-    params: MailParams,
-    query: MailGetQuery,
-    response: {
-      200: MailGetResponse,
-      400: MailGetErrorResponse,
-      403: MailGetErrorResponse,
-      404: MailGetErrorResponse,
-      500: MailGetErrorResponse,
-    },
-  },
+  { params: MailParams, query: MailGetQuery },
 );
 
 // ─── POST mutations (session OR mini-app auth + token check) ──────────────
@@ -115,10 +101,9 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
       const id = (params as { id: string }).id;
       const { accountId, token } = body as MailActionBody;
       const ctx = await resolveMailContext(env, id, accountId, token);
-      if (!ctx.ok)
-        return status(ctx.status, { ok: false as const, error: ctx.error });
+      if (!ctx.ok) return status(ctx.status, { ok: false, error: ctx.error });
       if (!isAdmin && ctx.account.telegram_user_id !== userId) {
-        return status(403, { ok: false as const, error: "Forbidden" });
+        return status(403, { ok: false, error: "Forbidden" });
       }
       return { account: ctx.account, emailMessageId: ctx.emailMessageId };
     },
@@ -160,17 +145,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
         return status(500, { ok: false, error: "操作失败" });
       }
     },
-    {
-      params: MailParams,
-      body: MailActionBody,
-      response: {
-        200: MailMutationResponse,
-        400: MailErrorResponse,
-        403: MailErrorResponse,
-        404: MailErrorResponse,
-        500: MailErrorResponse,
-      },
-    },
+    { params: MailParams, body: MailActionBody },
   )
 
   .post(
@@ -189,17 +164,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
         return status(500, { ok: false, error: "操作失败" });
       }
     },
-    {
-      params: MailParams,
-      body: MailActionBody,
-      response: {
-        200: MailMutationResponse,
-        400: MailErrorResponse,
-        403: MailErrorResponse,
-        404: MailErrorResponse,
-        500: MailErrorResponse,
-      },
-    },
+    { params: MailParams, body: MailActionBody },
   )
 
   .post(
@@ -218,17 +183,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
         return status(500, { ok: false, error: "操作失败" });
       }
     },
-    {
-      params: MailParams,
-      body: MailActionBody,
-      response: {
-        200: MailMutationResponse,
-        400: MailErrorResponse,
-        403: MailErrorResponse,
-        404: MailErrorResponse,
-        500: MailErrorResponse,
-      },
-    },
+    { params: MailParams, body: MailActionBody },
   )
 
   .post(
@@ -253,17 +208,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
         return status(500, { ok: false, error: "操作失败" });
       }
     },
-    {
-      params: MailParams,
-      body: MailActionBody,
-      response: {
-        200: MailMutationResponse,
-        400: MailErrorResponse,
-        403: MailErrorResponse,
-        404: MailErrorResponse,
-        500: MailErrorResponse,
-      },
-    },
+    { params: MailParams, body: MailActionBody },
   )
 
   .post(
@@ -299,17 +244,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
         return status(500, { ok: false, error: "操作失败" });
       }
     },
-    {
-      params: MailParams,
-      body: MailActionBody,
-      response: {
-        200: MailMutationResponse,
-        400: MailErrorResponse,
-        403: MailErrorResponse,
-        404: MailErrorResponse,
-        500: MailErrorResponse,
-      },
-    },
+    { params: MailParams, body: MailActionBody },
   )
 
   .post(
@@ -367,17 +302,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
         return status(500, { ok: false, error: "操作失败" });
       }
     },
-    {
-      params: MailParams,
-      body: MailToggleStarBody,
-      response: {
-        200: MailMutationResponse,
-        400: MailErrorResponse,
-        403: MailErrorResponse,
-        404: MailErrorResponse,
-        500: MailErrorResponse,
-      },
-    },
+    { params: MailParams, body: MailToggleStarBody },
   );
 
 export const mailController = new Elysia({ name: "controller.mail" })

@@ -1,4 +1,4 @@
-import type { MailMeta } from "@/types";
+import type { MailMeta } from "@worker/types";
 
 // ─── KV keys & prefixes ──────────────────────────────────────────────��─────
 

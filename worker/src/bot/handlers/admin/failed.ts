@@ -1,17 +1,20 @@
-import { isAdmin } from "@bot/utils/auth";
-import { clearBotState } from "@bot/utils/state";
+import { isAdmin } from "@worker/bot/utils/auth";
+import { clearBotState } from "@worker/bot/utils/state";
 import {
   deleteAllFailedEmails,
   deleteFailedEmail,
   getAllFailedEmails,
   getFailedEmail,
-} from "@db/failed-emails";
-import { retryAllFailedEmails, retryFailedEmail } from "@handlers/queue/bridge";
-import { t } from "@i18n";
-import { reportErrorToObservability } from "@utils/observability";
+} from "@worker/db/failed-emails";
+import {
+  retryAllFailedEmails,
+  retryFailedEmail,
+} from "@worker/handlers/queue/bridge";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 import { failedEmailListMessage } from "./utils";
 
 /** 注册 failed-emails 管理回调：list / retry-all / fr:N / fd:N / failed_clear。 */

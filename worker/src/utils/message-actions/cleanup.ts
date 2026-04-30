@@ -1,10 +1,10 @@
-import { deleteMessage } from "@clients/telegram";
+import { deleteMessage } from "@worker/clients/telegram";
 import {
   deleteMappingByEmailId,
   getMappingsByEmailIds,
   type MessageMapping,
-} from "@db/message-map";
-import type { Env } from "@/types";
+} from "@worker/db/message-map";
+import type { Env } from "@worker/types";
 
 /** 删除 TG 消息 + mapping（邮件不再归属 INBOX 时统一清理）。
  *  调用方拿到了 mapping 时直接用；只有 (account, emailMessageId) 时用下面的

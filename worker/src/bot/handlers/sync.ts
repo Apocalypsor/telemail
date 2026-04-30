@@ -1,10 +1,10 @@
-import { getOwnAccounts } from "@db/accounts";
-import { getMappingsByEmailIds } from "@db/message-map";
-import { t } from "@i18n";
-import { getEmailProvider } from "@providers";
-import { reportErrorToObservability } from "@utils/observability";
+import { getOwnAccounts } from "@worker/db/accounts";
+import { getMappingsByEmailIds } from "@worker/db/message-map";
+import { t } from "@worker/i18n";
+import { getEmailProvider } from "@worker/providers";
+import { type Account, type Env, QueueMessageType } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
-import { type Account, type Env, QueueMessageType } from "@/types";
 
 const MAX_SYNC_PER_ACCOUNT = 50;
 

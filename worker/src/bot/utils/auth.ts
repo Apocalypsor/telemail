@@ -1,6 +1,6 @@
-import { t } from "@i18n";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
 import type { Bot, Context, NextFunction } from "grammy";
-import type { Env } from "@/types";
 
 export function isAdmin(userId: string, env: Env): boolean {
   return userId === env.ADMIN_TELEGRAM_ID;

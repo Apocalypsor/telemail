@@ -1,7 +1,7 @@
-import { t } from "@i18n";
-import { PROVIDERS } from "@providers";
+import { t } from "@worker/i18n";
+import { PROVIDERS } from "@worker/providers";
+import type { Account } from "@worker/types";
 import { InlineKeyboard } from "grammy";
-import type { Account } from "@/types";
 
 export function accountDetailText(
   account: Account,

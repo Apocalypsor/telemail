@@ -1,7 +1,7 @@
 /** Provider 层对外公开的类型定义（接口 / 纯数据形状） */
 
-import type { EmailProvider } from "@providers/base";
-import type { Account, Env, MailMeta } from "@/types";
+import type { EmailProvider } from "@worker/providers/base";
+import type { Account, Env, MailMeta } from "@worker/types";
 
 /** 列表类 API 返回的最简邮件条目 */
 export interface EmailListItem {

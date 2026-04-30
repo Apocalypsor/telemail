@@ -1,16 +1,16 @@
-import { deleteUserWithAccounts } from "@bot/utils/account";
-import { isAdmin } from "@bot/utils/auth";
-import { formatUserName } from "@bot/utils/formatters";
+import { deleteUserWithAccounts } from "@worker/bot/utils/account";
+import { isAdmin } from "@worker/bot/utils/auth";
+import { formatUserName } from "@worker/bot/utils/formatters";
 import {
   approveUser,
   getNonAdminUsers,
   getUserByTelegramId,
   rejectUser,
-} from "@db/users";
-import { t } from "@i18n";
+} from "@worker/db/users";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 import { userListKeyboard, userListText } from "./utils";
 
 /** 注册 user 管理回调：列表 / info / approve / reject / delete confirm + confirmed。 */

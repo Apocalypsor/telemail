@@ -1,14 +1,14 @@
-import { buildEmailKeyboard } from "@bot/keyboards";
+import { buildEmailKeyboard } from "@worker/bot/keyboards";
 import {
   pinChatMessage,
   setReplyMarkup,
   unpinChatMessage,
-} from "@clients/telegram";
-import type { MessageMapping } from "@db/message-map";
-import { accountCanArchive, getEmailProvider } from "@providers";
-import type { MessageLocation, MessageState } from "@providers/types";
-import { reportErrorToObservability } from "@utils/observability";
-import type { Account, Env } from "@/types";
+} from "@worker/clients/telegram";
+import type { MessageMapping } from "@worker/db/message-map";
+import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import type { MessageLocation, MessageState } from "@worker/providers/types";
+import type { Account, Env } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import { removeFromTelegram } from "./cleanup";
 
 /**

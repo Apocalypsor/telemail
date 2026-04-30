@@ -1,5 +1,14 @@
-import { getAccountsByEmail, getHistoryId, putHistoryId } from "@db/accounts";
-import { EmailProvider } from "@providers/base";
+import {
+  GMAIL_MODIFY_SCOPE,
+  GOOGLE_OAUTH_AUTHORIZE_URL,
+  GOOGLE_OAUTH_TOKEN_URL,
+} from "@worker/constants";
+import {
+  getAccountsByEmail,
+  getHistoryId,
+  putHistoryId,
+} from "@worker/db/accounts";
+import { EmailProvider } from "@worker/providers/base";
 import type {
   GmailHistoryResponse,
   GmailMessage,
@@ -7,32 +16,30 @@ import type {
   GmailPayload,
   GmailProfile,
   GmailWatchResponse,
-} from "@providers/gmail/types";
+} from "@worker/providers/gmail/types";
 import {
   getAccessToken,
   gmailBatchGetMetadata,
   gmailGet,
   gmailPost,
-} from "@providers/gmail/utils";
+} from "@worker/providers/gmail/utils";
 import type {
   EmailListItem,
   MessageState,
   PreviewContent,
-} from "@providers/types";
-import { base64urlToArrayBuffer, base64urlToString } from "@utils/base64url";
-import { wrapPlainText } from "@utils/format";
-import { HTTPError } from "ky";
-import {
-  GMAIL_MODIFY_SCOPE,
-  GOOGLE_OAUTH_AUTHORIZE_URL,
-  GOOGLE_OAUTH_TOKEN_URL,
-} from "@/constants";
+} from "@worker/providers/types";
 import {
   type Account,
   type Env,
   type MailMeta,
   QueueMessageType,
-} from "@/types";
+} from "@worker/types";
+import {
+  base64urlToArrayBuffer,
+  base64urlToString,
+} from "@worker/utils/base64url";
+import { wrapPlainText } from "@worker/utils/format";
+import { HTTPError } from "ky";
 
 export class GmailProvider extends EmailProvider {
   static displayName = "Gmail";

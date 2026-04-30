@@ -1,8 +1,8 @@
-import { http } from "@clients/http";
-import type { GmailMessage } from "@providers/gmail/types";
-import { refreshAccessToken } from "@providers/utils";
-import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from "@/constants";
-import type { Account, Env } from "@/types";
+import { http } from "@worker/clients/http";
+import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from "@worker/constants";
+import type { GmailMessage } from "@worker/providers/gmail/types";
+import { refreshAccessToken } from "@worker/providers/utils";
+import type { Account, Env } from "@worker/types";
 
 /** 用 refresh_token 换 access_token（KV 缓存，共用 base.ts 的实现） */
 export async function getAccessToken(

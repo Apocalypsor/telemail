@@ -1,12 +1,15 @@
-import { buildEmailKeyboard } from "@bot/keyboards";
-import { resolveMessageAccount } from "@bot/utils/message-context";
-import { t } from "@i18n";
-import { accountCanArchive, getEmailProvider } from "@providers";
-import { cleanupTgForEmail, markEmailAsRead } from "@utils/message-actions";
-import { reportErrorToObservability } from "@utils/observability";
+import { buildEmailKeyboard } from "@worker/bot/keyboards";
+import { resolveMessageAccount } from "@worker/bot/utils/message-context";
+import { t } from "@worker/i18n";
+import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import type { Env } from "@worker/types";
+import {
+  cleanupTgForEmail,
+  markEmailAsRead,
+} from "@worker/utils/message-actions";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 
 /**
  * 从已有 reply_markup 推断当前星标状态 —— 读星按钮的 callback_data：

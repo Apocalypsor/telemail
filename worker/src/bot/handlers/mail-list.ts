@@ -1,18 +1,21 @@
-import { buildTgMessageLink } from "@clients/telegram";
-import { t } from "@i18n";
 import { ROUTE_MINI_APP_LIST } from "@page/paths";
+import { buildTgMessageLink } from "@worker/clients/telegram";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
 import {
   getMailList,
   getPreviewFolder,
   type MailListResult,
   type MailListType,
-} from "@utils/mail-list";
-import { buildMailPreviewUrl } from "@utils/mail-token";
-import { escapeMdV2 } from "@utils/markdown-v2";
-import { markAllAsRead, trashAllJunkEmails } from "@utils/message-actions";
+} from "@worker/utils/mail-list";
+import { buildMailPreviewUrl } from "@worker/utils/mail-token";
+import { escapeMdV2 } from "@worker/utils/markdown-v2";
+import {
+  markAllAsRead,
+  trashAllJunkEmails,
+} from "@worker/utils/message-actions";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { Env } from "@/types";
 
 interface DisplayConfig {
   icon: string;

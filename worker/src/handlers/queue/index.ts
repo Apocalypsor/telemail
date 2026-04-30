@@ -1,7 +1,7 @@
-import { deleteMessage } from "@clients/telegram";
-import { processEmailMessage } from "@handlers/queue/bridge";
-import { reportErrorToObservability } from "@utils/observability";
-import { type Env, type QueueMessage, QueueMessageType } from "@/types";
+import { deleteMessage } from "@worker/clients/telegram";
+import { processEmailMessage } from "@worker/handlers/queue/bridge";
+import { type Env, type QueueMessage, QueueMessageType } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 
 /** Queue consumer: 按 type 派发邮件投递 / 延迟删 TG 消息等任务 */
 export async function handleQueueBatch(

@@ -1,8 +1,8 @@
-import { t } from "@i18n";
-import { markAsReadByMessage, toggleStar } from "@utils/message-actions";
-import { reportErrorToObservability } from "@utils/observability";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
+import { markAsReadByMessage, toggleStar } from "@worker/utils/message-actions";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
-import type { Env } from "@/types";
 
 /** 星标/取消星标 inline button callback */
 export function registerStarHandler(bot: Bot, env: Env) {
