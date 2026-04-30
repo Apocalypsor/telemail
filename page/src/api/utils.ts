@@ -50,9 +50,12 @@ export async function extractErrorMessage(err: unknown): Promise<string> {
  * TanStack Router `validateSearch` 的 TypeBox 适配器 —— 跟 worker / middleware
  * 同一套 schema runtime（Elysia 的 `t`），page 这边复用一份。
  *
- * 流水线：`Clean` 丢未声明字段 → `Convert` 把字符串 query 强转成 schema 类型
- * （`?id=123` → `id: 123`、`?cache=true` → `cache: true`）→ `Parse` 验证 +
- * 抛异常（缺必填 / 类型对不上 → TanStack 走 errorComponent）。
+ * 流水线：
+ *   1. `Value.Clean` —— 丢 schema 未声明的字段
+ *   2. `Value.Convert` —— `?id=123` → `id: 123`、`?cache=true` → `cache: true`
+ *   3. **逐字段 `Value.Check`，类型不匹配的（包括 t.Optional 里塞了脏值）直接 delete** ——
+ *      还原老 zod 时代 `fallback(...)` 的"脏 URL 不炸页"语义
+ *   4. `Value.Parse` —— 必填字段还缺就抛（TanStack 走 errorComponent）
  *
  * 用法：
  * ```ts
@@ -60,15 +63,26 @@ export async function extractErrorMessage(err: unknown): Promise<string> {
  * createFileRoute("/mail/$id/")({ validateSearch: validateSearch(Search) })
  * ```
  *
- * 可选字段用 `t.Optional(...)`：缺失 → key 不存在（navigate 调用时不需要传），
- * 在场但类型错 → Parse 抛异常。
+ * `t.Optional(...)`：缺失或脏值都视作 undefined（key 不出现在解析结果里）；
+ * 必填字段缺失或类型对不上 → 抛 → errorComponent。
  */
 export function validateSearch<T extends TSchema>(
   schema: T,
 ): (input: Record<string, unknown>) => Static<T> {
   return (input) => {
     const cleaned = Value.Clean(schema, { ...input });
-    const converted = Value.Convert(schema, cleaned);
+    const converted = Value.Convert(schema, cleaned) as Record<string, unknown>;
+    if (converted && typeof converted === "object" && "properties" in schema) {
+      const properties = (
+        schema as unknown as { properties: Record<string, TSchema> }
+      ).properties;
+      for (const key of Object.keys(converted)) {
+        const fieldSchema = properties[key];
+        if (fieldSchema && !Value.Check(fieldSchema, converted[key])) {
+          delete converted[key];
+        }
+      }
+    }
     return Value.Parse(schema, converted) as Static<T>;
   };
 }
