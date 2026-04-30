@@ -11,6 +11,7 @@ import {
   findTrashFolder,
   findUidByMessageId,
   locateMessage,
+  normalizeMessageIdForSearch,
   resolveArchiveFolder,
   resolveFetchCandidates,
   searchAndFetch,
@@ -36,7 +37,7 @@ const Imap = {
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
       const hits = await conn.client.search(
-        { header: { "message-id": rfcMessageId } },
+        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
         { uid: true },
       );
       if (!Array.isArray(hits) || hits.length === 0) {
@@ -109,7 +110,9 @@ const Imap = {
       const lock = await conn.client.getMailboxLock(folder);
       try {
         const hits = await conn.client.search(
-          { header: { "message-id": rfcMessageId } },
+          {
+            header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) },
+          },
           { uid: true },
         );
         if (!Array.isArray(hits) || hits.length === 0) continue;
@@ -290,7 +293,7 @@ const Imap = {
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
       const hits = await conn.client.search(
-        { header: { "message-id": rfcMessageId } },
+        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
         { uid: true },
       );
       if (!Array.isArray(hits) || hits.length === 0) {
@@ -335,7 +338,7 @@ const Imap = {
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
       const hits = await conn.client.search(
-        { header: { "message-id": rfcMessageId } },
+        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
         { uid: true },
       );
       if (!Array.isArray(hits) || hits.length === 0) {
@@ -365,7 +368,7 @@ const Imap = {
     const lock = await conn.client.getMailboxLock(junkPath);
     try {
       const hits = await conn.client.search(
-        { header: { "message-id": rfcMessageId } },
+        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
         { uid: true },
       );
       if (!Array.isArray(hits) || hits.length === 0) {
@@ -397,7 +400,7 @@ const Imap = {
     const lock = await conn.client.getMailboxLock(resolved);
     try {
       const hits = await conn.client.search(
-        { header: { "message-id": rfcMessageId } },
+        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
         { uid: true },
       );
       if (!Array.isArray(hits) || hits.length === 0) {
@@ -439,7 +442,9 @@ const Imap = {
       const lock = await conn.client.getMailboxLock("INBOX");
       try {
         const hits = await conn.client.search(
-          { header: { "message-id": rfcMessageId } },
+          {
+            header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) },
+          },
           { uid: true },
         );
         if (Array.isArray(hits) && hits.length > 0) {
@@ -492,7 +497,10 @@ const Imap = {
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
       const hits = await conn.client.search(
-        { header: { "message-id": rfcMessageId }, flagged: true },
+        {
+          header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) },
+          flagged: true,
+        },
         { uid: true },
       );
       return Array.isArray(hits) && hits.length > 0;
