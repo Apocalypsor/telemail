@@ -2,6 +2,16 @@ import type { ActiveConnection } from "@middleware/imap/types";
 import type { MessageHit, MessageSummary } from "../types";
 
 /**
+ * IMAP `ENVELOPE.message-id` 默认带 `<...>`，但 `SEARCH HEADER MESSAGE-ID` 在不
+ * 同服务器上对带括号的兼容性参差（部分实现存储时已剥掉括号导致带括号搜不到，
+ * Dovecot substring 匹配能命中两边）。统一去掉外层尖括号再搜，靠 RFC 3501
+ * substring 匹配兜底两种存储形态。
+ */
+export function normalizeMessageIdForSearch(rfcMessageId: string): string {
+  return rfcMessageId.replace(/^<+|>+$/g, "").trim();
+}
+
+/**
  * 在 `folder` 里按 RFC 822 Message-Id 搜 UID。多条匹配时取最新（UID 最大）。
  * 没找到返回 null；folder 不存在 / 无权限 → 抛错由调用方处理。
  */
@@ -13,7 +23,7 @@ export async function findUidByMessageId(
   const lock = await conn.client.getMailboxLock(folder);
   try {
     const hits = await conn.client.search(
-      { header: { "message-id": rfcMessageId } },
+      { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
       { uid: true },
     );
     if (!Array.isArray(hits) || hits.length === 0) return null;
