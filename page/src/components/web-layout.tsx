@@ -3,7 +3,7 @@ import { Dropdown } from "@heroui/react";
 import { loginUrlForCurrentPath, useSession } from "@hooks/use-session";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ROUTE_SESSION_LOGOUT } from "@worker/handlers/hono/routes";
+import { ROUTE_SESSION_LOGOUT } from "@worker/api/routes";
 import type { ReactNode } from "react";
 
 /**

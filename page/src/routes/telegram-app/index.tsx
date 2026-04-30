@@ -5,7 +5,7 @@ import { Spinner } from "@heroui/react";
 import { useBackButton } from "@hooks/use-back-button";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
-import { ROUTE_REMINDERS_API_RESOLVE_CONTEXT } from "@worker/handlers/hono/routes";
+import { ROUTE_REMINDERS_API_RESOLVE_CONTEXT } from "@worker/api/routes";
 import { useEffect, useState } from "react";
 
 /**

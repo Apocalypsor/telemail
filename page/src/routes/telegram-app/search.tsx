@@ -9,7 +9,7 @@ import { INPUT_CLASS } from "@styles/inputs";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
-import { ROUTE_MINI_APP_API_SEARCH } from "@worker/handlers/hono/routes";
+import { ROUTE_MINI_APP_API_SEARCH } from "@worker/api/routes";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 

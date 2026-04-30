@@ -2,27 +2,28 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "ESNext",
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx",
+    "jsx": "react",
+    "jsxFactory": "Html.createElement",
+    "jsxFragmentFactory": "Html.Fragment",
     "allowJs": true,
     "checkJs": false,
     "types": ["./worker-configuration.d.ts", "node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@bot/*": ["./bot/*"],
-      "@clients/*": ["./clients/*"],
-      "@components/*": ["./components/*"],
-      "@db/*": ["./db/*"],
-      "@handlers/*": ["./handlers/*"],
-      "@i18n": ["./i18n"],
-      "@i18n/*": ["./i18n/*"],
-      "@providers": ["./providers"],
-      "@providers/*": ["./providers/*"],
-      "@services/*": ["./services/*"],
-      "@utils/*": ["./utils/*"],
+      "@/*": ["./src/*"],
+      "@api": ["./src/api"],
+      "@api/*": ["./src/api/*"],
+      "@bot/*": ["./src/bot/*"],
+      "@clients/*": ["./src/clients/*"],
+      "@db/*": ["./src/db/*"],
+      "@handlers/*": ["./src/handlers/*"],
+      "@i18n": ["./src/i18n"],
+      "@i18n/*": ["./src/i18n/*"],
+      "@providers": ["./src/providers"],
+      "@providers/*": ["./src/providers/*"],
+      "@utils/*": ["./src/utils/*"],
       "@page/*": ["../page/src/*"]
     }
   },
-  "include": ["worker-configuration.d.ts", "**/*.ts", "**/*.tsx"]
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "src/**/*.tsx"]
 }

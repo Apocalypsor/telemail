@@ -7,7 +7,7 @@ import { Card, Skeleton } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
-import { ROUTE_MAIL_API } from "@worker/handlers/hono/routes";
+import { ROUTE_MAIL_API } from "@worker/api/routes";
 import { useState } from "react";
 import { z } from "zod";
 import { WebMailToolbar } from "./-components/web-toolbar";

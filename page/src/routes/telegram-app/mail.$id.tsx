@@ -9,7 +9,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { openExternalLink } from "@utils/tg";
-import { ROUTE_MAIL_API } from "@worker/handlers/hono/routes";
+import { ROUTE_MAIL_API } from "@worker/api/routes";
 import { useCallback, useState } from "react";
 import { z } from "zod";
 

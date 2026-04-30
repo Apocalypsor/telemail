@@ -13,7 +13,7 @@ import {
 } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { notifyHaptic } from "@utils/tg";
-import { ROUTE_REMINDERS_API } from "@worker/handlers/hono/routes";
+import { ROUTE_REMINDERS_API } from "@worker/api/routes";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { ReminderEmailCard } from "./-components/email-card";

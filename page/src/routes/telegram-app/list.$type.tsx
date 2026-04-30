@@ -18,7 +18,7 @@ import {
   ROUTE_MINI_APP_API_LIST,
   ROUTE_MINI_APP_API_MARK_ALL_READ,
   ROUTE_MINI_APP_API_TRASH_ALL_JUNK,
-} from "@worker/handlers/hono/routes";
+} from "@worker/api/routes";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { MAIL_LIST_TITLES, MAIL_LIST_TYPES } from "@/constants";

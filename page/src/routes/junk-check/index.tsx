@@ -6,7 +6,7 @@ import { Button, Card, Spinner } from "@heroui/react";
 import { INPUT_CLASS } from "@styles/inputs";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ROUTE_JUNK_CHECK_API } from "@worker/handlers/hono/routes";
+import { ROUTE_JUNK_CHECK_API } from "@worker/api/routes";
 import { useState } from "react";
 import { ResultCard } from "./-components/result-card";
 

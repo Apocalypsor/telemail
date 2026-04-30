@@ -14,7 +14,7 @@ import { confirmPopup, notifyHaptic } from "@utils/tg";
 import {
   ROUTE_REMINDERS_API,
   ROUTE_REMINDERS_API_EMAIL_CONTEXT,
-} from "@worker/handlers/hono/routes";
+} from "@worker/api/routes";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { ReminderAddSection } from "./-components/add-section";

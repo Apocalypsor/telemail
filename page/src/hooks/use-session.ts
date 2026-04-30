@@ -1,7 +1,7 @@
 import { api } from "@api/client";
 import { type Whoami, whoamiResponseSchema } from "@api/schemas";
 import { useQuery } from "@tanstack/react-query";
-import { ROUTE_SESSION_WHOAMI } from "@worker/handlers/hono/routes";
+import { ROUTE_SESSION_WHOAMI } from "@worker/api/routes";
 import { HTTPError, type KyResponse } from "ky";
 
 /**

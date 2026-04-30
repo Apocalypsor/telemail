@@ -5,7 +5,7 @@ import { SessionGatedWebLayout } from "@components/session-gated-web-layout";
 import { Button, Spinner } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ROUTE_PREVIEW_API } from "@worker/handlers/hono/routes";
+import { ROUTE_PREVIEW_API } from "@worker/api/routes";
 import { useState } from "react";
 
 export const Route = createFileRoute("/preview")({

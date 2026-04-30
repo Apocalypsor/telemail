@@ -8,7 +8,7 @@ import { zodValidator } from "@tanstack/zod-adapter";
 import {
   ROUTE_LOGIN_CALLBACK,
   ROUTE_PUBLIC_BOT_INFO,
-} from "@worker/handlers/hono/routes";
+} from "@worker/api/routes";
 import { useEffect, useRef } from "react";
 import { z } from "zod";
 
