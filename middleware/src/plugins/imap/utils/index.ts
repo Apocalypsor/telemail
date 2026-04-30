@@ -12,6 +12,7 @@ export {
 } from "./folders";
 export {
   findUidByMessageId,
+  findUidInMailbox,
   locateMessage,
   normalizeMessageIdForSearch,
   searchAndFetch,

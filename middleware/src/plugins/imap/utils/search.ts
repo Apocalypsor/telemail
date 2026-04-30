@@ -1,14 +1,42 @@
 import type { ActiveConnection } from "@middleware/imap/types";
+import type { ImapFlow } from "imapflow";
 import type { MessageHit, MessageSummary } from "../types";
 
 /**
- * IMAP `ENVELOPE.message-id` 默认带 `<...>`，但 `SEARCH HEADER MESSAGE-ID` 在不
- * 同服务器上对带括号的兼容性参差（部分实现存储时已剥掉括号导致带括号搜不到，
- * Dovecot substring 匹配能命中两边）。统一去掉外层尖括号再搜，靠 RFC 3501
- * substring 匹配兜底两种存储形态。
+ * `SEARCH HEADER MESSAGE-ID` 在不同 IMAP 实现里对 `<...>` 的处理参差：
+ *  - Dovecot / Cyrus 大多走 RFC 3501 substring，带括号 / 不带都能命中
+ *  - iCloud / 部分自托管 Dovecot 索引时把外层 `<>` 剥掉，搜带括号反而 0 命中
+ *  - 反过来某些服务器只匹配带括号的原样
+ *
+ * 没法靠单一形态覆盖全部，唯一稳妥做法就是两种形态都试一次。`stripped` 工具函数
+ * 给调用方按需用。
  */
 export function normalizeMessageIdForSearch(rfcMessageId: string): string {
   return rfcMessageId.replace(/^<+|>+$/g, "").trim();
+}
+
+/**
+ * 调用方已经持有当前 mailbox lock（`getMailboxLock` 之后）—— 在已 SELECT 的
+ * mailbox 里按 RFC 822 Message-Id 找 UID。先按原样（含括号）搜一次，再用剥括号
+ * 形态兜底，覆盖两类服务器存储行为。多条匹配取最新（UID 最大）。
+ */
+export async function findUidInMailbox(
+  client: ImapFlow,
+  rfcMessageId: string,
+): Promise<number | null> {
+  const stripped = normalizeMessageIdForSearch(rfcMessageId);
+  const forms =
+    stripped === rfcMessageId ? [rfcMessageId] : [rfcMessageId, stripped];
+  for (const value of forms) {
+    const hits = await client.search(
+      { header: { "message-id": value } },
+      { uid: true },
+    );
+    if (Array.isArray(hits) && hits.length > 0) {
+      return (hits as number[]).sort((a, b) => b - a)[0];
+    }
+  }
+  return null;
 }
 
 /**
@@ -22,12 +50,7 @@ export async function findUidByMessageId(
 ): Promise<number | null> {
   const lock = await conn.client.getMailboxLock(folder);
   try {
-    const hits = await conn.client.search(
-      { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
-      { uid: true },
-    );
-    if (!Array.isArray(hits) || hits.length === 0) return null;
-    return (hits as number[]).sort((a, b) => b - a)[0];
+    return await findUidInMailbox(conn.client, rfcMessageId);
   } finally {
     lock.release();
   }

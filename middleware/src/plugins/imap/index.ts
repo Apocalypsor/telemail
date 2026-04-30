@@ -10,8 +10,8 @@ import {
   findJunkFolder,
   findTrashFolder,
   findUidByMessageId,
+  findUidInMailbox,
   locateMessage,
-  normalizeMessageIdForSearch,
   resolveArchiveFolder,
   resolveFetchCandidates,
   searchAndFetch,
@@ -36,17 +36,13 @@ const Imap = {
 
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
-      const hits = await conn.client.search(
-        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
-        { uid: true },
-      );
-      if (!Array.isArray(hits) || hits.length === 0) {
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) {
         console.warn(
           `[Account ${accountId}] setFlag: Message-Id not found in INBOX: ${rfcMessageId}`,
         );
         return false;
       }
-      const uid = (hits as number[]).sort((a, b) => b - a)[0];
       if (add) {
         await conn.client.messageFlagsAdd([uid], [flag], { uid: true });
       } else {
@@ -109,14 +105,8 @@ const Imap = {
     for (const folder of folders) {
       const lock = await conn.client.getMailboxLock(folder);
       try {
-        const hits = await conn.client.search(
-          {
-            header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) },
-          },
-          { uid: true },
-        );
-        if (!Array.isArray(hits) || hits.length === 0) continue;
-        const uid = (hits as number[]).sort((a, b) => b - a)[0];
+        const uid = await findUidInMailbox(conn.client, rfcMessageId);
+        if (uid === null) continue;
         const msg = await conn.client.fetchOne(
           String(uid),
           { source: true },
@@ -292,16 +282,12 @@ const Imap = {
 
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
-      const hits = await conn.client.search(
-        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
-        { uid: true },
-      );
-      if (!Array.isArray(hits) || hits.length === 0) {
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) {
         throw new Error(
           `[Account ${accountId}] archiveMessage: Message-Id not in INBOX: ${rfcMessageId}`,
         );
       }
-      const uid = (hits as number[]).sort((a, b) => b - a)[0];
       await conn.client.messageMove([uid], resolved, { uid: true });
       console.log(
         `[Account ${accountId}] Archived UID ${uid} from INBOX to ${resolved}`,
@@ -337,16 +323,12 @@ const Imap = {
 
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
-      const hits = await conn.client.search(
-        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
-        { uid: true },
-      );
-      if (!Array.isArray(hits) || hits.length === 0) {
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) {
         throw new Error(
           `[Account ${accountId}] markAsJunk: Message-Id not in INBOX: ${rfcMessageId}`,
         );
       }
-      const uid = (hits as number[]).sort((a, b) => b - a)[0];
       await conn.client.messageMove([uid], junkPath, { uid: true });
       console.log(
         `[Account ${accountId}] Moved UID ${uid} from INBOX to ${junkPath}`,
@@ -367,16 +349,12 @@ const Imap = {
 
     const lock = await conn.client.getMailboxLock(junkPath);
     try {
-      const hits = await conn.client.search(
-        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
-        { uid: true },
-      );
-      if (!Array.isArray(hits) || hits.length === 0) {
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) {
         throw new Error(
           `[Account ${accountId}] moveToInbox: Message-Id not in ${junkPath}: ${rfcMessageId}`,
         );
       }
-      const uid = (hits as number[]).sort((a, b) => b - a)[0];
       await conn.client.messageMove([uid], "INBOX", { uid: true });
       console.log(
         `[Account ${accountId}] Moved UID ${uid} from ${junkPath} to INBOX`,
@@ -399,16 +377,12 @@ const Imap = {
 
     const lock = await conn.client.getMailboxLock(resolved);
     try {
-      const hits = await conn.client.search(
-        { header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) } },
-        { uid: true },
-      );
-      if (!Array.isArray(hits) || hits.length === 0) {
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) {
         throw new Error(
           `[Account ${accountId}] unarchiveMessage: Message-Id not in ${resolved}: ${rfcMessageId}`,
         );
       }
-      const uid = (hits as number[]).sort((a, b) => b - a)[0];
       await conn.client.messageMove([uid], "INBOX", { uid: true });
       console.log(
         `[Account ${accountId}] Moved UID ${uid} from ${resolved} to INBOX`,
@@ -441,14 +415,8 @@ const Imap = {
     {
       const lock = await conn.client.getMailboxLock("INBOX");
       try {
-        const hits = await conn.client.search(
-          {
-            header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) },
-          },
-          { uid: true },
-        );
-        if (Array.isArray(hits) && hits.length > 0) {
-          const uid = (hits as number[]).sort((a, b) => b - a)[0];
+        const uid = await findUidInMailbox(conn.client, rfcMessageId);
+        if (uid !== null) {
           const flagged = await conn.client.search(
             { uid: `${uid}`, flagged: true },
             { uid: true },
@@ -496,14 +464,15 @@ const Imap = {
 
     const lock = await conn.client.getMailboxLock("INBOX");
     try {
-      const hits = await conn.client.search(
-        {
-          header: { "message-id": normalizeMessageIdForSearch(rfcMessageId) },
-          flagged: true,
-        },
+      // 拆成两步（先按 Message-Id 拿 UID，再查 flagged）—— 部分服务器（iCloud）
+      // SEARCH 把 header 和 flagged 合在一个请求时不命中，分开走稳定。
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) return false;
+      const flagged = await conn.client.search(
+        { uid: `${uid}`, flagged: true },
         { uid: true },
       );
-      return Array.isArray(hits) && hits.length > 0;
+      return Array.isArray(flagged) && (flagged as number[]).includes(uid);
     } finally {
       lock.release();
     }
