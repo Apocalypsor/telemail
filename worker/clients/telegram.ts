@@ -1,4 +1,4 @@
-import { http } from "@utils/http";
+import { http } from "@clients/http";
 import { HTTPError } from "ky";
 import {
   TG_API_BASE,

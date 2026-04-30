@@ -1,6 +1,6 @@
+import { http } from "@clients/http";
 import { getCachedAccessToken, putCachedAccessToken } from "@db/kv";
 import type { OAuthTokenResponse } from "@providers/types";
-import { http } from "@utils/http";
 import { HTTPError } from "ky";
 import type { Account, Env } from "@/types";
 

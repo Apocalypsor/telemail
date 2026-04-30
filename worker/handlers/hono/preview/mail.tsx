@@ -1,4 +1,5 @@
 import { buildEmailKeyboard } from "@bot/keyboards";
+import { buildTgMessageLink, setReplyMarkup } from "@clients/telegram";
 import { getMappingsByEmailIds } from "@db/message-map";
 import { requireSessionOrMiniApp } from "@handlers/hono/middleware";
 import {
@@ -18,7 +19,6 @@ import {
   markEmailAsRead,
   syncStarPinState,
 } from "@services/message-actions";
-import { buildTgMessageLink, setReplyMarkup } from "@services/telegram";
 import { buildWebMailUrl } from "@utils/mail-token";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Hono } from "hono";

@@ -1,3 +1,4 @@
+import { buildTgMessageLink } from "@clients/telegram";
 import { t } from "@i18n";
 import { ROUTE_MINI_APP_LIST } from "@page/paths";
 import {
@@ -7,7 +8,6 @@ import {
   type MailListType,
 } from "@services/mail-list";
 import { markAllAsRead, trashAllJunkEmails } from "@services/message-actions";
-import { buildTgMessageLink } from "@services/telegram";
 import { buildMailPreviewUrl } from "@utils/mail-token";
 import { escapeMdV2 } from "@utils/markdown-v2";
 import type { Bot } from "grammy";

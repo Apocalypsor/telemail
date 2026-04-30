@@ -1,12 +1,12 @@
 import { buildEmailKeyboard } from "@bot/keyboards";
-import type { MessageMapping } from "@db/message-map";
-import { accountCanArchive, getEmailProvider } from "@providers";
-import type { MessageLocation, MessageState } from "@providers/types";
 import {
   pinChatMessage,
   setReplyMarkup,
   unpinChatMessage,
-} from "@services/telegram";
+} from "@clients/telegram";
+import type { MessageMapping } from "@db/message-map";
+import { accountCanArchive, getEmailProvider } from "@providers";
+import type { MessageLocation, MessageState } from "@providers/types";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Account, Env } from "@/types";
 import { removeFromTelegram } from "./cleanup";

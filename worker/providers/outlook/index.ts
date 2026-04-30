@@ -1,3 +1,4 @@
+import { http } from "@clients/http";
 import { getAccountById } from "@db/accounts";
 import {
   deleteMsSubscription,
@@ -21,7 +22,6 @@ import {
 } from "@providers/outlook/utils";
 import type { MessageState } from "@providers/types";
 import { timingSafeEqual } from "@utils/hash";
-import { http } from "@utils/http";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Hono } from "hono";
 import { HTTPError } from "ky";

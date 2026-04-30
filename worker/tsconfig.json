@@ -12,6 +12,7 @@
     "paths": {
       "@/*": ["./*"],
       "@utils/*": ["./utils/*"],
+      "@clients/*": ["./clients/*"],
       "@services/*": ["./services/*"],
       "@providers": ["./providers"],
       "@providers/*": ["./providers/*"],

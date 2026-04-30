@@ -4,7 +4,8 @@ Cloudflare Worker (Hono). Cross-workspace rules in [root AGENTS.md](../AGENTS.md
 
 ## Conventions
 
-- **Layering**: `handlers/` only does routing / auth / req-resp shaping; business logic must live in `services/` or on a provider method. A long handler file means logic has leaked out.
+- **Layering**: `handlers/` does routing / auth / req-resp shaping; `services/` composes providers + DB + clients to do business work; `clients/` is the HTTP layer — the shared `ky` instance plus our hand-written wrappers around external APIs (Telegram Bot, LLM); `utils/` is everything else — pure helpers + thin wrappers over third-party libs that handle their own I/O (e.g. `observability`). Decision tree for a new file: routes → handlers; bot command → bot; new email provider → providers; SQL/KV → db; raw HTTP / hand-rolled API SDK → clients; composes the above → services; pure function or third-party-lib wrapper → utils.
+- **HTTP**: every outbound HTTP request goes through `@clients/http` (a `ky` instance). No raw `fetch`. Centralized retry / parse-fallback lives there.
 - **Bot commands**: private chat only by default — `bot/index.ts` registers `registerPrivateOnlyCommandGuard` as a global guard (also covers `channel_post`). New commands don't need to re-check; `callback_query` is unaffected.
 - **Email providers**: abstract class in `providers/base.ts`, barrel in `providers/index.ts`. **Never `branch on account.type` outside `providers/`** — per-provider differences live on the class (static metadata, instance methods, `static registerRoutes(app)`).
 - **IMAP message id = RFC 822 Message-Id** (not the per-folder UID). The bridge takes `rfcMessageId` everywhere; UIDs aren't stable across folders. Emails without Message-Id are dropped. Gmail / Outlook keep their native ids.

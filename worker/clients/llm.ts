@@ -1,7 +1,7 @@
 /** 使用 OpenAI compatible API 对邮件正文进行 AI 分析（验证码 + 摘要 + 标签） */
 
+import { http } from "@clients/http";
 import { extractLinks, prepareBody } from "@utils/format";
-import { http } from "@utils/http";
 import { LLM_TIMEOUT_MS, MAX_LINKS } from "@/constants";
 
 /** 从逗号分隔的 API Key 列表中随机选一个 */

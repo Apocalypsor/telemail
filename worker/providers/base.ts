@@ -1,3 +1,4 @@
+import { http } from "@clients/http";
 import {
   getAccountById,
   updateAccountEmail,
@@ -19,7 +20,6 @@ import type {
   PreviewContent,
 } from "@providers/types";
 import { formatAddress, wrapPlainText } from "@utils/format";
-import { http } from "@utils/http";
 import { buildCidMapFromAttachments } from "@utils/mail-html";
 import { reportErrorToObservability } from "@utils/observability";
 import PostalMime from "postal-mime";

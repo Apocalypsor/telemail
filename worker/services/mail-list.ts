@@ -13,21 +13,16 @@ import { generateMailTokenById } from "@utils/mail-token";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Account, Env } from "@/types";
 
-export const MAIL_LIST_TYPES = [
-  "unread",
-  "starred",
-  "junk",
-  "archived",
-] as const;
+const MAIL_LIST_TYPES = ["unread", "starred", "junk", "archived"] as const;
 export type MailListType = (typeof MAIL_LIST_TYPES)[number];
 
-export const MAX_PER_ACCOUNT = 20;
+const MAX_PER_ACCOUNT = 20;
 
 export function isMailListType(s: string): s is MailListType {
   return (MAIL_LIST_TYPES as readonly string[]).includes(s);
 }
 
-export interface MailListEmailItem {
+interface MailListEmailItem {
   /** Provider 原生邮件 id：Gmail messageId / Outlook Graph id / IMAP RFC 822 Message-Id */
   id: string;
   /** 显示标题：优先 LLM short_summary，回退邮件 subject */
@@ -41,7 +36,7 @@ export interface MailListEmailItem {
   from?: string;
 }
 
-export interface MailListAccountResult {
+interface MailListAccountResult {
   accountId: number;
   accountEmail: string | null;
   items: MailListEmailItem[];
@@ -74,7 +69,7 @@ interface ListDef {
   ) => Promise<void>;
 }
 
-export const LIST_DEFS: Record<MailListType, ListDef> = {
+const LIST_DEFS: Record<MailListType, ListDef> = {
   unread: {
     fetcher: (p) => p.listUnread(MAX_PER_ACCOUNT),
     errorEvent: "bot.unread_query_failed",
@@ -112,7 +107,7 @@ export function getPreviewFolder(
  * 命中 TG 已投递过的邮件会带 tgChatId/tgMessageId（前端可链接回 TG 消息）；
  * junk/archive 里的命中或没投递过的没有 mapping，链接字段缺省即可。
  */
-export interface MailSearchResult {
+interface MailSearchResult {
   query: string;
   results: MailListAccountResult[];
   total: number;

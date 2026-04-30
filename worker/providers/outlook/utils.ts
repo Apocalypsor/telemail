@@ -1,5 +1,5 @@
+import { http } from "@clients/http";
 import { refreshAccessToken } from "@providers/utils";
-import { http } from "@utils/http";
 import { MS_GRAPH_API, MS_MAIL_SCOPE, MS_OAUTH_TOKEN_URL } from "@/constants";
 import type { Account, Env } from "@/types";
 

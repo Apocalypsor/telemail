@@ -1,4 +1,15 @@
 import { buildEmailKeyboard, buildInitialEmailKeyboard } from "@bot/keyboards";
+import { analyzeEmail, type EmailAnalysis } from "@clients/llm";
+import {
+  deleteMessage,
+  editMessageCaption,
+  editTextMessage,
+  sendTextMessage,
+  sendWithAttachments,
+  setReplyMarkup,
+  TG_CAPTION_LIMIT,
+  TG_MSG_LIMIT,
+} from "@clients/telegram";
 import { getAccountById } from "@db/accounts";
 import {
   deleteFailedEmail,
@@ -15,21 +26,10 @@ import {
 import { t } from "@i18n";
 import { accountCanArchive, getEmailProvider } from "@providers";
 import type { MessageLocation } from "@providers/types";
-import { analyzeEmail, type EmailAnalysis } from "@services/llm";
 import {
   reconcileMessageState,
   syncStarPinState,
 } from "@services/message-actions";
-import {
-  deleteMessage,
-  editMessageCaption,
-  editTextMessage,
-  sendTextMessage,
-  sendWithAttachments,
-  setReplyMarkup,
-  TG_CAPTION_LIMIT,
-  TG_MSG_LIMIT,
-} from "@services/telegram";
 import { formatBody, htmlToMarkdown, toTelegramMdV2 } from "@utils/format";
 import { escapeMdV2, wrapExpandableQuote } from "@utils/markdown-v2";
 import { reportErrorToObservability } from "@utils/observability";

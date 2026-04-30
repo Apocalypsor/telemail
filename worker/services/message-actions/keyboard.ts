@@ -1,7 +1,7 @@
 import { buildEmailKeyboard } from "@bot/keyboards";
+import { setReplyMarkup } from "@clients/telegram";
 import { getMappingsByEmailIds, type MessageMapping } from "@db/message-map";
 import { accountCanArchive, getEmailProvider } from "@providers";
-import { setReplyMarkup } from "@services/telegram";
 import { reportErrorToObservability } from "@utils/observability";
 import type { Account, Env } from "@/types";
 import { syncStarPinState } from "./reconcile";

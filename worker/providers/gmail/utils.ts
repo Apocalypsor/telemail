@@ -1,6 +1,6 @@
+import { http } from "@clients/http";
 import type { GmailMessage } from "@providers/gmail/types";
 import { refreshAccessToken } from "@providers/utils";
-import { http } from "@utils/http";
 import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from "@/constants";
 import type { Account, Env } from "@/types";
 

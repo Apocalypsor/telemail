@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "@utils/hash";
 
 /** Telegram Mini App 用户信息（来自 initData 的 user 字段） */
-export interface TgWebAppUser {
+interface TgWebAppUser {
   id: number;
   first_name?: string;
   last_name?: string;

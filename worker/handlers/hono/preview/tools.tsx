@@ -1,6 +1,6 @@
+import { analyzeEmail } from "@clients/llm";
 import { requireTelegramLogin } from "@handlers/hono/middleware";
 import { ROUTE_JUNK_CHECK_API, ROUTE_PREVIEW_API } from "@handlers/hono/routes";
-import { analyzeEmail } from "@services/llm";
 import { formatBody } from "@utils/format";
 import type { Hono } from "hono";
 import { MAX_BODY_CHARS } from "@/constants";

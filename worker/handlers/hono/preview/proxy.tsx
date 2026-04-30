@@ -1,5 +1,5 @@
+import { http } from "@clients/http";
 import { ROUTE_CORS_PROXY } from "@handlers/hono/routes";
-import { http } from "@utils/http";
 import { verifyProxySignature } from "@utils/mail-html";
 import type { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

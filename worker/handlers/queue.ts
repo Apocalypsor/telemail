@@ -1,5 +1,5 @@
+import { deleteMessage } from "@clients/telegram";
 import { processEmailMessage } from "@services/bridge";
-import { deleteMessage } from "@services/telegram";
 import { reportErrorToObservability } from "@utils/observability";
 import { type Env, type QueueMessage, QueueMessageType } from "@/types";
 

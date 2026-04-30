@@ -7,7 +7,7 @@ import type { Account, Env, MailMeta } from "@/types";
 
 type Folder = "inbox" | "junk" | "archive";
 
-export type LoadedMailPreview =
+type LoadedMailPreview =
   | {
       ok: true;
       meta: MailMeta;

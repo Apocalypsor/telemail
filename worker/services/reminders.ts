@@ -1,3 +1,4 @@
+import { pinChatMessage, sendTextMessage } from "@clients/telegram";
 import { getAccountById } from "@db/accounts";
 import { deleteMessageMapping } from "@db/message-map";
 import {
@@ -9,7 +10,6 @@ import { t } from "@i18n";
 import { getEmailProvider } from "@providers";
 import { deliverEmailToTelegram } from "@services/bridge";
 import { refreshEmailKeyboardAfterReminderChange } from "@services/message-actions";
-import { pinChatMessage, sendTextMessage } from "@services/telegram";
 import { buildMiniAppMailUrl, generateMailTokenById } from "@utils/mail-token";
 import { escapeMdV2 } from "@utils/markdown-v2";
 import { reportErrorToObservability } from "@utils/observability";
