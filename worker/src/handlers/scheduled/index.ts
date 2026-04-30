@@ -11,8 +11,9 @@ export async function handleScheduled(
   ctx: ExecutionContext,
 ): Promise<void> {
   const date = new Date(event.scheduledTime);
-  const isMidnight = date.getUTCHours() === 0;
+
   const isHourly = date.getUTCMinutes() === 0;
+  const isMidnight = isHourly && date.getUTCHours() === 0;
   const waitUntil = ctx.waitUntil.bind(ctx);
 
   await Promise.allSettled([
