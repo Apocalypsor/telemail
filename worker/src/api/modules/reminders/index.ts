@@ -1,8 +1,4 @@
-import {
-  enrichReminders,
-  lookupEmailContext,
-  resolveEmailContext,
-} from "@worker/api/modules/miniapp/utils";
+import { MailService } from "@worker/api/modules/mail/service";
 import { authMiniApp } from "@worker/api/plugins/auth-miniapp";
 import { cf } from "@worker/api/plugins/cf";
 import { REMINDER_PER_USER_LIMIT, REMINDER_TEXT_MAX } from "@worker/constants";
@@ -17,7 +13,6 @@ import {
   listPendingRemindersForEmail,
   updatePendingReminder,
 } from "@worker/db/reminders";
-import { generateMailTokenById } from "@worker/utils/mail-token";
 import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
 import { Elysia } from "elysia";
 import {
@@ -28,6 +23,7 @@ import {
   ResolveContextQuery,
   UpdateBody,
 } from "./model";
+import { RemindersService } from "./service";
 
 /** Reminders CRUD + email-context + resolve-context（群聊 deep link）。 */
 export const remindersController = new Elysia({
@@ -54,7 +50,7 @@ export const remindersController = new Elysia({
       if (account.telegram_user_id !== userId)
         return status(403, { error: "无权为该邮件设提醒" });
 
-      const token = await generateMailTokenById(
+      const token = await MailService.generateToken(
         env.ADMIN_SECRET,
         mapping.email_message_id,
         mapping.account_id,
@@ -72,7 +68,7 @@ export const remindersController = new Elysia({
   .get(
     "/api/reminders/email-context",
     async ({ env, query, status }) => {
-      const ctx = await resolveEmailContext(
+      const ctx = await MailService.resolveContext(
         env,
         query.accountId,
         query.emailMessageId,
@@ -80,7 +76,7 @@ export const remindersController = new Elysia({
       );
       if (!ctx.ok) return status(ctx.status, { error: ctx.error });
 
-      const { subject, tgChatId } = await lookupEmailContext(
+      const { subject, tgChatId } = await MailService.lookupContext(
         env,
         ctx.account,
         ctx.emailMessageId,
@@ -100,7 +96,7 @@ export const remindersController = new Elysia({
     async ({ env, userId, query, status }) => {
       const { accountId, emailMessageId, token } = query;
       if (accountId || emailMessageId || token) {
-        const ctx = await resolveEmailContext(
+        const ctx = await MailService.resolveContext(
           env,
           accountId,
           emailMessageId,
@@ -116,7 +112,7 @@ export const remindersController = new Elysia({
         return { reminders: items };
       }
       const items = await listPendingReminders(env.DB, userId);
-      return { reminders: await enrichReminders(env, items) };
+      return { reminders: await RemindersService.enrich(env, items) };
     },
     { query: ListQuery },
   )
@@ -125,7 +121,7 @@ export const remindersController = new Elysia({
   .post(
     "/api/reminders",
     async ({ env, executionCtx, userId, body, status }) => {
-      const ctx = await resolveEmailContext(
+      const ctx = await MailService.resolveContext(
         env,
         body.accountId,
         body.emailMessageId,
@@ -156,11 +152,8 @@ export const remindersController = new Elysia({
           error: `待提醒数已达上限 ${REMINDER_PER_USER_LIMIT}`,
         });
 
-      const { tgChatId, tgMessageId, subject } = await lookupEmailContext(
-        env,
-        ctx.account,
-        ctx.emailMessageId,
-      );
+      const { tgChatId, tgMessageId, subject } =
+        await MailService.lookupContext(env, ctx.account, ctx.emailMessageId);
 
       const id = await createReminder(env.DB, {
         telegramUserId: userId,
@@ -195,7 +188,7 @@ export const remindersController = new Elysia({
       const reminder = await getReminderById(env.DB, id);
       if (!reminder || reminder.telegram_user_id !== userId)
         return status(404, { error: "未找到提醒" });
-      const [enriched] = await enrichReminders(env, [reminder]);
+      const [enriched] = await RemindersService.enrich(env, [reminder]);
       return { reminder: enriched };
     },
     { params: ReminderId },

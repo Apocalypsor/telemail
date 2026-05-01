@@ -1,4 +1,7 @@
-import type { ActiveConnection, Connection } from "@middleware/imap/types";
+import type {
+  ActiveConnection,
+  Connection,
+} from "@middleware/connections/types";
 import {
   clearCachedFolders,
   getLastUid,

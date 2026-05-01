@@ -1,5 +1,5 @@
-import { connectionManager } from "@middleware/imap";
-import type { ActiveConnection } from "@middleware/imap/types";
+import { connectionManager } from "@middleware/connections";
+import type { ActiveConnection } from "@middleware/connections/types";
 import { Elysia } from "elysia";
 import type {
   FolderHint,
