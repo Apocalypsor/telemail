@@ -10,6 +10,7 @@ import {
 } from "@worker/utils/session";
 import { Elysia } from "elysia";
 import { LoginCallbackQuery } from "./model";
+import { resolveSameOriginRedirectUrl } from "./utils";
 
 /**
  * Auth controller —— web 登录页相关 API：
@@ -62,7 +63,7 @@ export const authController = new Elysia({ name: "controller.auth" })
   // TG Login callback
   .get(
     "/api/login/callback",
-    async ({ env, query, cookie, redirect, status }) => {
+    async ({ env, query, cookie, redirect, status, request }) => {
       const {
         id,
         first_name,
@@ -73,7 +74,6 @@ export const authController = new Elysia({ name: "controller.auth" })
         hash,
         return_to,
       } = query;
-      const returnTo = return_to || "/";
 
       if (!id || !first_name || !auth_date || !hash) {
         return status(400, "Missing Telegram auth data");
@@ -105,7 +105,12 @@ export const authController = new Elysia({ name: "controller.auth" })
       if (!isAdmin) {
         const user = await getUserByTelegramId(env.DB, id);
         if (!user?.approved) {
-          return redirect(`/login?denied=1&uid=${encodeURIComponent(id)}`);
+          return redirect(
+            resolveSameOriginRedirectUrl(
+              request.url,
+              `/login?denied=1&uid=${encodeURIComponent(id)}`,
+            ),
+          );
         }
       }
 
@@ -119,7 +124,7 @@ export const authController = new Elysia({ name: "controller.auth" })
         maxAge: session.maxAge,
       });
 
-      return redirect(returnTo);
+      return redirect(resolveSameOriginRedirectUrl(request.url, return_to));
     },
     { query: LoginCallbackQuery },
   );
