@@ -42,6 +42,9 @@ export interface UseMailActionsParams {
   accountId: number;
   token: string;
   initialStarred: boolean;
+  /** 邮件当前 folder（来自预览页 search.folder）。仅 toggle-star 用到 ——
+   *  IMAP 需要它选对 mailbox 加 / 去 \Flagged；不传按 INBOX。 */
+  folder?: "inbox" | "junk" | "archive";
   /** 任意动作成功后回调（caller 一般用来 invalidate query 重拉预览） */
   onChanged?: () => void;
 }
@@ -79,13 +82,18 @@ export function useMailActions(
       action: MailAction,
       starredNext?: boolean,
     ): Promise<MailActionResult> => {
-      const { emailMessageId, accountId, token, onChanged } = propsRef.current;
+      const { emailMessageId, accountId, token, folder, onChanged } =
+        propsRef.current;
       setPending(true);
       try {
         const m = api.api.mail({ id: emailMessageId });
         const body = { accountId, token };
         const result = await (action === "toggle-star"
-          ? m["toggle-star"].post({ ...body, starred: starredNext ?? false })
+          ? m["toggle-star"].post({
+              ...body,
+              starred: starredNext ?? false,
+              folder,
+            })
           : action === "archive"
             ? m.archive.post(body)
             : action === "unarchive"

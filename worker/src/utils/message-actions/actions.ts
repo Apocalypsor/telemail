@@ -50,16 +50,15 @@ export async function toggleStar(
   return { ok: true, keyboard, emailMessageId: mapping.email_message_id };
 }
 
-/** Best-effort 标已读，失败上报但不抛——用于 preview 浏览 / star / archive /
- *  junk / trash 等"用户已经看过这封"的场景。`waitUntil` 友好。 */
 export async function markEmailAsRead(
   env: Env,
   account: Account,
   emailMessageId: string,
+  folder?: "inbox" | "junk" | "archive",
 ): Promise<void> {
   try {
     const provider = getEmailProvider(account, env);
-    await provider.markAsRead(emailMessageId);
+    await provider.markAsRead(emailMessageId, folder);
   } catch (err) {
     await reportErrorToObservability(env, "mark_read_failed", err, {
       accountId: account.id,

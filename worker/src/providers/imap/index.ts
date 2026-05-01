@@ -70,38 +70,55 @@ export class ImapProvider extends EmailProvider {
     return bridgeClient(this.env);
   }
 
-  async markAsRead(messageId: string) {
+  /** archive folder 路径只在 hint 为 archive 时有意义 —— 跟 fetchRawEmail 一致 */
+  private flagArchiveFolder(
+    folder?: "inbox" | "junk" | "archive",
+  ): string | undefined {
+    return folder === "archive"
+      ? (this.account.archive_folder ?? undefined)
+      : undefined;
+  }
+
+  async markAsRead(messageId: string, folder?: "inbox" | "junk" | "archive") {
     await this.bridge.api.flag.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       flag: IMAP_FLAG_SEEN,
       add: true,
+      folder,
+      archiveFolder: this.flagArchiveFolder(folder),
     });
   }
 
-  async addStar(messageId: string) {
+  async addStar(messageId: string, folder?: "inbox" | "junk" | "archive") {
     await this.bridge.api.flag.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       flag: IMAP_FLAG_FLAGGED,
       add: true,
+      folder,
+      archiveFolder: this.flagArchiveFolder(folder),
     });
   }
 
-  async removeStar(messageId: string) {
+  async removeStar(messageId: string, folder?: "inbox" | "junk" | "archive") {
     await this.bridge.api.flag.post({
       accountId: this.account.id,
       rfcMessageId: messageId,
       flag: IMAP_FLAG_FLAGGED,
       add: false,
+      folder,
+      archiveFolder: this.flagArchiveFolder(folder),
     });
   }
 
-  async isStarred(messageId: string) {
+  async isStarred(messageId: string, folder?: "inbox" | "junk" | "archive") {
     const data = await bridgeCall(
       this.bridge.api["is-starred"].post({
         accountId: this.account.id,
         rfcMessageId: messageId,
+        folder,
+        archiveFolder: this.flagArchiveFolder(folder),
       }),
     );
     return data.starred;

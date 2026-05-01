@@ -53,8 +53,9 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
     );
     if (!result.ok) return status(result.status, { error: result.reason });
 
-    // 用户打开预览 = 看过这封邮件，标已读（best-effort）
-    executionCtx.waitUntil(markEmailAsRead(env, account, emailMessageId));
+    executionCtx.waitUntil(
+      markEmailAsRead(env, account, emailMessageId, result.fetchFolder),
+    );
 
     const webMailUrl = env.WORKER_URL
       ? buildWebMailUrl(
@@ -253,10 +254,12 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
       try {
         const provider = getEmailProvider(account, env);
         if (body.starred) {
-          executionCtx.waitUntil(markEmailAsRead(env, account, emailMessageId));
-          await provider.addStar(emailMessageId);
+          executionCtx.waitUntil(
+            markEmailAsRead(env, account, emailMessageId, body.folder),
+          );
+          await provider.addStar(emailMessageId, body.folder);
         } else {
-          await provider.removeStar(emailMessageId);
+          await provider.removeStar(emailMessageId, body.folder);
         }
 
         const mappings = await getMappingsByEmailIds(env.DB, account.id, [

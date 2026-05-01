@@ -15,6 +15,7 @@ export function WebMailToolbar({
   inJunk,
   inArchive,
   canArchive,
+  folder,
   useProxy,
   onToggleProxy,
   onChanged,
@@ -26,6 +27,8 @@ export function WebMailToolbar({
   inJunk: boolean;
   inArchive: boolean;
   canArchive: boolean;
+  /** toggle-star 透传给后端，IMAP 用以选对 mailbox */
+  folder?: "inbox" | "junk" | "archive";
   useProxy: boolean;
   onToggleProxy: () => void;
   onChanged: () => void;
@@ -45,6 +48,7 @@ export function WebMailToolbar({
     accountId,
     token,
     initialStarred,
+    folder,
     onChanged,
   });
 

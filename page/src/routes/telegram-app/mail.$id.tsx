@@ -122,6 +122,7 @@ function MailPreviewPage() {
         inJunk={d.inJunk}
         inArchive={d.inArchive}
         canArchive={d.canArchive}
+        folder={search.folder}
         subject={d.meta.subject ?? null}
         webMailUrl={d.webMailUrl}
         tgMessageLink={d.tgMessageLink}

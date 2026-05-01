@@ -26,6 +26,8 @@ export interface MailFabProps {
   inJunk: boolean;
   inArchive: boolean;
   canArchive: boolean;
+  /** 邮件当前所在 folder —— toggle-star 透传给后端，IMAP 用以选对 mailbox */
+  folder?: "inbox" | "junk" | "archive";
   /** 邮件主题；用于分享时的预设文字 */
   subject?: string | null;
   /** 浏览器打开邮件的 URL；用作分享链接。缺失 → 不显示分享入口 */
@@ -85,6 +87,7 @@ export function MailFab({
   inJunk,
   inArchive,
   canArchive,
+  folder,
   subject,
   webMailUrl,
   tgMessageLink,
@@ -126,6 +129,7 @@ export function MailFab({
     accountId,
     token,
     initialStarred,
+    folder,
     onChanged,
   });
 

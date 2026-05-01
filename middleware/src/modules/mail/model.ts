@@ -9,6 +9,16 @@ export const AccountMessageBody = t.Object({
   rfcMessageId: t.String(),
 });
 
+export const IsStarredBody = t.Composite([
+  AccountMessageBody,
+  t.Object({
+    folder: t.Optional(
+      t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
+    ),
+    archiveFolder: t.Optional(t.String()),
+  }),
+]);
+
 export const AccountBody = t.Object({
   accountId: t.Number(),
 });
@@ -32,6 +42,10 @@ export const FlagBody = t.Object({
   rfcMessageId: t.String(),
   flag: t.String(),
   add: t.Boolean(),
+  folder: t.Optional(
+    t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
+  ),
+  archiveFolder: t.Optional(t.String()),
 });
 
 export const ListBody = t.Object({

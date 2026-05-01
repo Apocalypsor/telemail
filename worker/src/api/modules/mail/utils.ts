@@ -65,16 +65,20 @@ export async function loadMailForRendering(
   folderHint?: string,
 ): Promise<LoadedMail> {
   const provider = getEmailProvider(account, env);
-  const [inJunk, starred] = await Promise.all([
-    provider.isJunk(emailMessageId).catch(() => false),
-    provider.isStarred(emailMessageId).catch(() => false),
-  ]);
+  // hint 给定就直接信，省一次 isJunk —— hint 没传才回退用 isJunk 自动判断
+  const inJunk =
+    folderHint === "junk"
+      ? true
+      : folderHint === "archive" || folderHint === "inbox"
+        ? false
+        : await provider.isJunk(emailMessageId).catch(() => false);
   const fetchFolder: Folder =
-    folderHint === "archive"
-      ? "archive"
-      : folderHint === "junk" || inJunk
-        ? "junk"
-        : "inbox";
+    folderHint === "archive" ? "archive" : inJunk ? "junk" : "inbox";
+  // isStarred 需要 fetchFolder（IMAP 各 folder UID 不通用），所以排在 fetchFolder
+  // 算出之后；OAuth provider 忽略 folder 参数
+  const starred = await provider
+    .isStarred(emailMessageId, fetchFolder)
+    .catch(() => false);
 
   const cached = await getCachedMailData(
     env.EMAIL_KV,

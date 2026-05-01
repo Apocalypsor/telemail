@@ -107,6 +107,7 @@ function WebMailPage() {
           inJunk={d.inJunk}
           inArchive={d.inArchive}
           canArchive={d.canArchive}
+          folder={search.folder}
           useProxy={useProxy}
           onToggleProxy={() => setUseProxy((v) => !v)}
           onChanged={() => qc.invalidateQueries({ queryKey })}

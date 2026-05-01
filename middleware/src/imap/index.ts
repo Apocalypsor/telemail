@@ -1,5 +1,9 @@
 import type { ActiveConnection, Connection } from "@middleware/imap/types";
-import { getLastUid, setLastUid } from "@middleware/utils/redis";
+import {
+  clearCachedFolders,
+  getLastUid,
+  setLastUid,
+} from "@middleware/utils/redis";
 import {
   fetchImapAccounts,
   type ImapAccount,
@@ -82,6 +86,7 @@ class ImapConnectionManager {
     this.clearTimer(this.refreshTimers, id);
     this.connections.delete(id);
     await conn.client?.logout().catch(() => {});
+    await clearCachedFolders(id);
     console.log(`[Account ${id}] Stopped`);
   };
 

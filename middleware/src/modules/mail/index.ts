@@ -3,10 +3,10 @@ import { imap } from "@middleware/plugins/imap";
 import { Elysia } from "elysia";
 import {
   AccountBody,
-  AccountMessageBody,
   ArchiveBody,
   FetchBody,
   FlagBody,
+  IsStarredBody,
   ListBody,
   ListFolderBody,
   LocateBody,
@@ -26,6 +26,8 @@ export const mailController = new Elysia({ name: "controller.mail" })
         body.rfcMessageId,
         body.flag,
         body.add,
+        body.folder,
+        body.archiveFolder,
       );
       return { ok };
     },
@@ -73,10 +75,15 @@ export const mailController = new Elysia({ name: "controller.mail" })
   .post(
     "/is-starred",
     async ({ body, imap }) => {
-      const starred = await imap.isStarred(body.accountId, body.rfcMessageId);
+      const starred = await imap.isStarred(
+        body.accountId,
+        body.rfcMessageId,
+        body.folder,
+        body.archiveFolder,
+      );
       return { starred };
     },
-    { body: AccountMessageBody },
+    { body: IsStarredBody },
   )
 
   .post(

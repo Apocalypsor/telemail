@@ -18,7 +18,14 @@ export type MailActionBody = UnwrapSchema<typeof MailActionBody>;
 
 export const MailToggleStarBody = t.Composite([
   MailActionBody,
-  t.Object({ starred: t.Boolean() }),
+  t.Object({
+    starred: t.Boolean(),
+    /** 调用方知道邮件当前 folder（preview 页 search.folder）就传，IMAP 用以选对
+     *  mailbox 加 / 去 \Flagged；不传按 INBOX。Gmail / Outlook 忽略。 */
+    folder: t.Optional(
+      t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
+    ),
+  }),
 ]);
 export type MailToggleStarBody = UnwrapSchema<typeof MailToggleStarBody>;
 

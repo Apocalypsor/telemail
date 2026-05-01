@@ -8,12 +8,11 @@ export {
   findSpecialFolder,
   findTrashFolder,
   resolveArchiveFolder,
-  resolveFetchCandidates,
+  resolveFolderForHint,
 } from "./folders";
 export {
   findUidByMessageId,
   findUidInMailbox,
   locateMessage,
-  normalizeMessageIdForSearch,
   searchAndFetch,
 } from "./search";

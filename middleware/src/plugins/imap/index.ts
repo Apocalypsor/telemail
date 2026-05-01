@@ -1,4 +1,5 @@
 import { connectionManager } from "@middleware/imap";
+import type { ActiveConnection } from "@middleware/imap/types";
 import { Elysia } from "elysia";
 import type {
   FolderHint,
@@ -13,33 +14,47 @@ import {
   findUidInMailbox,
   locateMessage,
   resolveArchiveFolder,
-  resolveFetchCandidates,
+  resolveFolderForHint,
   searchAndFetch,
 } from "./utils";
 
 const Imap = {
   /**
-   * 给 INBOX 里的邮件设置 / 清除 flag（seen, flagged 等）。
-   * 按 Message-Id SEARCH HEADER 拿 UID，再 STORE flag。
+   * 给邮件设置 / 清除 flag（seen, flagged 等）。
+   *
+   * 默认在 INBOX 操作；调用方明确知道邮件在 junk / archive（如 mail 预览页用
+   * `fetchFolder` 拉的）就传 `folderHint`，直接去对应 folder 不用瞎猜。找不到对应
+   * 文件夹 / Message-Id 都返回 false 走 best-effort（调用方不依赖返回值）。
    */
   async setFlag(
     accountId: number,
     rfcMessageId: string,
     flag: string,
     add: boolean,
+    folderHint?: FolderHint,
+    archiveFolder?: string,
   ): Promise<boolean> {
-    const conn = connectionManager.getConnection(accountId);
-    if (!conn || !conn.client) {
+    const raw = connectionManager.getConnection(accountId);
+    if (!raw || !raw.client) {
       console.warn(`[Account ${accountId}] setFlag: no active connection`);
       return false;
     }
+    const conn = raw as ActiveConnection;
 
-    const lock = await conn.client.getMailboxLock("INBOX");
+    const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
+    if (folder === null) {
+      console.warn(
+        `[Account ${accountId}] setFlag: junk folder not found for hint=junk`,
+      );
+      return false;
+    }
+
+    const lock = await conn.client.getMailboxLock(folder);
     try {
       const uid = await findUidInMailbox(conn.client, rfcMessageId);
       if (uid === null) {
         console.warn(
-          `[Account ${accountId}] setFlag: Message-Id not found in INBOX: ${rfcMessageId}`,
+          `[Account ${accountId}] setFlag: Message-Id not found in ${folder}: ${rfcMessageId}`,
         );
         return false;
       }
@@ -49,7 +64,7 @@ const Imap = {
         await conn.client.messageFlagsRemove([uid], [flag], { uid: true });
       }
       console.log(
-        `[Account ${accountId}] ${add ? "+" : "-"}${flag} for UID ${uid}`,
+        `[Account ${accountId}] ${add ? "+" : "-"}${flag} for UID ${uid} in ${folder}`,
       );
       return true;
     } catch (err: unknown) {
@@ -96,36 +111,40 @@ const Imap = {
     archiveFolder?: string,
   ): Promise<string> {
     const conn = connectionManager.requireConnection(accountId, "fetchEmail");
-    const folders = await resolveFetchCandidates(
-      conn,
-      folderHint,
-      archiveFolder,
-    );
 
-    for (const folder of folders) {
-      const lock = await conn.client.getMailboxLock(folder);
-      try {
-        const uid = await findUidInMailbox(conn.client, rfcMessageId);
-        if (uid === null) continue;
-        const msg = await conn.client.fetchOne(
-          String(uid),
-          { source: true },
-          { uid: true },
-        );
-        if (msg && typeof msg !== "boolean" && msg.source) {
-          console.log(
-            `[Account ${accountId}] Fetched Message-Id ${rfcMessageId} from ${folder} (UID ${uid})`,
-          );
-          return Buffer.from(msg.source).toString("base64");
-        }
-      } finally {
-        lock.release();
-      }
+    // 调用方 hint 是权威 —— 单 folder 操作，不做跨 folder fallback。
+    const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
+    if (folder === null) {
+      throw new Error(
+        `[Account ${accountId}] fetchEmail: junk folder not found for hint=junk`,
+      );
     }
 
-    throw new Error(
-      `[Account ${accountId}] fetchEmail: Message-Id ${rfcMessageId} not found in ${folders.join(", ")}`,
-    );
+    const lock = await conn.client.getMailboxLock(folder);
+    try {
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) {
+        throw new Error(
+          `[Account ${accountId}] fetchEmail: Message-Id not found in ${folder}: ${rfcMessageId}`,
+        );
+      }
+      const msg = await conn.client.fetchOne(
+        String(uid),
+        { source: true },
+        { uid: true },
+      );
+      if (!msg || typeof msg === "boolean" || !msg.source) {
+        throw new Error(
+          `[Account ${accountId}] fetchEmail: empty source for UID ${uid} in ${folder}`,
+        );
+      }
+      console.log(
+        `[Account ${accountId}] Fetched Message-Id ${rfcMessageId} from ${folder} (UID ${uid})`,
+      );
+      return Buffer.from(msg.source).toString("base64");
+    } finally {
+      lock.release();
+    }
   },
 
   async listUnread(
@@ -459,10 +478,18 @@ const Imap = {
     return { location: "deleted" };
   },
 
-  async isStarred(accountId: number, rfcMessageId: string): Promise<boolean> {
+  async isStarred(
+    accountId: number,
+    rfcMessageId: string,
+    folderHint?: FolderHint,
+    archiveFolder?: string,
+  ): Promise<boolean> {
     const conn = connectionManager.requireConnection(accountId, "isStarred");
 
-    const lock = await conn.client.getMailboxLock("INBOX");
+    const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
+    if (folder === null) return false;
+
+    const lock = await conn.client.getMailboxLock(folder);
     try {
       // 拆成两步（先按 Message-Id 拿 UID，再查 flagged）—— 部分服务器（iCloud）
       // SEARCH 把 header 和 flagged 合在一个请求时不命中，分开走稳定。
