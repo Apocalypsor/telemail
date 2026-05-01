@@ -151,10 +151,9 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
 
   .post(
     "/api/mail/:id/trash",
-    async ({ env, executionCtx, account, emailMessageId, status }) => {
+    async ({ env, account, emailMessageId, status }) => {
       try {
         const provider = getEmailProvider(account, env);
-        executionCtx.waitUntil(markEmailAsRead(env, account, emailMessageId));
         await provider.trashMessage(emailMessageId);
         await cleanupTgForEmail(env, account.id, emailMessageId);
         return { ok: true, message: "已删除" };

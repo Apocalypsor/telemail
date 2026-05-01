@@ -1,7 +1,6 @@
 import { t, type UnwrapSchema } from "elysia";
 
 export const ListParams = t.Object({ type: t.String() });
-export const ListQuery = t.Object({ cache: t.Optional(t.String()) });
 export const SearchQuery = t.Object({ q: t.Optional(t.String()) });
 
 export const MailListType = t.Union([
@@ -30,9 +29,3 @@ export const MailListAccountResult = t.Object({
   error: t.Optional(t.String()),
 });
 export type MailListAccountResult = UnwrapSchema<typeof MailListAccountResult>;
-
-export const MailListResponse = t.Object({
-  type: MailListType,
-  results: t.Array(MailListAccountResult),
-  total: t.Number(),
-});

@@ -166,6 +166,28 @@ async function applyReminderSideEffects(
   if (!account) return;
   const provider = getEmailProvider(account, env);
 
+  // reminder 设置之后 → fire 之前，邮件可能已被用户标垃圾 / 归档 / 删除。这种
+  // 情况下 star / 重投递都无意义还会无谓报错。先 resolveMessageState 一次定位。
+  let location: string;
+  try {
+    const state = await provider.resolveMessageState(emailMessageId);
+    location = state.location;
+  } catch (err) {
+    await reportErrorToObservability(
+      env,
+      "reminders.resolve_state_failed",
+      err,
+      { reminderId: r.id, accountId, emailMessageId },
+    );
+    return;
+  }
+  if (location !== "inbox") {
+    console.log(
+      `Reminder ${r.id}: email is in ${location}, skipping star/pin/redeliver`,
+    );
+    return;
+  }
+
   // 1) 星标 —— 不依赖 TG 状态，跟 pin 并行
   const starP = provider.addStar(emailMessageId).catch((err) =>
     reportErrorToObservability(env, "reminders.star_failed", err, {
@@ -195,7 +217,6 @@ async function applyReminderSideEffects(
       return;
     }
     if (status !== "not_found") return;
-    // TG 消息被用户删了 → 重投递一份
     await redeliverEmail(env, account, emailMessageId, waitUntil).catch((err) =>
       reportErrorToObservability(env, "reminders.redeliver_failed", err, {
         reminderId: r.id,

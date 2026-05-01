@@ -1,12 +1,11 @@
 import { Skeleton, Spinner } from "@heroui/react";
 import { api } from "@page/api/client";
-import { extractErrorMessage, validateSearch } from "@page/api/utils";
+import { extractErrorMessage } from "@page/api/utils";
 import { MailListByAccount } from "@page/components/mail-list-by-account";
 import { MAIL_LIST_TITLES, MAIL_LIST_TYPES } from "@page/constants";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { useNavigateToMail } from "@page/hooks/use-navigate-to-mail";
 import { confirmPopup, notifyHaptic } from "@page/utils/tg";
-import { Type as t } from "@sinclair/typebox";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import type { MailListType } from "@worker/api/modules/miniapp/model";
@@ -47,11 +46,8 @@ function isMailListType(s: string): s is MailListType {
   return (MAIL_LIST_TYPES as readonly string[]).includes(s);
 }
 
-const Search = t.Object({ cache: t.Optional(t.Boolean()) });
-
 export const Route = createFileRoute("/telegram-app/list/$type")({
   component: MailListPage,
-  validateSearch: validateSearch(Search),
   beforeLoad: ({ params }) => {
     if (!isMailListType(params.type)) throw notFound();
   },
