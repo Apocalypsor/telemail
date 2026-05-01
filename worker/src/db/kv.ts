@@ -61,7 +61,7 @@ function kvMailHtmlKey(
   return `mail_html:${accountId}:${folder}:${emailMessageId}`;
 }
 
-export interface CachedMailData {
+interface CachedMailData {
   html: string;
   meta?: MailMeta;
 }
