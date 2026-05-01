@@ -33,50 +33,40 @@ All scripts run from repo root. Read root + per-workspace `package.json` for the
 
 适用于所有用 Elysia 的位置：worker `worker/src/api/{modules,plugins}/`、middleware `middleware/src/{modules,plugins}/`。
 
-[Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) 是两种形态，按是否依赖 HTTP context 分：
+[Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) 分两种：
 
-1. **Non-request-dependent service** —— 不读 cookie / header / Context，靠显式参数（如 `env`）拿依赖。**严格用 `abstract class XxxService { static foo(env, ...){} }`**，避免实例分配。住在 `modules/<name>/service.ts`。Biome 的 `noStaticOnlyClass` 跟这条冲突，已在根 `biome.json` 全局关掉。
-2. **Request-dependent service** —— 需要读 cookie / header / Elysia Context 才能完成职责（鉴权、session 解析、env 注入等）。形态是 Elysia instance（`new Elysia(...).macro(...)` 或 `.derive(...)`），住在 `plugins/<name>/`。Plugin 本身就是 Elysia 推荐的这种 service 形态，**不要在 plugin 目录里再开 `service.ts`**。
+- **Non-request-dependent** —— 不读 cookie / header / Context，靠显式参数（如 `env`）拿依赖。**严格用 `abstract class XxxService { static foo(env, ...){} }`**，住 `modules/<name>/service.ts`。Biome 的 `noStaticOnlyClass` 跟这条冲突，已在根 `biome.json` 关掉。
+- **Request-dependent** —— 读 cookie / header / Elysia Context（鉴权、env 注入等）。形态是 Elysia instance（`new Elysia(...).macro(...)` / `.derive(...)`），住 `plugins/<name>/`。Plugin 自身就是这种 service，**不要在 plugin 目录里再开 `service.ts`**。
 
-每个 module 在 `modules/<name>/`，**严格只允许这套文件名**：
-
-```
-modules/<name>/
-├── index.ts        # Elysia controller —— 路由声明、handler 主体
-├── model.ts        # `t.Object(...)` body / query / params / response schema
-├── types.ts        # 仅 TS 类型声明（schema 装不下的 union / interface）
-├── service.ts      # 业务编排（DB / provider / KV / HMAC 跨子系统的 use-case，non-request-dependent）
-├── utils.ts        # 纯 helper —— 不含编排，仅供本 module 用
-└── components.ts   # SSR HTML 渲染（仅 oauth 等少数模块需要）
-```
-
-`service.ts` vs `utils.ts`：
-- **service** 装"业务逻辑用例"：跨 DB / provider / KV / HMAC 的编排、auth/ownership 校验、enrich 流程。形态见上文第 1 类。
-- **utils** 只装真正的纯 helper：单一职责、不依赖业务上下文（formatter / parser / 一行 lookup）。如果一个函数要 `env` + 两三个 db 调用 + provider 调用 → 它是 service，不是 util。
-
-每个 plugin 在 `plugins/`，要么是单文件 `<name>.ts`，要么是 `<name>/` 目录。
-目录形态**严格只允许**：
+### Module (`modules/<name>/`) — 严格只允许这套文件名
 
 ```
-plugins/<name>/
-├── index.ts        # 导出 Elysia 实例（plugin 即 request-dependent service，业务体一并写在这里）
-├── types.ts        # 类型
-└── utils.ts        # 私有 helper
+index.ts        # Elysia controller —— 路由 + handler
+model.ts        # `t.Object(...)` body / query / params / response schema
+types.ts        # schema 装不下的 union / interface
+service.ts      # 业务编排（DB / provider / KV / HMAC 跨子系统）
+utils.ts        # 纯 helper —— 单一职责、不依赖业务上下文
+components.ts   # SSR HTML（仅 oauth 在用）
 ```
 
-`.macro` 用于路由 opt-in 的能力（如 `isSignIn: true`），`.derive` 用于无条件挂上 context（如 cf plugin 注入 `env` / `waitUntil`，auth-miniapp 注入 `userId` / `isAdmin`）。Elysia 推荐 `.decorate` 只用于 request-dependent property（避免把代码绑死到 Elysia），但作为 ergonomic 取舍，singleton-like 的 `env` 也可以 decorate（见 `api/plugins/cf.ts`）。
+判定 service vs utils：要 `env` + 多个 db / provider 调用 → service；formatter / parser / 一行 lookup → util。
 
-**不允许**别的命名（不要 `helpers.ts` `lib.ts` `format.ts` `deliver.ts` 之类）。
+### Plugin (`plugins/<name>/`)
 
-**`utils.ts` 单文件写不下** → 升级为 `utils/` 目录，**目录里同样严格遵守 `index / utils / types`**：
+单文件 `<name>.ts` 或目录。目录形态：
 
 ```
-modules/<name>/utils/
-├── index.ts        # barrel：re-export 给外部用的
-├── <purpose>.ts    # 按用途拆分（如 `format.ts` `deliver.ts` `retry.ts`）
-└── ...
+index.ts        # Elysia 实例 + 业务体
+types.ts
+utils.ts        # 私有 helper
 ```
 
-子文件可以按用途自由命名（因为是 module 内部私有），但**同样不能再有 `service.ts` `lib.ts` 这种泛词**（service 应当出现在 module 根，不是 utils 子目录）。子目录也按同样规则递归。
+### `utils.ts` 装不下 → 升级为 `utils/` 目录
 
-`worker/src/api/modules/oauth/` 是当前唯一带 `components.ts` 的例子；其它 module 不需要就别造。
+```
+utils/
+├── index.ts        # barrel re-export
+└── <purpose>.ts    # 按用途命名（`format.ts` `deliver.ts` `retry.ts`）
+```
+
+子文件可按用途命名，但**任何 utils 子目录里都不允许** `service.ts` `lib.ts` `helpers.ts` 这种泛词 —— service 只能在 module 根。
