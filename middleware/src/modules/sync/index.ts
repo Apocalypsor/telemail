@@ -1,4 +1,4 @@
-import { connectionManager } from "@middleware/imap";
+import { connectionManager } from "@middleware/connections";
 import { auth } from "@middleware/plugins/auth";
 import { Elysia } from "elysia";
 

@@ -40,21 +40,28 @@ modules/<name>/
 ├── index.ts        # Elysia controller —— 路由声明、handler 主体
 ├── model.ts        # `t.Object(...)` body / query / params / response schema
 ├── types.ts        # 仅 TS 类型声明（schema 装不下的 union / interface）
-├── utils.ts        # 私有 helper —— 仅供本 module 用
+├── service.ts      # 业务编排（DB / provider / KV / HMAC 跨子系统的 use-case）
+├── utils.ts        # 纯 helper —— 不含编排，仅供本 module 用
 └── components.ts   # SSR HTML 渲染（仅 oauth 等少数模块需要）
 ```
+
+`service.ts` vs `utils.ts` —— 跟 [Elysia best-practice "Service"](https://elysiajs.com/essential/best-practice.html#service) 对齐：
+- **service** 装"业务逻辑用例"：跨 DB / provider / KV / HMAC 的编排、auth/ownership 校验、enrich 流程。**严格用 `abstract class XxxService { static foo(env, ...){} }`** —— Elysia 推荐的非 request-dependent service 模式，避免实例分配。Biome 的 `noStaticOnlyClass` 跟这条直接冲突，已在根 `biome.json` 全局关掉。
+- **utils** 只装真正的纯 helper：单一职责、不依赖业务上下文（formatter / parser / 一行 lookup）。如果一个函数要 `env` + 两三个 db 调用 + provider 调用 → 它是 service，不是 util。
 
 每个 plugin 在 `plugins/`，要么是单文件 `<name>.ts`，要么是 `<name>/` 目录。
 目录形态**严格只允许**：
 
 ```
 plugins/<name>/
-├── index.ts        # 导出 Elysia 实例
+├── index.ts        # 导出 Elysia 实例（注入业务体一并写在这里）
 ├── types.ts        # 类型
 └── utils.ts        # 私有 helper
 ```
 
-**不允许**别的命名（不要 `service.ts` `helpers.ts` `format.ts` `deliver.ts` 之类）。
+Plugin 本身就是 Elysia 推荐的 "request-dependent service" 形态 —— plugin 没有 controller / 路由要拆分关切，注入的业务体直接写在 `index.ts` 里就好，**不要再单独放 `service.ts`**。
+
+**不允许**别的命名（不要 `helpers.ts` `lib.ts` `format.ts` `deliver.ts` 之类）。
 
 **`utils.ts` 单文件写不下** → 升级为 `utils/` 目录，**目录里同样严格遵守 `index / utils / types`**：
 
@@ -65,6 +72,6 @@ modules/<name>/utils/
 └── ...
 ```
 
-子文件可以按用途自由命名（因为是 module 内部私有），但**同样不能再有 `service.ts` `lib.ts` 这种泛词**。子目录也按同样规则递归。
+子文件可以按用途自由命名（因为是 module 内部私有），但**同样不能再有 `service.ts` `lib.ts` 这种泛词**（service 应当出现在 module 根，不是 utils 子目录）。子目录也按同样规则递归。
 
 `worker/src/api/modules/oauth/` 是当前唯一带 `components.ts` 的例子；其它 module 不需要就别造。

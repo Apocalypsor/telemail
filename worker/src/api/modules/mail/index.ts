@@ -19,7 +19,7 @@ import {
   MailParams,
   MailToggleStarBody,
 } from "./model";
-import { loadMailForRendering, resolveMailContext } from "./utils";
+import { MailService } from "./service";
 
 /**
  * Mail preview API + 6 mutations:
@@ -36,16 +36,16 @@ import { loadMailForRendering, resolveMailContext } from "./utils";
 const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
   "/api/mail/:id",
   async ({ env, executionCtx, params, query, status }) => {
-    const ctx = await resolveMailContext(
+    const ctx = await MailService.resolveContext(
       env,
-      params.id,
       query.accountId,
+      params.id,
       query.t,
     );
     if (!ctx.ok) return status(ctx.status, { error: ctx.error });
     const { account, emailMessageId, token } = ctx;
 
-    const result = await loadMailForRendering(
+    const result = await MailService.loadForRendering(
       env,
       account,
       emailMessageId,
@@ -101,7 +101,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
     async ({ env, params, body, userId, isAdmin, status }) => {
       const id = (params as { id: string }).id;
       const { accountId, token } = body as MailActionBody;
-      const ctx = await resolveMailContext(env, id, accountId, token);
+      const ctx = await MailService.resolveContext(env, accountId, id, token);
       if (!ctx.ok) return status(ctx.status, { ok: false, error: ctx.error });
       if (!isAdmin && ctx.account.telegram_user_id !== userId) {
         return status(403, { ok: false, error: "Forbidden" });

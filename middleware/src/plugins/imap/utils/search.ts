@@ -1,4 +1,4 @@
-import type { ActiveConnection } from "@middleware/imap/types";
+import type { ActiveConnection } from "@middleware/connections/types";
 import type { ImapFlow } from "imapflow";
 import type { MessageHit, MessageSummary } from "../types";
 

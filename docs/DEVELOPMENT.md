@@ -88,7 +88,7 @@ cookie 7 天有效。改 `ADMIN_SECRET` 或 `ADMIN_TELEGRAM_ID` 后要重签。
 
 ## 跨包导入
 
-仓库统一只用三个 TS path alias：`@page/*` `@worker/*` `@middleware/*`，全部声明在根 `tsconfig.base.json`（每个子 tsconfig 通过 `extends` 继承）。各包内部一律用带前缀的全路径（`@worker/db/...` `@page/components/...` `@middleware/imap` 等），没有 `@db/*` `@components/*` 这种短 alias。
+仓库统一只用三个 TS path alias：`@page/*` `@worker/*` `@middleware/*`，全部声明在根 `tsconfig.base.json`（每个子 tsconfig 通过 `extends` 继承）。各包内部一律用带前缀的全路径（`@worker/db/...` `@page/components/...` `@middleware/connections` 等），没有 `@db/*` `@components/*` 这种短 alias。
 
 跨包只走 **类型 + 字符串常量**，从不跨包拖运行时代码：
 

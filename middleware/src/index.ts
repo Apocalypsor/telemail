@@ -4,7 +4,7 @@ const ts = () => new Date().toISOString();
 console.log = (...args: unknown[]) => _log(ts(), ...args);
 console.error = (...args: unknown[]) => _err(ts(), ...args);
 
-import { connectionManager } from "@middleware/imap";
+import { connectionManager } from "@middleware/connections";
 import { junkController } from "@middleware/modules/junk/index";
 import { mailController } from "@middleware/modules/mail/index";
 import { syncController } from "@middleware/modules/sync/index";
