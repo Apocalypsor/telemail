@@ -54,6 +54,16 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
     executionCtx.waitUntil(
       markEmailAsRead(env, account, emailMessageId, result.fetchFolder),
     );
+    // 缺 short_summary 时后台补 —— 不卡响应；下次列表刷新即可看到
+    executionCtx.waitUntil(
+      MailService.ensureShortSummary(
+        env,
+        account,
+        emailMessageId,
+        result.meta.subject,
+        result.rawHtml,
+      ),
+    );
 
     const webMailUrl = env.WORKER_URL
       ? buildWebMailUrl(

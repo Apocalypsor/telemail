@@ -2,16 +2,22 @@
  *  按 [Elysia best-practice](https://elysiajs.com/essential/best-practice.html#service)
  *  非 request-dependent service 形态：`abstract class` + static method，
  *  调用方 `MailService.foo(env, ...)`。不实例化、不持状态。 */
+import { analyzeEmail } from "@worker/clients/llm";
 import { getAccountById } from "@worker/db/accounts";
 import { getCachedMailData, putCachedMailData } from "@worker/db/kv";
-import { getMappingsByEmailIds } from "@worker/db/message-map";
+import {
+  getMappingsByEmailIds,
+  updateShortSummary,
+} from "@worker/db/message-map";
 import { getEmailProvider, PROVIDERS } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
+import { htmlToMarkdown } from "@worker/utils/format";
 import { proxyImages, replaceCidReferences } from "@worker/utils/mail-html";
 import {
   generateMailTokenById,
   verifyMailTokenById,
 } from "@worker/utils/mail-token";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type {
   Folder,
   LoadForRenderingResult,
@@ -201,5 +207,54 @@ export abstract class MailService {
     accountId: number,
   ): Promise<string> {
     return generateMailTokenById(secret, emailMessageId, accountId);
+  }
+
+  /** 没有 short_summary 时调 LLM 现补一份，写回 message_map。
+   *  调用方应当通过 `executionCtx.waitUntil` 在响应后台跑 —— preview 接口
+   *  打开邮件时若 mapping 缺 short_summary 就触发；下次列表刷新就能展示。
+   *
+   *  Bail 条件：LLM 未配置 / 没有 mapping（没投递过 → 没行可写） /
+   *  short_summary 已存在。失败走 observability，不抛。 */
+  static async ensureShortSummary(
+    env: Env,
+    account: Account,
+    emailMessageId: string,
+    subject: string | null | undefined,
+    rawHtml: string,
+  ): Promise<void> {
+    if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL) return;
+
+    const [mapping] = await getMappingsByEmailIds(env.DB, account.id, [
+      emailMessageId,
+    ]);
+    if (!mapping || mapping.short_summary) return;
+
+    try {
+      const body = htmlToMarkdown(rawHtml);
+      if (!body.trim()) return;
+
+      const analysis = await analyzeEmail(
+        env.LLM_API_URL,
+        env.LLM_API_KEY,
+        env.LLM_MODEL,
+        subject ?? "",
+        body,
+      );
+      if (analysis.shortSummary) {
+        await updateShortSummary(
+          env.DB,
+          account.id,
+          emailMessageId,
+          analysis.shortSummary,
+        );
+      }
+    } catch (err) {
+      await reportErrorToObservability(
+        env,
+        "preview.short_summary_failed",
+        err,
+        { accountId: account.id, emailMessageId },
+      );
+    }
   }
 }
