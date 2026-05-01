@@ -1,13 +1,11 @@
 import { ROUTE_MINI_APP_LIST } from "@page/paths";
+import type { MailListType } from "@worker/api/modules/miniapp/model";
+import { MiniappService } from "@worker/api/modules/miniapp/service";
+import type { MailListResult } from "@worker/api/modules/miniapp/types";
+import { getPreviewFolder } from "@worker/api/modules/miniapp/utils";
 import { buildTgMessageLink } from "@worker/clients/telegram";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
-import {
-  getMailList,
-  getPreviewFolder,
-  type MailListResult,
-  type MailListType,
-} from "@worker/utils/mail-list";
 import { buildMailPreviewUrl } from "@worker/utils/mail-token";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import {
@@ -128,7 +126,7 @@ function register(bot: Bot, env: Env, def: RegisterDef) {
     hasItems && def.actionKeyboard ? { reply_markup: def.actionKeyboard } : {};
 
   const queryAndFormat = async (userId: string) => {
-    const result = await getMailList(env, userId, def.type);
+    const result = await MiniappService.getMailList(env, userId, def.type);
     const { text, hasItems } = await formatList(env, result);
     return { text, hasItems, pendingSideEffects: result.pendingSideEffects };
   };

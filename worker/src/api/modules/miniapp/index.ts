@@ -1,16 +1,13 @@
 import { authMiniApp } from "@worker/api/plugins/auth-miniapp";
 import { cf } from "@worker/api/plugins/cf";
 import {
-  getMailList,
-  isMailListType,
-  searchMail,
-} from "@worker/utils/mail-list";
-import {
   markAllAsRead,
   trashAllJunkEmails,
 } from "@worker/utils/message-actions/actions";
 import { Elysia } from "elysia";
 import { ListParams, SearchQuery } from "./model";
+import { MiniappService } from "./service";
+import { isMailListType } from "./utils";
 
 /**
  * Mini App 通用 API:
@@ -32,7 +29,7 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
       if (!isMailListType(type))
         return status(400, { error: "Unknown list type" });
 
-      const result = await getMailList(env, userId, type);
+      const result = await MiniappService.getMailList(env, userId, type);
       if (result.pendingSideEffects.length > 0) {
         executionCtx.waitUntil(
           Promise.allSettled(result.pendingSideEffects.map((t) => t())),
@@ -61,7 +58,7 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
       const q = (query.q ?? "").trim();
       if (!q) return status(400, { error: "缺少搜索关键词" });
       if (q.length > 200) return status(400, { error: "关键词过长" });
-      return await searchMail(env, userId, q);
+      return await MiniappService.searchMail(env, userId, q);
     },
     { query: SearchQuery },
   );
