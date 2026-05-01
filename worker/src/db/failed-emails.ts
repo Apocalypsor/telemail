@@ -1,7 +1,7 @@
 /** failed_emails: 失败邮件记录（LLM 摘要失败时保存，管理员可手动重试） */
+import { getDb } from "@worker/db/client";
 import { failedEmails } from "@worker/db/schema";
 import { count, desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
 
 export type FailedEmail = typeof failedEmails.$inferSelect;
 
@@ -10,7 +10,7 @@ export async function putFailedEmail(
   d1: D1Database,
   data: Omit<FailedEmail, "id" | "created_at">,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const now = new Date();
   await db
     .insert(failedEmails)
@@ -34,7 +34,7 @@ export async function putFailedEmail(
 export async function getAllFailedEmails(
   d1: D1Database,
 ): Promise<FailedEmail[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db.select().from(failedEmails).orderBy(desc(failedEmails.created_at));
 }
 
@@ -43,7 +43,7 @@ export async function getFailedEmail(
   d1: D1Database,
   id: number,
 ): Promise<FailedEmail | null> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .select()
     .from(failedEmails)
@@ -56,13 +56,13 @@ export async function deleteFailedEmail(
   d1: D1Database,
   id: number,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db.delete(failedEmails).where(eq(failedEmails.id, id));
 }
 
 /** 清空所有失败邮件记录 */
 export async function deleteAllFailedEmails(d1: D1Database): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db.delete(failedEmails);
 }
 
@@ -71,13 +71,13 @@ export async function deleteFailedEmailsByAccountId(
   d1: D1Database,
   accountId: number,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db.delete(failedEmails).where(eq(failedEmails.account_id, accountId));
 }
 
 /** 统计失败邮件数量 */
 export async function countFailedEmails(d1: D1Database): Promise<number> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db.select({ cnt: count() }).from(failedEmails);
   return row?.cnt ?? 0;
 }

@@ -1,7 +1,7 @@
 /** message_map: Telegram 消息 ↔ 邮件消息映射 */
+import { getDb } from "@worker/db/client";
 import { messageMap } from "@worker/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
 
 type MessageMapRow = typeof messageMap.$inferSelect;
 
@@ -16,7 +16,7 @@ export async function putMessageMapping(
     "tg_message_id" | "tg_chat_id" | "email_message_id" | "account_id"
   >,
 ): Promise<boolean> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const result = await db
     .insert(messageMap)
     .values({
@@ -35,7 +35,7 @@ export async function getMessageMapping(
   chatId: string,
   tgMessageId: number,
 ): Promise<MessageMapping | null> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .select()
     .from(messageMap)
@@ -55,7 +55,7 @@ export async function getMappingsByEmailIds(
   emailMessageIds: string[],
 ): Promise<MessageMapping[]> {
   if (emailMessageIds.length === 0) return [];
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db
     .select()
     .from(messageMap)
@@ -72,7 +72,7 @@ export async function deleteMappingsByAccountId(
   d1: D1Database,
   accountId: number,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db.delete(messageMap).where(eq(messageMap.account_id, accountId));
 }
 
@@ -84,7 +84,7 @@ export async function deleteMessageMapping(
   accountId: number,
   emailMessageId: string,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .delete(messageMap)
     .where(
@@ -102,7 +102,7 @@ export async function updateShortSummary(
   emailMessageId: string,
   shortSummary: string,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .update(messageMap)
     .set({ short_summary: shortSummary })
@@ -120,7 +120,7 @@ export async function deleteMappingByEmailId(
   emailMessageId: string,
   accountId: number,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .delete(messageMap)
     .where(

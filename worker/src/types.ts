@@ -1,3 +1,4 @@
+import type { accounts, users } from "@worker/db/schema";
 import type { ObservabilityHubBinding } from "workers-observability-hub";
 
 /** 用 const + 类型别名替代 enum —— 这样字面量值就是 string literal type，跟 Drizzle
@@ -10,41 +11,10 @@ export const AccountType = {
 } as const;
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
 
-/** D1 accounts 表记录 */
-export interface Account {
-  id: number;
-  type: AccountType;
-  email: string | null;
-  chat_id: string;
-  refresh_token: string | null;
-  telegram_user_id: string | null;
-  /** IMAP only */
-  imap_host: string | null;
-  imap_port: number | null;
-  imap_secure: number | null; // 0 | 1
-  imap_user: string | null;
-  imap_pass: string | null;
-  /** 归档目标：Gmail = label ID（NULL 时禁用归档）；IMAP = 文件夹名（NULL 时回退到 "Archive"）；Outlook 不用 */
-  archive_folder: string | null;
-  /** 归档目标的人类可读名称（仅 Gmail 需要：label ID 用户不可读，存这份用于 UI 展示） */
-  archive_folder_name: string | null;
-  /** 1 = 暂停：push/队列/定时任务/列表都会跳过；账号配置保留，可随时恢复 */
-  disabled: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-/** D1 users 表记录（登录过的 Telegram 用户） */
-export interface TelegramUser {
-  telegram_id: string;
-  first_name: string;
-  last_name: string | null;
-  username: string | null;
-  photo_url: string | null;
-  approved: number;
-  last_login_at: Date;
-  created_at: Date;
-}
+/** D1 accounts / users 表记录 —— Drizzle 推断，schema.ts 是真相来源，字段语义注解
+ *  也写在那里（IMAP only / archive_folder / disabled 等）。 */
+export type Account = typeof accounts.$inferSelect;
+export type TelegramUser = typeof users.$inferSelect;
 
 export interface Env {
   /** 由 webhook handler 注入，用于在响应后执行后台任务 */

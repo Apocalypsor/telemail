@@ -11,12 +11,14 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 const tsMs = (name: string) => integer(name, { mode: "timestamp_ms" });
 const nowDefault = sql`(CAST(strftime('%s', 'now') AS INTEGER) * 1000)`;
 
+/** D1 accounts 表 */
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   type: text("type", { enum: ["gmail", "imap", "outlook"] })
@@ -26,19 +28,28 @@ export const accounts = sqliteTable("accounts", {
   chat_id: text("chat_id").notNull(),
   refresh_token: text("refresh_token"),
   telegram_user_id: text("telegram_user_id"),
+  /** IMAP only */
   imap_host: text("imap_host"),
+  /** IMAP only */
   imap_port: integer("imap_port"),
+  /** IMAP only —— 0 | 1 */
   imap_secure: integer("imap_secure"),
+  /** IMAP only */
   imap_user: text("imap_user"),
+  /** IMAP only */
   imap_pass: text("imap_pass"),
   created_at: tsMs("created_at").notNull().default(nowDefault),
   updated_at: tsMs("updated_at").notNull().default(nowDefault),
   history_id: text("history_id"),
+  /** 归档目标：Gmail = label ID（NULL 时禁用归档）；IMAP = 文件夹名（NULL 时回退到 "Archive"）；Outlook 不用 */
   archive_folder: text("archive_folder"),
+  /** 归档目标的人类可读名称（仅 Gmail 需要：label ID 用户不可读，存这份用于 UI 展示） */
   archive_folder_name: text("archive_folder_name"),
+  /** 1 = 暂停：push/队列/定时任务/列表都会跳过；账号配置保留，可随时恢复 */
   disabled: integer("disabled").notNull().default(0),
 });
 
+/** D1 users 表（登录过的 Telegram 用户） */
 export const users = sqliteTable("users", {
   telegram_id: text("telegram_id").primaryKey(),
   first_name: text("first_name").notNull(),
@@ -82,12 +93,10 @@ export const failedEmails = sqliteTable(
     error_message: text("error_message"),
     created_at: tsMs("created_at").notNull().default(nowDefault),
   },
-  (t) => [
-    uniqueIndex("failed_emails_email_message_id_tg_message_id_unique").on(
-      t.email_message_id,
-      t.tg_message_id,
-    ),
-  ],
+  // 跟 migration 0007 / 0024 的 inline `UNIQUE(...)` 对齐 —— 表级约束、无独立命名
+  // 索引（SQLite 自动建 sqlite_autoindex_failed_emails_*）。`uniqueIndex` 会另开
+  // 一个 CREATE UNIQUE INDEX，跟实际 DDL 不一致。
+  (t) => [unique().on(t.email_message_id, t.tg_message_id)],
 );
 
 export const reminders = sqliteTable(

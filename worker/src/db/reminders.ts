@@ -1,6 +1,6 @@
+import { getDb } from "@worker/db/client";
 import { reminders } from "@worker/db/schema";
 import { and, asc, count, eq, isNull, lte } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
 
 /** D1 reminders 表记录 —— Drizzle `mode: "timestamp_ms"` 自动把 INTEGER ms epoch
  *  读出来 wrap 成 Date、写入时调 `.getTime()`。 */
@@ -24,7 +24,7 @@ export async function createReminder(
   d1: D1Database,
   input: CreateReminderInput,
 ): Promise<number> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .insert(reminders)
     .values({
@@ -46,7 +46,7 @@ export async function listPendingReminders(
   d1: D1Database,
   telegramUserId: string,
 ): Promise<Reminder[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db
     .select()
     .from(reminders)
@@ -66,7 +66,7 @@ export async function listPendingRemindersForEmail(
   accountId: number,
   emailMessageId: string,
 ): Promise<Reminder[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db
     .select()
     .from(reminders)
@@ -87,7 +87,7 @@ export async function countPendingRemindersForEmail(
   accountId: number,
   emailMessageId: string,
 ): Promise<number> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .select({ n: count() })
     .from(reminders)
@@ -106,7 +106,7 @@ export async function getReminderById(
   d1: D1Database,
   id: number,
 ): Promise<Reminder | null> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db.select().from(reminders).where(eq(reminders.id, id));
   return row ?? null;
 }
@@ -119,7 +119,7 @@ export async function updatePendingReminder(
   id: number,
   patch: { text: string; remindAt: Date },
 ): Promise<boolean> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const result = await db
     .update(reminders)
     .set({ text: patch.text, remind_at: patch.remindAt })
@@ -139,7 +139,7 @@ export async function deletePendingReminder(
   telegramUserId: string,
   id: number,
 ): Promise<boolean> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const result = await db
     .delete(reminders)
     .where(
@@ -158,7 +158,7 @@ export async function listDueReminders(
   now: Date,
   limit = 200,
 ): Promise<Reminder[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db
     .select()
     .from(reminders)
@@ -172,7 +172,7 @@ export async function markReminderSent(
   d1: D1Database,
   id: number,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .update(reminders)
     .set({ sent_at: new Date() })
@@ -184,7 +184,7 @@ export async function countPendingReminders(
   d1: D1Database,
   telegramUserId: string,
 ): Promise<number> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .select({ n: count() })
     .from(reminders)

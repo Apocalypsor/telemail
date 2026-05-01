@@ -1,10 +1,10 @@
+import { getDb } from "@worker/db/client";
 import { accounts } from "@worker/db/schema";
 import type { Account, AccountType } from "@worker/types";
 import { and, asc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
 
 export async function getAllAccounts(d1: D1Database): Promise<Account[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db.select().from(accounts).orderBy(asc(accounts.id));
 }
 
@@ -12,7 +12,7 @@ export async function getAccountById(
   d1: D1Database,
   id: number,
 ): Promise<Account | null> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db.select().from(accounts).where(eq(accounts.id, id));
   return row ?? null;
 }
@@ -22,7 +22,7 @@ export async function getAccountsByEmail(
   d1: D1Database,
   email: string,
 ): Promise<Account[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db
     .select()
     .from(accounts)
@@ -35,7 +35,7 @@ export async function getOwnAccounts(
   d1: D1Database,
   telegramUserId: string,
 ): Promise<Account[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db
     .select()
     .from(accounts)
@@ -73,7 +73,7 @@ export async function createAccount(
   telegramUserId: string | undefined,
   type: AccountType,
 ): Promise<Account> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .insert(accounts)
     .values({
@@ -87,7 +87,7 @@ export async function createAccount(
 }
 
 export async function deleteAccount(d1: D1Database, id: number): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db.delete(accounts).where(eq(accounts.id, id));
 }
 
@@ -96,7 +96,7 @@ export async function updateRefreshToken(
   id: number,
   refreshToken: string,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .update(accounts)
     .set({ refresh_token: refreshToken, updated_at: new Date() })
@@ -108,7 +108,7 @@ export async function updateAccountEmail(
   id: number,
   email: string,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .update(accounts)
     .set({ email, updated_at: new Date() })
@@ -121,7 +121,7 @@ export async function updateAccount(
   chatId: string,
   telegramUserId?: string | null,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const patch =
     telegramUserId !== undefined
       ? {
@@ -135,7 +135,7 @@ export async function updateAccount(
 
 /** 获取所有启用状态的 IMAP 账号（供中间件拉取，disabled 账号会被跳过） */
 export async function getImapAccounts(d1: D1Database): Promise<Account[]> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   return db
     .select()
     .from(accounts)
@@ -149,7 +149,7 @@ export async function setAccountDisabled(
   accountId: number,
   disabled: boolean,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .update(accounts)
     .set({ disabled: disabled ? 1 : 0, updated_at: new Date() })
@@ -162,7 +162,7 @@ export async function getHistoryId(
   d1: D1Database,
   accountId: number,
 ): Promise<string | null> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .select({ history_id: accounts.history_id })
     .from(accounts)
@@ -175,7 +175,7 @@ export async function putHistoryId(
   accountId: number,
   historyId: string,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .update(accounts)
     .set({ history_id: historyId, updated_at: new Date() })
@@ -190,7 +190,7 @@ export async function setArchiveFolder(
   archiveFolder: string | null,
   archiveFolderName: string | null,
 ): Promise<void> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   await db
     .update(accounts)
     .set({
@@ -215,7 +215,7 @@ export async function createImapAccount(
     imapPass: string;
   },
 ): Promise<Account> {
-  const db = drizzle(d1);
+  const db = getDb(d1);
   const [row] = await db
     .insert(accounts)
     .values({

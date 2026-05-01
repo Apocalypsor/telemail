@@ -1,4 +1,5 @@
 import type { MailMeta } from "@worker/types";
+import { parseEmailDate } from "@worker/utils/format";
 
 // ─── KV keys & prefixes ──────────────────────────────────────────────��─────
 
@@ -60,10 +61,17 @@ function kvMailHtmlKey(
   return `mail_html:${accountId}:${folder}:${emailMessageId}`;
 }
 
-interface CachedMailData {
+export interface CachedMailData {
   html: string;
   meta?: MailMeta;
 }
+
+/** wire 形态：JSON.stringify 把 meta.date 编成 ISO 字符串落盘，所以读回来必须先用
+ *  `string` 处理、再 revive 成 Date 才符合 `MailMeta` 的类型。 */
+type CachedMailDataWire = {
+  html: string;
+  meta?: Omit<MailMeta, "date"> & { date?: string | null };
+};
 
 export async function getCachedMailData(
   kv: KVNamespace,
@@ -73,12 +81,16 @@ export async function getCachedMailData(
 ): Promise<CachedMailData | null> {
   const raw = await kv.get(kvMailHtmlKey(accountId, folder, emailMessageId));
   if (!raw) return null;
+  let wire: CachedMailDataWire;
   try {
-    return JSON.parse(raw) as CachedMailData;
+    wire = JSON.parse(raw) as CachedMailDataWire;
   } catch {
     // 兼容旧格式（纯 HTML 字符串）
     return { html: raw };
   }
+  if (!wire.meta) return { html: wire.html };
+  const { date, ...rest } = wire.meta;
+  return { html: wire.html, meta: { ...rest, date: parseEmailDate(date) } };
 }
 
 export async function putCachedMailData(
