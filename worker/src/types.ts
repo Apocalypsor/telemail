@@ -1,5 +1,4 @@
 import type { accounts, users } from "@worker/db/schema";
-import type { ObservabilityHubBinding } from "workers-observability-hub";
 
 /** 用 const + 类型别名替代 enum —— 这样字面量值就是 string literal type，跟 Drizzle
  *  schema 的 `text({ enum: [...] })` 推出来的 union 类型完全对齐，免掉强转。
@@ -16,11 +15,7 @@ export type AccountType = (typeof AccountType)[keyof typeof AccountType];
 export type Account = typeof accounts.$inferSelect;
 export type TelegramUser = typeof users.$inferSelect;
 
-export interface Env {
-  /** 由 webhook handler 注入，用于在响应后执行后台任务 */
-  waitUntil?: (p: Promise<unknown>) => void;
-  /** Worker 名称（用于日志/告警） */
-  WORKER_NAME: string;
+interface WorkerSecrets {
   /** Telegram Bot Token（环境变量 / wrangler secret） */
   TELEGRAM_BOT_TOKEN: string;
   /** Google OAuth2 Client ID */
@@ -35,14 +30,6 @@ export interface Env {
   ADMIN_SECRET: string;
   /** Telegram 管理员 user ID，用于 Telegram Login 鉴权 */
   ADMIN_TELEGRAM_ID: string;
-  /** KV 命名空间（access_token 缓存、消息去重、OAuth state） */
-  EMAIL_KV: KVNamespace;
-  /** D1 数据库（多账号信息） */
-  DB: D1Database;
-  /** Queue 绑定 */
-  EMAIL_QUEUE: Queue<QueueMessage>;
-  /** Observability Hub Service Binding */
-  OBS_SERVICE: ObservabilityHubBinding;
   /** OpenAI compatible API base URL，例如 https://api.openai.com（可选，不配置则跳过 AI 摘要） */
   LLM_API_URL?: string;
   /** OpenAI compatible API key */
@@ -71,6 +58,15 @@ export interface Env {
    */
   TG_MINI_APP_SHORT_NAME?: string;
 }
+
+type RefinedBindings = Omit<Cloudflare.Env, "EMAIL_QUEUE"> & {
+  /** Queue 绑定 —— wrangler 生成 binding，项目侧细化 message body 类型 */
+  EMAIL_QUEUE: Queue<QueueMessage>;
+};
+
+/** Worker runtime env：binding 来源于 `wrangler types` 生成的 `Cloudflare.Env`；
+ *  secrets 不在 wrangler config 中声明，单独补充。 */
+export type Env = RefinedBindings & WorkerSecrets;
 
 /** 邮件元数据（发件人/收件人/主题/日期） */
 export interface MailMeta {

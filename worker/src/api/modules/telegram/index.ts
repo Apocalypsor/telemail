@@ -31,11 +31,10 @@ export const telegramController = new Elysia({ name: "controller.telegram" })
       // 异步同步 Bot 命令菜单
       executionCtx.waitUntil(syncBotCommands(env).catch(() => {}));
 
-      // 注入 waitUntil 到 env，bot handler 后台任务用
-      env.waitUntil = executionCtx.waitUntil.bind(executionCtx);
-
       const botInfo = await getBotInfo(env);
-      const bot = createBot(env, botInfo);
+      const bot = createBot(env, botInfo, {
+        waitUntil: executionCtx.waitUntil.bind(executionCtx),
+      });
       try {
         await bot.handleUpdate(body as Update);
       } catch {

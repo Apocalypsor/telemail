@@ -3,6 +3,7 @@ import type { MailListType } from "@worker/api/modules/miniapp/model";
 import { MiniappService } from "@worker/api/modules/miniapp/service";
 import type { MailListResult } from "@worker/api/modules/miniapp/types";
 import { getPreviewFolder } from "@worker/api/modules/miniapp/utils";
+import type { BotRuntime } from "@worker/bot";
 import { buildTgMessageLink } from "@worker/clients/telegram";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
@@ -121,7 +122,7 @@ interface RegisterDef {
   };
 }
 
-function register(bot: Bot, env: Env, def: RegisterDef) {
+function register(bot: Bot, env: Env, runtime: BotRuntime, def: RegisterDef) {
   const replyMarkupOpt = (hasItems: boolean) =>
     hasItems && def.actionKeyboard ? { reply_markup: def.actionKeyboard } : {};
 
@@ -132,8 +133,8 @@ function register(bot: Bot, env: Env, def: RegisterDef) {
   };
 
   const schedule = (tasks: (() => Promise<void>)[]) => {
-    if (tasks.length === 0 || !env.waitUntil) return;
-    env.waitUntil(
+    if (tasks.length === 0) return;
+    runtime.waitUntil(
       (async () => {
         for (const task of tasks) {
           try {
@@ -204,8 +205,12 @@ function register(bot: Bot, env: Env, def: RegisterDef) {
   }
 }
 
-export function registerMailListHandlers(bot: Bot, env: Env) {
-  register(bot, env, {
+export function registerMailListHandlers(
+  bot: Bot,
+  env: Env,
+  runtime: BotRuntime,
+) {
+  register(bot, env, runtime, {
     type: "unread",
     actionKeyboard: new InlineKeyboard().text(
       t("mailList:unread.markAllRead"),
@@ -225,11 +230,11 @@ export function registerMailListHandlers(bot: Bot, env: Env) {
     },
   });
 
-  register(bot, env, { type: "starred" });
+  register(bot, env, runtime, { type: "starred" });
 
-  register(bot, env, { type: "archived" });
+  register(bot, env, runtime, { type: "archived" });
 
-  register(bot, env, {
+  register(bot, env, runtime, {
     type: "junk",
     actionKeyboard: new InlineKeyboard().text(
       t("mailList:junk.deleteAll"),

@@ -1,5 +1,8 @@
 import type { Env } from "@worker/types";
-import { TelegramErrorReporter } from "workers-observability-hub";
+import {
+  type ObservabilityHubBinding,
+  TelegramErrorReporter,
+} from "workers-observability-hub";
 
 type ErrorContext = Record<string, unknown>;
 
@@ -38,8 +41,9 @@ export async function reportErrorToObservability(
   error: unknown,
   context: ErrorContext = {},
 ): Promise<void> {
+  const binding = env.OBS_SERVICE as Fetcher & ObservabilityHubBinding;
   const reporter = new TelegramErrorReporter({
-    binding: env.OBS_SERVICE,
+    binding,
     console: true,
   });
 
