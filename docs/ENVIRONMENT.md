@@ -12,6 +12,7 @@
 | `ADMIN_TELEGRAM_ID`       | 管理员 Telegram user ID，用于鉴权                      |
 | `ADMIN_SECRET`            | 自定义密钥，HMAC 签名用（session cookie、邮件链接 token） |
 | `TELEGRAM_WEBHOOK_SECRET` | 自定义密钥，验证 Telegram webhook                      |
+| `WORKER_URL`              | Worker + Pages 对外 URL，例如 `https://telemail.dov.moe`；OAuth callback、Outlook webhook、邮件查看 / 提醒按钮都会用 |
 
 ### Gmail（用 Gmail 时必填）
 
@@ -53,10 +54,9 @@
 
 | Secret                   | 说明                                                            |
 | ------------------------ | --------------------------------------------------------------- |
-| `WORKER_URL`             | Worker + Pages 对外 URL，例如 `https://telemail.dov.moe`       |
 | `TG_MINI_APP_SHORT_NAME` | BotFather `/newapp` 注册的 Mini App short name（群聊 deep link 用） |
 
-`WORKER_URL` 未配 → 邮件消息不带"👁 查看原文 / ⏰ 提醒"按钮。`TG_MINI_APP_SHORT_NAME` 未配 → 群聊里上述按钮退化成裸 web 链接（无 Mini App 能力）。
+`WORKER_URL` 未配 → Gmail / Outlook Bot 授权链接、Outlook webhook subscription、邮件消息里的"👁 查看原文 / ⏰ 提醒"按钮都不可用。`TG_MINI_APP_SHORT_NAME` 未配 → 私聊仍可用 Mini App 按钮；群聊只保留裸 web "👁 查看原文"链接，不显示 ⏰ 提醒入口。
 
 ## Cloudflare Bindings
 
@@ -74,7 +74,7 @@
 `"triggers": { "crons": ["* * * * *"] }` —— 每分钟一次，`worker/src/handlers/scheduled/index.ts` 内部按 `getUTCMinutes() === 0` 区分轻 / 重任务：
 
 - **每分钟**：分发到期的 Mini App 提醒
-- **每小时**（`minute === 0`）：检查 IMAP Bridge 健康、重试失败的 LLM 摘要、digest 等
+- **每小时**（`minute === 0`）：检查 IMAP Bridge 健康、重试失败的 LLM 摘要
 - **每天 UTC 0 点**（额外）：为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）
 
 ## D1 Schema

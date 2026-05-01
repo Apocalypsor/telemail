@@ -71,11 +71,13 @@ gcloud pubsub subscriptions create gmail-push-sub \
 bun wrangler d1 create gmail-tg-bridge
 ```
 
-把返回的 `database_id` 填入 `worker/wrangler.jsonc` 中 `d1_databases[0].database_id`（替换占位符 `${D1_DATABASE_ID}`），同时把这个 UUID 加到 GitHub repo secrets 里叫 `CF_D1_DATABASE_ID`（CI 用）。然后从仓库根跑：
+把返回的 `database_id` 填入 `worker/wrangler.jsonc` 中 `d1_databases[0].database_id`（替换占位符 `${D1_DATABASE_ID}`），同时把这个 UUID 加到 GitHub repo secrets 里叫 `CF_D1_DATABASE_ID`（CI 用）。首次建库后从仓库根跑：
 
 ```sh
 bun migrate:worker:remote
 ```
+
+后续只要代码改动包含 `worker/migrations/` 或 D1 schema 变化，也要在部署对应 Worker 版本前跑一次 `bun migrate:worker:remote`。`wrangler deploy` 不会自动执行 D1 migrations。
 
 ### 4.2 KV 命名空间
 
@@ -102,6 +104,7 @@ bun wrangler secret put TELEGRAM_BOT_TOKEN
 bun wrangler secret put ADMIN_TELEGRAM_ID
 bun wrangler secret put ADMIN_SECRET
 bun wrangler secret put TELEGRAM_WEBHOOK_SECRET
+bun wrangler secret put WORKER_URL              # https://YOUR_WORKER_DOMAIN
 # Gmail
 bun wrangler secret put GMAIL_CLIENT_ID
 bun wrangler secret put GMAIL_CLIENT_SECRET
@@ -109,11 +112,23 @@ bun wrangler secret put GMAIL_PUBSUB_TOPIC
 bun wrangler secret put GMAIL_PUSH_SECRET
 ```
 
+`WORKER_URL` 不是敏感值，但 Gmail / Outlook 的 Bot 授权链接、Outlook webhook subscription、邮件查看 / 提醒按钮都会用它拼公开 URL；生产环境建议始终配置为最终同源域名。
+
 ## 5. Worker 部署
+
+如果本次发布包含 D1 schema / migrations 变更，先从仓库根应用远端迁移：
+
+```sh
+bun migrate:worker:remote
+```
+
+确认迁移成功后再部署 Worker：
 
 ```sh
 bun deploy:worker
 ```
+
+GitHub Actions 的 `deploy-worker` job 也只执行 `wrangler deploy`，不会自动跑 D1 migrations；用 CI 发版时同样需要先手动 apply，或在 workflow 里单独加 migration step。
 
 ### 5.1 设置 Telegram Webhook
 
@@ -183,7 +198,7 @@ BotFather：
 - `/setdomain` 设为 `example.com`
 - `/newapp` 注册 Mini App，Web App URL 填 `https://example.com/telegram-app`，short name 记下来
 
-Worker 的 `WORKER_URL` 和 `TG_MINI_APP_SHORT_NAME` secret 分别填 `https://example.com` 和刚才的 short name：
+如果 §4.4 还没配置 `WORKER_URL`，这里补成最终同源域名；`TG_MINI_APP_SHORT_NAME` 填刚才的 short name：
 
 ```sh
 bun wrangler secret put WORKER_URL
@@ -257,7 +272,7 @@ docker compose pull && docker compose up -d
 
 1. 向 Bot 发送 `/start` → **账号管理** → **添加账号**
 2. 选择账号类型（Gmail / Outlook / IMAP），按提示完成配置
-3. Gmail / Outlook 需完成 OAuth 授权；IMAP 需填写服务器信息和密码
+3. Gmail / Outlook 需完成 OAuth 授权（先确保 `WORKER_URL` 已配置，且 OAuth redirect URI 指向同一域名）；IMAP 需填写服务器信息和密码
 4. 授权成功后自动创建 webhook 订阅，新邮件实时推送到 Telegram
 
 后续 Cron Trigger 会自动维护：每分钟分发到期提醒；每小时检查 IMAP 中间件健康并重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
@@ -271,11 +286,11 @@ docker compose pull && docker compose up -d
 | 触发 | 跑什么 |
 | --- | --- |
 | `pull_request` | CI 总跑（biome + typecheck + build page + build middleware）<br/>`worker/**` 变 → `preview-worker`（`wrangler versions upload`，输出 preview URL，不接生产流量）<br/>`page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>`middleware/**` 变 → `docker-middleware` 仅 build 验证（不 push）<br/>**`preview-comment`** sticky comment 把上面三个的 URL / 状态贴到 PR |
-| `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`、pages `wrangler pages deploy --branch=main`、docker 多 arch 镜像 push 到 GHCR `:latest` + `:sha-<short>` |
+| `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`、pages `wrangler pages deploy --branch=main`、docker 多 arch 镜像 push 到 GHCR `:latest` + `:sha-<short>`。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
 | `workflow_dispatch` on `main` | **强制**三个 deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 / 镜像重 push |
 | `workflow_dispatch` on 其他 branch | 仅 CI |
 
-Path filter 故意**不含** `bun.lock`：免得 middleware 改个 dep 牵连 worker / page 重部署。子包 `package.json` 已被各自 `**` 范围 cover；根 `package.json` 同时影响 worker / page（共享 devDeps）。
+Path filter 故意**不含** `bun.lock`：免得改个 lockfile 牵连所有 workspace 重部署。子包 `package.json` 已被各自 `**` 范围 cover；根 `package.json` 同时影响 worker / page / middleware（共享 devDeps）。
 
 ### 8.2 配置 Repo Secrets
 

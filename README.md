@@ -52,7 +52,7 @@ Queue Consumer 拉取原始 RFC 2822 邮件（Gmail REST / Outlook Graph / IMAP 
 
 每条邮件消息附带 inline keyboard：⭐ 星标 / 🚫 垃圾 / 📥 归档 / 🔄 刷新。星标同时自动标记已读 + 置顶（取消星标 → 取消置顶）；标记垃圾移到垃圾邮件文件夹 + 删除 Telegram 消息；归档移出收件箱（Gmail 需先在账号详情指定标签）；刷新先和远端对账（邮件被移到垃圾 / 归档 / 删除 → 清理 TG 消息），仍在收件箱才重新拉取 + LLM 分析。
 
-配置 `WORKER_URL` 后额外出现 ⏰ 提醒 + 👁 查看原文。私聊里直接打开 Mini App；群聊走 `t.me/<bot>/<short>?startapp=...` deep link（需配 `TG_MINI_APP_SHORT_NAME`）。Mini App 里能看邮件预览（带星标 / 归档 / 删除等 FAB），设提醒，浏览未读 / 星标 / 垃圾 / 归档列表。
+配置 `WORKER_URL` 后额外出现 ⏰ 提醒 + 👁 查看原文。私聊里直接打开 Mini App；群聊走 `t.me/<bot>/<short>?startapp=...` deep link（需配 `TG_MINI_APP_SHORT_NAME`，未配时群聊只保留 web 查看原文）。Mini App 里能看邮件预览（带星标 / 归档 / 删除等 FAB），设提醒，浏览未读 / 星标 / 垃圾 / 归档列表。
 
 频道 / 群组里对邮件消息加 emoji reaction 会自动标记对应邮件为已读。
 

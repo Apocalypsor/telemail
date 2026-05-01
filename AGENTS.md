@@ -32,41 +32,41 @@ All scripts run from repo root. Read root + per-workspace `package.json` for the
 
 ## Elysia layout
 
-适用于所有用 Elysia 的位置：worker `worker/src/api/{modules,plugins}/`、middleware `middleware/src/{modules,plugins}/`。
+Applies everywhere Elysia is used: worker `worker/src/api/{modules,plugins}/` and middleware `middleware/src/{modules,plugins}/`.
 
-[Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) 分两种：
+[Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) means two different patterns here:
 
-- **Non-request-dependent** —— 不读 cookie / header / Context，靠显式参数（如 `env`）拿依赖。**严格用 `abstract class XxxService { static foo(env, ...){} }`**，住 `modules/<name>/service.ts`。Biome 的 `noStaticOnlyClass` 跟这条冲突，已在根 `biome.json` 关掉。
-- **Request-dependent** —— 读 cookie / header / Elysia Context（鉴权、env 注入等）。形态是 Elysia instance（`new Elysia(...).macro(...)` / `.derive(...)`），住 `plugins/<name>/`。Plugin 自身就是这种 service，**不要在 plugin 目录里再开 `service.ts`**。
+- **Non-request-dependent** - does not read cookies, headers, or Elysia `Context`; dependencies are passed explicitly, such as `env`. **Always use `abstract class XxxService { static foo(env, ...){} }`** and place it in `modules/<name>/service.ts`. This conflicts with Biome's `noStaticOnlyClass`, so that rule is disabled in the root `biome.json`.
+- **Request-dependent** - reads cookies, headers, or Elysia `Context` for auth, env injection, and similar concerns. This should be an Elysia instance (`new Elysia(...).macro(...)` / `.derive(...)`) under `plugins/<name>/`. The plugin itself is the service; **do not add a separate `service.ts` inside a plugin directory**.
 
-### Module (`modules/<name>/`) — 严格只允许这套文件名
+### Module (`modules/<name>/`) - only these filenames are allowed
 
 ```
-index.ts        # Elysia controller —— 路由 + handler
+index.ts        # Elysia controller - routes + handlers
 model.ts        # `t.Object(...)` body / query / params / response schema
-types.ts        # schema 装不下的 union / interface
-service.ts      # 业务编排（DB / provider / KV / HMAC 跨子系统）
-utils.ts        # 纯 helper —— 单一职责、不依赖业务上下文
-components.ts   # SSR HTML（仅 oauth 在用）
+types.ts        # unions / interfaces that do not fit in schema
+service.ts      # business orchestration across DB / provider / KV / HMAC
+utils.ts        # pure helpers - single-purpose, no business context dependency
+components.ts   # SSR HTML (only oauth uses this)
 ```
 
-判定 service vs utils：要 `env` + 多个 db / provider 调用 → service；formatter / parser / 一行 lookup → util。
+How to decide service vs utils: needs `env` plus multiple DB / provider calls -> service; formatter / parser / one-line lookup -> util.
 
 ### Plugin (`plugins/<name>/`)
 
-单文件 `<name>.ts` 或目录。目录形态：
+Either a single `<name>.ts` file or a directory. Directory shape:
 
 ```
-index.ts        # Elysia 实例 + 业务体
+index.ts        # Elysia instance + implementation
 types.ts
-utils.ts        # 私有 helper
+utils.ts        # private helpers
 ```
 
-### `utils.ts` 装不下 → 升级为 `utils/` 目录
+### When `utils.ts` grows too large -> promote it to a `utils/` directory
 
 ```
 utils/
-└── <purpose>.ts    # 按用途命名（`format.ts` `deliver.ts` `retry.ts`）
+└── <purpose>.ts    # name by purpose (`format.ts` `deliver.ts` `retry.ts`)
 ```
 
-**不允许 barrel `index.ts`**（项目约定全面禁 barrel re-export，多写文件无非省一行 import 路径，但读代码时跳两次找定义更烦）—— 直接 `from "@worker/.../utils/<purpose>"`。子文件可按用途命名，但**不允许** `service.ts` `lib.ts` `helpers.ts` 这种泛词（service 只能在 module 根）。
+**No barrel `index.ts` files**. The project bans barrel re-exports across the board: they save one import segment but make definition lookup harder. Import directly from `@worker/.../utils/<purpose>`. Child files may be named by purpose, but **do not use** generic names like `service.ts`, `lib.ts`, or `helpers.ts`; `service.ts` is only allowed at the module root.
