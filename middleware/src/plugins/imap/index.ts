@@ -38,7 +38,7 @@ const Imap = {
     archiveFolder?: string,
   ): Promise<boolean> {
     const raw = connectionManager.getConnection(accountId);
-    if (!raw || !raw.client) {
+    if (!raw?.client) {
       console.warn(`[Account ${accountId}] setFlag: no active connection`);
       return false;
     }

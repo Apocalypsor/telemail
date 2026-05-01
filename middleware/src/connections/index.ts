@@ -27,7 +27,7 @@ class ImapConnectionManager {
 
   requireConnection(accountId: number, caller: string): ActiveConnection {
     const conn = this.connections.get(accountId);
-    if (!conn || !conn.client) {
+    if (!conn?.client) {
       throw new Error(`[Account ${accountId}] ${caller}: no active connection`);
     }
 
