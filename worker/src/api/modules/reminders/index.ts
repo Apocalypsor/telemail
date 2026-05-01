@@ -140,12 +140,13 @@ export const remindersController = new Elysia({
           error: `备注超过 ${REMINDER_TEXT_MAX} 字`,
         });
 
-      const remindAt = (body.remind_at ?? "").trim();
-      const ts = Date.parse(remindAt);
-      if (Number.isNaN(ts))
+      // body.remind_at 是 TypeBox `t.Date()` —— Elysia 会把 ISO 字符串自动 decode 成
+      // Date；缺失或格式不对就直接走 VALIDATION 422，handler 这里 narrow 检查即可
+      const remindAt = body.remind_at;
+      if (!remindAt || Number.isNaN(remindAt.getTime()))
         return status(400, { ok: false, error: "时间格式错误" });
       // 30s 宽限：客户端时钟偏移
-      if (ts <= Date.now() - 30_000)
+      if (remindAt.getTime() <= Date.now() - 30_000)
         return status(400, { ok: false, error: "提醒时间需在未来" });
 
       const count = await countPendingReminders(env.DB, userId);
@@ -164,7 +165,7 @@ export const remindersController = new Elysia({
       const id = await createReminder(env.DB, {
         telegramUserId: userId,
         text,
-        remindAtIso: new Date(ts).toISOString(),
+        remindAt,
         accountId: ctx.accountId,
         emailMessageId: ctx.emailMessageId,
         emailSubject: subject ?? undefined,
@@ -214,15 +215,15 @@ export const remindersController = new Elysia({
           ok: false,
           error: `备注超过 ${REMINDER_TEXT_MAX} 字`,
         });
-      const ts = Date.parse((body.remind_at ?? "").trim());
-      if (Number.isNaN(ts))
+      const remindAt = body.remind_at;
+      if (!remindAt || Number.isNaN(remindAt.getTime()))
         return status(400, { ok: false, error: "时间格式错误" });
-      if (ts <= Date.now() - 30_000)
+      if (remindAt.getTime() <= Date.now() - 30_000)
         return status(400, { ok: false, error: "提醒时间需在未来" });
 
       const ok = await updatePendingReminder(env.DB, userId, id, {
         text,
-        remindAtIso: new Date(ts).toISOString(),
+        remindAt,
       });
       if (!ok) return status(404, { ok: false, error: "未找到提醒" });
       return { ok: true };

@@ -1,25 +1,16 @@
-/** D1 reminders 表记录 */
-export interface Reminder {
-  id: number;
-  telegram_user_id: string;
-  text: string;
-  /** ISO 8601 UTC */
-  remind_at: string;
-  /** 邮件上下文（NULL = 通用提醒） */
-  account_id: number | null;
-  email_message_id: string | null;
-  email_subject: string | null;
-  tg_chat_id: string | null;
-  tg_message_id: number | null;
-  sent_at: string | null;
-  created_at: string;
-}
+import { getDb } from "@worker/db/client";
+import { reminders } from "@worker/db/schema";
+import { and, asc, count, eq, isNull, lte } from "drizzle-orm";
+
+/** D1 reminders 表记录 —— Drizzle `mode: "timestamp_ms"` 自动把 INTEGER ms epoch
+ *  读出来 wrap 成 Date、写入时调 `.getTime()`。 */
+export type Reminder = typeof reminders.$inferSelect;
 
 /** 创建提醒的输入：邮件上下文五个字段同时为 NULL = 通用提醒；同时 set = 邮件提醒 */
 export interface CreateReminderInput {
   telegramUserId: string;
   text: string;
-  remindAtIso: string;
+  remindAt: Date;
   /** 以下五个字段绑定一封邮件；要么全 set，要么全 omit */
   accountId?: number;
   emailMessageId?: string;
@@ -30,159 +21,178 @@ export interface CreateReminderInput {
 
 /** 创建提醒，返回新行 id */
 export async function createReminder(
-  db: D1Database,
+  d1: D1Database,
   input: CreateReminderInput,
 ): Promise<number> {
-  const result = await db
-    .prepare(
-      `INSERT INTO reminders (
-        telegram_user_id, text, remind_at,
-        account_id, email_message_id, email_subject, tg_chat_id, tg_message_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      input.telegramUserId,
-      input.text,
-      input.remindAtIso,
-      input.accountId ?? null,
-      input.emailMessageId ?? null,
-      input.emailSubject ?? null,
-      input.tgChatId ?? null,
-      input.tgMessageId ?? null,
-    )
-    .run();
-  return Number(result.meta.last_row_id);
+  const db = getDb(d1);
+  const [row] = await db
+    .insert(reminders)
+    .values({
+      telegram_user_id: input.telegramUserId,
+      text: input.text,
+      remind_at: input.remindAt,
+      account_id: input.accountId ?? null,
+      email_message_id: input.emailMessageId ?? null,
+      email_subject: input.emailSubject ?? null,
+      tg_chat_id: input.tgChatId ?? null,
+      tg_message_id: input.tgMessageId ?? null,
+    })
+    .returning({ id: reminders.id });
+  return row.id;
 }
 
 /** 列出某用户所有待发送提醒，按时间升序 */
 export async function listPendingReminders(
-  db: D1Database,
+  d1: D1Database,
   telegramUserId: string,
 ): Promise<Reminder[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT * FROM reminders WHERE telegram_user_id = ? AND sent_at IS NULL ORDER BY remind_at ASC`,
+  const db = getDb(d1);
+  return db
+    .select()
+    .from(reminders)
+    .where(
+      and(
+        eq(reminders.telegram_user_id, telegramUserId),
+        isNull(reminders.sent_at),
+      ),
     )
-    .bind(telegramUserId)
-    .all<Reminder>();
-  return results;
+    .orderBy(asc(reminders.remind_at));
 }
 
 /** 列出某用户某封邮件下所有待发送提醒（按时间升序） */
 export async function listPendingRemindersForEmail(
-  db: D1Database,
+  d1: D1Database,
   telegramUserId: string,
   accountId: number,
   emailMessageId: string,
 ): Promise<Reminder[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT * FROM reminders
-       WHERE telegram_user_id = ? AND account_id = ? AND email_message_id = ?
-         AND sent_at IS NULL
-       ORDER BY remind_at ASC`,
+  const db = getDb(d1);
+  return db
+    .select()
+    .from(reminders)
+    .where(
+      and(
+        eq(reminders.telegram_user_id, telegramUserId),
+        eq(reminders.account_id, accountId),
+        eq(reminders.email_message_id, emailMessageId),
+        isNull(reminders.sent_at),
+      ),
     )
-    .bind(telegramUserId, accountId, emailMessageId)
-    .all<Reminder>();
-  return results;
+    .orderBy(asc(reminders.remind_at));
 }
 
 /** 统计某封邮件未发送的提醒数（用于 keyboard 上显示数字） */
 export async function countPendingRemindersForEmail(
-  db: D1Database,
+  d1: D1Database,
   accountId: number,
   emailMessageId: string,
 ): Promise<number> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM reminders
-       WHERE account_id = ? AND email_message_id = ? AND sent_at IS NULL`,
-    )
-    .bind(accountId, emailMessageId)
-    .first<{ n: number }>();
+  const db = getDb(d1);
+  const [row] = await db
+    .select({ n: count() })
+    .from(reminders)
+    .where(
+      and(
+        eq(reminders.account_id, accountId),
+        eq(reminders.email_message_id, emailMessageId),
+        isNull(reminders.sent_at),
+      ),
+    );
   return row?.n ?? 0;
 }
 
 /** 按 id 取单条提醒（删除前用来读 account_id/email_message_id 决定是否刷键盘） */
 export async function getReminderById(
-  db: D1Database,
+  d1: D1Database,
   id: number,
 ): Promise<Reminder | null> {
-  return db
-    .prepare(`SELECT * FROM reminders WHERE id = ?`)
-    .bind(id)
-    .first<Reminder>();
+  const db = getDb(d1);
+  const [row] = await db.select().from(reminders).where(eq(reminders.id, id));
+  return row ?? null;
 }
 
 /** 编辑某用户的待发送提醒（只能改时间和备注；邮件上下文不变）。
  *  WHERE 双重约束：不允许改别人的，sent_at IS NULL 防止改已发送的。 */
 export async function updatePendingReminder(
-  db: D1Database,
+  d1: D1Database,
   telegramUserId: string,
   id: number,
-  patch: { text: string; remindAtIso: string },
+  patch: { text: string; remindAt: Date },
 ): Promise<boolean> {
+  const db = getDb(d1);
   const result = await db
-    .prepare(
-      `UPDATE reminders SET text = ?, remind_at = ?
-       WHERE id = ? AND telegram_user_id = ? AND sent_at IS NULL`,
-    )
-    .bind(patch.text, patch.remindAtIso, id, telegramUserId)
-    .run();
-  return result.meta.changes > 0;
+    .update(reminders)
+    .set({ text: patch.text, remind_at: patch.remindAt })
+    .where(
+      and(
+        eq(reminders.id, id),
+        eq(reminders.telegram_user_id, telegramUserId),
+        isNull(reminders.sent_at),
+      ),
+    );
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 /** 删除某用户的待发送提醒（不允许删别人的，所以 WHERE 双重约束） */
 export async function deletePendingReminder(
-  db: D1Database,
+  d1: D1Database,
   telegramUserId: string,
   id: number,
 ): Promise<boolean> {
+  const db = getDb(d1);
   const result = await db
-    .prepare(
-      `DELETE FROM reminders WHERE id = ? AND telegram_user_id = ? AND sent_at IS NULL`,
-    )
-    .bind(id, telegramUserId)
-    .run();
-  return result.meta.changes > 0;
+    .delete(reminders)
+    .where(
+      and(
+        eq(reminders.id, id),
+        eq(reminders.telegram_user_id, telegramUserId),
+        isNull(reminders.sent_at),
+      ),
+    );
+  return (result.meta?.changes ?? 0) > 0;
 }
 
-/** 取所有 remind_at <= nowIso 的待发送提醒（cron 调用） */
+/** 取所有 remind_at <= now 的待发送提醒（cron 调用） */
 export async function listDueReminders(
-  db: D1Database,
-  nowIso: string,
+  d1: D1Database,
+  now: Date,
   limit = 200,
 ): Promise<Reminder[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT * FROM reminders WHERE sent_at IS NULL AND remind_at <= ? ORDER BY remind_at ASC LIMIT ?`,
-    )
-    .bind(nowIso, limit)
-    .all<Reminder>();
-  return results;
+  const db = getDb(d1);
+  return db
+    .select()
+    .from(reminders)
+    .where(and(isNull(reminders.sent_at), lte(reminders.remind_at, now)))
+    .orderBy(asc(reminders.remind_at))
+    .limit(limit);
 }
 
 /** 标记提醒已发送 */
 export async function markReminderSent(
-  db: D1Database,
+  d1: D1Database,
   id: number,
 ): Promise<void> {
+  const db = getDb(d1);
   await db
-    .prepare(`UPDATE reminders SET sent_at = datetime('now') WHERE id = ?`)
-    .bind(id)
-    .run();
+    .update(reminders)
+    .set({ sent_at: new Date() })
+    .where(eq(reminders.id, id));
 }
 
 /** 统计某用户待发送提醒数量（用于上限保护） */
 export async function countPendingReminders(
-  db: D1Database,
+  d1: D1Database,
   telegramUserId: string,
 ): Promise<number> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM reminders WHERE telegram_user_id = ? AND sent_at IS NULL`,
-    )
-    .bind(telegramUserId)
-    .first<{ n: number }>();
+  const db = getDb(d1);
+  const [row] = await db
+    .select({ n: count() })
+    .from(reminders)
+    .where(
+      and(
+        eq(reminders.telegram_user_id, telegramUserId),
+        isNull(reminders.sent_at),
+      ),
+    );
   return row?.n ?? 0;
 }

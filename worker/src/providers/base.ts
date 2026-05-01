@@ -20,7 +20,11 @@ import type {
   PreviewContent,
 } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
-import { formatAddress, wrapPlainText } from "@worker/utils/format";
+import {
+  formatAddress,
+  parseEmailDate,
+  wrapPlainText,
+} from "@worker/utils/format";
 import { buildCidMapFromAttachments } from "@worker/utils/mail-html";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
@@ -109,7 +113,7 @@ export abstract class EmailProvider {
         subject: email.subject ?? null,
         from: email.from ? formatAddress(email.from) : null,
         to: email.to?.map(formatAddress).join(", ") ?? null,
-        date: email.date ?? null,
+        date: parseEmailDate(email.date),
       },
     };
   }

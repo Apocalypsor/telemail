@@ -193,6 +193,17 @@ export function formatAddress(addr: Address): string {
   return addr.name;
 }
 
+/**
+ * 邮件 Date 头的安全解析。Gmail 来的是 RFC 5322（"Wed, 29 Apr 2026 …"），IMAP /
+ * Outlook 走 PostalMime 来的是 ISO 8601 —— `new Date(...)` 两种都接，但格式有时
+ * 残缺，统一收成 Date | null。空 / 解析不出来 → null。
+ */
+export function parseEmailDate(input: string | null | undefined): Date | null {
+  if (!input) return null;
+  const d = new Date(input);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /** 将纯文本包裹成可读的 HTML 页面 */
 export function wrapPlainText(text: string): string {
   const escaped = text

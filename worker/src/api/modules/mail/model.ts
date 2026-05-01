@@ -33,7 +33,7 @@ const MailMetaResponse = t.Object({
   subject: t.Optional(t.Union([t.String(), t.Null()])),
   from: t.Optional(t.Union([t.String(), t.Null()])),
   to: t.Optional(t.Union([t.String(), t.Null()])),
-  date: t.Optional(t.Union([t.String(), t.Null()])),
+  date: t.Optional(t.Union([t.Date(), t.Null()])),
 });
 
 export const MailGetResponse = t.Object({

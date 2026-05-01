@@ -1,8 +1,11 @@
+import { getDb } from "@worker/db/client";
+import { users } from "@worker/db/schema";
 import type { TelegramUser } from "@worker/types";
+import { desc, eq, ne } from "drizzle-orm";
 
 /** 登录时 upsert 用户信息（approved 仅在首次 INSERT 时设置，UPDATE 不覆盖） */
 export async function upsertUser(
-  db: D1Database,
+  d1: D1Database,
   telegramId: string,
   firstName: string,
   lastName?: string,
@@ -10,90 +13,92 @@ export async function upsertUser(
   photoUrl?: string,
   approved?: number,
 ): Promise<void> {
+  const db = getDb(d1);
+  const now = new Date();
   await db
-    .prepare(
-      `INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, approved, last_login_at)
-			 VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-			 ON CONFLICT (telegram_id) DO UPDATE SET
-			   first_name = excluded.first_name,
-			   last_name = excluded.last_name,
-			   username = excluded.username,
-			   photo_url = excluded.photo_url,
-			   last_login_at = datetime('now')`,
-    )
-    .bind(
-      telegramId,
-      firstName,
-      lastName ?? null,
-      username ?? null,
-      photoUrl ?? null,
-      approved ?? 0,
-    )
-    .run();
+    .insert(users)
+    .values({
+      telegram_id: telegramId,
+      first_name: firstName,
+      last_name: lastName ?? null,
+      username: username ?? null,
+      photo_url: photoUrl ?? null,
+      approved: approved ?? 0,
+      last_login_at: now,
+    })
+    .onConflictDoUpdate({
+      target: users.telegram_id,
+      set: {
+        first_name: firstName,
+        last_name: lastName ?? null,
+        username: username ?? null,
+        photo_url: photoUrl ?? null,
+        last_login_at: now,
+      },
+    });
 }
 
 /** 根据 Telegram ID 查询用户 */
 export async function getUserByTelegramId(
-  db: D1Database,
+  d1: D1Database,
   telegramId: string,
 ): Promise<TelegramUser | null> {
-  return db
-    .prepare("SELECT * FROM users WHERE telegram_id = ?")
-    .bind(telegramId)
-    .first<TelegramUser>();
+  const db = getDb(d1);
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(eq(users.telegram_id, telegramId));
+  return row ?? null;
 }
 
 /** 获取所有已登录过的用户 */
-export async function getAllUsers(db: D1Database): Promise<TelegramUser[]> {
-  const { results } = await db
-    .prepare("SELECT * FROM users ORDER BY last_login_at DESC")
-    .all<TelegramUser>();
-  return results;
+export async function getAllUsers(d1: D1Database): Promise<TelegramUser[]> {
+  const db = getDb(d1);
+  return db.select().from(users).orderBy(desc(users.last_login_at));
 }
 
 /** 获取除管理员外的所有用户 */
 export async function getNonAdminUsers(
-  db: D1Database,
+  d1: D1Database,
   adminTelegramId: string,
 ): Promise<TelegramUser[]> {
-  const { results } = await db
-    .prepare(
-      "SELECT * FROM users WHERE telegram_id != ? ORDER BY last_login_at DESC",
-    )
-    .bind(adminTelegramId)
-    .all<TelegramUser>();
-  return results;
+  const db = getDb(d1);
+  return db
+    .select()
+    .from(users)
+    .where(ne(users.telegram_id, adminTelegramId))
+    .orderBy(desc(users.last_login_at));
 }
 
 /** 批准用户 */
 export async function approveUser(
-  db: D1Database,
+  d1: D1Database,
   telegramId: string,
 ): Promise<void> {
+  const db = getDb(d1);
   await db
-    .prepare("UPDATE users SET approved = 1 WHERE telegram_id = ?")
-    .bind(telegramId)
-    .run();
+    .update(users)
+    .set({ approved: 1 })
+    .where(eq(users.telegram_id, telegramId));
 }
 
 /** 拒绝用户（重置为未批准） */
 export async function rejectUser(
-  db: D1Database,
+  d1: D1Database,
   telegramId: string,
 ): Promise<void> {
+  const db = getDb(d1);
   await db
-    .prepare("UPDATE users SET approved = 0 WHERE telegram_id = ?")
-    .bind(telegramId)
-    .run();
+    .update(users)
+    .set({ approved: 0 })
+    .where(eq(users.telegram_id, telegramId));
 }
 
 /** 删除用户记录 */
 export async function deleteUser(
-  db: D1Database,
+  d1: D1Database,
   telegramId: string,
 ): Promise<void> {
-  await db
-    .prepare("DELETE FROM users WHERE telegram_id = ?")
-    .bind(telegramId)
-    .run();
+  const db = getDb(d1);
+  await db.delete(users).where(eq(users.telegram_id, telegramId));
 }

@@ -19,6 +19,7 @@
   "dependencies": {
     "@elysiajs/eden": "^1.4.9",
     "@elysiajs/html": "^1.4.2",
+    "drizzle-orm": "^0.45.2",
     "elysia": "^1.4.28",
     "grammy": "^1.42.0",
     "i18next": "^26.0.8",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
-    "@types/turndown": "^5.0.6"
+    "@types/turndown": "^5.0.6",
+    "drizzle-kit": "^0.31.10"
   }
 }
