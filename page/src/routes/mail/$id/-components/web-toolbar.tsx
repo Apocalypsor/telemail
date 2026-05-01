@@ -6,7 +6,10 @@ import { AccentButton } from "./accent-button";
 
 /** Web 版邮件 toolbar：星标 / 归档 / 标垃圾 / 图片代理切换。
  *  miniapp 那一套用 TG 原生 Main+SecondaryButton 走 popup；web 这套是真 DOM
- *  按钮平铺。共用 useMailActions hook 控制状态转换和后端调用。 */
+ *  按钮平铺。共用 useMailActions hook 控制状态转换和后端调用。
+ *
+ *  图片代理开关只是本地切换 proxied/raw HTML，不发后端请求；即使浏览器未登录，
+ *  只要邮件 token 有效也应该可用。 */
 export function WebMailToolbar({
   emailMessageId,
   accountId,
@@ -62,17 +65,15 @@ export function WebMailToolbar({
     );
   }
 
-  // 邮件操作需要 Telegram 登录（session cookie）—— Worker 的
-  // `requireSessionOrMiniApp` middleware 对未登录请求返 401。session 没
-  // 拿到（加载中或未登录）直接不渲染 toolbar，用户走 header 右上的 "登录"
-  // 链接进 `/login`，回来后 session 就有了，toolbar 自然出现。
-  if (!session.data) return null;
-
   const isDisabled = done || pending;
+  const canMutateMail = !!session.data;
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
-      {!inArchive && (
+      {/* 邮件操作需要 Telegram 登录（session cookie）—— Worker 的 authAny
+          对未登录 mutation 返 401。session 没拿到时隐藏这些后端动作，用户可
+          从 header 右上的 "登录" 进入；登录回来后操作自然出现。 */}
+      {canMutateMail && !inArchive && (
         <AccentButton
           label={starred ? "✅ 已星标" : "⭐ 星标"}
           tone={starred ? "success-soft" : "neutral"}
@@ -80,7 +81,7 @@ export function WebMailToolbar({
           onPress={() => run("toggle-star", !starred)}
         />
       )}
-      {inJunk ? (
+      {canMutateMail && inJunk ? (
         <>
           <AccentButton
             label="📥 移到收件箱"
@@ -95,14 +96,14 @@ export function WebMailToolbar({
             onPress={() => run("trash")}
           />
         </>
-      ) : inArchive ? (
+      ) : canMutateMail && inArchive ? (
         <AccentButton
           label="📥 移出归档"
           tone="accent"
           isDisabled={isDisabled}
           onPress={() => run("unarchive")}
         />
-      ) : (
+      ) : canMutateMail ? (
         <>
           {canArchive && (
             <AccentButton
@@ -119,7 +120,7 @@ export function WebMailToolbar({
             onPress={() => run("mark-as-junk")}
           />
         </>
-      )}
+      ) : null}
       {/* CORS 图片代理 toggle —— 不会发请求、不影响 pending；放在所有状态
           按钮之后，inbox 默认会自然落在「标记为垃圾」旁边。 */}
       <AccentButton
