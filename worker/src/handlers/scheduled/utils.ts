@@ -29,10 +29,9 @@ function isPermanentSendError(err: unknown): boolean {
   );
 }
 
-/** 把存的 UTC ISO 格式化成 "YYYY-MM-DD HH:MM UTC" —— 服务端不知道用户时区，
- *  所以统一显示 UTC 并明确标注，用户自行换算。 */
-function formatRemindAt(iso: string): string {
-  const d = new Date(iso);
+/** 把 Date 格式化成 "YYYY-MM-DD HH:MM UTC" —— 服务端不知道用户时区，所以统一
+ *  显示 UTC 并明确标注，用户自行换算。 */
+function formatRemindAt(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
 }
@@ -70,7 +69,7 @@ export async function dispatchDueReminders(
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
 ): Promise<void> {
-  const due = await listDueReminders(env.DB, new Date().toISOString());
+  const due = await listDueReminders(env.DB, new Date());
   if (due.length === 0) return;
 
   await Promise.allSettled(

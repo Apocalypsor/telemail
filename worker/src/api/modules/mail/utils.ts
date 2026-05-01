@@ -2,6 +2,7 @@ import { getAccountById } from "@worker/db/accounts";
 import { getCachedMailData, putCachedMailData } from "@worker/db/kv";
 import { getEmailProvider, PROVIDERS } from "@worker/providers";
 import type { Account, Env, MailMeta } from "@worker/types";
+import { parseEmailDate } from "@worker/utils/format";
 import { proxyImages, replaceCidReferences } from "@worker/utils/mail-html";
 import { verifyMailTokenById } from "@worker/utils/mail-token";
 
@@ -87,9 +88,17 @@ export async function loadMailForRendering(
     emailMessageId,
   );
   if (cached) {
+    // KV 走 JSON 存，date 落盘时是 Date.toISOString() 字符串、读回是 string
+    // —— 这里 revive 回 Date 跟 fresh fetch 的 `MailMeta` 类型对齐
+    const meta: MailMeta = cached.meta
+      ? {
+          ...cached.meta,
+          date: parseEmailDate(cached.meta.date as unknown as string),
+        }
+      : {};
     return {
       ok: true,
-      meta: cached.meta ?? {},
+      meta,
       rawHtml: cached.html,
       proxiedHtml: await proxyImages(cached.html, env.ADMIN_SECRET),
       fetchFolder,

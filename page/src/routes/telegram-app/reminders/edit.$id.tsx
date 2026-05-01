@@ -91,7 +91,7 @@ function EditReminderPage() {
       if (dt.getTime() <= Date.now()) throw new Error("提醒时间需在未来");
       const { error } = await api.api.reminders({ id: String(id) }).patch({
         text: text.trim(),
-        remind_at: dt.toISOString(),
+        remind_at: dt,
       });
       if (error) throw error;
     },

@@ -1,10 +1,14 @@
 import type { ObservabilityHubBinding } from "workers-observability-hub";
 
-export enum AccountType {
-  Gmail = "gmail",
-  Imap = "imap",
-  Outlook = "outlook",
-}
+/** 用 const + 类型别名替代 enum —— 这样字面量值就是 string literal type，跟 Drizzle
+ *  schema 的 `text({ enum: [...] })` 推出来的 union 类型完全对齐，免掉强转。
+ *  调用方 `AccountType.Gmail` 用法不变。 */
+export const AccountType = {
+  Gmail: "gmail",
+  Imap: "imap",
+  Outlook: "outlook",
+} as const;
+export type AccountType = (typeof AccountType)[keyof typeof AccountType];
 
 /** D1 accounts 表记录 */
 export interface Account {
@@ -26,8 +30,8 @@ export interface Account {
   archive_folder_name: string | null;
   /** 1 = 暂停：push/队列/定时任务/列表都会跳过；账号配置保留，可随时恢复 */
   disabled: number;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /** D1 users 表记录（登录过的 Telegram 用户） */
@@ -38,8 +42,8 @@ export interface TelegramUser {
   username: string | null;
   photo_url: string | null;
   approved: number;
-  last_login_at: string;
-  created_at: string;
+  last_login_at: Date;
+  created_at: Date;
 }
 
 export interface Env {
@@ -103,7 +107,7 @@ export interface MailMeta {
   subject?: string | null;
   from?: string | null;
   to?: string | null;
-  date?: string | null;
+  date?: Date | null;
 }
 
 export enum QueueMessageType {

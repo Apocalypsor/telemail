@@ -38,7 +38,7 @@ import {
   base64urlToArrayBuffer,
   base64urlToString,
 } from "@worker/utils/base64url";
-import { wrapPlainText } from "@worker/utils/format";
+import { parseEmailDate, wrapPlainText } from "@worker/utils/format";
 import { HTTPError } from "ky";
 
 export class GmailProvider extends EmailProvider {
@@ -256,7 +256,7 @@ export class GmailProvider extends EmailProvider {
       subject: extractHeader(msg.payload, "subject"),
       from: extractHeader(msg.payload, "from"),
       to: extractHeader(msg.payload, "to"),
-      date: extractHeader(msg.payload, "date"),
+      date: parseEmailDate(extractHeader(msg.payload, "date")),
     };
     const html = extractPartByMime(msg.payload, "text/html");
 

@@ -70,7 +70,7 @@ export function failedEmailListMessage(items: FailedEmail[]): {
     };
   }
   const lines = items.map((item, i) => {
-    const date = item.created_at.replace("T", " ").slice(0, 16);
+    const date = item.created_at.toISOString().replace("T", " ").slice(0, 16);
     const subj = item.subject
       ? item.subject.length > 30
         ? `${item.subject.slice(0, 30)}…`

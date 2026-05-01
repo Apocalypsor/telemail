@@ -109,7 +109,7 @@ function RemindersPage() {
       if (dt.getTime() <= Date.now()) throw new Error("提醒时间需在未来");
       const { data, error } = await api.api.reminders.post({
         text: text.trim(),
-        remind_at: dt.toISOString(),
+        remind_at: dt,
         accountId: search.accountId,
         emailMessageId: search.emailMessageId,
         token: search.token,

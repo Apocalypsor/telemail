@@ -13,7 +13,7 @@ export function MailMeta({
   if (meta.from) rows.push(["From", meta.from]);
   if (meta.to) rows.push(["To", meta.to]);
   if (accountEmail) rows.push(["Account", accountEmail]);
-  if (meta.date) rows.push(["Date", meta.date]);
+  if (meta.date) rows.push(["Date", meta.date.toLocaleString()]);
 
   if (rows.length === 0) return null;
 

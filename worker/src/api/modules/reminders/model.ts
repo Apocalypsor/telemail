@@ -20,7 +20,7 @@ export const ListQuery = t.Object({
 
 export const CreateBody = t.Object({
   text: t.Optional(t.String()),
-  remind_at: t.Optional(t.String()),
+  remind_at: t.Optional(t.Date()),
   accountId: t.Optional(t.Number()),
   emailMessageId: t.Optional(t.String()),
   token: t.Optional(t.String()),
@@ -28,22 +28,24 @@ export const CreateBody = t.Object({
 
 export const UpdateBody = t.Object({
   text: t.Optional(t.String()),
-  remind_at: t.Optional(t.String()),
+  remind_at: t.Optional(t.Date()),
 });
 
-/** Reminder 行（含 enrich 字段：mail_token / email_summary 仅 list 接口填）。 */
+/** Reminder 行（含 enrich 字段：mail_token / email_summary 仅 list 接口填）。
+ *  时间字段 `t.Date()` —— DB 层已经把 INTEGER ms epoch revive 成 Date 返回，wire
+ *  上 JSON.stringify 编成 ISO 字符串，eden 客户端 `parseDate: true` 自动 revive。 */
 export const Reminder = t.Object({
   id: t.Number(),
   telegram_user_id: t.String(),
   text: t.String(),
-  remind_at: t.String(),
+  remind_at: t.Date(),
   account_id: t.Union([t.Number(), t.Null()]),
   email_message_id: t.Union([t.String(), t.Null()]),
   email_subject: t.Union([t.String(), t.Null()]),
   tg_chat_id: t.Union([t.String(), t.Null()]),
   tg_message_id: t.Union([t.Number(), t.Null()]),
-  sent_at: t.Union([t.String(), t.Null()]),
-  created_at: t.String(),
+  sent_at: t.Union([t.Date(), t.Null()]),
+  created_at: t.Date(),
   mail_token: t.Optional(t.Union([t.String(), t.Null()])),
   email_summary: t.Optional(t.Union([t.String(), t.Null()])),
 });
