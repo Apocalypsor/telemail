@@ -1,6 +1,9 @@
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
-import { markAsReadByMessage, toggleStar } from "@worker/utils/message-actions";
+import {
+  markAsReadByMessage,
+  toggleStar,
+} from "@worker/utils/message-actions/actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 

@@ -1,11 +1,11 @@
 import { analyzeEmail, type EmailAnalysis } from "@worker/clients/llm";
+import { editMessageCaption, editTextMessage } from "@worker/clients/telegram";
 import {
-  editMessageCaption,
-  editTextMessage,
+  MESSAGE_DATE_LOCALE,
+  MESSAGE_DATE_TIMEZONE,
   TG_CAPTION_LIMIT,
   TG_MSG_LIMIT,
-} from "@worker/clients/telegram";
-import { MESSAGE_DATE_LOCALE, MESSAGE_DATE_TIMEZONE } from "@worker/constants";
+} from "@worker/constants";
 import { t } from "@worker/i18n";
 import type { Account, Env } from "@worker/types";
 import {

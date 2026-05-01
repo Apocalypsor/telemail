@@ -1,4 +1,4 @@
-import { refreshEmail } from "@worker/handlers/queue/utils";
+import { refreshEmail } from "@worker/handlers/queue/utils/retry";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";

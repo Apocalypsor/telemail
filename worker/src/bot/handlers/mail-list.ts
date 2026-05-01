@@ -13,7 +13,7 @@ import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import {
   markAllAsRead,
   trashAllJunkEmails,
-} from "@worker/utils/message-actions";
+} from "@worker/utils/message-actions/actions";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 

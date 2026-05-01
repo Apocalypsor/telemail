@@ -9,7 +9,7 @@ import {
 import {
   retryAllFailedEmails,
   retryFailedEmail,
-} from "@worker/handlers/queue/utils";
+} from "@worker/handlers/queue/utils/retry";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";

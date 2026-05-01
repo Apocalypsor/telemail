@@ -18,7 +18,7 @@ import { t } from "@worker/i18n";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import type { MessageLocation } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
-import { reconcileMessageState } from "@worker/utils/message-actions";
+import { reconcileMessageState } from "@worker/utils/message-actions/reconcile";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 

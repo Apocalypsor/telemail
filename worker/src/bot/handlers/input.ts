@@ -10,7 +10,7 @@ import {
   updateAccount,
 } from "@worker/db/accounts";
 import { t } from "@worker/i18n";
-import { syncAccounts } from "@worker/providers/imap";
+import { syncAccounts } from "@worker/providers/imap/utils";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";

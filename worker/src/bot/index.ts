@@ -19,8 +19,6 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import { Api, Bot } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
 
-export { syncBotCommands } from "@worker/bot/commands";
-
 /**
  * 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存。
  * `memoizeAsync` 负责 isolate-scope 内存命中，免得 webhook + 群聊键盘

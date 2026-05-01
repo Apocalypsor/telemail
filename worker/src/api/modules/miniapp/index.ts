@@ -8,7 +8,7 @@ import {
 import {
   markAllAsRead,
   trashAllJunkEmails,
-} from "@worker/utils/message-actions";
+} from "@worker/utils/message-actions/actions";
 import { Elysia } from "elysia";
 import { ListParams, SearchQuery } from "./model";
 

@@ -17,7 +17,7 @@ import {
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
 import { wrapExpandableQuote } from "@worker/utils/markdown-v2";
-import { syncStarPinState } from "@worker/utils/message-actions";
+import { syncStarPinState } from "@worker/utils/message-actions/reconcile";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 

@@ -6,7 +6,7 @@ import {
   markReminderSent,
   type Reminder,
 } from "@worker/db/reminders";
-import { deliverEmailToTelegram } from "@worker/handlers/queue/utils";
+import { deliverEmailToTelegram } from "@worker/handlers/queue/utils/deliver";
 import { t } from "@worker/i18n";
 import { getEmailProvider } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
@@ -15,7 +15,7 @@ import {
   generateMailTokenById,
 } from "@worker/utils/mail-token";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
-import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
+import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions/keyboard";
 import { reportErrorToObservability } from "@worker/utils/observability";
 
 /** 永久性失败：bot 被屏蔽 / 踢出群 / 用户停用 → 标记 sent_at 放弃，避免每分钟重试。 */

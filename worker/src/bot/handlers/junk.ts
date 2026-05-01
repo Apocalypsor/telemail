@@ -3,10 +3,8 @@ import { resolveMessageAccount } from "@worker/bot/utils/message-context";
 import { t } from "@worker/i18n";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import type { Env } from "@worker/types";
-import {
-  cleanupTgForEmail,
-  markEmailAsRead,
-} from "@worker/utils/message-actions";
+import { markEmailAsRead } from "@worker/utils/message-actions/actions";
+import { cleanupTgForEmail } from "@worker/utils/message-actions/cleanup";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";

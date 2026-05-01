@@ -3,14 +3,12 @@ import { cf } from "@worker/api/plugins/cf";
 import { buildEmailKeyboard } from "@worker/bot/keyboards";
 import { buildTgMessageLink, setReplyMarkup } from "@worker/clients/telegram";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
-import { deliverEmailToTelegram } from "@worker/handlers/queue/utils";
+import { deliverEmailToTelegram } from "@worker/handlers/queue/utils/deliver";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import { buildWebMailUrl } from "@worker/utils/mail-token";
-import {
-  cleanupTgForEmail,
-  markEmailAsRead,
-  syncStarPinState,
-} from "@worker/utils/message-actions";
+import { markEmailAsRead } from "@worker/utils/message-actions/actions";
+import { cleanupTgForEmail } from "@worker/utils/message-actions/cleanup";
+import { syncStarPinState } from "@worker/utils/message-actions/reconcile";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { Elysia } from "elysia";
 import {

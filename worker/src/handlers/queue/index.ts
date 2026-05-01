@@ -1,6 +1,6 @@
 import { deleteMessage } from "@worker/clients/telegram";
 import { getAccountById } from "@worker/db/accounts";
-import { deliverEmailToTelegram } from "@worker/handlers/queue/utils";
+import { deliverEmailToTelegram } from "@worker/handlers/queue/utils/deliver";
 import { getEmailProvider } from "@worker/providers";
 import {
   type EmailQueueMessage,

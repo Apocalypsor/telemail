@@ -4,11 +4,9 @@ import {
   requireImapBridgeBearer,
 } from "@worker/api/plugins/secrets";
 import { getImapAccounts } from "@worker/db/accounts";
-import {
-  GmailProvider,
-  ImapProvider,
-  OutlookProvider,
-} from "@worker/providers";
+import { GmailProvider } from "@worker/providers/gmail";
+import { ImapProvider } from "@worker/providers/imap";
+import { OutlookProvider } from "@worker/providers/outlook";
 import { timingSafeEqual } from "@worker/utils/hash";
 import { Elysia } from "elysia";
 import { OutlookPushQuery, PushBody } from "./model";

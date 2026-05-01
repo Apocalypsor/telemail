@@ -13,7 +13,7 @@ import {
   listPendingRemindersForEmail,
   updatePendingReminder,
 } from "@worker/db/reminders";
-import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
+import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions/keyboard";
 import { Elysia } from "elysia";
 import {
   CreateBody,

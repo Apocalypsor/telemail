@@ -4,9 +4,6 @@ import { handleQueueBatch } from "@worker/handlers/queue";
 import { handleScheduled } from "@worker/handlers/scheduled";
 import type { Env, QueueMessage } from "@worker/types";
 
-export type { App } from "@worker/api";
-export type { Env } from "@worker/types";
-
 export default {
   /**
    * 把 ExecutionContext 挂到 request 上，让 Elysia 的 `cf` plugin derive

@@ -24,6 +24,7 @@ All scripts run from repo root. Read root + per-workspace `package.json` for the
 ## Cross-cutting conventions
 
 - **Helpers**: file-private if used in ONE file; lift to nearest `utils/` (or `components/` / `hooks/` on page side) when used in multiple. Same applies to dedup — extract instead of copy-pasting.
+- **No barrel imports**: don't write `index.ts` files that just `export ... from "./foo"`. Consumers `import { x } from "@worker/.../<file>"` directly. Saves one redirection when reading code, removes a class of "where does this actually live" confusion. Module / plugin `index.ts` that contain real logic (Elysia controller, Worker entry) are fine — only re-export-only barrels are banned.
 - **Shared types**: `worker/types.ts` for cross-cutting; module-scoped `types.ts` (e.g. `providers/types.ts`) otherwise. Never inline reusable types into handlers / services / route components.
 - **Error reporting** (worker): `reportErrorToObservability(env, "tag", err)`, never `console.error`. Page side: surface via `extractErrorMessage()`, no silent swallowing.
 - **Cross-package imports**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in `tsconfig.base.json`. Page imports `@worker/*` are **type-only** (no runtime — keeps the page bundle slim). Worker imports `@page/paths` (Mini App URL constants) and `@middleware/index` (Eden `App` type for the IMAP bridge client).
@@ -65,8 +66,7 @@ utils.ts        # 私有 helper
 
 ```
 utils/
-├── index.ts        # barrel re-export
 └── <purpose>.ts    # 按用途命名（`format.ts` `deliver.ts` `retry.ts`）
 ```
 
-子文件可按用途命名，但**任何 utils 子目录里都不允许** `service.ts` `lib.ts` `helpers.ts` 这种泛词 —— service 只能在 module 根。
+**不允许 barrel `index.ts`**（项目约定全面禁 barrel re-export，多写文件无非省一行 import 路径，但读代码时跳两次找定义更烦）—— 直接 `from "@worker/.../utils/<purpose>"`。子文件可按用途命名，但**不允许** `service.ts` `lib.ts` `helpers.ts` 这种泛词（service 只能在 module 根）。

@@ -1,14 +1,7 @@
 import { http } from "@worker/clients/http";
-import {
-  TG_API_BASE,
-  TG_CAPTION_LIMIT,
-  TG_MEDIA_GROUP_LIMIT,
-  TG_MSG_LIMIT,
-} from "@worker/constants";
+import { TG_API_BASE, TG_MEDIA_GROUP_LIMIT } from "@worker/constants";
 import type { Attachment } from "@worker/types";
 import { HTTPError } from "ky";
-
-export { TG_CAPTION_LIMIT, TG_MSG_LIMIT };
 
 function isEntityParseError(description: string | undefined): boolean {
   return !!description && /can't parse entities/i.test(description);

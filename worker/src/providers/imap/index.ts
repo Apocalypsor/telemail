@@ -10,11 +10,6 @@ import type { EmailListItem, MessageState } from "@worker/providers/types";
 import { type Env, QueueMessageType } from "@worker/types";
 import { base64ToArrayBuffer } from "@worker/utils/base64url";
 
-export {
-  checkImapBridgeHealth,
-  syncAccounts,
-} from "@worker/providers/imap/utils";
-
 /**
  * IMAP provider —— 所有 `messageId` 参数都是 RFC 822 Message-Id（全局唯一，跨 folder
  * 稳定）。不是 IMAP UID。middleware 会按 `SEARCH HEADER Message-Id` 在相关 folder

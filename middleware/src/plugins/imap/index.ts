@@ -11,13 +11,15 @@ import {
   findArchiveFolder,
   findJunkFolder,
   findTrashFolder,
+  resolveArchiveFolder,
+  resolveFolderForHint,
+} from "./utils/folders";
+import {
   findUidByMessageId,
   findUidInMailbox,
   locateMessage,
-  resolveArchiveFolder,
-  resolveFolderForHint,
   searchAndFetch,
-} from "./utils";
+} from "./utils/search";
 
 const Imap = {
   /**

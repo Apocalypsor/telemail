@@ -8,7 +8,7 @@ Cloudflare Worker (Elysia + grammY). Cross-workspace rules in [root AGENTS.md](.
 - **`bot/`** — Telegram bot (grammY). Self-contained: `handlers/<feature>/`, `utils/` (cross-feature formatters, state, account cleanup, etc.), `commands.ts`, `keyboards.ts`. **No** sub-`services/`. Helpers live in the **nearest** `utils/`: feature-internal (used by ≥2 files in one `handlers/<feature>/`) → `bot/handlers/<feature>/utils.ts`; cross-feature (used across multiple `handlers/<feature>/`) → `bot/utils/`.
 - **`handlers/`** — non-HTTP entry points: `queue/{index.ts, bridge.ts}` (queue consumer + email delivery), `scheduled/{index.ts, reminders.ts}` (cron + reminder dispatch).
 - **`clients/`** — outbound HTTP layer: shared `ky` instance (`http.ts`) + hand-written external API wrappers (`telegram.ts`, `llm.ts`).
-- **`providers/`** — email provider impls (Gmail / Outlook / IMAP), abstract in `base.ts`, barrel in `index.ts`. Per-provider differences stay on the class — **never `branch on account.type` outside `providers/`**.
+- **`providers/`** — email provider impls (Gmail / Outlook / IMAP), abstract in `base.ts`. `index.ts` exports the `PROVIDERS` map + `getEmailProvider` / `accountCanArchive` / `renewAllPush` (no barrel re-exports — import provider classes / types from their own files). Per-provider differences stay on the class — **never `branch on account.type` outside `providers/`**.
 - **`db/`** — D1 + KV access. Schema-typed wrappers only.
 - **`utils/`** — cross-cutting helpers: pure (`markdown-v2`, `format`, `hash`, `mail-token`), thin wrappers over external libs (`observability` over `workers-observability-hub`), AND cross-feature domain ops (`message-actions/`, `mail-list.ts`) used by both `bot/` and `api/`.
 - **`i18n/`** — translations.

@@ -3,17 +3,13 @@ import {
   getMappingsByEmailIds,
   type MessageMapping,
 } from "@worker/db/message-map";
-import {
-  type EmailListItem,
-  type EmailProvider,
-  getEmailProvider,
-} from "@worker/providers";
+import { getEmailProvider } from "@worker/providers";
+import type { EmailProvider } from "@worker/providers/base";
+import type { EmailListItem } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
 import { generateMailTokenById } from "@worker/utils/mail-token";
-import {
-  deleteJunkMappings,
-  syncStarButtonsForMappings,
-} from "@worker/utils/message-actions";
+import { deleteJunkMappings } from "@worker/utils/message-actions/cleanup";
+import { syncStarButtonsForMappings } from "@worker/utils/message-actions/keyboard";
 import { reportErrorToObservability } from "@worker/utils/observability";
 
 const MAIL_LIST_TYPES = ["unread", "starred", "junk", "archived"] as const;

@@ -6,19 +6,6 @@ import { OutlookProvider } from "@worker/providers/outlook";
 import type { EmailProviderClass } from "@worker/providers/types";
 import { type Account, AccountType, type Env } from "@worker/types";
 
-export { EmailProvider } from "@worker/providers/base";
-export { GmailProvider } from "@worker/providers/gmail";
-export { ImapProvider } from "@worker/providers/imap";
-export { OutlookProvider } from "@worker/providers/outlook";
-export type {
-  EmailListItem,
-  EmailProviderClass,
-  OAuthHandler,
-  OAuthProviderConfig,
-  OAuthTokenResponse,
-  PreviewContent,
-} from "@worker/providers/types";
-
 /**
  * AccountType → provider class 的唯一映射。新增 provider 在这加一行。
  * URL slug `/oauth/:provider/*` 里的 `:provider` 就是 AccountType 的值。
