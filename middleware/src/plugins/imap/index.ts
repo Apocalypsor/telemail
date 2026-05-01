@@ -8,6 +8,7 @@ import type {
   SearchResultMessage,
 } from "./types";
 import {
+  findArchiveFolder,
   findJunkFolder,
   findTrashFolder,
   findUidByMessageId,
@@ -188,13 +189,13 @@ const Imap = {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    const junkPath = await findJunkFolder(conn);
-    const archivePath = await resolveArchiveFolder(conn, undefined);
-    const mailboxes = await conn.client.list();
-    const archiveExists = mailboxes.some(
-      (m) => m.path === archivePath || m.name === archivePath,
-    );
-    const folders = ["INBOX", junkPath, archiveExists ? archivePath : null]
+    // 并发查 Redis 缓存。`findArchiveFolder` 返回非 null 即说明该 folder 在
+    // server 上存在（不会返回 fallback 字面量），省掉额外一次 IMAP `LIST` 验证。
+    const [junkPath, archivePath] = await Promise.all([
+      findJunkFolder(conn),
+      findArchiveFolder(conn),
+    ]);
+    const folders = ["INBOX", junkPath, archivePath]
       .filter((f): f is string => !!f)
       .filter((f, i, arr) => arr.indexOf(f) === i);
 
@@ -261,15 +262,21 @@ const Imap = {
     maxResults: number = 20,
   ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listFolder");
-    const resolved = await resolveArchiveFolder(conn, folder);
-    // 文件夹不存在时返回空（避免 getMailboxLock 抛错导致请求失败）
-    const mailboxes = await conn.client.list();
-    const exists = mailboxes.some(
-      (m) => m.path === resolved || m.name === resolved,
-    );
-    if (!exists) {
+
+    // 没传 folder 时走自动探测（`findArchiveFolder` 返回非 null 即存在），跳过
+    // 一次 IMAP `LIST` 验证；用户自定义路径才需要查存在性。
+    let resolved: string | null;
+    if (folder) {
+      const mailboxes = await conn.client.list();
+      resolved = mailboxes.some((m) => m.path === folder || m.name === folder)
+        ? folder
+        : null;
+    } else {
+      resolved = await findArchiveFolder(conn);
+    }
+    if (!resolved) {
       console.log(
-        `[Account ${accountId}] listFolder: '${resolved}' not found, returning empty`,
+        `[Account ${accountId}] listFolder: archive folder not found, returning empty`,
       );
       return [];
     }
@@ -285,18 +292,35 @@ const Imap = {
       accountId,
       "archiveMessage",
     );
-    const resolved = await resolveArchiveFolder(conn, folder);
 
-    // 不存在就创建
-    const mailboxes = await conn.client.list();
-    const exists = mailboxes.some(
-      (m) => m.path === resolved || m.name === resolved,
-    );
-    if (!exists) {
-      await conn.client.mailboxCreate(resolved);
-      console.log(
-        `[Account ${accountId}] Created archive folder '${resolved}'`,
+    // 用户没传 folder 且 `findArchiveFolder` 命中（Redis 或 server LIST 返回非
+    // null）即说明该 folder 在 server 上存在；直接跳过 `list()` + `mailboxCreate`
+    // 这条慢路径。只有用户自定义 / 兜底字面量 "Archive" 才需要查存在性 + 建。
+    let resolved: string;
+    let needsCreate = false;
+    if (folder) {
+      resolved = folder;
+      needsCreate = true;
+    } else {
+      const auto = await findArchiveFolder(conn);
+      if (auto) {
+        resolved = auto;
+      } else {
+        resolved = "Archive";
+        needsCreate = true;
+      }
+    }
+    if (needsCreate) {
+      const mailboxes = await conn.client.list();
+      const exists = mailboxes.some(
+        (m) => m.path === resolved || m.name === resolved,
       );
+      if (!exists) {
+        await conn.client.mailboxCreate(resolved);
+        console.log(
+          `[Account ${accountId}] Created archive folder '${resolved}'`,
+        );
+      }
     }
 
     const lock = await conn.client.getMailboxLock("INBOX");
@@ -454,14 +478,18 @@ const Imap = {
       return { location: "junk" };
     }
 
-    // archive 可能尚未创建（首次归档时才建），不存在就跳过
-    const archivePath = await resolveArchiveFolder(conn, archiveFolder);
-    const mailboxes = await conn.client.list();
-    const archiveExists = mailboxes.some(
-      (m) => m.path === archivePath || m.name === archivePath,
-    );
+    // archive 可能尚未创建（首次归档时才建），不存在就跳过。用户自定义路径才需要
+    // `client.list()` 验证；走自动探测 (`findArchiveFolder`) 时返回非 null 即存在，
+    // 直接省掉那次 IMAP 往返。
+    const archivePath = archiveFolder
+      ? (await conn.client.list()).some(
+          (m) => m.path === archiveFolder || m.name === archiveFolder,
+        )
+        ? archiveFolder
+        : null
+      : await findArchiveFolder(conn);
     if (
-      archiveExists &&
+      archivePath &&
       (await findUidByMessageId(conn, archivePath, rfcMessageId))
     ) {
       return { location: "archive" };
@@ -513,18 +541,16 @@ const Imap = {
   async trashMessage(accountId: number, rfcMessageId: string): Promise<void> {
     const conn = connectionManager.requireConnection(accountId, "trashMessage");
 
-    const junkPath = await findJunkFolder(conn);
-    const archivePath = await resolveArchiveFolder(conn, undefined);
-    const mailboxes = await conn.client.list();
-    const archiveExists = mailboxes.some(
-      (m) => m.path === archivePath || m.name === archivePath,
+    // 三个特殊 folder 走 Redis 缓存并发拉。findArchiveFolder 非 null 即存在，
+    // 不需要额外 `client.list()` 验证。
+    const [junkPath, archivePath, trashPath] = await Promise.all([
+      findJunkFolder(conn),
+      findArchiveFolder(conn),
+      findTrashFolder(conn),
+    ]);
+    const candidates = ["INBOX", junkPath, archivePath].filter(
+      (f): f is string => !!f,
     );
-
-    const candidates = [
-      "INBOX",
-      junkPath,
-      archiveExists ? archivePath : null,
-    ].filter((f): f is string => !!f);
     const hit = await locateMessage(conn, rfcMessageId, candidates);
     if (!hit) {
       throw new Error(
@@ -532,7 +558,6 @@ const Imap = {
       );
     }
 
-    const trashPath = await findTrashFolder(conn);
     const lock = await conn.client.getMailboxLock(hit.folder);
     try {
       if (trashPath) {

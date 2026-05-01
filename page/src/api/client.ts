@@ -21,5 +21,6 @@ export const api = treaty<App>(
       return initData ? { "X-Telegram-Init-Data": initData } : {};
     },
     fetch: { credentials: "same-origin" },
+    parseDate: false,
   },
 );
