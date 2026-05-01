@@ -60,13 +60,13 @@ export const messageMap = sqliteTable(
     created_at: tsMs("created_at").notNull().default(nowDefault),
     short_summary: text("short_summary"),
   },
-  (t) => ({
-    pk: primaryKey({ columns: [t.tg_chat_id, t.tg_message_id] }),
-    emailUnique: uniqueIndex("idx_message_map_email_unique").on(
+  (t) => [
+    primaryKey({ columns: [t.tg_chat_id, t.tg_message_id] }),
+    uniqueIndex("idx_message_map_email_unique").on(
       t.account_id,
       t.email_message_id,
     ),
-  }),
+  ],
 );
 
 export const failedEmails = sqliteTable(
@@ -82,11 +82,12 @@ export const failedEmails = sqliteTable(
     error_message: text("error_message"),
     created_at: tsMs("created_at").notNull().default(nowDefault),
   },
-  (t) => ({
-    emailMsgUnique: uniqueIndex(
-      "failed_emails_email_message_id_tg_message_id_unique",
-    ).on(t.email_message_id, t.tg_message_id),
-  }),
+  (t) => [
+    uniqueIndex("failed_emails_email_message_id_tg_message_id_unique").on(
+      t.email_message_id,
+      t.tg_message_id,
+    ),
+  ],
 );
 
 export const reminders = sqliteTable(
@@ -104,8 +105,8 @@ export const reminders = sqliteTable(
     tg_chat_id: text("tg_chat_id"),
     tg_message_id: integer("tg_message_id"),
   },
-  (t) => ({
-    due: index("idx_reminders_due").on(t.sent_at, t.remind_at),
-    user: index("idx_reminders_user").on(t.telegram_user_id),
-  }),
+  (t) => [
+    index("idx_reminders_due").on(t.sent_at, t.remind_at),
+    index("idx_reminders_user").on(t.telegram_user_id),
+  ],
 );
