@@ -10,6 +10,7 @@ const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
 const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
 const KV_BOT_INFO_KEY = "telegram:bot_info";
 const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
+const KV_THINGS_APP_INSTANCE_ID_KEY = "things:app_instance_id";
 
 // ─── TTLs ───────────────────────────────────────────────────────────────────
 
@@ -298,4 +299,19 @@ export async function putBotCommandsVersion(
   version: string,
 ): Promise<void> {
   await kv.put(KV_BOT_COMMANDS_VERSION_KEY, version);
+}
+
+// ─── Things Cloud ───────────────────────────────────────────────────────────
+
+export async function getThingsAppInstanceId(
+  kv: KVNamespace,
+): Promise<string | null> {
+  return kv.get(KV_THINGS_APP_INSTANCE_ID_KEY);
+}
+
+export async function putThingsAppInstanceId(
+  kv: KVNamespace,
+  appInstanceId: string,
+): Promise<void> {
+  await kv.put(KV_THINGS_APP_INSTANCE_ID_KEY, appInstanceId);
 }

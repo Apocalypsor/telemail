@@ -58,6 +58,18 @@
 
 `WORKER_URL` 未配 → Gmail / Outlook Bot 授权链接、Outlook webhook subscription、邮件消息里的"👁 查看原文 / ⏰ 提醒"按钮都不可用。`TG_MINI_APP_SHORT_NAME` 未配 → 私聊仍可用 Mini App 按钮；群聊只保留裸 web "👁 查看原文"链接，不显示 ⏰ 提醒入口。
 
+### Things Cloud（可选）
+
+配置后，邮件提醒到期时会在后台推送创建一条 Things 任务。推送失败只会上报 observability，不影响 Telemail 提醒分发。
+
+| Secret                    | 说明                                                      |
+| ------------------------- | --------------------------------------------------------- |
+| `THINGS_CLOUD_EMAIL`      | Things Cloud 账号邮箱                                    |
+| `THINGS_CLOUD_PASSWORD`   | Things Cloud 密码                                        |
+| `THINGS_CLOUD_ENDPOINT`   | Things Cloud API endpoint override（调试用，默认官方 endpoint） |
+
+注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径。
+
 ## Cloudflare Bindings
 
 `worker/wrangler.jsonc` 里声明，`bun typegen:worker` 把类型同步到 `worker/worker-configuration.d.ts`。
@@ -83,6 +95,6 @@
 
 - `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、`refresh_token` 加密等）
 - `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id)`，幂等去重用
-- `reminders` —— Mini App 设的提醒
+- `reminders` —— Mini App 设的提醒，可选记录推送到 Things Cloud 的 task UUID
 - `users` —— 登录过 Telegram Login Widget 的用户（`approved` 状态控制访问 web 工具页 `/preview` / `/junk-check`）
 - `failed_emails` —— LLM / queue 处理失败的邮件，cron 批量重试

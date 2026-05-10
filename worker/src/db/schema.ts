@@ -113,6 +113,7 @@ export const reminders = sqliteTable(
     email_subject: text("email_subject"),
     tg_chat_id: text("tg_chat_id"),
     tg_message_id: integer("tg_message_id"),
+    things_task_id: text("things_task_id"),
   },
   (t) => [
     index("idx_reminders_due").on(t.sent_at, t.remind_at),

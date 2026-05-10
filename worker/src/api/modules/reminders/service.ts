@@ -1,10 +1,34 @@
 /** Reminders 模块的业务用例编排。目前只有一项：list 接口的 enrich 流程
  *  （给 reminder 行附加 mail_token + email_summary）。 */
 import { MailService } from "@worker/api/modules/mail/service";
+import {
+  deriveThingsUuid,
+  generateThingsAppInstanceId,
+  ThingsCloudClient,
+} from "@worker/clients/things-cloud";
+import { getAccountById } from "@worker/db/accounts";
+import { getThingsAppInstanceId, putThingsAppInstanceId } from "@worker/db/kv";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
-import type { Reminder } from "@worker/db/reminders";
+import {
+  getReminderById,
+  type Reminder,
+  updateReminderThingsTaskId,
+} from "@worker/db/reminders";
 import type { Env } from "@worker/types";
+import {
+  buildWebMailUrl,
+  generateMailTokenById,
+} from "@worker/utils/mail-token";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import type { EnrichedReminder } from "./types";
+
+async function getOrCreateThingsAppInstanceId(env: Env): Promise<string> {
+  const cached = await getThingsAppInstanceId(env.EMAIL_KV);
+  if (cached) return cached;
+  const generated = generateThingsAppInstanceId();
+  await putThingsAppInstanceId(env.EMAIL_KV, generated);
+  return generated;
+}
 
 export abstract class RemindersService {
   /** 给 listOnly 模式（主菜单"我的提醒"）的 reminder 列表附加 mail_token + email_summary。
@@ -68,5 +92,80 @@ export abstract class RemindersService {
         email_summary: key ? (summaryByKey.get(key) ?? null) : null,
       };
     });
+  }
+
+  static async pushThingsTaskForDueEmailReminder(
+    env: Env,
+    reminder: Reminder,
+  ): Promise<void> {
+    if (!env.THINGS_CLOUD_EMAIL || !env.THINGS_CLOUD_PASSWORD) return;
+    if (reminder.account_id == null || reminder.email_message_id == null)
+      return;
+
+    try {
+      const current = await getReminderById(env.DB, reminder.id);
+      if (!current || current.things_task_id) return;
+
+      const account = await getAccountById(env.DB, reminder.account_id);
+      if (!account) return;
+
+      const taskId = await deriveThingsUuid(
+        env.ADMIN_SECRET,
+        `reminder:${reminder.id}`,
+      );
+      const token = await generateMailTokenById(
+        env.ADMIN_SECRET,
+        reminder.email_message_id,
+        reminder.account_id,
+      );
+      const mailUrl = env.WORKER_URL
+        ? buildWebMailUrl(
+            env.WORKER_URL,
+            reminder.email_message_id,
+            reminder.account_id,
+            token,
+          )
+        : null;
+      const title = reminder.text || reminder.email_subject || "Email reminder";
+      const notes = [
+        reminder.text && reminder.text !== title
+          ? `Note: ${reminder.text}`
+          : null,
+        `Reminder fired: ${new Date().toISOString()}`,
+        `Original reminder time: ${reminder.remind_at.toISOString()}`,
+        account.email ? `Account: ${account.email}` : null,
+        reminder.email_subject && reminder.email_subject !== title
+          ? `Mail: ${reminder.email_subject}`
+          : null,
+        mailUrl ? `Open mail: ${mailUrl}` : null,
+        `Telemail reminder #${reminder.id}`,
+      ]
+        .filter((line): line is string => !!line)
+        .join("\n");
+
+      const client = new ThingsCloudClient({
+        email: env.THINGS_CLOUD_EMAIL,
+        password: env.THINGS_CLOUD_PASSWORD,
+        appInstanceId: await getOrCreateThingsAppInstanceId(env),
+        endpoint: env.THINGS_CLOUD_ENDPOINT,
+      });
+      const createdTaskId = await client.createTodo({
+        id: taskId,
+        title,
+        notes,
+      });
+      await updateReminderThingsTaskId(env.DB, reminder.id, createdTaskId);
+    } catch (err) {
+      await reportErrorToObservability(
+        env,
+        "reminders.things_push_failed",
+        err,
+        {
+          reminderId: reminder.id,
+          accountId: reminder.account_id,
+          emailMessageId: reminder.email_message_id,
+        },
+      );
+    }
   }
 }

@@ -114,6 +114,13 @@ bun wrangler secret put GMAIL_PUSH_SECRET
 
 `WORKER_URL` 不是敏感值，但 Gmail / Outlook 的 Bot 授权链接、Outlook webhook subscription、邮件查看 / 提醒按钮都会用它拼公开 URL；生产环境建议始终配置为最终同源域名。
 
+可选：如果要在邮件提醒到期时推送到 Things Cloud，再配置：
+
+```sh
+bun wrangler secret put THINGS_CLOUD_EMAIL
+bun wrangler secret put THINGS_CLOUD_PASSWORD
+```
+
 ## 5. Worker 部署
 
 如果本次发布包含 D1 schema / migrations 变更，先从仓库根应用远端迁移：

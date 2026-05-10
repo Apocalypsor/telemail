@@ -44,6 +44,7 @@ export const Reminder = t.Object({
   email_subject: t.Union([t.String(), t.Null()]),
   tg_chat_id: t.Union([t.String(), t.Null()]),
   tg_message_id: t.Union([t.Number(), t.Null()]),
+  things_task_id: t.Union([t.String(), t.Null()]),
   sent_at: t.Union([t.Date(), t.Null()]),
   created_at: t.Date(),
   mail_token: t.Optional(t.Union([t.String(), t.Null()])),
