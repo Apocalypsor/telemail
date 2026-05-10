@@ -46,7 +46,7 @@ export interface EmailAnalysis {
   verificationCode: string | null;
   /** 摘要（bullet list） */
   summary: string;
-  /** 一句话摘要（~30 字，用于邮件列表显示） */
+  /** 一句话摘要（用于邮件列表显示） */
   shortSummary: string;
   /** 标签 */
   tags: string[];
@@ -92,10 +92,13 @@ export async function analyzeEmail(
     `   - State directly what happened, what the key data is, and what action is needed\n` +
     linkRule +
     `   - You may use Markdown formatting: **bold**, _italic_, \`code\`\n\n` +
-    `3. "short_summary": A SINGLE short line (max ~40 characters, no line breaks, no markdown, no bullet) suitable for a list preview.\n` +
+    `3. "short_summary": A SINGLE compact line (target max ~60 characters, no line breaks, no markdown, no bullet) suitable for a list preview.\n` +
     `   - Same language rule as "summary" (English if email is English, else 简体中文)\n` +
-    `   - Capture the core intent / key fact in a compact form. Examples: "GitHub 登录验证码", "LinkedIn weekly digest"\n` +
-    `   - For order / transaction emails (order confirmation, shipping update, payment receipt, refund), include the key identifiers: merchant + status + one of (order #, amount, or tracking #). Examples: "Amazon 订单 #112-3456 已发货", "Uber 支付 ¥128 成功", "Stripe 退款 $29.99 已到账"\n` +
+    `   - Capture concrete key facts, not a generic category. Prefer: sender/service + item/event/name + time/date + identifier/status.\n` +
+    `   - For shopping/order/receipt/shipping/refund emails, include merchant + purchased item or service + order number (if present) + status/time/amount. Examples: "Amazon AirPods 订单#112 已发货", "Apple MacBook 5月10日付款成功", "Uber 行程¥128 已支付"\n` +
+    `   - For flight/train/travel tickets, include carrier + flight/train number + route + departure/arrival time/date + booking/order number or status when present. Examples: "UA857 SFO→PVG 5月12日20:30 已确认", "国航CA982 6月1日 北京→纽约 已出票"\n` +
+    `   - For hotel/lodging bookings, include hotel name + city/room if useful + check-in/check-out date + booking/order number or status when present. Examples: "东京希尔顿 5月12日入住 订单#ABC123", "Marriott NYC 6/1-6/3 booking confirmed"\n` +
+    `   - If details exceed the length target, keep the most actionable identifiers first: item/hotel/flight name, time/date, order/booking/tracking number, status.\n` +
     `   - Always produce a non-empty value, even if "summary" is empty (e.g. verification code emails)\n\n` +
     `4. "tags": An array of 1-3 PascalCase tags for this email.\n` +
     `   Rules:\n` +
