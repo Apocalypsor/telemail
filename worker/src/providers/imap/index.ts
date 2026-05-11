@@ -7,7 +7,11 @@ import {
   syncAccounts,
 } from "@worker/providers/imap/utils";
 import type { EmailListItem, MessageState } from "@worker/providers/types";
-import { type Env, QueueMessageType } from "@worker/types";
+import {
+  type Env,
+  type MailAttachmentDownload,
+  QueueMessageType,
+} from "@worker/types";
 import { base64ToArrayBuffer } from "@worker/utils/base64url";
 
 /**
@@ -267,6 +271,53 @@ export class ImapProvider extends EmailProvider {
       }),
     );
     return data.count;
+  }
+
+  async fetchAttachment(
+    messageId: string,
+    attachmentId: string,
+    folder: "inbox" | "junk" | "archive",
+  ): Promise<MailAttachmentDownload | null> {
+    if (!this.env.IMAP_BRIDGE_URL || !this.env.IMAP_BRIDGE_SECRET) {
+      throw new Error(
+        "IMAP bridge not configured (missing IMAP_BRIDGE_URL or IMAP_BRIDGE_SECRET)",
+      );
+    }
+
+    const resp = await fetch(
+      `${this.env.IMAP_BRIDGE_URL.replace(/\/$/, "")}/api/attachment`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.env.IMAP_BRIDGE_SECRET}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          accountId: this.account.id,
+          rfcMessageId: messageId,
+          attachmentId,
+          folder,
+          archiveFolder:
+            folder === "archive"
+              ? (this.account.archive_folder ?? undefined)
+              : undefined,
+        }),
+      },
+    );
+    if (!resp.ok) {
+      if (resp.status === 404) return null;
+      throw new Error(`IMAP attachment download failed: ${await resp.text()}`);
+    }
+    if (!resp.body) return null;
+
+    const encodedFilename = resp.headers.get("x-attachment-filename");
+    return {
+      filename: encodedFilename
+        ? decodeURIComponent(encodedFilename)
+        : "attachment",
+      mimeType: resp.headers.get("content-type"),
+      body: resp.body,
+    };
   }
 
   /** 通过 IMAP bridge 拉取单封邮件原文，返回 ArrayBuffer */

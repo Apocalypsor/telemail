@@ -1,29 +1,5 @@
 import { http } from "@worker/clients/http";
-import { GMAIL_API, GOOGLE_OAUTH_TOKEN_URL } from "@worker/constants";
 import type { GmailMessage } from "@worker/providers/gmail/types";
-import { refreshAccessToken } from "@worker/providers/utils";
-import type { Account, Env } from "@worker/types";
-
-/** 用 refresh_token 换 access_token（KV 缓存，共用 base.ts 的实现） */
-export async function getAccessToken(
-  env: Env,
-  account: Account,
-): Promise<string> {
-  return refreshAccessToken(env, account, {
-    tokenUrl: GOOGLE_OAUTH_TOKEN_URL,
-    clientId: env.GMAIL_CLIENT_ID,
-    clientSecret: env.GMAIL_CLIENT_SECRET,
-  });
-}
-
-/** 调用 Gmail REST API (GET) */
-export async function gmailGet<T>(token: string, path: string): Promise<T> {
-  return http
-    .get(`${GMAIL_API}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    .json() as Promise<T>;
-}
 
 /**
  * Gmail Batch API：把 N 个 `messages.get?format=METADATA` 合并成一个 multipart/mixed
@@ -57,11 +33,11 @@ export async function gmailBatchGetMetadata(
   for (let i = 0; i < messageIds.length; i++) {
     const id = encodeURIComponent(messageIds[i]);
     body += `--${boundary}\r\n`;
-    body += `Content-Type: application/http\r\n`;
+    body += "Content-Type: application/http\r\n";
     body += `Content-ID: <item-${i}>\r\n`;
-    body += `\r\n`;
+    body += "\r\n";
     body += `GET /gmail/v1/users/me/messages/${id}?format=METADATA&${headerQs}\r\n`;
-    body += `\r\n`;
+    body += "\r\n";
   }
   body += `--${boundary}--\r\n`;
 
@@ -113,18 +89,4 @@ export async function gmailBatchGetMetadata(
   }
 
   return result;
-}
-
-/** 调用 Gmail REST API (POST with JSON body) */
-export async function gmailPost<T = void>(
-  token: string,
-  path: string,
-  body: Record<string, unknown>,
-): Promise<T> {
-  const resp = await http.post(`${GMAIL_API}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    json: body,
-  });
-  const text = await resp.text();
-  return (text ? JSON.parse(text) : null) as T;
 }

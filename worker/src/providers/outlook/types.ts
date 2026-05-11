@@ -13,3 +13,17 @@ export interface GraphMessageList {
 export interface GraphFolder {
   id: string;
 }
+
+export interface GraphAttachment {
+  "@odata.type"?: string;
+  id: string;
+  name?: string;
+  contentType?: string;
+  size?: number;
+  isInline?: boolean;
+}
+
+export interface GraphAttachmentList {
+  value?: GraphAttachment[];
+  "@odata.nextLink"?: string;
+}

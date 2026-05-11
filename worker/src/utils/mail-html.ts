@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
+import type { MailAttachmentMeta } from "@worker/types";
 import { timingSafeEqual } from "@worker/utils/hash";
-import type { Attachment } from "postal-mime";
+import type { Attachment as PostalAttachment } from "postal-mime";
 
 // ─── CID 内联图片 ────────────────────────────────────────────────────────────
 
@@ -17,7 +18,9 @@ export function replaceCidReferences(html: string, cidMap: CidMap): string {
 }
 
 /** 从 postal-mime 附件列表中提取 CID 内联图片为 data URI */
-export function buildCidMapFromAttachments(attachments: Attachment[]): CidMap {
+export function buildCidMapFromAttachments(
+  attachments: PostalAttachment[],
+): CidMap {
   const cidMap: CidMap = new Map();
   for (const att of attachments) {
     if (att.contentId && att.mimeType.startsWith("image/")) {
@@ -31,6 +34,36 @@ export function buildCidMapFromAttachments(attachments: Attachment[]): CidMap {
     }
   }
   return cidMap;
+}
+
+function attachmentSize(content: PostalAttachment["content"]): number | null {
+  if (typeof content === "string")
+    return new TextEncoder().encode(content).length;
+  if (content instanceof ArrayBuffer) return content.byteLength;
+  return content.byteLength;
+}
+
+function shouldShowAttachment(att: PostalAttachment): boolean {
+  if (att.related) return false;
+  if (att.disposition === "inline" && att.contentId) return false;
+  return att.disposition === "attachment" || !!att.filename;
+}
+
+export function buildAttachmentMetaFromMime(
+  attachments: PostalAttachment[],
+): MailAttachmentMeta[] {
+  return visibleMailAttachments(attachments).map((att, index) => ({
+    id: String(index),
+    filename: att.filename || null,
+    mimeType: att.mimeType || null,
+    size: attachmentSize(att.content),
+  }));
+}
+
+export function visibleMailAttachments(
+  attachments: PostalAttachment[],
+): PostalAttachment[] {
+  return attachments.filter(shouldShowAttachment);
 }
 
 // ─── CORS 代理签名 ───────────────────────────────────────────────────────────

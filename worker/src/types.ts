@@ -80,6 +80,20 @@ export interface MailMeta {
   date?: Date | null;
 }
 
+/** 邮件预览页展示用附件元数据。不含二进制内容。 */
+export interface MailAttachmentMeta {
+  id: string;
+  filename: string | null;
+  mimeType: string | null;
+  size: number | null;
+}
+
+export interface MailAttachmentDownload {
+  filename: string | null;
+  mimeType: string | null;
+  body: string | ArrayBuffer | ReadableStream<Uint8Array>;
+}
+
 export enum QueueMessageType {
   Email = "email",
   DeleteTgMessage = "delete-tg-message",

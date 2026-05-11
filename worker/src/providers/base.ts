@@ -19,13 +19,18 @@ import type {
   OAuthTokenResponse,
   PreviewContent,
 } from "@worker/providers/types";
-import type { Account, Env } from "@worker/types";
+import { attachmentBody } from "@worker/providers/utils";
+import type { Account, Env, MailAttachmentDownload } from "@worker/types";
 import {
   formatAddress,
   parseEmailDate,
   wrapPlainText,
 } from "@worker/utils/format";
-import { buildCidMapFromAttachments } from "@worker/utils/mail-html";
+import {
+  buildAttachmentMetaFromMime,
+  buildCidMapFromAttachments,
+  visibleMailAttachments,
+} from "@worker/utils/mail-html";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 
@@ -109,12 +114,31 @@ export abstract class EmailProvider {
     return {
       html,
       cidMap: buildCidMapFromAttachments(email.attachments),
+      attachments: buildAttachmentMetaFromMime(email.attachments),
       meta: {
         subject: email.subject ?? null,
         from: email.from ? formatAddress(email.from) : null,
         to: email.to?.map(formatAddress).join(", ") ?? null,
         date: parseEmailDate(email.date),
       },
+    };
+  }
+
+  async fetchAttachment(
+    messageId: string,
+    attachmentId: string,
+    folder: "inbox" | "junk" | "archive",
+  ): Promise<MailAttachmentDownload | null> {
+    const index = Number(attachmentId);
+    if (!Number.isInteger(index) || index < 0) return null;
+    const rawEmail = await this.fetchRawEmail(messageId, folder);
+    const email = await new PostalMime().parse(rawEmail);
+    const att = visibleMailAttachments(email.attachments)[index];
+    if (!att) return null;
+    return {
+      filename: att.filename || null,
+      mimeType: att.mimeType || null,
+      body: attachmentBody(att.content),
     };
   }
 

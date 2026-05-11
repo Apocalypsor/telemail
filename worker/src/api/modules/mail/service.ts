@@ -93,12 +93,13 @@ export abstract class MailService {
       fetchFolder,
       emailMessageId,
     );
-    if (cached) {
+    if (cached?.attachments) {
       return {
         ok: true,
         meta: cached.meta ?? {},
         rawHtml: cached.html,
         proxiedHtml: await proxyImages(cached.html, env.ADMIN_SECRET),
+        attachments: cached.attachments,
         fetchFolder,
         inJunk,
         starred,
@@ -118,13 +119,14 @@ export abstract class MailService {
       account.id,
       fetchFolder,
       emailMessageId,
-      { html, meta: result.meta },
+      { html, meta: result.meta, attachments: result.attachments },
     );
     return {
       ok: true,
       meta: result.meta ?? {},
       rawHtml: html,
       proxiedHtml: await proxyImages(html, env.ADMIN_SECRET),
+      attachments: result.attachments,
       fetchFolder,
       inJunk,
       starred,
@@ -177,7 +179,11 @@ export abstract class MailService {
               account.id,
               "inbox",
               emailMessageId,
-              { html: result.html, meta: result.meta },
+              {
+                html: result.html,
+                meta: result.meta,
+                attachments: result.attachments,
+              },
             ).catch(() => {});
           }
         } catch {

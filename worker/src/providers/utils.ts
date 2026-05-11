@@ -1,8 +1,23 @@
 import { http } from "@worker/clients/http";
 import { getCachedAccessToken, putCachedAccessToken } from "@worker/db/kv";
 import type { OAuthTokenResponse } from "@worker/providers/types";
-import type { Account, Env } from "@worker/types";
+import type { Account, Env, MailAttachmentDownload } from "@worker/types";
 import { HTTPError } from "ky";
+
+export function attachmentBody(
+  content: string | ArrayBuffer | Uint8Array,
+): MailAttachmentDownload["body"] {
+  if (typeof content === "string" || content instanceof ArrayBuffer) {
+    return content;
+  }
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(content);
+      controller.close();
+    },
+  });
+}
 
 /**
  * 用 refresh_token 交换 access_token（KV 缓存，按账号隔离）。

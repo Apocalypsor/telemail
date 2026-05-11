@@ -1,9 +1,11 @@
+import { Readable } from "node:stream";
 import { auth } from "@middleware/plugins/auth";
 import { imap } from "@middleware/plugins/imap";
 import { Elysia } from "elysia";
 import {
   AccountBody,
   ArchiveBody,
+  AttachmentBody,
   FetchBody,
   FlagBody,
   IsStarredBody,
@@ -46,6 +48,44 @@ export const mailController = new Elysia({ name: "controller.mail" })
       return { rawEmail };
     },
     { body: FetchBody },
+  )
+
+  .post(
+    "/attachment",
+    async ({ body, imap, status }) => {
+      let attachment: Awaited<ReturnType<typeof imap.downloadAttachment>>;
+      try {
+        attachment = await imap.downloadAttachment(
+          body.accountId,
+          body.rfcMessageId,
+          body.attachmentId,
+          body.folder,
+          body.archiveFolder,
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (
+          message.includes("not found") ||
+          message.includes("invalid attachmentId")
+        ) {
+          return status(404, { error: "Attachment not found" });
+        }
+        throw err;
+      }
+      const headers = new Headers({
+        "Content-Type": attachment.mimeType || "application/octet-stream",
+        "X-Attachment-Filename": encodeURIComponent(
+          attachment.filename || "attachment",
+        ),
+      });
+      return new Response(
+        Readable.toWeb(
+          attachment.content,
+        ) as unknown as ReadableStream<Uint8Array>,
+        { headers },
+      );
+    },
+    { body: AttachmentBody },
   )
 
   .post(

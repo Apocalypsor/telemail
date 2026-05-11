@@ -8,6 +8,10 @@ import type {
   SearchResultMessage,
 } from "./types";
 import {
+  attachmentStructureFilename,
+  collectVisibleAttachmentParts,
+} from "./utils/attachments";
+import {
   findArchiveFolder,
   findJunkFolder,
   findTrashFolder,
@@ -147,6 +151,97 @@ const Imap = {
       return Buffer.from(msg.source).toString("base64");
     } finally {
       lock.release();
+    }
+  },
+
+  async downloadAttachment(
+    accountId: number,
+    rfcMessageId: string,
+    attachmentId: string,
+    folderHint?: FolderHint,
+    archiveFolder?: string,
+  ) {
+    const raw = connectionManager.getConnection(accountId);
+    if (!raw?.client) {
+      throw new Error(
+        `[Account ${accountId}] downloadAttachment: no active connection`,
+      );
+    }
+    const conn = raw as ActiveConnection;
+
+    const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
+    if (folder === null) {
+      throw new Error(
+        `[Account ${accountId}] downloadAttachment: folder not found for hint=${folderHint}`,
+      );
+    }
+
+    const index = Number(attachmentId);
+    if (!Number.isInteger(index) || index < 0) {
+      throw new Error(
+        `[Account ${accountId}] downloadAttachment: invalid attachmentId ${attachmentId}`,
+      );
+    }
+
+    const lock = await conn.client.getMailboxLock(folder);
+    let handedOffStream = false;
+    try {
+      const uid = await findUidInMailbox(conn.client, rfcMessageId);
+      if (uid === null) {
+        throw new Error(
+          `[Account ${accountId}] downloadAttachment: Message-Id not found in ${folder}: ${rfcMessageId}`,
+        );
+      }
+
+      const msg = await conn.client.fetchOne(
+        String(uid),
+        { bodyStructure: true },
+        { uid: true },
+      );
+      if (!msg || typeof msg === "boolean" || !msg.bodyStructure) {
+        throw new Error(
+          `[Account ${accountId}] downloadAttachment: missing bodyStructure for UID ${uid} in ${folder}`,
+        );
+      }
+
+      const part = collectVisibleAttachmentParts(msg.bodyStructure)[index];
+      if (!part?.part) {
+        throw new Error(
+          `[Account ${accountId}] downloadAttachment: attachment ${attachmentId} not found for UID ${uid} in ${folder}`,
+        );
+      }
+
+      const download = await conn.client.download(String(uid), part.part, {
+        uid: true,
+        chunkSize: 64 * 1024,
+      });
+      if (!download.content) {
+        throw new Error(
+          `[Account ${accountId}] downloadAttachment: empty content for attachment ${attachmentId} in ${folder}`,
+        );
+      }
+
+      let released = false;
+      const releaseLock = () => {
+        if (released) return;
+        released = true;
+        lock.release();
+      };
+      download.content.once("end", releaseLock);
+      download.content.once("close", releaseLock);
+      download.content.once("error", releaseLock);
+      handedOffStream = true;
+
+      console.log(
+        `[Account ${accountId}] Streaming attachment ${attachmentId} from ${folder} (UID ${uid}, part ${part.part})`,
+      );
+      return {
+        filename: download.meta.filename ?? attachmentStructureFilename(part),
+        mimeType: download.meta.contentType || part.type || null,
+        content: download.content,
+      };
+    } finally {
+      if (!handedOffStream) lock.release();
     }
   },
 

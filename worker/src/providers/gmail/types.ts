@@ -4,9 +4,10 @@ interface GmailHeader {
 }
 
 export interface GmailPayload {
+  filename?: string;
   mimeType?: string;
   headers?: GmailHeader[];
-  body?: { data?: string; attachmentId?: string };
+  body?: { data?: string; attachmentId?: string; size?: number };
   parts?: GmailPayload[];
 }
 
