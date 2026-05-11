@@ -6,7 +6,7 @@ import { Button } from "@heroui/react";
  *   - accent: emerald 强调，主要操作（移到收件箱 / 移出归档）
  *   - danger: red 危险，垃圾 / 删除
  *   - success-soft: 绿色弱填充，已激活的状态（已星标） */
-export function AccentButton({
+export const AccentButton = ({
   label,
   tone,
   isDisabled,
@@ -16,7 +16,7 @@ export function AccentButton({
   tone: "neutral" | "accent" | "danger" | "success-soft";
   isDisabled: boolean;
   onPress: () => void;
-}) {
+}) => {
   const className = {
     neutral:
       "bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700",
@@ -37,4 +37,4 @@ export function AccentButton({
       {label}
     </Button>
   );
-}
+};

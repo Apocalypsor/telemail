@@ -10,15 +10,15 @@ import type {
   WireNote,
 } from "@worker/clients/things-cloud/types";
 
-export function endpointUrl(endpoint: string, path: string): string {
+export const endpointUrl = (endpoint: string, path: string): string => {
   return `${endpoint.replace(/\/+$/, "")}${path}`;
-}
+};
 
-function encodeBase64Ascii(value: string): string {
+const encodeBase64Ascii = (value: string): string => {
   return btoa(value);
-}
+};
 
-function thingsClientInfoHeader(): string {
+const thingsClientInfoHeader = (): string => {
   return encodeBase64Ascii(
     JSON.stringify({
       dm: "MacBookPro18,3",
@@ -33,9 +33,9 @@ function thingsClientInfoHeader(): string {
       ul: "en-Latn-US",
     }),
   );
-}
+};
 
-export function commonHeaders(): Record<string, string> {
+export const commonHeaders = (): Record<string, string> => {
   return {
     "User-Agent": THINGS_USER_AGENT,
     Accept: "application/json",
@@ -43,9 +43,9 @@ export function commonHeaders(): Record<string, string> {
     "Accept-Language": "en-US,en;q=0.9",
     "Things-Client-Info": thingsClientInfoHeader(),
   };
-}
+};
 
-function base58Encode(bytes: Uint8Array): string {
+const base58Encode = (bytes: Uint8Array): string => {
   let value = 0n;
   for (const byte of bytes) value = (value << 8n) + BigInt(byte);
   if (value === 0n) return "1";
@@ -57,41 +57,39 @@ function base58Encode(bytes: Uint8Array): string {
     value /= 58n;
   }
   return encoded;
-}
+};
 
-export function generateThingsUuid(): string {
+export const generateThingsUuid = (): string => {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return base58Encode(bytes);
-}
+};
 
-function randomHex(length: number): string {
+const randomHex = (length: number): string => {
   const bytes = new Uint8Array(Math.ceil(length / 2));
   crypto.getRandomValues(bytes);
   return Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")
     .slice(0, length);
-}
+};
 
-export function generateThingsAppInstanceId(): string {
+export const generateThingsAppInstanceId = (): string => {
   return `${randomHex(63)}-${APP_ID}-${randomHex(63)}`;
-}
+};
 
-export async function deriveThingsUuid(
+export const deriveThingsUuid = async (
   secret: string,
   namespace: string,
-): Promise<string> {
+): Promise<string> => {
   const bytes = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(`${secret}:${namespace}`),
   );
   return base58Encode(new Uint8Array(bytes).slice(0, 16));
-}
+};
 
-let crcTable: Uint32Array | null = null;
-
-function getCrcTable(): Uint32Array {
+const getCrcTable = (): Uint32Array => {
   if (crcTable) return crcTable;
   const table = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
@@ -103,30 +101,30 @@ function getCrcTable(): Uint32Array {
   }
   crcTable = table;
   return table;
-}
+};
 
-function crc32(value: string): number {
+const crc32 = (value: string): number => {
   const table = getCrcTable();
   let crc = 0xffffffff;
   for (const byte of new TextEncoder().encode(value)) {
     crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
-}
+};
 
-function textNote(value: string): WireNote {
+const textNote = (value: string): WireNote => {
   return { _t: "tx", ch: value ? crc32(value) : 0, v: value, t: 1 };
-}
+};
 
-function extension(): WireExtension {
+const extension = (): WireExtension => {
   return { sn: {}, _t: "oo" };
-}
+};
 
-function nowTimestamp(): number {
+const nowTimestamp = (): number => {
   return Date.now() / 1000;
-}
+};
 
-function partsInTimeZone(
+const partsInTimeZone = (
   date: Date,
   timeZone: string,
 ): {
@@ -136,7 +134,7 @@ function partsInTimeZone(
   hour: number;
   minute: number;
   second: number;
-} {
+} => {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hour12: false,
@@ -159,12 +157,12 @@ function partsInTimeZone(
     minute: get("minute"),
     second: get("second"),
   };
-}
+};
 
-function thingsSchedule(
+const thingsSchedule = (
   date: Date | undefined,
   timeZone: string | undefined,
-): { scheduledDate: number | null; alarmOffset: number | null } {
+): { scheduledDate: number | null; alarmOffset: number | null } => {
   if (!date) return { scheduledDate: null, alarmOffset: null };
   const parts = partsInTimeZone(date, timeZone || "UTC");
   const scheduledDate = Math.floor(
@@ -172,9 +170,11 @@ function thingsSchedule(
   );
   const alarmOffset = parts.hour * 60 * 60 + parts.minute * 60 + parts.second;
   return { scheduledDate, alarmOffset };
-}
+};
 
-export function createTaskPayload(input: ThingsTodoInput): TaskCreatePayload {
+export const createTaskPayload = (
+  input: ThingsTodoInput,
+): TaskCreatePayload => {
   const { scheduledDate, alarmOffset } = thingsSchedule(
     input.when,
     input.timeZone,
@@ -225,4 +225,5 @@ export function createTaskPayload(input: ThingsTodoInput): TaskCreatePayload {
     rr: null,
     xx: extension(),
   };
-}
+};
+let crcTable: Uint32Array | null = null;

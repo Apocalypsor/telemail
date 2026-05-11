@@ -11,7 +11,7 @@ import { registerFailedEmailCallbacks } from "./failed";
 import { registerUserCallbacks } from "./users";
 import { adminMenuKeyboard, userListKeyboard, userListText } from "./utils";
 
-export function registerAdminHandlers(bot: Bot, env: Env) {
+export const registerAdminHandlers = (bot: Bot, env: Env) => {
   // ─── /users: 快速查看用户列表（管理员） ──────────────────────────────────
   bot.command("users", async (ctx) => {
     const userId = String(ctx.from?.id);
@@ -115,4 +115,4 @@ export function registerAdminHandlers(bot: Bot, env: Env) {
 
   registerUserCallbacks(bot, env);
   registerFailedEmailCallbacks(bot, env);
-}
+};

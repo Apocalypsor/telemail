@@ -20,7 +20,7 @@ import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-a
 import { reportErrorToObservability } from "@worker/utils/observability";
 
 /** 永久性失败：bot 被屏蔽 / 踢出群 / 用户停用 → 标记 sent_at 放弃，避免每分钟重试。 */
-function isPermanentSendError(err: unknown): boolean {
+const isPermanentSendError = (err: unknown): boolean => {
   const msg = err instanceof Error ? err.message : String(err);
   return (
     /\b(403|400)\b/.test(msg) &&
@@ -28,18 +28,18 @@ function isPermanentSendError(err: unknown): boolean {
       msg,
     )
   );
-}
+};
 
 /** 把 Date 格式化成 "YYYY-MM-DD HH:MM UTC" —— 服务端不知道用户时区，所以统一
  *  显示 UTC 并明确标注，用户自行换算。 */
-function formatRemindAt(d: Date): string {
+const formatRemindAt = (d: Date): string => {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
-}
+};
 
 /** 标 sent_at 后给邮件 TG 键盘做一次刷新 —— 让 ⏰ 上的 count -1。
  *  通用提醒（无邮件上下文）跳过；refresh 失败仅观测上报，不抛出。 */
-async function markSentAndRefresh(env: Env, r: Reminder): Promise<void> {
+const markSentAndRefresh = async (env: Env, r: Reminder): Promise<void> => {
   await markReminderSent(env.DB, r.id);
   if (r.account_id == null || r.email_message_id == null) return;
   const account = await getAccountById(env.DB, r.account_id);
@@ -53,7 +53,7 @@ async function markSentAndRefresh(env: Env, r: Reminder): Promise<void> {
       reminderId: r.id,
     }),
   );
-}
+};
 
 /**
  * 扫描 D1 中所有到期的提醒，发送并标记已发送。
@@ -66,10 +66,10 @@ async function markSentAndRefresh(env: Env, r: Reminder): Promise<void> {
  * `waitUntil` 来自 cron 的 `ctx.waitUntil` —— 邮件 reminder 触发时的副作用
  * （pin / star / 必要时重投递）走 background fire-and-forget，不阻塞 cron tick。
  */
-export async function dispatchDueReminders(
+export const dispatchDueReminders = async (
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
-): Promise<void> {
+): Promise<void> => {
   const due = await listDueReminders(env.DB, new Date());
   if (due.length === 0) return;
 
@@ -100,13 +100,13 @@ export async function dispatchDueReminders(
       }
     }),
   );
-}
+};
 
-async function sendEmailReminder(
+const sendEmailReminder = async (
   env: Env,
   r: Reminder,
   waitUntil: (p: Promise<unknown>) => void,
-): Promise<void> {
+): Promise<void> => {
   // r.account_id 和 r.email_message_id 在调用前已确认非 null
   const accountId = r.account_id as number;
   const emailMessageId = r.email_message_id as string;
@@ -155,15 +155,15 @@ async function sendEmailReminder(
   // 走 waitUntil 后台跑，不阻塞 cron tick。每步独立 catch + observability，
   // 一步失败不影响其它步。
   waitUntil(applyReminderSideEffects(env, r, waitUntil));
-}
+};
 
 /** Reminder 触发时的副作用：星标邮件 + 置顶原 TG 消息。
  *  TG 消息已不在历史里（被删）→ 删旧 mapping，调 deliverEmailToTelegram 重投。 */
-async function applyReminderSideEffects(
+const applyReminderSideEffects = async (
   env: Env,
   r: Reminder,
   waitUntil: (p: Promise<unknown>) => void,
-): Promise<void> {
+): Promise<void> => {
   const accountId = r.account_id as number;
   const emailMessageId = r.email_message_id as string;
 
@@ -247,17 +247,17 @@ async function applyReminderSideEffects(
       emailMessageId,
     }),
   );
-}
+};
 
 /** 把邮件重新投递到 TG 聊天。先删旧 mapping 防止 `(chat_id, email_message_id,
  *  account_id)` 唯一索引挡住。`deliverEmailToTelegram` 内部会 reconcile 远端状态，
  *  邮件已经不在 inbox（被归档/删了）就跳过。 */
-async function redeliverEmail(
+const redeliverEmail = async (
   env: Env,
   account: Account,
   emailMessageId: string,
   waitUntil: (p: Promise<unknown>) => void,
-): Promise<void> {
+): Promise<void> => {
   const provider = getEmailProvider(account, env);
   const rawEmail = await provider.fetchRawEmail(emailMessageId);
   await deleteMessageMapping(env.DB, account.id, emailMessageId);
@@ -268,9 +268,9 @@ async function redeliverEmail(
     env,
     waitUntil,
   );
-}
+};
 
-async function sendGenericReminder(env: Env, r: Reminder): Promise<void> {
+const sendGenericReminder = async (env: Env, r: Reminder): Promise<void> => {
   const text = [
     t("reminders:reminderHeader"),
     `🕒 ${escapeMdV2(formatRemindAt(r.remind_at))}`,
@@ -278,4 +278,4 @@ async function sendGenericReminder(env: Env, r: Reminder): Promise<void> {
     escapeMdV2(r.text || "(无备注)"),
   ].join("\n");
   await sendTextMessage(env.TELEGRAM_BOT_TOKEN, r.telegram_user_id, text);
-}
+};

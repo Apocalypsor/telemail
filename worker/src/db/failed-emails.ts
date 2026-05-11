@@ -3,13 +3,11 @@ import { getDb } from "@worker/db/client";
 import { failedEmails } from "@worker/db/schema";
 import { count, desc, eq } from "drizzle-orm";
 
-export type FailedEmail = typeof failedEmails.$inferSelect;
-
 /** 保存失败邮件记录（UPSERT：相同 email_message_id + tg_message_id 则更新） */
-export async function putFailedEmail(
+export const putFailedEmail = async (
   d1: D1Database,
   data: Omit<FailedEmail, "id" | "created_at">,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   const now = new Date();
   await db
@@ -28,56 +26,57 @@ export async function putFailedEmail(
       target: [failedEmails.email_message_id, failedEmails.tg_message_id],
       set: { error_message: data.error_message ?? null, created_at: now },
     });
-}
+};
 
 /** 获取所有失败邮件（按创建时间倒序） */
-export async function getAllFailedEmails(
+export const getAllFailedEmails = async (
   d1: D1Database,
-): Promise<FailedEmail[]> {
+): Promise<FailedEmail[]> => {
   const db = getDb(d1);
   return db.select().from(failedEmails).orderBy(desc(failedEmails.created_at));
-}
+};
 
 /** 获取单条失败邮件 */
-export async function getFailedEmail(
+export const getFailedEmail = async (
   d1: D1Database,
   id: number,
-): Promise<FailedEmail | null> {
+): Promise<FailedEmail | null> => {
   const db = getDb(d1);
   const [row] = await db
     .select()
     .from(failedEmails)
     .where(eq(failedEmails.id, id));
   return row ?? null;
-}
+};
 
 /** 删除单条失败邮件记录 */
-export async function deleteFailedEmail(
+export const deleteFailedEmail = async (
   d1: D1Database,
   id: number,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db.delete(failedEmails).where(eq(failedEmails.id, id));
-}
+};
 
 /** 清空所有失败邮件记录 */
-export async function deleteAllFailedEmails(d1: D1Database): Promise<void> {
+export const deleteAllFailedEmails = async (d1: D1Database): Promise<void> => {
   const db = getDb(d1);
   await db.delete(failedEmails);
-}
+};
 
 /** 删除指定账号的所有失败邮件记录 */
-export async function deleteFailedEmailsByAccountId(
+export const deleteFailedEmailsByAccountId = async (
   d1: D1Database,
   accountId: number,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db.delete(failedEmails).where(eq(failedEmails.account_id, accountId));
-}
+};
 
 /** 统计失败邮件数量 */
-export async function countFailedEmails(d1: D1Database): Promise<number> {
+export const countFailedEmails = async (d1: D1Database): Promise<number> => {
   const db = getDb(d1);
   const [row] = await db.select({ cnt: count() }).from(failedEmails);
   return row?.cnt ?? 0;
-}
+};
+export type FailedEmail = typeof failedEmails.$inferSelect;

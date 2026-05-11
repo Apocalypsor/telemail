@@ -1,4 +1,4 @@
-export function normalizeIanaTimeZone(value: unknown): string | null {
+export const normalizeIanaTimeZone = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const timeZone = value.trim();
   if (!timeZone || timeZone.length > 80) return null;
@@ -8,4 +8,4 @@ export function normalizeIanaTimeZone(value: unknown): string | null {
   } catch {
     return null;
   }
-}
+};

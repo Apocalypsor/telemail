@@ -12,7 +12,7 @@ import { useEffect, useRef } from "react";
  * 原始 HTML。组件本身只渲染 iframe；toggle 由父组件控制（web 在 toolbar、
  * miniapp 在 SecondaryButton 里），通过 `useProxy` prop 切换正文源。
  */
-export function MailBodyFrame({
+export const MailBodyFrame = ({
   bodyHtml,
   bodyHtmlRaw,
   useProxy = true,
@@ -20,7 +20,7 @@ export function MailBodyFrame({
   bodyHtml: string;
   bodyHtmlRaw: string;
   useProxy?: boolean;
-}) {
+}) => {
   const frameRef = useRef<HTMLIFrameElement>(null);
 
   // 注入 CSS：
@@ -40,7 +40,7 @@ export function MailBodyFrame({
 
     let observers: ResizeObserver[] = [];
 
-    function resize() {
+    const resize = () => {
       try {
         const doc = f?.contentDocument;
         if (!doc || !f) return;
@@ -52,19 +52,19 @@ export function MailBodyFrame({
       } catch {
         /* cross-origin (shouldn't happen with srcdoc) */
       }
-    }
+    };
 
-    function teardownObservers() {
+    const teardownObservers = () => {
       for (const o of observers) o.disconnect();
       observers = [];
-    }
+    };
 
     // DOM parse 完就跑（不等图片）—— 邮件常带十几张走 cors-proxy 的图，
     // 等 iframe load 事件（要所有 subresource 完成）会让 iframe 在默认
     // ~150px 卡好几秒。这里挂 img onload + ResizeObserver(body)，图片陆续
     // 加载时会自动把 iframe 撑高。切换代理 → srcDoc 变 → iframe 重载新文档
     // → load 事件再次触发 setup，先 disconnect 旧 ResizeObserver 避免泄漏。
-    function setup() {
+    const setup = () => {
       teardownObservers();
       resize();
       try {
@@ -84,7 +84,7 @@ export function MailBodyFrame({
       } catch {
         /* ignore */
       }
-    }
+    };
 
     // initial：srcDoc iframe 在 commit 后 load 事件可能已经 fire 过，所以
     // readyState 不是 loading 就立即 setup 一次；后续每次 srcDoc 变更都会
@@ -125,4 +125,4 @@ export function MailBodyFrame({
       }}
     />
   );
-}
+};

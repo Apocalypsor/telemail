@@ -3,24 +3,19 @@ import type { MailAttachmentMeta } from "@worker/types";
 import { timingSafeEqual } from "@worker/utils/hash";
 import type { Attachment as PostalAttachment } from "postal-mime";
 
-// ─── CID 内联图片 ────────────────────────────────────────────────────────────
-
-/** CID → data URI 映射 */
-type CidMap = Map<string, string>;
-
 /** 将 HTML 中的 cid:xxx 引用替换为 data URI */
-export function replaceCidReferences(html: string, cidMap: CidMap): string {
+export const replaceCidReferences = (html: string, cidMap: CidMap): string => {
   if (cidMap.size === 0) return html;
   return html.replace(
     /cid:([^"'\s)]+)/gi,
     (match, cid) => cidMap.get(cid) ?? match,
   );
-}
+};
 
 /** 从 postal-mime 附件列表中提取 CID 内联图片为 data URI */
-export function buildCidMapFromAttachments(
+export const buildCidMapFromAttachments = (
   attachments: PostalAttachment[],
-): CidMap {
+): CidMap => {
   const cidMap: CidMap = new Map();
   for (const att of attachments) {
     if (att.contentId && att.mimeType.startsWith("image/")) {
@@ -34,66 +29,68 @@ export function buildCidMapFromAttachments(
     }
   }
   return cidMap;
-}
+};
 
-function attachmentSize(content: PostalAttachment["content"]): number | null {
+const attachmentSize = (
+  content: PostalAttachment["content"],
+): number | null => {
   if (typeof content === "string")
     return new TextEncoder().encode(content).length;
   if (content instanceof ArrayBuffer) return content.byteLength;
   return content.byteLength;
-}
+};
 
-function shouldShowAttachment(att: PostalAttachment): boolean {
+const shouldShowAttachment = (att: PostalAttachment): boolean => {
   if (att.related) return false;
   if (att.disposition === "inline" && att.contentId) return false;
   return att.disposition === "attachment" || !!att.filename;
-}
+};
 
-export function buildAttachmentMetaFromMime(
+export const buildAttachmentMetaFromMime = (
   attachments: PostalAttachment[],
-): MailAttachmentMeta[] {
+): MailAttachmentMeta[] => {
   return visibleMailAttachments(attachments).map((att, index) => ({
     id: String(index),
     filename: att.filename || null,
     mimeType: att.mimeType || null,
     size: attachmentSize(att.content),
   }));
-}
+};
 
-export function visibleMailAttachments(
+export const visibleMailAttachments = (
   attachments: PostalAttachment[],
-): PostalAttachment[] {
+): PostalAttachment[] => {
   return attachments.filter(shouldShowAttachment);
-}
+};
 
 // ─── CORS 代理签名 ───────────────────────────────────────────────────────────
 
 /** 为 CORS 代理 URL 生成 HMAC-SHA256 签名（同步） */
-function signProxyUrl(secret: string, url: string): string {
+const signProxyUrl = (secret: string, url: string): string => {
   return createHmac("sha256", secret).update(url).digest("hex").slice(0, 32);
-}
+};
 
 /** 验证 CORS 代理 URL 签名 */
-export function verifyProxySignature(
+export const verifyProxySignature = (
   secret: string,
   url: string,
   signature: string,
-): boolean {
+): boolean => {
   return timingSafeEqual(signProxyUrl(secret, url), signature);
-}
+};
 
 /** 将外部 URL 改写为经由 CORS 代理（附带 HMAC 签名） */
-function proxied(url: string, secret: string): string {
+const proxied = (url: string, secret: string): string => {
   if (!/^https?:\/\//i.test(url)) return url;
   const sig = signProxyUrl(secret, url);
   return `/api/cors-proxy?url=${encodeURIComponent(url)}&sig=${sig}`;
-}
+};
 
 /** 用 HTMLRewriter 将 HTML 中所有外部资源 URL 改写为经由 CORS 代理 */
-export async function proxyImages(
+export const proxyImages = async (
   html: string,
   secret: string,
-): Promise<string> {
+): Promise<string> => {
   return new HTMLRewriter()
     .on("img", {
       element(el) {
@@ -141,4 +138,8 @@ export async function proxyImages(
     })
     .transform(new Response(html))
     .text();
-}
+};
+// ─── CID 内联图片 ────────────────────────────────────────────────────────────
+
+/** CID → data URI 映射 */
+type CidMap = Map<string, string>;

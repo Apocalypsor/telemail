@@ -1,20 +1,11 @@
 import { api } from "@page/api/client";
 
-export type MailContentFolder = "inbox" | "junk" | "archive";
-
-export interface MailContentQueryInput {
-  emailMessageId: string;
-  accountId: number;
-  token: string;
-  folder?: MailContentFolder;
-}
-
-export function mailContentQueryOptions({
+export const mailContentQueryOptions = ({
   emailMessageId,
   accountId,
   token,
   folder,
-}: MailContentQueryInput) {
+}: MailContentQueryInput) => {
   return {
     queryKey: ["mail-preview", emailMessageId, accountId, folder],
     queryFn: async () => {
@@ -29,15 +20,15 @@ export function mailContentQueryOptions({
       return data;
     },
   };
-}
+};
 
-export function buildMailAttachmentUrl({
+export const buildMailAttachmentUrl = ({
   emailMessageId,
   accountId,
   token,
   folder,
   attachmentId,
-}: MailContentQueryInput & { attachmentId: string }): string {
+}: MailContentQueryInput & { attachmentId: string }): string => {
   const params = new URLSearchParams({
     accountId: String(accountId),
     t: token,
@@ -45,4 +36,12 @@ export function buildMailAttachmentUrl({
   });
   if (folder) params.set("folder", folder);
   return `/api/mail/${encodeURIComponent(emailMessageId)}/attachment?${params.toString()}`;
+};
+export type MailContentFolder = "inbox" | "junk" | "archive";
+
+export interface MailContentQueryInput {
+  emailMessageId: string;
+  accountId: number;
+  token: string;
+  folder?: MailContentFolder;
 }

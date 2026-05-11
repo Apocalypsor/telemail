@@ -10,7 +10,7 @@ import { AccountBox } from "./account-box";
  *
  *   - `errorLabel(r)`: 该账号查询失败时，AccountBox 内的红色提示文本
  *   - `children(item, accountId)`: 渲染单封邮件的 `<button>` 内容（caller 负责点击行为） */
-export function MailListByAccount({
+export const MailListByAccount = ({
   results,
   errorLabel,
   children,
@@ -18,7 +18,7 @@ export function MailListByAccount({
   results: MailListAccountResult[];
   errorLabel: (r: MailListAccountResult) => string;
   children: (item: MailListItem, accountId: number) => ReactNode;
-}) {
+}) => {
   return (
     <>
       {results.map((r) => {
@@ -52,4 +52,4 @@ export function MailListByAccount({
       })}
     </>
   );
-}
+};

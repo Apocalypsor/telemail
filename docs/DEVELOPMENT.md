@@ -51,6 +51,12 @@ bun typecheck             # tsc on worker + page + middleware
 
 也可以进子包跑（`worker/` 里 `bun dev` / `bun deploy` 等是无前缀短名）。Zed 用户：`.zed/tasks.json` 已配好常用任务，cmd-shift-p → "task: spawn"。
 
+## 代码风格
+
+独立函数统一使用 arrow function expression：`const foo = (...) => {}` / `export const foo = (...) => {}`。这个规则覆盖 helpers、React components、hooks、route-local handlers、provider utils 和嵌套函数。
+
+保留更符合语义的位置：class methods、object literal methods、Elysia 链式路由、type / interface method signatures 继续使用它们原本的写法。
+
 ## 前端开发流程
 
 1. 一个终端跑 `bun dev:worker`（:8787）

@@ -17,7 +17,7 @@ import { InlineKeyboard } from "grammy";
  *  - addtype:gmail|outlook... — OAuth 型 provider 通用流程（动态根据 PROVIDERS）
  *  - addtype:imap / imapsecure:* — IMAP 配置流程
  */
-export function registerAddCallbacks(bot: Bot, env: Env) {
+export const registerAddCallbacks = (bot: Bot, env: Env) => {
   // Start add flow
   bot.callbackQuery("add", async (ctx) => {
     const userId = String(ctx.from.id);
@@ -180,4 +180,4 @@ export function registerAddCallbacks(bot: Bot, env: Env) {
     );
     await ctx.answerCallbackQuery();
   });
-}
+};

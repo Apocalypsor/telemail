@@ -21,7 +21,7 @@ import { escapeMdV2, wrapExpandableQuote } from "@worker/utils/markdown-v2";
  * 调用方负责拼装、写 mapping、维护 keyboard。
  */
 
-function getEmailPlainBody(email: { text?: string; html?: string }): string {
+const getEmailPlainBody = (email: { text?: string; html?: string }): string => {
   if (email.text?.trim()) return email.text;
   if (email.html) {
     try {
@@ -31,15 +31,15 @@ function getEmailPlainBody(email: { text?: string; html?: string }): string {
     }
   }
   return "";
-}
+};
 
-function buildTelegramHeader(
+const buildTelegramHeader = (
   fromName: string,
   fromAddress: string,
   recipient: string,
   subject: string,
   accountEmail?: string,
-): string {
+): string => {
   const date = new Date().toLocaleString(MESSAGE_DATE_LOCALE, {
     timeZone: MESSAGE_DATE_TIMEZONE,
   });
@@ -57,10 +57,10 @@ function buildTelegramHeader(
     ``,
   );
   return lines.join("\n");
-}
+};
 
 /** 从解析后的邮件中提取 TG 消息所需的各项内容（subject / header / 渲染好的正文 / LLM 用的纯文本） */
-export function prepareEmailContent(
+export const prepareEmailContent = (
   email: {
     subject?: string;
     to?: { address?: string }[];
@@ -70,7 +70,7 @@ export function prepareEmailContent(
   },
   account: Account,
   isCaption: boolean,
-) {
+) => {
   const subject = email.subject || t("common:label.noSubject");
   const recipient =
     email.to?.map((addr) => addr.address).join(", ") ||
@@ -91,10 +91,10 @@ export function prepareEmailContent(
   const formattedBody = formatBody(email.text, email.html, bodyBudget);
   const plainBody = getEmailPlainBody(email);
   return { subject, header, formattedBody, plainBody };
-}
+};
 
 /** 调用 LLM 分析邮件并编辑 Telegram 消息（验证码 / 摘要 + 标签），返回分析结果 */
-export async function editMessageWithAnalysis(
+export const editMessageWithAnalysis = async (
   env: Env,
   tgToken: string,
   chatId: string,
@@ -105,7 +105,7 @@ export async function editMessageWithAnalysis(
   plainBody: string,
   formattedBody: string,
   keyboard: unknown,
-): Promise<EmailAnalysis> {
+): Promise<EmailAnalysis> => {
   const editMsg = (newText: string) =>
     isCaption
       ? editMessageCaption(tgToken, chatId, tgMessageId, newText, keyboard)
@@ -145,4 +145,4 @@ export async function editMessageWithAnalysis(
   const summarySection = `*${escapeMdV2(t("bridge:aiSummary"))}*\n\n${toTelegramMdV2(result.summary)}`;
   await editMsg(header + summarySection + tagsLine);
   return result;
-}
+};

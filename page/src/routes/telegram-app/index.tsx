@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
  *   <chatId>_<tgMsgId>    → /telegram-app/reminders（兼容旧按钮，无前缀 = reminder）
  *   无 start_param         → /telegram-app/reminders（列表模式，主菜单"我的提醒"）
  */
-function RouterPage() {
+const RouterPage = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
@@ -91,8 +91,7 @@ function RouterPage() {
     );
   }
   return <AppPendingSkeleton surface="miniapp" />;
-}
-
+};
 export const Route = createFileRoute("/telegram-app/")({
   component: RouterPage,
 });

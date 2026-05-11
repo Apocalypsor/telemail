@@ -2,9 +2,9 @@ import { http } from "@worker/clients/http";
 import { GMAIL_API } from "@worker/constants";
 import { base64urlToBytes } from "@worker/utils/base64url";
 
-export function gmailAttachmentDataJsonStream(
+export const gmailAttachmentDataJsonStream = (
   body: ReadableStream<Uint8Array>,
-): ReadableStream<Uint8Array> {
+): ReadableStream<Uint8Array> => {
   const dataKey = '"data"';
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -14,11 +14,11 @@ export function gmailAttachmentDataJsonStream(
   let pendingBase64 = "";
   let closed = false;
 
-  function enqueueBase64(
+  const enqueueBase64 = (
     controller: ReadableStreamDefaultController<Uint8Array>,
     value: string,
     final = false,
-  ): boolean {
+  ): boolean => {
     pendingBase64 += value;
     const length = final
       ? pendingBase64.length
@@ -29,11 +29,11 @@ export function gmailAttachmentDataJsonStream(
     pendingBase64 = pendingBase64.slice(length);
     controller.enqueue(bytes);
     return true;
-  }
+  };
 
-  function processBuffer(
+  const processBuffer = (
     controller: ReadableStreamDefaultController<Uint8Array>,
-  ): boolean {
+  ): boolean => {
     while (!closed) {
       if (state === "done") {
         closed = true;
@@ -99,7 +99,7 @@ export function gmailAttachmentDataJsonStream(
     }
 
     return false;
-  }
+  };
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -129,13 +129,13 @@ export function gmailAttachmentDataJsonStream(
       return reader.cancel(reason);
     },
   });
-}
+};
 
-export async function gmailGetAttachmentDataStream(
+export const gmailGetAttachmentDataStream = async (
   token: string,
   messageId: string,
   attachmentId: string,
-): Promise<ReadableStream<Uint8Array> | null> {
+): Promise<ReadableStream<Uint8Array> | null> => {
   const resp = await http.get(
     `${GMAIL_API}/users/me/messages/${encodeURIComponent(
       messageId,
@@ -153,4 +153,4 @@ export async function gmailGetAttachmentDataStream(
   }
   if (!resp.body) return null;
   return gmailAttachmentDataJsonStream(resp.body);
-}
+};

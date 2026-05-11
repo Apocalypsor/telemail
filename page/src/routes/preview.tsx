@@ -9,11 +9,7 @@ import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
-export const Route = createFileRoute("/preview")({
-  component: PreviewPage,
-});
-
-function PreviewPage() {
+const PreviewPage = () => {
   const [html, setHtml] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -98,13 +94,13 @@ function PreviewPage() {
       </section>
     </SessionGatedWebLayout>
   );
-}
+};
 
 /**
  * 分栏容器：顶栏 label + subLabel + sideLabel（字符数 / 状态），下面给调用
  * 者放 textarea 或 pre。用 Card overflow-hidden 统一圆角 + 边框。
  */
-function Pane({
+const Pane = ({
   label,
   subLabel,
   sideLabel,
@@ -114,7 +110,7 @@ function Pane({
   subLabel: string;
   sideLabel: string;
   children: React.ReactNode;
-}) {
+}) => {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-950/30">
@@ -129,4 +125,7 @@ function Pane({
       <div className="h-72 sm:h-96 lg:h-[480px]">{children}</div>
     </div>
   );
-}
+};
+export const Route = createFileRoute("/preview")({
+  component: PreviewPage,
+});

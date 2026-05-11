@@ -6,6 +6,36 @@ import {
 } from "@middleware/utils/redis";
 import type { FolderHint } from "../types";
 
+/**
+ * 解析归档目标文件夹：
+ * 1. 调用方显式指定 → 用指定的
+ * 2. 否则查 `\Archive` special-use / 常见名字
+ * 3. 都没有 → fallback 到字面量 "Archive"
+ */
+export const resolveArchiveFolder = async (
+  conn: ActiveConnection,
+  explicit: string | undefined,
+): Promise<string> => {
+  if (explicit) return explicit;
+  return (await findArchiveFolder(conn)) ?? "Archive";
+};
+
+/**
+ * 把 worker 端的 `folderHint` 解析成具体 IMAP folder path —— setFlag / fetchEmail /
+ * isStarred 都用这个映射。`junk` hint 但服务器没 junk folder → 返回 null，调用方
+ * 自己决定怎么处理（warn / throw / silent false）；其它分支总能给出 path
+ * （archive 不存在会自动 fallback 到 "Archive"）。
+ */
+export const resolveFolderForHint = async (
+  conn: ActiveConnection,
+  folderHint: FolderHint | undefined,
+  archiveFolder: string | undefined,
+): Promise<string | null> => {
+  if (folderHint === "junk") return findJunkFolder(conn);
+  if (folderHint === "archive")
+    return resolveArchiveFolder(conn, archiveFolder);
+  return "INBOX";
+};
 export const findSpecialFolder = async (
   conn: ActiveConnection,
   specialUse: string,
@@ -58,34 +88,3 @@ export const findArchiveFolder = (conn: ActiveConnection) =>
     "all mail",
     "[gmail]/all mail",
   ]);
-
-/**
- * 解析归档目标文件夹：
- * 1. 调用方显式指定 → 用指定的
- * 2. 否则查 `\Archive` special-use / 常见名字
- * 3. 都没有 → fallback 到字面量 "Archive"
- */
-export async function resolveArchiveFolder(
-  conn: ActiveConnection,
-  explicit: string | undefined,
-): Promise<string> {
-  if (explicit) return explicit;
-  return (await findArchiveFolder(conn)) ?? "Archive";
-}
-
-/**
- * 把 worker 端的 `folderHint` 解析成具体 IMAP folder path —— setFlag / fetchEmail /
- * isStarred 都用这个映射。`junk` hint 但服务器没 junk folder → 返回 null，调用方
- * 自己决定怎么处理（warn / throw / silent false）；其它分支总能给出 path
- * （archive 不存在会自动 fallback 到 "Archive"）。
- */
-export async function resolveFolderForHint(
-  conn: ActiveConnection,
-  folderHint: FolderHint | undefined,
-  archiveFolder: string | undefined,
-): Promise<string | null> {
-  if (folderHint === "junk") return findJunkFolder(conn);
-  if (folderHint === "archive")
-    return resolveArchiveFolder(conn, archiveFolder);
-  return "INBOX";
-}

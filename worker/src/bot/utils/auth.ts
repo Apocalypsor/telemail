@@ -2,9 +2,9 @@ import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import type { Bot, Context, NextFunction } from "grammy";
 
-export function isAdmin(userId: string, env: Env): boolean {
+export const isAdmin = (userId: string, env: Env): boolean => {
   return userId === env.ADMIN_TELEGRAM_ID;
-}
+};
 
 /** 全局命令中间件：把 `/cmd` 形式的消息限制为仅私聊。
  *  群 / 频道里发 /accounts /sync /unread 等会泄漏用户私人数据；/start 在那里跑
@@ -18,7 +18,7 @@ export function isAdmin(userId: string, env: Env): boolean {
  *
  *  注册必须在所有 `bot.command(...)` handler 之前 —— grammY 中间件按 `use`
  *  顺序串起来跑。 */
-export function registerPrivateOnlyCommandGuard(bot: Bot) {
+export const registerPrivateOnlyCommandGuard = (bot: Bot) => {
   bot.use(async (ctx: Context, next: NextFunction) => {
     const isTopLevelCommand = ctx.msg?.entities?.some(
       (e) => e.type === "bot_command" && e.offset === 0,
@@ -31,4 +31,4 @@ export function registerPrivateOnlyCommandGuard(bot: Bot) {
     }
     await next();
   });
-}
+};

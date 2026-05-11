@@ -5,11 +5,11 @@ import { checkImapBridgeHealth } from "@worker/providers/imap/utils";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 
-export async function handleScheduled(
+export const handleScheduled = async (
   event: ScheduledEvent,
   env: Env,
   ctx: ExecutionContext,
-): Promise<void> {
+): Promise<void> => {
   const date = new Date(event.scheduledTime);
 
   const isHourly = date.getUTCMinutes() === 0;
@@ -61,4 +61,4 @@ export async function handleScheduled(
         )
       : Promise.resolve(),
   ]);
-}
+};

@@ -10,7 +10,7 @@ import { AccentButton } from "./accent-button";
  *
  *  图片代理开关只是本地切换 proxied/raw HTML，不发后端请求；即使浏览器未登录，
  *  只要邮件 token 有效也应该可用。 */
-export function WebMailToolbar({
+export const WebMailToolbar = ({
   emailMessageId,
   accountId,
   token,
@@ -35,7 +35,7 @@ export function WebMailToolbar({
   useProxy: boolean;
   onToggleProxy: () => void;
   onChanged: () => void;
-}) {
+}) => {
   const session = useSession();
   const [msg, setMsg] = useState<{ text: string; kind: "ok" | "error" } | null>(
     null,
@@ -55,7 +55,7 @@ export function WebMailToolbar({
     onChanged,
   });
 
-  async function run(action: MailAction, starredNext?: boolean) {
+  const runWithFeedback = async (action: MailAction, starredNext?: boolean) => {
     setMsg(null);
     const r = await runAction(action, starredNext);
     setMsg(
@@ -63,7 +63,7 @@ export function WebMailToolbar({
         ? { text: r.message ?? "操作成功", kind: "ok" }
         : { text: r.error ?? "操作失败", kind: "error" },
     );
-  }
+  };
 
   const isDisabled = done || pending;
   const canMutateMail = !!session.data;
@@ -78,7 +78,7 @@ export function WebMailToolbar({
           label={starred ? "✅ 已星标" : "⭐ 星标"}
           tone={starred ? "success-soft" : "neutral"}
           isDisabled={isDisabled}
-          onPress={() => run("toggle-star", !starred)}
+          onPress={() => runWithFeedback("toggle-star", !starred)}
         />
       )}
       {canMutateMail && inJunk ? (
@@ -87,13 +87,13 @@ export function WebMailToolbar({
             label="📥 移到收件箱"
             tone="accent"
             isDisabled={isDisabled}
-            onPress={() => run("move-to-inbox")}
+            onPress={() => runWithFeedback("move-to-inbox")}
           />
           <AccentButton
             label="🗑 删除"
             tone="danger"
             isDisabled={isDisabled}
-            onPress={() => run("trash")}
+            onPress={() => runWithFeedback("trash")}
           />
         </>
       ) : canMutateMail && inArchive ? (
@@ -101,7 +101,7 @@ export function WebMailToolbar({
           label="📥 移出归档"
           tone="accent"
           isDisabled={isDisabled}
-          onPress={() => run("unarchive")}
+          onPress={() => runWithFeedback("unarchive")}
         />
       ) : canMutateMail ? (
         <>
@@ -110,14 +110,14 @@ export function WebMailToolbar({
               label="📥 归档"
               tone="neutral"
               isDisabled={isDisabled}
-              onPress={() => run("archive")}
+              onPress={() => runWithFeedback("archive")}
             />
           )}
           <AccentButton
             label="🚫 标记为垃圾"
             tone="danger"
             isDisabled={isDisabled}
-            onPress={() => run("mark-as-junk")}
+            onPress={() => runWithFeedback("mark-as-junk")}
           />
         </>
       ) : null}
@@ -143,4 +143,4 @@ export function WebMailToolbar({
       )}
     </div>
   );
-}
+};

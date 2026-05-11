@@ -8,7 +8,7 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 
 /** 星标/取消星标 inline button callback */
-export function registerStarHandler(bot: Bot, env: Env) {
+export const registerStarHandler = (bot: Bot, env: Env) => {
   bot.callbackQuery("star", async (ctx) => {
     const msg = ctx.callbackQuery.message;
     if (!msg) return;
@@ -67,4 +67,4 @@ export function registerStarHandler(bot: Bot, env: Env) {
       });
     }
   });
-}
+};

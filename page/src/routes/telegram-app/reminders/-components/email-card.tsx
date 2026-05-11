@@ -1,7 +1,7 @@
 import { Skeleton } from "@heroui/react";
 
 /** 提醒页头部的邮件卡片 —— 显示当前邮件的 subject + account；点击跳邮件预览页。 */
-export function ReminderEmailCard({
+export const ReminderEmailCard = ({
   subject,
   accountEmail,
   loading,
@@ -13,7 +13,7 @@ export function ReminderEmailCard({
   loading: boolean;
   error: boolean;
   onClick: () => void;
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -42,4 +42,4 @@ export function ReminderEmailCard({
       )}
     </button>
   );
-}
+};

@@ -8,54 +8,54 @@ import type { MessageHit, MessageSummary } from "../types";
  * 不做任何形态规整：服务器命不中是服务器自己的问题，不在客户端层做兜底。多条
  * 匹配取最新（UID 最大）。
  */
-export async function findUidInMailbox(
+export const findUidInMailbox = async (
   client: ImapFlow,
   rfcMessageId: string,
-): Promise<number | null> {
+): Promise<number | null> => {
   const hits = await client.search(
     { header: { "message-id": rfcMessageId } },
     { uid: true },
   );
   if (!Array.isArray(hits) || hits.length === 0) return null;
   return (hits as number[]).sort((a, b) => b - a)[0];
-}
+};
 
 /**
  * 在 `folder` 里按 RFC 822 Message-Id 搜 UID。多条匹配时取最新（UID 最大）。
  * 没找到返回 null；folder 不存在 / 无权限 → 抛错由调用方处理。
  */
-export async function findUidByMessageId(
+export const findUidByMessageId = async (
   conn: ActiveConnection,
   folder: string,
   rfcMessageId: string,
-): Promise<number | null> {
+): Promise<number | null> => {
   const lock = await conn.client.getMailboxLock(folder);
   try {
     return await findUidInMailbox(conn.client, rfcMessageId);
   } finally {
     lock.release();
   }
-}
+};
 
 /** 在候选文件夹里依次按 Message-Id 搜索，返回命中的 `{folder, uid}` 或 null */
-export async function locateMessage(
+export const locateMessage = async (
   conn: ActiveConnection,
   rfcMessageId: string,
   folders: string[],
-): Promise<MessageHit | null> {
+): Promise<MessageHit | null> => {
   for (const folder of folders) {
     const uid = await findUidByMessageId(conn, folder, rfcMessageId);
     if (uid !== null) return { folder, uid };
   }
   return null;
-}
+};
 
-export async function searchAndFetch(
+export const searchAndFetch = async (
   conn: ActiveConnection,
   folder: string,
   searchQuery: Record<string, unknown>,
   maxResults: number,
-): Promise<MessageSummary[]> {
+): Promise<MessageSummary[]> => {
   const lock = await conn.client.getMailboxLock(folder);
   try {
     const result = await conn.client.search(searchQuery, { uid: true });
@@ -81,4 +81,4 @@ export async function searchAndFetch(
   } finally {
     lock.release();
   }
-}
+};

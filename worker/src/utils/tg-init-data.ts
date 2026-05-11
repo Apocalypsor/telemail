@@ -1,18 +1,9 @@
 import { timingSafeEqual } from "@worker/utils/hash";
 
-/** Telegram Mini App 用户信息（来自 initData 的 user 字段） */
-interface TgWebAppUser {
-  id: number;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  language_code?: string;
-}
-
-async function hmacSha256(
+const hmacSha256 = async (
   keyBytes: Uint8Array | ArrayBuffer,
   data: string,
-): Promise<Uint8Array> {
+): Promise<Uint8Array> => {
   const buf =
     keyBytes instanceof ArrayBuffer
       ? keyBytes
@@ -33,13 +24,13 @@ async function hmacSha256(
     new TextEncoder().encode(data),
   );
   return new Uint8Array(sig);
-}
+};
 
-function bytesToHex(b: Uint8Array): string {
+const bytesToHex = (b: Uint8Array): string => {
   let s = "";
   for (let i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, "0");
   return s;
-}
+};
 
 /**
  * 校验 Telegram Mini App initData。规范见
@@ -51,11 +42,11 @@ function bytesToHex(b: Uint8Array): string {
  *
  * 通过则返回 user，并带 maxAgeSeconds 限制 auth_date 防重放。
  */
-export async function verifyTgInitData(
+export const verifyTgInitData = async (
   botToken: string,
   initData: string,
   maxAgeSeconds = 24 * 3600,
-): Promise<TgWebAppUser | null> {
+): Promise<TgWebAppUser | null> => {
   const params = new URLSearchParams(initData);
   const hash = params.get("hash");
   if (!hash) return null;
@@ -85,4 +76,12 @@ export async function verifyTgInitData(
   } catch {
     return null;
   }
+};
+/** Telegram Mini App 用户信息（来自 initData 的 user 字段） */
+interface TgWebAppUser {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
 }

@@ -11,14 +11,14 @@ import type { ReactNode } from "react";
  * pill 链接到 `/login?return_to=<current>`，登录了显示头像首字母 + first name
  * + chevron，点击下拉出 "登出"）。
  */
-export function WebLayout({
+export const WebLayout = ({
   subtitle,
   children,
 }: {
   /** 可选副标题，显示在 wordmark 旁边（比如 "工具"） */
   subtitle?: string;
   children: ReactNode;
-}) {
+}) => {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
       <header className="sticky top-0 z-20 bg-zinc-950/80 backdrop-blur">
@@ -42,7 +42,7 @@ export function WebLayout({
       </main>
     </div>
   );
-}
+};
 
 /**
  * 顶栏右侧登录状态。
@@ -52,7 +52,7 @@ export function WebLayout({
  *   的窄按钮（hover 背景变深），popover 是紧凑的 zinc-900 卡片，里面
  *   只有一项 "登出"
  */
-function AuthStatus() {
+const AuthStatus = () => {
   const session = useSession();
 
   const logoutMut = useMutation({
@@ -128,4 +128,4 @@ function AuthStatus() {
       </Dropdown.Popover>
     </Dropdown>
   );
-}
+};

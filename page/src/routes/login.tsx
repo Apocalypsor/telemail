@@ -7,21 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
-// `return_to` 登陆成功后跳回的路径（默认 `/`）。
-// `denied=1` + `uid` 由 Worker callback 在用户未 approved 时带过来，页面展示
-// 拒绝态。其他情况都渲染登录表单。
-const Search = t.Object({
-  return_to: t.Optional(t.String()),
-  denied: t.Optional(t.Number()),
-  uid: t.Optional(t.String()),
-});
-
-export const Route = createFileRoute("/login")({
-  component: LoginPage,
-  validateSearch: validateSearch(Search),
-});
-
-function LoginPage() {
+const LoginPage = () => {
   const search = Route.useSearch();
   const returnTo = search.return_to || "/";
 
@@ -62,9 +48,9 @@ function LoginPage() {
       </Card>
     </WebLayout>
   );
-}
+};
 
-function LoginWidget({ returnTo }: { returnTo: string }) {
+const LoginWidget = ({ returnTo }: { returnTo: string }) => {
   const botInfo = useQuery({
     queryKey: ["public", "bot-info"],
     queryFn: async () => {
@@ -108,4 +94,17 @@ function LoginWidget({ returnTo }: { returnTo: string }) {
   }
 
   return <div ref={hostRef} className="flex justify-center min-h-[45px]" />;
-}
+};
+// `return_to` 登陆成功后跳回的路径（默认 `/`）。
+// `denied=1` + `uid` 由 Worker callback 在用户未 approved 时带过来，页面展示
+// 拒绝态。其他情况都渲染登录表单。
+const Search = t.Object({
+  return_to: t.Optional(t.String()),
+  denied: t.Optional(t.Number()),
+  uid: t.Optional(t.String()),
+});
+
+export const Route = createFileRoute("/login")({
+  component: LoginPage,
+  validateSearch: validateSearch(Search),
+});

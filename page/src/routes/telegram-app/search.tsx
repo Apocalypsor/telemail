@@ -11,17 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-// 查询字串放 URL，目的有二：
-// 1) 搜索状态可被浏览器 / TG WebView 历史保留 —— 点击邮件后回退能回到带结果的搜索页
-// 2) useQuery 用 q 做 cacheKey，回退时直接 hit 缓存，不再发请求
-const Search = t.Object({ q: t.Optional(t.String()) });
-
-export const Route = createFileRoute("/telegram-app/search")({
-  component: SearchPage,
-  validateSearch: validateSearch(Search),
-});
-
-function SearchPage() {
+const SearchPage = () => {
   const { q: urlQ } = Route.useSearch();
   const navigate = useNavigate();
   const navigateToMail = useNavigateToMail();
@@ -52,12 +42,12 @@ function SearchPage() {
     },
   });
 
-  function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const next = input.trim();
     if (!next || next === q) return;
     navigate({ to: "/telegram-app/search", search: { q: next } });
-  }
+  };
 
   const data = searchQuery.data;
   // 用 async extractErrorMessage 拉响应 body 里的 `error` 字段（比裸 message
@@ -142,4 +132,13 @@ function SearchPage() {
       )}
     </div>
   );
-}
+};
+// 查询字串放 URL，目的有二：
+// 1) 搜索状态可被浏览器 / TG WebView 历史保留 —— 点击邮件后回退能回到带结果的搜索页
+// 2) useQuery 用 q 做 cacheKey，回退时直接 hit 缓存，不再发请求
+const Search = t.Object({ q: t.Optional(t.String()) });
+
+export const Route = createFileRoute("/telegram-app/search")({
+  component: SearchPage,
+  validateSearch: validateSearch(Search),
+});

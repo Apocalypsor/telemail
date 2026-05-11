@@ -4,6 +4,6 @@ import type { AccountType } from "@worker/types";
 
 /** 从 URL path param 解析对应 provider 的 OAuth handler；slug 未知 / 该 provider
  *  不支持 OAuth（如 IMAP）→ null。 */
-export function resolveOAuth(slug: string): OAuthHandler | null {
+export const resolveOAuth = (slug: string): OAuthHandler | null => {
   return PROVIDERS[slug as AccountType]?.oauth || null;
-}
+};

@@ -13,35 +13,35 @@ import { InlineKeyboard } from "grammy";
  * - 管理员 + account 无绑定 user → 返回 ""（显示"(无)"）
  * - 管理员 + 能查到 user → 优先 @username，否则用 formatUserName
  */
-export async function resolveOwnerName(
+export const resolveOwnerName = async (
   db: D1Database,
   admin: boolean,
   telegramUserId: string | null,
-): Promise<string | undefined> {
+): Promise<string | undefined> => {
   if (!admin) return undefined;
   if (!telegramUserId) return "";
   const owner = await getUserByTelegramId(db, telegramUserId);
   return owner?.username
     ? `@${owner.username}`
     : formatUserName(owner ?? { first_name: telegramUserId });
-}
+};
 
-export async function resolveAccount(
+export const resolveAccount = async (
   env: Env,
   fromId: number,
   accountIdStr: string,
-) {
+) => {
   const userId = String(fromId);
   const accountId = parseInt(accountIdStr, 10);
   const admin = isAdmin(userId, env);
   const account = await getAuthorizedAccount(env.DB, accountId, userId, admin);
   return { userId, accountId, admin, account };
-}
+};
 
-export function accountListKeyboard(
+export const accountListKeyboard = (
   accounts: Account[],
   options?: { isAdmin?: boolean; showAll?: boolean; showBack?: boolean },
-): InlineKeyboard {
+): InlineKeyboard => {
   const kb = new InlineKeyboard();
   for (const acc of accounts) {
     // 禁用 > 非 OAuth（IMAP 等，直接视为可用）> OAuth 授权状态
@@ -67,4 +67,4 @@ export function accountListKeyboard(
   }
   if (options?.showBack) kb.text(t("common:button.back"), "menu");
   return kb;
-}
+};

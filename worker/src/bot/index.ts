@@ -19,33 +19,12 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import { Api, Bot } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
 
-export interface BotRuntime {
-  waitUntil: (p: Promise<unknown>) => void;
-}
-
-/**
- * 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存。
- * `memoizeAsync` 负责 isolate-scope 内存命中，免得 webhook + 群聊键盘
- * 构建每次都重读 `telegram:bot_info` 这个 KV key。
- */
-export const getBotInfo = memoizeAsync(
-  async (env: Env): Promise<UserFromGetMe> => {
-    const cached = await getCachedBotInfo(env.EMAIL_KV);
-    if (cached) return JSON.parse(cached) as UserFromGetMe;
-
-    const api = new Api(env.TELEGRAM_BOT_TOKEN);
-    const botInfo = await api.getMe();
-    await putCachedBotInfo(env.EMAIL_KV, JSON.stringify(botInfo));
-    return botInfo;
-  },
-);
-
 /** 创建 grammY Bot 实例（仅用于 webhook 接收端） */
-export function createBot(
+export const createBot = (
   env: Env,
   botInfo: UserFromGetMe,
   runtime: BotRuntime,
-) {
+) => {
   const bot = new Bot(env.TELEGRAM_BOT_TOKEN, { botInfo });
 
   bot.catch(async (err) => {
@@ -82,4 +61,24 @@ export function createBot(
   registerInputHandler(bot, env);
 
   return bot;
+};
+export interface BotRuntime {
+  waitUntil: (p: Promise<unknown>) => void;
 }
+
+/**
+ * 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存。
+ * `memoizeAsync` 负责 isolate-scope 内存命中，免得 webhook + 群聊键盘
+ * 构建每次都重读 `telegram:bot_info` 这个 KV key。
+ */
+export const getBotInfo = memoizeAsync(
+  async (env: Env): Promise<UserFromGetMe> => {
+    const cached = await getCachedBotInfo(env.EMAIL_KV);
+    if (cached) return JSON.parse(cached) as UserFromGetMe;
+
+    const api = new Api(env.TELEGRAM_BOT_TOKEN);
+    const botInfo = await api.getMe();
+    await putCachedBotInfo(env.EMAIL_KV, JSON.stringify(botInfo));
+    return botInfo;
+  },
+);

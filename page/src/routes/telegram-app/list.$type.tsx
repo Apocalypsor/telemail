@@ -12,49 +12,11 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import type { MailListType } from "@worker/api/modules/miniapp/model";
 import { useMemo, useState } from "react";
 
-interface BulkAction {
-  label: string;
-  run: () => Promise<{ success: number; failed: number }>;
-  confirmText: string;
-  danger?: boolean;
-}
-
-const BULK_ACTIONS: Partial<Record<MailListType, BulkAction>> = {
-  unread: {
-    label: "✓ 全部已读",
-    run: async () => {
-      const { data, error } =
-        await api.api["mini-app"]["mark-all-as-read"].post();
-      if (error) throw error;
-      return data;
-    },
-    confirmText: "把所有未读邮件标记为已读？",
-  },
-  junk: {
-    label: "🗑 清空垃圾",
-    run: async () => {
-      const { data, error } =
-        await api.api["mini-app"]["trash-all-junk"].post();
-      if (error) throw error;
-      return data;
-    },
-    confirmText: "清空所有账号的垃圾邮件？此操作不可撤销。",
-    danger: true,
-  },
+const isMailListType = (s: string): s is MailListType => {
+  return (MAIL_LIST_TYPES as readonly string[]).includes(s);
 };
 
-function isMailListType(s: string): s is MailListType {
-  return (MAIL_LIST_TYPES as readonly string[]).includes(s);
-}
-
-export const Route = createFileRoute("/telegram-app/list/$type")({
-  component: MailListPage,
-  beforeLoad: ({ params }) => {
-    if (!isMailListType(params.type)) throw notFound();
-  },
-});
-
-function MailListPage() {
+const MailListPage = () => {
   const { type: typeParam } = Route.useParams();
   if (!isMailListType(typeParam)) throw notFound();
   const listType: MailListType = typeParam;
@@ -105,12 +67,12 @@ function MailListPage() {
       setMeta({ msg: await extractErrorMessage(err), kind: "error" }),
   });
 
-  async function handleBulk() {
+  const handleBulk = async () => {
     if (!bulk) return;
     if (!(await confirmPopup(bulk.confirmText))) return;
     setMeta(null);
     bulkMut.mutate();
-  }
+  };
 
   const data = listQuery.data;
   const isError = listQuery.isError;
@@ -193,4 +155,41 @@ function MailListPage() {
       )}
     </div>
   );
+};
+interface BulkAction {
+  label: string;
+  run: () => Promise<{ success: number; failed: number }>;
+  confirmText: string;
+  danger?: boolean;
 }
+
+const BULK_ACTIONS: Partial<Record<MailListType, BulkAction>> = {
+  unread: {
+    label: "✓ 全部已读",
+    run: async () => {
+      const { data, error } =
+        await api.api["mini-app"]["mark-all-as-read"].post();
+      if (error) throw error;
+      return data;
+    },
+    confirmText: "把所有未读邮件标记为已读？",
+  },
+  junk: {
+    label: "🗑 清空垃圾",
+    run: async () => {
+      const { data, error } =
+        await api.api["mini-app"]["trash-all-junk"].post();
+      if (error) throw error;
+      return data;
+    },
+    confirmText: "清空所有账号的垃圾邮件？此操作不可撤销。",
+    danger: true,
+  },
+};
+
+export const Route = createFileRoute("/telegram-app/list/$type")({
+  component: MailListPage,
+  beforeLoad: ({ params }) => {
+    if (!isMailListType(params.type)) throw notFound();
+  },
+});

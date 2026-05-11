@@ -16,19 +16,19 @@ import { InlineKeyboard } from "grammy";
 import { userListKeyboard, userListText } from "./utils";
 
 /** 删除用户及其绑定的所有邮箱账号 */
-async function deleteUserWithAccounts(
+const deleteUserWithAccounts = async (
   env: Env,
   telegramId: string,
-): Promise<void> {
+): Promise<void> => {
   const accounts = await getOwnAccounts(env.DB, telegramId);
   for (const acc of accounts) {
     await cleanupAndDeleteAccount(env, acc);
   }
   await deleteUser(env.DB, telegramId);
-}
+};
 
 /** 注册 user 管理回调：列表 / info / approve / reject / delete confirm + confirmed。 */
-export function registerUserCallbacks(bot: Bot, env: Env) {
+export const registerUserCallbacks = (bot: Bot, env: Env) => {
   // User list
   bot.callbackQuery("users", async (ctx) => {
     const userId = String(ctx.from.id);
@@ -138,4 +138,4 @@ export function registerUserCallbacks(bot: Bot, env: Env) {
     });
     await ctx.answerCallbackQuery({ text: t("admin:users.deleted") });
   });
-}
+};

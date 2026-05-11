@@ -2,7 +2,7 @@
  * Mini App 列表 / 搜索页用的"按账号分组"卡片：顶部一条 zinc-950/30 的 header
  * 显示账号名 + 可选 count chip / 错误态色彩，body 由 children 决定。
  */
-export function AccountBox({
+export const AccountBox = ({
   label,
   count,
   errored,
@@ -12,7 +12,7 @@ export function AccountBox({
   count?: number;
   errored?: boolean;
   children: React.ReactNode;
-}) {
+}) => {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
       <div
@@ -30,4 +30,4 @@ export function AccountBox({
       {children}
     </div>
   );
-}
+};

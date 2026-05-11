@@ -19,14 +19,14 @@ import { removeFromTelegram } from "./cleanup";
  * 所有需要「远端变更同步回 TG」的入口（refresh、未来的扩展触点）都走这一个函数。
  * 各 provider 在 `resolveMessageState` 内部尽量合并成少量 API 调用。
  */
-export async function reconcileMessageState(
+export const reconcileMessageState = async (
   env: Env,
   account: Account,
   mapping: MessageMapping,
 ): Promise<
   | { status: "removed"; location: Exclude<MessageLocation, "inbox"> }
   | { status: "inbox"; starred: boolean }
-> {
+> => {
   const provider = getEmailProvider(account, env);
   let state: MessageState;
   try {
@@ -90,18 +90,18 @@ export async function reconcileMessageState(
   }
 
   return { status: "inbox", starred: state.starred };
-}
+};
 
 /**
  * 同步 TG 消息的置顶状态以匹配星标状态。best-effort —— 失败仅上报观测、不抛出，
  * 避免因缺少 `can_pin_messages` 权限等环境问题打断星标主流程。
  */
-export async function syncStarPinState(
+export const syncStarPinState = async (
   env: Env,
   chatId: string,
   tgMessageId: number,
   starred: boolean,
-): Promise<void> {
+): Promise<void> => {
   try {
     if (starred) {
       await pinChatMessage(env.TELEGRAM_BOT_TOKEN, chatId, tgMessageId);
@@ -115,4 +115,4 @@ export async function syncStarPinState(
       starred,
     });
   }
-}
+};

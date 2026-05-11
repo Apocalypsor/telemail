@@ -22,14 +22,7 @@ import {
   TZ_GROUPS,
 } from "./-utils/tz";
 
-const Search = t.Object({ back: t.Optional(t.String()) });
-
-export const Route = createFileRoute("/telegram-app/reminders/edit/$id")({
-  component: EditReminderPage,
-  validateSearch: validateSearch(Search),
-});
-
-function EditReminderPage() {
+const EditReminderPage = () => {
   const { id: idParam } = Route.useParams();
   const search = Route.useSearch();
   const id = Number(idParam);
@@ -74,11 +67,11 @@ function EditReminderPage() {
     setInitialized(true);
   }, [reminderQuery.data, tz, initialized]);
 
-  function goBack() {
+  const goBack = () => {
     // SPA 导航 —— 走硬刷新会跟 BackButton cleanup postMessage 跑赢比赛
     if (search.back) router.history.push(search.back);
     else navigate({ to: "/telegram-app/reminders", search: {} });
-  }
+  };
 
   // 只有真的从某页跳进来才显示 BackButton；直接打开 edit 页（深链 / 刷新丢
   // search.back）时不显示，让 TG 全屏的原生 ✕ 关闭按钮露出来
@@ -253,4 +246,10 @@ function EditReminderPage() {
       </div>
     </div>
   );
-}
+};
+const Search = t.Object({ back: t.Optional(t.String()) });
+
+export const Route = createFileRoute("/telegram-app/reminders/edit/$id")({
+  component: EditReminderPage,
+  validateSearch: validateSearch(Search),
+});

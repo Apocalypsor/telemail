@@ -21,15 +21,15 @@ import { InlineKeyboard } from "grammy";
  * 升级成完整键盘。万一升级那步失败，用户至少还有刷新键能手动触发重建
  * （`bot/handlers/refresh.ts` 会跑 `refreshEmail`，最终再打一遍完整键盘）。
  */
-export function buildInitialEmailKeyboard(): InlineKeyboard {
+export const buildInitialEmailKeyboard = (): InlineKeyboard => {
   return new InlineKeyboard().text(t("keyboards:mail.refresh"), "refresh");
-}
+};
 
-function addCoreButtons(
+const addCoreButtons = (
   kb: InlineKeyboard,
   starred: boolean,
   canArchive: boolean,
-): InlineKeyboard {
+): InlineKeyboard => {
   kb.text(
     t(starred ? "keyboards:mail.starred" : "keyboards:mail.star"),
     starred ? "unstar" : "star",
@@ -38,13 +38,13 @@ function addCoreButtons(
   if (canArchive) kb.text(t("keyboards:mail.archive"), "archive");
   kb.text(t("keyboards:mail.refresh"), "refresh");
   return kb;
-}
+};
 
 /** ⏰ 按钮 label：有待提醒就带数字 `⏰ (N)`，否则裸 emoji */
-function remindLabel(count: number): string {
+const remindLabel = (count: number): string => {
   const base = t("keyboards:mail.remind");
   return count > 0 ? `${base} (${count})` : base;
-}
+};
 
 /**
  * 构建邮件消息的完整 inline keyboard。**必须在 send 之后调用**（需要 tgMessageId
@@ -60,7 +60,7 @@ function remindLabel(count: number): string {
  *   需要配 `TG_MINI_APP_SHORT_NAME` + BotFather `/newapp`。
  *   未配置时群聊的 ⏰/👁 退化成裸 web URL（无 Mini App 能力）。
  */
-export async function buildEmailKeyboard(
+export const buildEmailKeyboard = async (
   env: Env,
   emailMessageId: string,
   accountId: number,
@@ -68,7 +68,7 @@ export async function buildEmailKeyboard(
   canArchive: boolean,
   chatId: string,
   tgMessageId: number,
-): Promise<InlineKeyboard> {
+): Promise<InlineKeyboard> => {
   const kb = addCoreButtons(new InlineKeyboard(), starred, canArchive);
   if (!env.WORKER_URL) return kb;
 
@@ -126,4 +126,4 @@ export async function buildEmailKeyboard(
     buildWebMailUrl(base, emailMessageId, accountId, mailToken),
   );
   return kb;
-}
+};

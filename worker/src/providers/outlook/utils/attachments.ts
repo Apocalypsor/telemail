@@ -6,28 +6,28 @@ import type {
 } from "@worker/providers/outlook/types";
 import type { MailAttachmentMeta } from "@worker/types";
 
-function isDownloadableAttachment(attachment: GraphAttachment): boolean {
+const isDownloadableAttachment = (attachment: GraphAttachment): boolean => {
   const type = attachment["@odata.type"]?.toLowerCase() ?? "";
   return (
     type === "#microsoft.graph.fileattachment" ||
     type === "#microsoft.graph.itemattachment" ||
     type === ""
   );
-}
+};
 
-function isVisibleAttachment(attachment: GraphAttachment): boolean {
+const isVisibleAttachment = (attachment: GraphAttachment): boolean => {
   return (
     !!attachment.id &&
     !attachment.isInline &&
     !!attachment.name &&
     isDownloadableAttachment(attachment)
   );
-}
+};
 
-export async function listOutlookAttachments(
+export const listOutlookAttachments = async (
   token: string,
   messageId: string,
-): Promise<GraphAttachment[]> {
+): Promise<GraphAttachment[]> => {
   let url: string | null =
     `${MS_GRAPH_API}/me/messages/${encodeURIComponent(messageId)}/attachments`;
   const result: GraphAttachment[] = [];
@@ -50,12 +50,12 @@ export async function listOutlookAttachments(
   }
 
   return result.filter(isVisibleAttachment);
-}
+};
 
-export async function buildOutlookAttachmentMeta(
+export const buildOutlookAttachmentMeta = async (
   token: string,
   messageId: string,
-): Promise<MailAttachmentMeta[]> {
+): Promise<MailAttachmentMeta[]> => {
   const attachments = await listOutlookAttachments(token, messageId);
   return attachments.map((attachment, index) => ({
     id: attachment.id || String(index),
@@ -63,13 +63,13 @@ export async function buildOutlookAttachmentMeta(
     mimeType: attachment.contentType ?? null,
     size: attachment.size ?? null,
   }));
-}
+};
 
-async function fetchAttachmentValue(
+const fetchAttachmentValue = async (
   token: string,
   messageId: string,
   attachmentId: string,
-): Promise<Response> {
+): Promise<Response> => {
   return http.get(
     `${MS_GRAPH_API}/me/messages/${encodeURIComponent(
       messageId,
@@ -79,16 +79,16 @@ async function fetchAttachmentValue(
       throwHttpErrors: false,
     },
   );
-}
+};
 
-export async function fetchOutlookAttachmentStream(
+export const fetchOutlookAttachmentStream = async (
   token: string,
   messageId: string,
   attachmentId: string,
 ): Promise<{
   attachment: GraphAttachment;
   body: ReadableStream<Uint8Array>;
-} | null> {
+} | null> => {
   const attachments = await listOutlookAttachments(token, messageId);
   const index = Number(attachmentId);
   const attachment =
@@ -105,4 +105,4 @@ export async function fetchOutlookAttachmentStream(
   }
   if (!resp.body) return null;
   return { attachment, body: resp.body };
-}
+};

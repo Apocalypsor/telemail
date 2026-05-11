@@ -2,13 +2,13 @@
  * 转义 Telegram MarkdownV2 特殊字符。
  * 参考: https://core.telegram.org/bots/api#markdownv2-style
  */
-export function escapeMdV2(str: string): string {
+export const escapeMdV2 = (str: string): string => {
   if (!str) return "";
   return str.replace(/([_*[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
-}
+};
 
 /** 将文本包裹为 Telegram 可展开引用块（expandable blockquote） */
-export function wrapExpandableQuote(text: string): string {
+export const wrapExpandableQuote = (text: string): string => {
   if (!text) return "";
   let inCode = false;
   const processed: string[] = [];
@@ -24,35 +24,22 @@ export function wrapExpandableQuote(text: string): string {
   return `${processed
     .map((line, i) => (i === 0 ? `**>${line}` : `>${line}`))
     .join("\n")}||`;
-}
+};
 
-/** NUL byte used as placeholder delimiter in slot-based rendering */
-const NUL = "\x00";
-const SLOT_RE = new RegExp(`${NUL}(\\d+)${NUL}`, "g");
-
-type StyleToken = "*" | "_" | "__" | "~" | "||";
-type CodeToken = "`" | "```";
-
-type TokenState =
-  | { type: "style"; token: StyleToken }
-  | { type: "code"; token: CodeToken }
-  | { type: "link-text" }
-  | { type: "link-url" };
-
-function toggleStyle(stack: TokenState[], token: StyleToken): void {
+const toggleStyle = (stack: TokenState[], token: StyleToken): void => {
   const top = stack[stack.length - 1];
   if (top?.type === "style" && top.token === token) {
     stack.pop();
   } else {
     stack.push({ type: "style", token });
   }
-}
+};
 
-function isExpandableBlockquoteMarker(
+const isExpandableBlockquoteMarker = (
   md: string,
   index: number,
   inBlockquoteLine: boolean,
-): boolean {
+): boolean => {
   if (!inBlockquoteLine) return false;
   if (md[index] !== "|" || md[index + 1] !== "|") return false;
 
@@ -60,23 +47,21 @@ function isExpandableBlockquoteMarker(
     if (md[i] !== " " && md[i] !== "\t") return false;
   }
   return true;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Standard Markdown → Telegram MarkdownV2 converter
 // ---------------------------------------------------------------------------
 
 /** Escape content inside ` ` or ``` ``` (only ` and \ need escaping per Telegram spec). */
-function escapeCode(s: string): string {
+const escapeCode = (s: string): string => {
   return s.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
-}
+};
 
 /** Escape a URL inside (...) of an inline link (only ) and \ need escaping per Telegram spec). */
-function escapeLinkUrl(url: string): string {
+const escapeLinkUrl = (url: string): string => {
   return url.replace(/\\/g, "\\\\").replace(/\)/g, "\\)");
-}
-
-const HR_RE = /^(\*[ \t]*){3,}$|^(-[ \t]*){3,}$|^(_[ \t]*){3,}$/;
+};
 
 /**
  * Convert standard Markdown to Telegram MarkdownV2.
@@ -84,21 +69,21 @@ const HR_RE = /^(\*[ \t]*){3,}$|^(-[ \t]*){3,}$|^(_[ \t]*){3,}$/;
  * blocks, links, images, headings, ordered & unordered lists, blockquotes,
  * and horizontal rules.
  */
-export function markdownToMdV2(md: string): string {
+export const markdownToMdV2 = (md: string): string => {
   if (!md) return "";
 
   // Shared placeholder slots — all recursive inline() calls share the same
   // array so that nested constructs (e.g. bold wrapping a link) resolve
   // correctly in a single final restoration pass.
   const slots: string[] = [];
-  function ph(s: string): string {
+  const ph = (s: string): string => {
     const idx = slots.length;
     slots.push(s);
     return `${NUL}${idx}${NUL}`;
-  }
+  };
 
   /** Convert inline Markdown spans, storing results as placeholder slots. */
-  function inline(text: string): string {
+  const inline = (text: string): string => {
     let s = text;
 
     // 1. Inline code — protect content from further processing
@@ -146,7 +131,7 @@ export function markdownToMdV2(md: string): string {
     s = s.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, "\\$&");
 
     return s;
-  }
+  };
 
   // --- Block-level processing ---
   const lines = md.split("\n");
@@ -230,7 +215,7 @@ export function markdownToMdV2(md: string): string {
   }
 
   return result;
-}
+};
 
 // ---------------------------------------------------------------------------
 // MdV2 validation
@@ -241,7 +226,7 @@ export function markdownToMdV2(md: string): string {
  * 目标覆盖 Bot API MarkdownV2 语法中的主要实体闭合规则：
  * *, _, __, ~, ||, `code`, ```pre```, [text](url), ![emoji](tg://emoji?id=...).
  */
-export function findLongestValidMdV2Prefix(md: string): number {
+export const findLongestValidMdV2Prefix = (md: string): number => {
   const stack: TokenState[] = [];
   let escaped = false;
   let longestValidEnd = 0;
@@ -402,4 +387,19 @@ export function findLongestValidMdV2Prefix(md: string): number {
   }
 
   return longestValidEnd;
-}
+};
+
+/** NUL byte used as placeholder delimiter in slot-based rendering */
+const NUL = "\x00";
+const SLOT_RE = new RegExp(`${NUL}(\\d+)${NUL}`, "g");
+
+type StyleToken = "*" | "_" | "__" | "~" | "||";
+type CodeToken = "`" | "```";
+
+type TokenState =
+  | { type: "style"; token: StyleToken }
+  | { type: "code"; token: CodeToken }
+  | { type: "link-text" }
+  | { type: "link-url" };
+
+const HR_RE = /^(\*[ \t]*){3,}$|^(-[ \t]*){3,}$|^(_[ \t]*){3,}$/;

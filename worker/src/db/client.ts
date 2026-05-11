@@ -3,13 +3,12 @@
  *  WeakMap 让 D1 binding 释放时缓存自动 GC，跨请求不会泄漏。 */
 import { type DrizzleD1Database, drizzle } from "drizzle-orm/d1";
 
-const cache = new WeakMap<D1Database, DrizzleD1Database>();
-
-export function getDb(d1: D1Database): DrizzleD1Database {
+export const getDb = (d1: D1Database): DrizzleD1Database => {
   let db = cache.get(d1);
   if (!db) {
     db = drizzle(d1);
     cache.set(d1, db);
   }
   return db;
-}
+};
+const cache = new WeakMap<D1Database, DrizzleD1Database>();

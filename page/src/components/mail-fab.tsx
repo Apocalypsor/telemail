@@ -18,48 +18,6 @@ import {
 } from "@telegram-apps/sdk-react";
 import { useCallback, useMemo } from "react";
 
-export interface MailFabProps {
-  emailMessageId: string;
-  accountId: number;
-  token: string;
-  starred: boolean;
-  inJunk: boolean;
-  inArchive: boolean;
-  canArchive: boolean;
-  /** 邮件当前所在 folder —— toggle-star 透传给后端，IMAP 用以选对 mailbox */
-  folder?: "inbox" | "junk" | "archive";
-  /** 邮件主题；用于分享时的预设文字 */
-  subject?: string | null;
-  /** 浏览器打开邮件的 URL；用作分享链接。缺失 → 不显示分享入口 */
-  webMailUrl?: string | null;
-  /** 跳到 TG 原消息的 deep link。缺失 → 不显示跳转入口 */
-  tgMessageLink?: string | null;
-  /** 当前 CORS 图片代理是否开启 —— 决定 SettingsButton/extras 里 toggle 文案 */
-  useProxy: boolean;
-  /** 切换 CORS 图片代理；点 TG SettingsButton（或老版本退化的 extras 项）调用 */
-  onToggleProxy: () => void;
-  /** 跳到提醒页（带 back URL）；undefined → 隐藏 ⏰ 入口 */
-  onSetReminder?: () => void;
-  /** FAB 动作成功后通知父组件 refetch 预览数据；交给 caller 处理 */
-  onChanged?: () => void;
-}
-
-interface ActionDef {
-  id: MailAction;
-  label: string;
-  type: "default" | "destructive";
-  /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 MainButton 隐藏 */
-  terminal: boolean;
-}
-
-type ExtraId = "reminder" | "share" | "tg-link" | "toggle-proxy";
-
-interface ExtraDef {
-  id: ExtraId;
-  label: string;
-  run: () => void;
-}
-
 /**
  * 邮件预览页的操作入口 —— 用 TG 原生 MainButton + SecondaryButton +
  * SettingsButton + showPopup 做，**不渲染任何 DOM**。
@@ -79,7 +37,7 @@ interface ExtraDef {
  * 一封已归档的邮件仍有意义）。
  * 失败：alertPopup(error) 弹原生 popup。
  */
-export function MailFab({
+export const MailFab = ({
   emailMessageId,
   accountId,
   token,
@@ -95,7 +53,7 @@ export function MailFab({
   onToggleProxy,
   onSetReminder,
   onChanged,
-}: MailFabProps) {
+}: MailFabProps) => {
   // 图片代理走 TG SettingsButton（右上角 ⋮）。Bot API 7.0+；不可用 → 回落到
   // SecondaryButton extras 末位。注：还需 @BotFather 把 bot menu button 配为
   // "settings" 才会显示 —— 部署时检查。
@@ -348,4 +306,45 @@ export function MailFab({
 
   // 没渲染任何 DOM —— UI 全在 TG 宿主
   return null;
+};
+export interface MailFabProps {
+  emailMessageId: string;
+  accountId: number;
+  token: string;
+  starred: boolean;
+  inJunk: boolean;
+  inArchive: boolean;
+  canArchive: boolean;
+  /** 邮件当前所在 folder —— toggle-star 透传给后端，IMAP 用以选对 mailbox */
+  folder?: "inbox" | "junk" | "archive";
+  /** 邮件主题；用于分享时的预设文字 */
+  subject?: string | null;
+  /** 浏览器打开邮件的 URL；用作分享链接。缺失 → 不显示分享入口 */
+  webMailUrl?: string | null;
+  /** 跳到 TG 原消息的 deep link。缺失 → 不显示跳转入口 */
+  tgMessageLink?: string | null;
+  /** 当前 CORS 图片代理是否开启 —— 决定 SettingsButton/extras 里 toggle 文案 */
+  useProxy: boolean;
+  /** 切换 CORS 图片代理；点 TG SettingsButton（或老版本退化的 extras 项）调用 */
+  onToggleProxy: () => void;
+  /** 跳到提醒页（带 back URL）；undefined → 隐藏 ⏰ 入口 */
+  onSetReminder?: () => void;
+  /** FAB 动作成功后通知父组件 refetch 预览数据；交给 caller 处理 */
+  onChanged?: () => void;
+}
+
+interface ActionDef {
+  id: MailAction;
+  label: string;
+  type: "default" | "destructive";
+  /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 MainButton 隐藏 */
+  terminal: boolean;
+}
+
+type ExtraId = "reminder" | "share" | "tg-link" | "toggle-proxy";
+
+interface ExtraDef {
+  id: ExtraId;
+  label: string;
+  run: () => void;
 }

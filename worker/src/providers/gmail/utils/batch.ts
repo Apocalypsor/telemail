@@ -17,11 +17,11 @@ import type { GmailMessage } from "@worker/providers/gmail/types";
  *    `<response-item-N>` 与之对应，按这个序号映射回原 messageIds。
  *  - 不需要给每个 sub-request 单独写 Authorization —— 外层 POST 的 Bearer 会被继承。
  */
-export async function gmailBatchGetMetadata(
+export const gmailBatchGetMetadata = async (
   token: string,
   messageIds: string[],
   metadataHeaders: string[],
-): Promise<Map<string, GmailMessage>> {
+): Promise<Map<string, GmailMessage>> => {
   if (messageIds.length === 0) return new Map();
 
   const boundary = `batch_${crypto.randomUUID()}`;
@@ -89,4 +89,4 @@ export async function gmailBatchGetMetadata(
   }
 
   return result;
-}
+};

@@ -23,17 +23,16 @@ import {
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { EnrichedReminder } from "./types";
 
-async function getOrCreateThingsAppInstanceId(
+const getOrCreateThingsAppInstanceId = async (
   env: Env,
   telegramUserId: string,
-): Promise<string> {
+): Promise<string> => {
   const cached = await getThingsAppInstanceId(env.EMAIL_KV, telegramUserId);
   if (cached) return cached;
   const generated = generateThingsAppInstanceId();
   await putThingsAppInstanceId(env.EMAIL_KV, telegramUserId, generated);
   return generated;
-}
-
+};
 export abstract class RemindersService {
   /** 给 listOnly 模式（主菜单"我的提醒"）的 reminder 列表附加 mail_token + email_summary。
    *  按 (accountId, emailMessageId) 去重，HMAC + mapping 计算两路并发。 */

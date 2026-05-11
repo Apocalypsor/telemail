@@ -1,22 +1,15 @@
 import { formatExactTime, formatMailDate } from "@page/utils/format-time";
 import type { MailGetResponse } from "@worker/api/modules/mail/model";
 
-interface Row {
-  label: string;
-  value: string;
-  /** 鼠标悬停 tooltip（Date 行展示完整时间含时区，避免相对/简化形式丢精度） */
-  title?: string;
-}
-
 /** 邮件 meta 块（From / To / Account / Date）。web `/mail/$id` 和 miniapp
  *  `/telegram-app/mail/$id` 两边渲染一字不差，统一这一份。 */
-export function MailMeta({
+export const MailMeta = ({
   meta,
   accountEmail,
 }: {
   meta: MailGetResponse["meta"];
   accountEmail: MailGetResponse["accountEmail"];
-}) {
+}) => {
   const rows: Row[] = [];
   if (meta.from) rows.push({ label: "From", value: meta.from });
   if (meta.to) rows.push({ label: "To", value: meta.to });
@@ -43,4 +36,10 @@ export function MailMeta({
       ))}
     </dl>
   );
+};
+interface Row {
+  label: string;
+  value: string;
+  /** 鼠标悬停 tooltip（Date 行展示完整时间含时区，避免相对/简化形式丢精度） */
+  title?: string;
 }

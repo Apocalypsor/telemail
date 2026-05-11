@@ -20,7 +20,7 @@ import { InlineKeyboard } from "grammy";
  * 处理文本消息输入（用于添加/编辑账号的多步骤交互）。
  * 必须在所有 command handler 之后注册，作为 catch-all。
  */
-export function registerInputHandler(bot: Bot, env: Env) {
+export const registerInputHandler = (bot: Bot, env: Env) => {
   bot.on("message:text", async (ctx) => {
     const userId = String(ctx.from.id);
     const text = ctx.message.text.trim();
@@ -193,4 +193,4 @@ export function registerInputHandler(bot: Bot, env: Env) {
       }
     }
   });
-}
+};

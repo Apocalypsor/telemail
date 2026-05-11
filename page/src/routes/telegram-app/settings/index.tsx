@@ -9,13 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-export const Route = createFileRoute("/telegram-app/settings/")({
-  component: SettingsPage,
-});
-
-const SETTINGS_QUERY_KEY = ["settings", "things"];
-
-function SettingsPage() {
+const SettingsPage = () => {
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -104,11 +98,11 @@ function SettingsPage() {
     },
   });
 
-  async function handleDisconnect() {
+  const handleDisconnect = async () => {
     if (!(await confirmPopup("断开 Things Cloud？"))) return;
     setStatus(null);
     disconnectMut.mutate();
-  }
+  };
 
   const hasPassword = settingsQuery.data?.hasPassword ?? false;
   const displayUserTimezone =
@@ -227,4 +221,9 @@ function SettingsPage() {
       </form>
     </div>
   );
-}
+};
+export const Route = createFileRoute("/telegram-app/settings/")({
+  component: SettingsPage,
+});
+
+const SETTINGS_QUERY_KEY = ["settings", "things"];

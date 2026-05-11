@@ -11,11 +11,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { ResultCard } from "./-components/result-card";
 
-export const Route = createFileRoute("/junk-check/")({
-  component: JunkCheckPage,
-});
-
-function JunkCheckPage() {
+const JunkCheckPage = () => {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -111,4 +107,7 @@ function JunkCheckPage() {
       </section>
     </SessionGatedWebLayout>
   );
-}
+};
+export const Route = createFileRoute("/junk-check/")({
+  component: JunkCheckPage,
+});

@@ -16,40 +16,11 @@ import {
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 
-interface DisplayConfig {
-  icon: string;
-  label: string;
-  emptyText: string;
-}
-
-const DISPLAY: Record<MailListType, DisplayConfig> = {
-  unread: {
-    icon: t("mailList:unread.icon"),
-    label: t("mailList:unread.label"),
-    emptyText: t("mailList:unread.empty"),
-  },
-  starred: {
-    icon: t("mailList:starred.icon"),
-    label: t("mailList:starred.label"),
-    emptyText: t("mailList:starred.empty"),
-  },
-  junk: {
-    icon: t("mailList:junk.icon"),
-    label: t("mailList:junk.label"),
-    emptyText: t("mailList:junk.empty"),
-  },
-  archived: {
-    icon: t("mailList:archived.icon"),
-    label: t("mailList:archived.label"),
-    emptyText: t("mailList:archived.empty"),
-  },
-};
-
 /** 把 service 返回的结构格式化成 MarkdownV2 文本 + 同时为每条邮件生成 web preview link */
-async function formatList(
+const formatList = async (
   env: Env,
   result: MailListResult,
-): Promise<{ text: string; hasItems: boolean }> {
+): Promise<{ text: string; hasItems: boolean }> => {
   const display = DISPLAY[result.type];
   const previewFolder = getPreviewFolder(result.type);
 
@@ -106,23 +77,14 @@ async function formatList(
     })}\n${lines.join("\n")}`,
     hasItems: true,
   };
-}
+};
 
-interface RegisterDef {
-  type: MailListType;
-  actionKeyboard?: InlineKeyboard;
-  action?: {
-    callbackName: string;
-    loadingText: string;
-    handler: (
-      env: Env,
-      userId: string,
-    ) => Promise<{ success: number; failed: number }>;
-    resultText: (success: number, failed: number) => string;
-  };
-}
-
-function register(bot: Bot, env: Env, runtime: BotRuntime, def: RegisterDef) {
+const register = (
+  bot: Bot,
+  env: Env,
+  runtime: BotRuntime,
+  def: RegisterDef,
+) => {
   const replyMarkupOpt = (hasItems: boolean) =>
     hasItems && def.actionKeyboard ? { reply_markup: def.actionKeyboard } : {};
 
@@ -203,13 +165,13 @@ function register(bot: Bot, env: Env, runtime: BotRuntime, def: RegisterDef) {
       await ctx.editMessageText(resultText(success, failed));
     });
   }
-}
+};
 
-export function registerMailListHandlers(
+export const registerMailListHandlers = (
   bot: Bot,
   env: Env,
   runtime: BotRuntime,
-) {
+) => {
   register(bot, env, runtime, {
     type: "unread",
     actionKeyboard: new InlineKeyboard().text(
@@ -253,4 +215,46 @@ export function registerMailListHandlers(
           : t("mailList:junk.deleteResult", { success: s }),
     },
   });
+};
+interface DisplayConfig {
+  icon: string;
+  label: string;
+  emptyText: string;
+}
+
+const DISPLAY: Record<MailListType, DisplayConfig> = {
+  unread: {
+    icon: t("mailList:unread.icon"),
+    label: t("mailList:unread.label"),
+    emptyText: t("mailList:unread.empty"),
+  },
+  starred: {
+    icon: t("mailList:starred.icon"),
+    label: t("mailList:starred.label"),
+    emptyText: t("mailList:starred.empty"),
+  },
+  junk: {
+    icon: t("mailList:junk.icon"),
+    label: t("mailList:junk.label"),
+    emptyText: t("mailList:junk.empty"),
+  },
+  archived: {
+    icon: t("mailList:archived.icon"),
+    label: t("mailList:archived.label"),
+    emptyText: t("mailList:archived.empty"),
+  },
+};
+
+interface RegisterDef {
+  type: MailListType;
+  actionKeyboard?: InlineKeyboard;
+  action?: {
+    callbackName: string;
+    loadingText: string;
+    handler: (
+      env: Env,
+      userId: string,
+    ) => Promise<{ success: number; failed: number }>;
+    resultText: (success: number, failed: number) => string;
+  };
 }

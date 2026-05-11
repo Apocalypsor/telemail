@@ -22,26 +22,12 @@ import { reconcileMessageState } from "@worker/utils/message-actions/reconcile";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 
-/**
- * 已投递邮件的"二次处理"路径 —— 给三个入口共用：
- *  - bot ↻ 按钮：手动 refresh
- *  - cron 每小时：retry 之前 LLM 分析挂掉的（`failed_emails` 表）
- *  - bot 管理面板：按 id 单条 retry
- *
- * 都先做 `reconcileMessageState`：邮件已不在 inbox（被 junk / archive / 删了）
- * → 清掉 TG 消息 + mapping 直接返回；仍在 inbox 才走 LLM + edit message。
- */
-
-type ReanalyzeResult =
-  | { status: "analyzed" }
-  | { status: "removed"; location: Exclude<MessageLocation, "inbox"> };
-
-async function reanalyzeEmail(
+const reanalyzeEmail = async (
   env: Env,
   account: Account,
   mapping: MessageMapping,
   isCaption: boolean,
-): Promise<ReanalyzeResult> {
+): Promise<ReanalyzeResult> => {
   const reconcile = await reconcileMessageState(env, account, mapping);
   if (reconcile.status === "removed") {
     return { status: "removed", location: reconcile.location };
@@ -93,13 +79,13 @@ async function reanalyzeEmail(
     );
   }
   return { status: "analyzed" };
-}
+};
 
 /** 重试单封失败邮件的 LLM 摘要处理，成功后自动删除失败记录 */
-export async function retryFailedEmail(
+export const retryFailedEmail = async (
   failed: FailedEmail,
   env: Env,
-): Promise<void> {
+): Promise<void> => {
   const account = await getAccountById(env.DB, failed.account_id);
   if (!account) throw new Error(`Account ${failed.account_id} not found`);
 
@@ -125,10 +111,10 @@ export async function retryFailedEmail(
 
   // removed 也算「处理完」—— 邮件已不在 inbox，没必要再重试
   await deleteFailedEmail(env.DB, failed.id);
-}
+};
 
 /** 刷新邮件：先对账远端状态（junk/archive/deleted/inbox），仅 inbox 时重新 LLM 分析 */
-export async function refreshEmail(
+export const refreshEmail = async (
   env: Env,
   chatId: string,
   tgMessageId: number,
@@ -136,7 +122,7 @@ export async function refreshEmail(
 ): Promise<
   | { ok: true; removed?: "junk" | "archive" | "deleted" }
   | { ok: false; reason: string }
-> {
+> => {
   if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL) {
     return { ok: false, reason: t("bridge:refreshNoLlm") };
   }
@@ -156,12 +142,12 @@ export async function refreshEmail(
     return { ok: true, removed: result.location };
   }
   return { ok: true };
-}
+};
 
 /** 重试所有失败邮件，返回 { success, failed } 计数 */
-export async function retryAllFailedEmails(
+export const retryAllFailedEmails = async (
   env: Env,
-): Promise<{ success: number; failed: number }> {
+): Promise<{ success: number; failed: number }> => {
   const items = await getAllFailedEmails(env.DB);
   let success = 0;
   let failed = 0;
@@ -177,4 +163,17 @@ export async function retryAllFailedEmails(
     }
   }
   return { success, failed };
-}
+};
+/**
+ * 已投递邮件的"二次处理"路径 —— 给三个入口共用：
+ *  - bot ↻ 按钮：手动 refresh
+ *  - cron 每小时：retry 之前 LLM 分析挂掉的（`failed_emails` 表）
+ *  - bot 管理面板：按 id 单条 retry
+ *
+ * 都先做 `reconcileMessageState`：邮件已不在 inbox（被 junk / archive / 删了）
+ * → 清掉 TG 消息 + mapping 直接返回；仍在 inbox 才走 LLM + edit message。
+ */
+
+type ReanalyzeResult =
+  | { status: "analyzed" }
+  | { status: "removed"; location: Exclude<MessageLocation, "inbox"> };

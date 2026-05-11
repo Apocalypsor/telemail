@@ -1,26 +1,26 @@
 import type { MessageStructureObject } from "imapflow";
 
-function structureFilename(node: MessageStructureObject): string | null {
+const structureFilename = (node: MessageStructureObject): string | null => {
   return (
     node.dispositionParameters?.filename ??
     node.parameters?.name ??
     node.description ??
     null
   );
-}
+};
 
-function isInlineStructure(node: MessageStructureObject): boolean {
+const isInlineStructure = (node: MessageStructureObject): boolean => {
   const disposition = node.disposition?.toLowerCase();
   return (
     disposition?.startsWith("inline") === true ||
     (!!node.id && node.type.toLowerCase().startsWith("image/"))
   );
-}
+};
 
-export function collectVisibleAttachmentParts(
+export const collectVisibleAttachmentParts = (
   node: MessageStructureObject,
   result: MessageStructureObject[] = [],
-): MessageStructureObject[] {
+): MessageStructureObject[] => {
   if (!node) return result;
 
   const filename = structureFilename(node);
@@ -34,10 +34,10 @@ export function collectVisibleAttachmentParts(
     }
   }
   return result;
-}
+};
 
-export function attachmentStructureFilename(
+export const attachmentStructureFilename = (
   node: MessageStructureObject,
-): string | null {
+): string | null => {
   return structureFilename(node);
-}
+};

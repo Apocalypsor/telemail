@@ -7,17 +7,13 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { InlineKeyboard } from "grammy";
 import { syncStarPinState } from "./reconcile";
 
-type ToggleStarResult =
-  | { ok: true; keyboard: InlineKeyboard; emailMessageId: string }
-  | { ok: false; reason: string };
-
 /** 切换星标并返回新的 keyboard */
-export async function toggleStar(
+export const toggleStar = async (
   env: Env,
   chatId: string,
   messageId: number,
   starred: boolean,
-): Promise<ToggleStarResult> {
+): Promise<ToggleStarResult> => {
   const mapping = await getMessageMapping(env.DB, chatId, messageId);
   if (!mapping) return { ok: false, reason: "消息映射未找到" };
 
@@ -48,14 +44,14 @@ export async function toggleStar(
     mapping.tg_message_id,
   );
   return { ok: true, keyboard, emailMessageId: mapping.email_message_id };
-}
+};
 
-export async function markEmailAsRead(
+export const markEmailAsRead = async (
   env: Env,
   account: Account,
   emailMessageId: string,
   folder?: "inbox" | "junk" | "archive",
-): Promise<void> {
+): Promise<void> => {
   try {
     const provider = getEmailProvider(account, env);
     await provider.markAsRead(emailMessageId, folder);
@@ -65,14 +61,14 @@ export async function markEmailAsRead(
       emailMessageId,
     });
   }
-}
+};
 
 /** 通过 Telegram 消息标记对应邮件为已读 */
-export async function markAsReadByMessage(
+export const markAsReadByMessage = async (
   env: Env,
   chatId: string,
   messageId: number,
-): Promise<void> {
+): Promise<void> => {
   const mapping = await getMessageMapping(env.DB, chatId, messageId);
   if (!mapping) {
     console.log(`No mapping found for chat=${chatId}, message=${messageId}`);
@@ -91,15 +87,15 @@ export async function markAsReadByMessage(
       messageId: mapping.email_message_id,
     });
   }
-}
+};
 
 /** 标记用户所有账号的未读邮件为已读。各 provider 各自走 bulk API（Gmail
  *  batchModify / Outlook $batch / IMAP 单条 STORE），不再 N 次单调 modify。 */
-export async function markAllAsRead(
+export const markAllAsRead = async (
   env: Env,
   userId: string,
   maxPerAccount: number = 20,
-): Promise<{ success: number; failed: number }> {
+): Promise<{ success: number; failed: number }> => {
   const accounts = await getOwnAccounts(env.DB, userId);
   let success = 0;
   let failed = 0;
@@ -119,13 +115,13 @@ export async function markAllAsRead(
   }
 
   return { success, failed };
-}
+};
 
 /** 清空用户所有账号的垃圾邮件（移到回收站） */
-export async function trashAllJunkEmails(
+export const trashAllJunkEmails = async (
   env: Env,
   userId: string,
-): Promise<{ success: number; failed: number }> {
+): Promise<{ success: number; failed: number }> => {
   const accounts = await getOwnAccounts(env.DB, userId);
   let success = 0;
   let failed = 0;
@@ -144,4 +140,7 @@ export async function trashAllJunkEmails(
   }
 
   return { success, failed };
-}
+};
+type ToggleStarResult =
+  | { ok: true; keyboard: InlineKeyboard; emailMessageId: string }
+  | { ok: false; reason: string };

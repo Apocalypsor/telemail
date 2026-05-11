@@ -4,7 +4,7 @@ import { useCallback } from "react";
 /** 跳到 Mini App 邮件预览页 `/telegram-app/mail/$id` 的统一入口。
  *  自动用 window.location 拼 `back=` 让 TG BackButton 能回到当前页。
  *  `folder` 给 IMAP 列表（junk / archive）传，让预览页定位 UID。 */
-export function useNavigateToMail() {
+export const useNavigateToMail = () => {
   const navigate = useNavigate();
   return useCallback(
     (
@@ -27,4 +27,4 @@ export function useNavigateToMail() {
     },
     [navigate],
   );
-}
+};

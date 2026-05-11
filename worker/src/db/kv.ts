@@ -1,87 +1,57 @@
 import type { MailAttachmentMeta, MailMeta } from "@worker/types";
 import { parseEmailDate } from "@worker/utils/format";
 
-// ─── KV keys & prefixes ──────────────────────────────────────────────��─────
-
-const KV_OAUTH_STATE_PREFIX = "oauth_state:";
-const KV_OAUTH_BOT_MSG_PREFIX = "oauth_bot_msg:";
-const KV_MS_SUB_ACCOUNT_PREFIX = "ms_sub_account:";
-const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
-const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
-const KV_BOT_INFO_KEY = "telegram:bot_info";
-const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
-const KV_THINGS_APP_INSTANCE_ID_PREFIX = "things:app_instance_id:";
-
-// ─── TTLs ───────────────────────────────────────────────────────────────────
-
-const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天
-const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
-const BOT_INFO_TTL = 86400 * 30; // 30 天
-const OUTLOOK_FOLDERS_TTL = 86400 * 30; // 30 天 —— well-known folder ID 在账号生命周期内稳定
+// 30 天 —— well-known folder ID 在账号生命周期内稳定
 
 // ─── Access Token Cache ─────────────────────────────────────────────────────
 
-function kvAccessTokenKey(accountId: number): string {
+const kvAccessTokenKey = (accountId: number): string => {
   return `access_token:${accountId}`;
-}
+};
 
-export async function getCachedAccessToken(
+export const getCachedAccessToken = async (
   kv: KVNamespace,
   accountId: number,
-): Promise<string | null> {
+): Promise<string | null> => {
   return kv.get(kvAccessTokenKey(accountId));
-}
+};
 
-export async function putCachedAccessToken(
+export const putCachedAccessToken = async (
   kv: KVNamespace,
   accountId: number,
   token: string,
   ttlSeconds: number,
-): Promise<void> {
+): Promise<void> => {
   await kv.put(kvAccessTokenKey(accountId), token, {
     expirationTtl: ttlSeconds,
   });
-}
+};
 
-export async function deleteCachedAccessToken(
+export const deleteCachedAccessToken = async (
   kv: KVNamespace,
   accountId: number,
-): Promise<void> {
+): Promise<void> => {
   await kv.delete(kvAccessTokenKey(accountId));
-}
+};
 
 // ─── Mail HTML Cache ────────────────────────────────────────────────────────
 
 // 同一封邮件在 INBOX / junk / archive 的渲染可能不同（folder 提示 IMAP 去哪个
 // 文件夹拉 raw），所以 folder 要进 key。emailMessageId 是 provider 原生邮件 id。
-function kvMailHtmlKey(
+const kvMailHtmlKey = (
   accountId: number,
   folder: string,
   emailMessageId: string,
-): string {
+): string => {
   return `mail_html:${accountId}:${folder}:${emailMessageId}`;
-}
-
-interface CachedMailData {
-  html: string;
-  meta?: MailMeta;
-  attachments?: MailAttachmentMeta[];
-}
-
-/** wire 形态：JSON.stringify 把 meta.date 编成 ISO 字符串落盘，所以读回来必须先用
- *  `string` 处理、再 revive 成 Date 才符合 `MailMeta` 的类型。 */
-type CachedMailDataWire = {
-  html: string;
-  meta?: Omit<MailMeta, "date"> & { date?: string | null };
-  attachments?: MailAttachmentMeta[];
 };
 
-export async function getCachedMailData(
+export const getCachedMailData = async (
   kv: KVNamespace,
   accountId: number,
   folder: string,
   emailMessageId: string,
-): Promise<CachedMailData | null> {
+): Promise<CachedMailData | null> => {
   const raw = await kv.get(kvMailHtmlKey(accountId, folder, emailMessageId));
   if (!raw) return null;
   let wire: CachedMailDataWire;
@@ -98,101 +68,94 @@ export async function getCachedMailData(
     meta: { ...rest, date: parseEmailDate(date) },
     attachments: wire.attachments,
   };
-}
+};
 
-export async function putCachedMailData(
+export const putCachedMailData = async (
   kv: KVNamespace,
   accountId: number,
   folder: string,
   emailMessageId: string,
   data: CachedMailData,
-): Promise<void> {
+): Promise<void> => {
   await kv.put(
     kvMailHtmlKey(accountId, folder, emailMessageId),
     JSON.stringify(data),
     { expirationTtl: MAIL_HTML_CACHE_TTL },
   );
-}
+};
 
 // ─── OAuth State ────────────────────────────────────────────────────────────
 
-export async function putOAuthState(
+export const putOAuthState = async (
   kv: KVNamespace,
   statePrefix: string,
   state: string,
   accountId: number,
-): Promise<void> {
+): Promise<void> => {
   await kv.put(
     `${KV_OAUTH_STATE_PREFIX}${statePrefix}${state}`,
     String(accountId),
     { expirationTtl: OAUTH_STATE_TTL_SECONDS },
   );
-}
+};
 
-export async function getOAuthState(
+export const getOAuthState = async (
   kv: KVNamespace,
   statePrefix: string,
   state: string,
-): Promise<string | null> {
+): Promise<string | null> => {
   return kv.get(`${KV_OAUTH_STATE_PREFIX}${statePrefix}${state}`);
-}
+};
 
-export async function deleteOAuthState(
+export const deleteOAuthState = async (
   kv: KVNamespace,
   statePrefix: string,
   state: string,
-): Promise<void> {
+): Promise<void> => {
   await kv.delete(`${KV_OAUTH_STATE_PREFIX}${statePrefix}${state}`);
-}
+};
 
-// ─── OAuth Bot Message (回写 Bot 消息位置) ──────────────────────────────────
-
-interface OAuthBotMsg {
-  chatId: string;
-  messageId: number;
-}
-
-export async function putOAuthBotMsg(
+export const putOAuthBotMsg = async (
   kv: KVNamespace,
   accountId: number,
   msg: OAuthBotMsg,
-): Promise<void> {
+): Promise<void> => {
   await kv.put(`${KV_OAUTH_BOT_MSG_PREFIX}${accountId}`, JSON.stringify(msg), {
     expirationTtl: OAUTH_STATE_TTL_SECONDS,
   });
-}
+};
 
-export async function getOAuthBotMsg(
+export const getOAuthBotMsg = async (
   kv: KVNamespace,
   accountId: number,
-): Promise<OAuthBotMsg | null> {
+): Promise<OAuthBotMsg | null> => {
   const raw = await kv.get(`${KV_OAUTH_BOT_MSG_PREFIX}${accountId}`);
   if (!raw) return null;
   return JSON.parse(raw) as OAuthBotMsg;
-}
+};
 
-export async function deleteOAuthBotMsg(
+export const deleteOAuthBotMsg = async (
   kv: KVNamespace,
   accountId: number,
-): Promise<void> {
+): Promise<void> => {
   await kv.delete(`${KV_OAUTH_BOT_MSG_PREFIX}${accountId}`);
-}
+};
 
 // ─── Outlook Subscription ─────────────────────────────────────────────��─────
 
-export async function getMsSubscriptionId(
+export const getMsSubscriptionId = async (
   kv: KVNamespace,
   accountId: number,
-): Promise<string | null> {
+): Promise<string | null> => {
   return kv.get(`${KV_MS_SUBSCRIPTION_PREFIX}${accountId}`);
-}
+};
 
-export async function putMsSubscription(
+export const putMsSubscription = async (
   kv: KVNamespace,
   accountId: number,
   subscriptionId: string,
   ttlSeconds: number,
-): Promise<void> {
+): Promise<void> => {
   await Promise.all([
     kv.put(`${KV_MS_SUBSCRIPTION_PREFIX}${accountId}`, subscriptionId, {
       expirationTtl: ttlSeconds,
@@ -201,37 +164,163 @@ export async function putMsSubscription(
       expirationTtl: ttlSeconds,
     }),
   ]);
-}
+};
 
-export async function refreshMsSubAccountMapping(
+export const refreshMsSubAccountMapping = async (
   kv: KVNamespace,
   subscriptionId: string,
   accountId: number,
   ttlSeconds: number,
-): Promise<void> {
+): Promise<void> => {
   await kv.put(
     `${KV_MS_SUB_ACCOUNT_PREFIX}${subscriptionId}`,
     String(accountId),
     { expirationTtl: ttlSeconds },
   );
-}
+};
 
-export async function getMsAccountBySubscription(
+export const getMsAccountBySubscription = async (
   kv: KVNamespace,
   subscriptionId: string,
-): Promise<string | null> {
+): Promise<string | null> => {
   return kv.get(`${KV_MS_SUB_ACCOUNT_PREFIX}${subscriptionId}`);
-}
+};
 
-export async function deleteMsSubscription(
+export const deleteMsSubscription = async (
   kv: KVNamespace,
   accountId: number,
-): Promise<void> {
+): Promise<void> => {
   const subId = await getMsSubscriptionId(kv, accountId);
   await kv.delete(`${KV_MS_SUBSCRIPTION_PREFIX}${accountId}`);
   if (subId) {
     await kv.delete(`${KV_MS_SUB_ACCOUNT_PREFIX}${subId}`);
   }
+};
+
+export const getCachedOutlookFolderIds = async (
+  kv: KVNamespace,
+  accountId: number,
+): Promise<OutlookFolderIds | null> => {
+  return kv.get<OutlookFolderIds>(
+    `${KV_OUTLOOK_FOLDERS_PREFIX}${accountId}`,
+    "json",
+  );
+};
+
+export const putCachedOutlookFolderIds = async (
+  kv: KVNamespace,
+  accountId: number,
+  ids: OutlookFolderIds,
+): Promise<void> => {
+  await kv.put(
+    `${KV_OUTLOOK_FOLDERS_PREFIX}${accountId}`,
+    JSON.stringify(ids),
+    { expirationTtl: OUTLOOK_FOLDERS_TTL },
+  );
+};
+
+export const deleteCachedOutlookFolderIds = async (
+  kv: KVNamespace,
+  accountId: number,
+): Promise<void> => {
+  await kv.delete(`${KV_OUTLOOK_FOLDERS_PREFIX}${accountId}`);
+};
+
+// ─── Bot Info Cache ─────────────────────────────────────────────────────────
+
+export const getCachedBotInfo = async (
+  kv: KVNamespace,
+): Promise<string | null> => {
+  return kv.get(KV_BOT_INFO_KEY);
+};
+
+export const putCachedBotInfo = async (
+  kv: KVNamespace,
+  botInfo: string,
+): Promise<void> => {
+  await kv.put(KV_BOT_INFO_KEY, botInfo, {
+    expirationTtl: BOT_INFO_TTL,
+  });
+};
+
+// ─── Bot Commands Version ───────────────────────────────────────────────────
+
+export const getBotCommandsVersion = async (
+  kv: KVNamespace,
+): Promise<string | null> => {
+  return kv.get(KV_BOT_COMMANDS_VERSION_KEY);
+};
+
+export const putBotCommandsVersion = async (
+  kv: KVNamespace,
+  version: string,
+): Promise<void> => {
+  await kv.put(KV_BOT_COMMANDS_VERSION_KEY, version);
+};
+
+// ─── Things Cloud ───────────────────────────────────────────────────────────
+
+export const getThingsAppInstanceId = async (
+  kv: KVNamespace,
+  telegramUserId: string,
+): Promise<string | null> => {
+  return kv.get(`${KV_THINGS_APP_INSTANCE_ID_PREFIX}${telegramUserId}`);
+};
+
+export const putThingsAppInstanceId = async (
+  kv: KVNamespace,
+  telegramUserId: string,
+  appInstanceId: string,
+): Promise<void> => {
+  await kv.put(
+    `${KV_THINGS_APP_INSTANCE_ID_PREFIX}${telegramUserId}`,
+    appInstanceId,
+  );
+};
+
+export const deleteThingsAppInstanceId = async (
+  kv: KVNamespace,
+  telegramUserId: string,
+): Promise<void> => {
+  await kv.delete(`${KV_THINGS_APP_INSTANCE_ID_PREFIX}${telegramUserId}`);
+};
+// ─── KV keys & prefixes ──────────────────────────────────────────────��─────
+
+const KV_OAUTH_STATE_PREFIX = "oauth_state:";
+const KV_OAUTH_BOT_MSG_PREFIX = "oauth_bot_msg:";
+const KV_MS_SUB_ACCOUNT_PREFIX = "ms_sub_account:";
+const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
+const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
+const KV_BOT_INFO_KEY = "telegram:bot_info";
+const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
+const KV_THINGS_APP_INSTANCE_ID_PREFIX = "things:app_instance_id:";
+
+// ─── TTLs ───────────────────────────────────────────────────────────────────
+
+const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天
+const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
+const BOT_INFO_TTL = 86400 * 30; // 30 天
+const OUTLOOK_FOLDERS_TTL = 86400 * 30;
+
+interface CachedMailData {
+  html: string;
+  meta?: MailMeta;
+  attachments?: MailAttachmentMeta[];
+}
+
+/** wire 形态：JSON.stringify 把 meta.date 编成 ISO 字符串落盘，所以读回来必须先用
+ *  `string` 处理、再 revive 成 Date 才符合 `MailMeta` 的类型。 */
+type CachedMailDataWire = {
+  html: string;
+  meta?: Omit<MailMeta, "date"> & { date?: string | null };
+  attachments?: MailAttachmentMeta[];
+};
+
+// ─── OAuth Bot Message (回写 Bot 消息位置) ──────────────────────────────────
+
+interface OAuthBotMsg {
+  chatId: string;
+  messageId: number;
 }
 
 // ─── Outlook Well-known Folder IDs Cache ───────────────────────────────────
@@ -244,92 +333,4 @@ export interface OutlookFolderIds {
   junk: string;
   archive: string;
   deleted: string;
-}
-
-export async function getCachedOutlookFolderIds(
-  kv: KVNamespace,
-  accountId: number,
-): Promise<OutlookFolderIds | null> {
-  return kv.get<OutlookFolderIds>(
-    `${KV_OUTLOOK_FOLDERS_PREFIX}${accountId}`,
-    "json",
-  );
-}
-
-export async function putCachedOutlookFolderIds(
-  kv: KVNamespace,
-  accountId: number,
-  ids: OutlookFolderIds,
-): Promise<void> {
-  await kv.put(
-    `${KV_OUTLOOK_FOLDERS_PREFIX}${accountId}`,
-    JSON.stringify(ids),
-    { expirationTtl: OUTLOOK_FOLDERS_TTL },
-  );
-}
-
-export async function deleteCachedOutlookFolderIds(
-  kv: KVNamespace,
-  accountId: number,
-): Promise<void> {
-  await kv.delete(`${KV_OUTLOOK_FOLDERS_PREFIX}${accountId}`);
-}
-
-// ─── Bot Info Cache ─────────────────────────────────────────────────────────
-
-export async function getCachedBotInfo(
-  kv: KVNamespace,
-): Promise<string | null> {
-  return kv.get(KV_BOT_INFO_KEY);
-}
-
-export async function putCachedBotInfo(
-  kv: KVNamespace,
-  botInfo: string,
-): Promise<void> {
-  await kv.put(KV_BOT_INFO_KEY, botInfo, {
-    expirationTtl: BOT_INFO_TTL,
-  });
-}
-
-// ─── Bot Commands Version ───────────────────────────────────────────────────
-
-export async function getBotCommandsVersion(
-  kv: KVNamespace,
-): Promise<string | null> {
-  return kv.get(KV_BOT_COMMANDS_VERSION_KEY);
-}
-
-export async function putBotCommandsVersion(
-  kv: KVNamespace,
-  version: string,
-): Promise<void> {
-  await kv.put(KV_BOT_COMMANDS_VERSION_KEY, version);
-}
-
-// ─── Things Cloud ───────────────────────────────────────────────────────────
-
-export async function getThingsAppInstanceId(
-  kv: KVNamespace,
-  telegramUserId: string,
-): Promise<string | null> {
-  return kv.get(`${KV_THINGS_APP_INSTANCE_ID_PREFIX}${telegramUserId}`);
-}
-
-export async function putThingsAppInstanceId(
-  kv: KVNamespace,
-  telegramUserId: string,
-  appInstanceId: string,
-): Promise<void> {
-  await kv.put(
-    `${KV_THINGS_APP_INSTANCE_ID_PREFIX}${telegramUserId}`,
-    appInstanceId,
-  );
-}
-
-export async function deleteThingsAppInstanceId(
-  kv: KVNamespace,
-  telegramUserId: string,
-): Promise<void> {
-  await kv.delete(`${KV_THINGS_APP_INSTANCE_ID_PREFIX}${telegramUserId}`);
 }

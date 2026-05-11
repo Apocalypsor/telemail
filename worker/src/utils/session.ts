@@ -1,23 +1,11 @@
 import { SESSION_TTL, TG_AUTH_MAX_AGE } from "@worker/constants";
 import { hmacSha256Hex, timingSafeEqual } from "@worker/utils/hash";
 
-// ── Telegram Login Widget ───────────────────────────────────────────────────
-
-export interface TelegramLoginData {
-  id: string;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date: string;
-  hash: string;
-}
-
 /** 验证 Telegram Login Widget 数据（https://core.telegram.org/widgets/login#checking-authorization） */
-export async function verifyTelegramLogin(
+export const verifyTelegramLogin = async (
   botToken: string,
   data: TelegramLoginData,
-): Promise<boolean> {
+): Promise<boolean> => {
   const authDate = parseInt(data.auth_date, 10);
   if (Number.isNaN(authDate) || Date.now() / 1000 - authDate > TG_AUTH_MAX_AGE)
     return false;
@@ -51,26 +39,26 @@ export async function verifyTelegramLogin(
     .join("");
 
   return timingSafeEqual(expected, data.hash);
-}
+};
 
 // ── Session cookie ──────────────────────────────────────────────────────────
 
 /** 生成 session cookie 值: telegramId:timestamp:hmac */
-export async function generateSessionCookie(
+export const generateSessionCookie = async (
   secret: string,
   telegramId: string,
-): Promise<{ value: string; maxAge: number }> {
+): Promise<{ value: string; maxAge: number }> => {
   const ts = Math.floor(Date.now() / 1000);
   const payload = `${telegramId}:${ts}`;
   const hmac = await hmacSha256Hex(secret, payload, 32);
   return { value: `${payload}:${hmac}`, maxAge: SESSION_TTL };
-}
+};
 
 /** 验证 session cookie，返回 telegramId 或 null */
-export async function verifySessionCookie(
+export const verifySessionCookie = async (
   secret: string,
   cookie: string,
-): Promise<string | null> {
+): Promise<string | null> => {
   const parts = cookie.split(":");
   if (parts.length !== 3) return null;
   const [telegramId, tsStr, hmac] = parts;
@@ -80,4 +68,15 @@ export async function verifySessionCookie(
   const expected = await hmacSha256Hex(secret, `${telegramId}:${tsStr}`, 32);
   if (!timingSafeEqual(expected, hmac)) return null;
   return telegramId;
+};
+// ── Telegram Login Widget ───────────────────────────────────────────────────
+
+export interface TelegramLoginData {
+  id: string;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: string;
+  hash: string;
 }

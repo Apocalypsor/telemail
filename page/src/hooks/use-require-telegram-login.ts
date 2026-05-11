@@ -13,11 +13,11 @@ import { useEffect } from "react";
  * `useSession` 不会 redirect、只返回状态；这个 hook 就是"useSession + 强
  * 制 redirect 未登录用户"的组合。两者共享同一个 TanStack Query 缓存。
  */
-export function useRequireTelegramLogin(): {
+export const useRequireTelegramLogin = (): {
   isLoading: boolean;
   isRedirecting: boolean;
   data: WhoamiResponse | undefined;
-} {
+} => {
   const session = useSession();
   const isRedirecting = !session.isLoading && !session.data;
 
@@ -31,4 +31,4 @@ export function useRequireTelegramLogin(): {
     isRedirecting,
     data: session.data ?? undefined,
   };
-}
+};

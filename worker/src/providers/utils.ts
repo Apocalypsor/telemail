@@ -4,9 +4,9 @@ import type { OAuthTokenResponse } from "@worker/providers/types";
 import type { Account, Env, MailAttachmentDownload } from "@worker/types";
 import { HTTPError } from "ky";
 
-export function attachmentBody(
+export const attachmentBody = (
   content: string | ArrayBuffer | Uint8Array,
-): MailAttachmentDownload["body"] {
+): MailAttachmentDownload["body"] => {
   if (typeof content === "string" || content instanceof ArrayBuffer) {
     return content;
   }
@@ -17,14 +17,14 @@ export function attachmentBody(
       controller.close();
     },
   });
-}
+};
 
 /**
  * 用 refresh_token 交换 access_token（KV 缓存，按账号隔离）。
  * Gmail / Outlook 两个 OAuth provider 的刷新逻辑共用这一个实现——差异仅是
  * tokenUrl、client 凭据、以及 Outlook 需要塞 `scope`。
  */
-export async function refreshAccessToken(
+export const refreshAccessToken = async (
   env: Env,
   account: Account,
   opts: {
@@ -36,7 +36,7 @@ export async function refreshAccessToken(
     /** 错误前缀，用来区分是哪家 provider 的失败（例如 "MS "） */
     errorLabel?: string;
   },
-): Promise<string> {
+): Promise<string> => {
   const cached = await getCachedAccessToken(env.EMAIL_KV, account.id);
   if (cached) return cached;
 
@@ -80,4 +80,4 @@ export async function refreshAccessToken(
     Math.max(data.expires_in - 120, 60),
   );
   return data.access_token;
-}
+};

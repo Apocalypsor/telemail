@@ -6,7 +6,7 @@ import { Value } from "@sinclair/typebox/value";
 /** Eden treaty error shape: `{ status: number, value: unknown, response: Response }`. */
 type EdenError = { status: number; value: unknown };
 
-function isEdenError(err: unknown): err is EdenError {
+const isEdenError = (err: unknown): err is EdenError => {
   return (
     err != null &&
     typeof err === "object" &&
@@ -14,23 +14,23 @@ function isEdenError(err: unknown): err is EdenError {
     typeof (err as { status: unknown }).status === "number" &&
     "value" in err
   );
-}
+};
 
 /**
  * session-auth 页面（/preview, /junk-check）碰到 401 时：跳登录页带 return_to。
  * 返回 true 表示已经触发跳转，调用方应该立即终止后续处理。
  */
-export function redirectToLoginOnUnauthorized(err: unknown): boolean {
+export const redirectToLoginOnUnauthorized = (err: unknown): boolean => {
   if (isEdenError(err) && err.status === 401) {
     const here = window.location.pathname + window.location.search;
     window.location.href = `/login?return_to=${encodeURIComponent(here)}`;
     return true;
   }
   return false;
-}
+};
 
 /** 从 Eden / Error 错误里挖 error 字段；拿不到就用 HTTP status 文本兜底 */
-export async function extractErrorMessage(err: unknown): Promise<string> {
+export const extractErrorMessage = async (err: unknown): Promise<string> => {
   if (isEdenError(err)) {
     const v = err.value;
     if (typeof v === "string" && v) return v;
@@ -42,7 +42,7 @@ export async function extractErrorMessage(err: unknown): Promise<string> {
   }
   if (err instanceof Error) return err.message;
   return String(err);
-}
+};
 
 // ─── Route search-param validator ──────────────────────────────────────────
 
@@ -66,9 +66,9 @@ export async function extractErrorMessage(err: unknown): Promise<string> {
  * `t.Optional(...)`：缺失或脏值都视作 undefined（key 不出现在解析结果里）；
  * 必填字段缺失或类型对不上 → 抛 → errorComponent。
  */
-export function validateSearch<T extends TSchema>(
+export const validateSearch = <T extends TSchema>(
   schema: T,
-): (input: Record<string, unknown>) => Static<T> {
+): ((input: Record<string, unknown>) => Static<T>) => {
   return (input) => {
     const cleaned = Value.Clean(schema, { ...input });
     const converted = Value.Convert(schema, cleaned) as Record<string, unknown>;
@@ -85,4 +85,4 @@ export function validateSearch<T extends TSchema>(
     }
     return Value.Parse(schema, converted) as Static<T>;
   };
-}
+};

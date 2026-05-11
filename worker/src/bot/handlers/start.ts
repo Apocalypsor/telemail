@@ -21,7 +21,7 @@ import { InlineKeyboard } from "grammy";
 /** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/用户管理。
  *  /start 默认私聊，inline web_app 按钮在私聊有效；没配 WORKER_URL 时回退
  *  到文本命令（callback_data 对应 /unread 等路由）。 */
-function mainMenuKeyboard(admin: boolean, env: Env): InlineKeyboard {
+const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
   const kb = new InlineKeyboard();
   if (env.WORKER_URL) {
     const base = env.WORKER_URL.replace(/\/$/, "");
@@ -57,9 +57,9 @@ function mainMenuKeyboard(admin: boolean, env: Env): InlineKeyboard {
       .row();
   }
   return kb;
-}
+};
 
-export function registerStartHandlers(bot: Bot, env: Env) {
+export const registerStartHandlers = (bot: Bot, env: Env) => {
   // ─── /start: 主入口，自动注册用户（私聊由全局守卫保证） ──────────────────
   bot.command("start", async (ctx) => {
     const telegramId = String(ctx.from?.id);
@@ -165,4 +165,4 @@ export function registerStartHandlers(bot: Bot, env: Env) {
     }
     return ctx.answerCallbackQuery();
   });
-}
+};

@@ -16,7 +16,7 @@ import type { Bot } from "grammy";
  *   pinned_message 服务消息——反正顶部 pin banner 不受影响，只是把聊天流里的
  *   "频道 pinned 「xxx」"那条噪音去掉。
  */
-export function registerPinCleanupHandler(bot: Bot, _env: Env) {
+export const registerPinCleanupHandler = (bot: Bot, _env: Env) => {
   bot.on(
     ["message:pinned_message", "channel_post:pinned_message"],
     async (ctx) => {
@@ -25,4 +25,4 @@ export function registerPinCleanupHandler(bot: Bot, _env: Env) {
       await ctx.deleteMessage().catch(() => {});
     },
   );
-}
+};

@@ -1,7 +1,7 @@
-export function resolveSameOriginRedirectUrl(
+export const resolveSameOriginRedirectUrl = (
   requestUrl: string,
   target = "/",
-): string {
+): string => {
   const base = new URL(requestUrl);
   try {
     const redirectUrl = new URL(target, base.origin);
@@ -10,4 +10,4 @@ export function resolveSameOriginRedirectUrl(
   } catch {
     return `${base.origin}/`;
   }
-}
+};

@@ -1,5 +1,129 @@
 import { Html } from "@elysiajs/html";
 
+const Layout = (title: string, body: HtmlChild): HtmlElement => {
+  return h("html", { lang: "zh-CN" }, [
+    h("head", null, [
+      h("meta", { charset: "utf-8" }),
+      h("meta", {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
+      }),
+      h("title", null, title),
+      h("link", { rel: "icon", type: "image/png", href: "/favicon.png" }),
+      h("style", null, INLINE_CSS),
+    ]),
+    h("body", null, body),
+  ]);
+};
+
+const Card = (children: HtmlChild, className?: string): HtmlElement => {
+  return h(
+    "main",
+    { class: `card${className ? ` ${className}` : ""}` },
+    children,
+  );
+};
+
+export const OAuthSetupPage = ({
+  startUrl,
+  callbackUrl,
+  accountEmail,
+}: {
+  startUrl: string;
+  callbackUrl: string;
+  accountEmail: string;
+}): HtmlElement => {
+  return Layout(
+    "OAuth 授权",
+    Card([
+      h("h1", null, "OAuth 授权"),
+      h("p", null, [
+        "为账号 ",
+        h("code", null, accountEmail),
+        " 授权邮箱访问权限。回调成功后 ",
+        h("code", null, "refresh_token"),
+        " 会自动保存到 D1 数据库。",
+      ]),
+      h("ol", { class: "steps" }, [
+        h("li", null, [
+          "在 OAuth 应用的 ",
+          h("strong", null, "Redirect URIs"),
+          " 添加：",
+          h("code", null, callbackUrl),
+        ]),
+        h("li", null, "点击下方按钮完成授权。"),
+        h("li", null, [
+          h("strong", null, `请确认登录的是 ${accountEmail}`),
+          "，回调成功后 refresh_token 会自动保存。",
+        ]),
+      ]),
+      h("a", { class: "btn", href: startUrl }, "开始授权"),
+    ]),
+  );
+};
+
+export const OAuthCallbackPage = ({
+  refreshToken,
+  scope,
+  expiresIn,
+  accountEmail,
+}: {
+  refreshToken: string | undefined;
+  scope: string;
+  expiresIn: number | undefined;
+  accountEmail: string;
+}): HtmlElement => {
+  const title = refreshToken ? "OAuth 授权成功" : "本次未返回 Refresh Token";
+  const statusText = refreshToken
+    ? `已为 ${accountEmail} 保存 refresh_token 到数据库，后续会自动使用。Watch 已自动续订。`
+    : "Google 返回成功，但没有 refresh_token。通常是同一账号已授权过且未强制重新授权。";
+
+  const tokenBlock = refreshToken
+    ? h("div", null, [
+        h(
+          "textarea",
+          { id: "token", readonly: true, class: "token-input" },
+          refreshToken,
+        ),
+        h("button", { type: "button", id: "copy", class: "btn" }, "复制 Token"),
+      ])
+    : h(
+        "p",
+        { class: "text-warn" },
+        `请重新执行授权流程，并确认登录的是 ${accountEmail}。`,
+      );
+
+  const expiryNote =
+    typeof expiresIn === "number"
+      ? `，access_token 有效期约 ${expiresIn} 秒`
+      : "";
+
+  return Layout(title, [
+    Card([
+      h("h1", { class: refreshToken ? "title-ok" : "title-warn" }, title),
+      h("p", null, statusText),
+      tokenBlock,
+      h("p", null, ["返回 scope: ", h("code", null, scope), `${expiryNote}。`]),
+    ]),
+    h("script", null, COPY_SCRIPT),
+  ]);
+};
+
+export const OAuthErrorPage = ({
+  title,
+  detail,
+}: {
+  title: string;
+  detail: string;
+}): HtmlElement => {
+  return Layout(
+    title,
+    Card([
+      h("h1", { class: "title-err" }, title),
+      h("pre", { class: "error" }, detail),
+    ]),
+  );
+};
 /** kitajs/html `JSX.Element` 实际就是 string | Promise<string> —— 不引 JSX 命名空间，
  *  避免 page 端 `react-jsx` 全局 JSX 冲突。 */
 type HtmlElement = string | Promise<string>;
@@ -128,138 +252,13 @@ const COPY_SCRIPT = `
 var btn = document.getElementById('copy');
 var input = document.getElementById('token');
 if (btn && input) {
-  btn.addEventListener('click', async function () {
+  btn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(input.value);
       btn.textContent = '已复制';
-      setTimeout(function () { btn.textContent = '复制 Token'; }, 1200);
+      setTimeout(() => { btn.textContent = '复制 Token'; }, 1200);
     } catch {
       btn.textContent = '复制失败';
     }
   });
 }`;
-
-function Layout(title: string, body: HtmlChild): HtmlElement {
-  return h("html", { lang: "zh-CN" }, [
-    h("head", null, [
-      h("meta", { charset: "utf-8" }),
-      h("meta", {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1",
-      }),
-      h("title", null, title),
-      h("link", { rel: "icon", type: "image/png", href: "/favicon.png" }),
-      h("style", null, INLINE_CSS),
-    ]),
-    h("body", null, body),
-  ]);
-}
-
-function Card(children: HtmlChild, className?: string): HtmlElement {
-  return h(
-    "main",
-    { class: `card${className ? ` ${className}` : ""}` },
-    children,
-  );
-}
-
-export function OAuthSetupPage({
-  startUrl,
-  callbackUrl,
-  accountEmail,
-}: {
-  startUrl: string;
-  callbackUrl: string;
-  accountEmail: string;
-}): HtmlElement {
-  return Layout(
-    "OAuth 授权",
-    Card([
-      h("h1", null, "OAuth 授权"),
-      h("p", null, [
-        "为账号 ",
-        h("code", null, accountEmail),
-        " 授权邮箱访问权限。回调成功后 ",
-        h("code", null, "refresh_token"),
-        " 会自动保存到 D1 数据库。",
-      ]),
-      h("ol", { class: "steps" }, [
-        h("li", null, [
-          "在 OAuth 应用的 ",
-          h("strong", null, "Redirect URIs"),
-          " 添加：",
-          h("code", null, callbackUrl),
-        ]),
-        h("li", null, "点击下方按钮完成授权。"),
-        h("li", null, [
-          h("strong", null, `请确认登录的是 ${accountEmail}`),
-          "，回调成功后 refresh_token 会自动保存。",
-        ]),
-      ]),
-      h("a", { class: "btn", href: startUrl }, "开始授权"),
-    ]),
-  );
-}
-
-export function OAuthCallbackPage({
-  refreshToken,
-  scope,
-  expiresIn,
-  accountEmail,
-}: {
-  refreshToken: string | undefined;
-  scope: string;
-  expiresIn: number | undefined;
-  accountEmail: string;
-}): HtmlElement {
-  const title = refreshToken ? "OAuth 授权成功" : "本次未返回 Refresh Token";
-  const statusText = refreshToken
-    ? `已为 ${accountEmail} 保存 refresh_token 到数据库，后续会自动使用。Watch 已自动续订。`
-    : "Google 返回成功，但没有 refresh_token。通常是同一账号已授权过且未强制重新授权。";
-
-  const tokenBlock = refreshToken
-    ? h("div", null, [
-        h(
-          "textarea",
-          { id: "token", readonly: true, class: "token-input" },
-          refreshToken,
-        ),
-        h("button", { type: "button", id: "copy", class: "btn" }, "复制 Token"),
-      ])
-    : h(
-        "p",
-        { class: "text-warn" },
-        `请重新执行授权流程，并确认登录的是 ${accountEmail}。`,
-      );
-
-  const expiryNote =
-    typeof expiresIn === "number"
-      ? `，access_token 有效期约 ${expiresIn} 秒`
-      : "";
-
-  return Layout(title, [
-    Card([
-      h("h1", { class: refreshToken ? "title-ok" : "title-warn" }, title),
-      h("p", null, statusText),
-      tokenBlock,
-      h("p", null, ["返回 scope: ", h("code", null, scope), `${expiryNote}。`]),
-    ]),
-    h("script", null, COPY_SCRIPT),
-  ]);
-}
-
-export function OAuthErrorPage({
-  title,
-  detail,
-}: {
-  title: string;
-  detail: string;
-}): HtmlElement {
-  return Layout(
-    title,
-    Card([
-      h("h1", { class: "title-err" }, title),
-      h("pre", { class: "error" }, detail),
-    ]),
-  );
-}

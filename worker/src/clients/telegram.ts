@@ -3,34 +3,34 @@ import { TG_API_BASE, TG_MEDIA_GROUP_LIMIT } from "@worker/constants";
 import type { Attachment } from "@worker/types";
 import { HTTPError } from "ky";
 
-function isEntityParseError(description: string | undefined): boolean {
+const isEntityParseError = (description: string | undefined): boolean => {
   return !!description && /can't parse entities/i.test(description);
-}
+};
 
-function markdownV2ToPlainText(text: string): string {
+const markdownV2ToPlainText = (text: string): string => {
   let out = text;
   out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1: $2");
   out = out.replace(/\\([_*[\]()~`>#+\-=|{}.!\\])/g, "$1");
   return out;
-}
+};
 
-function extractTelegramDescription(payload: unknown): string {
+const extractTelegramDescription = (payload: unknown): string => {
   if (!payload || typeof payload !== "object" || !("description" in payload))
     return "Unknown Telegram error";
   const desc = (payload as { description?: unknown }).description;
   return typeof desc === "string" ? desc : "Unknown Telegram error";
-}
+};
 
 /**
  * 通用 Telegram JSON API 请求，带 MarkdownV2 parse error 自动回退。
  * 429 由 ky 内置 retry 自动处理。
  * 当 parse_mode 存在且返回 entity parse error 时，自动去掉 parse_mode 并将 text/caption 转为纯文本重试。
  */
-async function tgPost<T = unknown>(
+const tgPost = async <T = unknown>(
   url: string,
   payload: Record<string, unknown>,
   label: string,
-): Promise<T> {
+): Promise<T> => {
   try {
     return ((await http.post(url, { json: payload }).json()) as { result: T })
       .result;
@@ -56,17 +56,17 @@ async function tgPost<T = unknown>(
 
     throw new Error(`TG ${label} ${response.status}: ${errDescription}`);
   }
-}
+};
 
 /** 发送纯文字消息，返回 message_id。`extras` 用于透传 reply_to_message_id /
  *  link_preview_options 等可选字段（与 chat_id/text/parse_mode 同层）。 */
-export async function sendTextMessage(
+export const sendTextMessage = async (
   token: string,
   chatId: string,
   text: string,
   replyMarkup?: unknown,
   extras?: Record<string, unknown>,
-): Promise<number> {
+): Promise<number> => {
   const url = `${TG_API_BASE}${token}/sendMessage`;
   const payload: Record<string, unknown> = {
     chat_id: chatId,
@@ -81,16 +81,16 @@ export async function sendTextMessage(
     "sendMessage",
   );
   return data.message_id;
-}
+};
 
 /** 编辑已发送的文字消息 */
-export async function editTextMessage(
+export const editTextMessage = async (
   token: string,
   chatId: string,
   messageId: number,
   text: string,
   replyMarkup?: unknown,
-): Promise<void> {
+): Promise<void> => {
   const url = `${TG_API_BASE}${token}/editMessageText`;
   const payload: Record<string, unknown> = {
     chat_id: chatId,
@@ -100,9 +100,9 @@ export async function editTextMessage(
   };
   if (replyMarkup) payload.reply_markup = replyMarkup;
   await tgPost(url, payload, "editMessageText");
-}
+};
 
-function attToBlob(att: Attachment): Blob {
+const attToBlob = (att: Attachment): Blob => {
   const mime = att.mimeType || "application/octet-stream";
   // Cast through unknown：Workers runtime 的 ArrayBufferLike 跟 page tsconfig
   // lib (DOM) 里的 BlobPart 不严格相容，运行时一致。
@@ -111,7 +111,10 @@ function attToBlob(att: Attachment): Blob {
       ? new TextEncoder().encode(att.content)
       : att.content;
   return new Blob([part as unknown as ArrayBuffer], { type: mime });
-}
+};
+
+/** pinChatMessage 的精细返回值 —— 上层（reminder dispatch）需要分支。 */
+export type PinResult = "ok" | "not_found" | "rate_limited";
 
 /**
  * 发送消息 + 附件，返回文字消息的 message_id。
@@ -119,13 +122,13 @@ function attToBlob(att: Attachment): Blob {
  * - 多个附件: 先发文字消息（带 reply_markup），再发媒体组作为回复
  * - 超过 10 个附件: 分批发送，每批最多 10 个
  */
-export async function sendWithAttachments(
+export const sendWithAttachments = async (
   token: string,
   chatId: string,
   caption: string,
   attachments: Attachment[],
   replyMarkup?: unknown,
-): Promise<number> {
+): Promise<number> => {
   try {
     if (attachments.length === 1) {
       const att = attachments[0];
@@ -199,16 +202,16 @@ export async function sendWithAttachments(
       `发送附件消息异常: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
-}
+};
 
 /** 编辑附件消息的 caption */
-export async function editMessageCaption(
+export const editMessageCaption = async (
   token: string,
   chatId: string,
   messageId: number,
   caption: string,
   replyMarkup?: unknown,
-): Promise<void> {
+): Promise<void> => {
   const url = `${TG_API_BASE}${token}/editMessageCaption`;
   const payload: Record<string, unknown> = {
     chat_id: chatId,
@@ -218,17 +221,17 @@ export async function editMessageCaption(
   };
   if (replyMarkup) payload.reply_markup = replyMarkup;
   await tgPost(url, payload, "editMessageCaption");
-}
+};
 
 /**
  * 置顶消息。幂等：已置顶或消息不存在时静默返回；其它错误（无权限等）抛出。
  * 默认 disable_notification=true，避免每次 ⭐ 都刷一条「已置顶」提示。
  */
-export async function pinChatMessage(
+export const pinChatMessage = async (
   token: string,
   chatId: string,
   messageId: number,
-): Promise<PinResult> {
+): Promise<PinResult> => {
   const url = `${TG_API_BASE}${token}/pinChatMessage`;
   try {
     await tgPost(
@@ -249,17 +252,14 @@ export async function pinChatMessage(
     }
     throw err;
   }
-}
-
-/** pinChatMessage 的精细返回值 —— 上层（reminder dispatch）需要分支。 */
-export type PinResult = "ok" | "not_found" | "rate_limited";
+};
 
 /** 取消置顶指定消息。幂等：未置顶 / 消息不存在 / 被限流，全部静默返回。 */
-export async function unpinChatMessage(
+export const unpinChatMessage = async (
   token: string,
   chatId: string,
   messageId: number,
-): Promise<void> {
+): Promise<void> => {
   const url = `${TG_API_BASE}${token}/unpinChatMessage`;
   try {
     await tgPost(
@@ -277,50 +277,53 @@ export async function unpinChatMessage(
       return;
     throw err;
   }
-}
+};
 
 /** 设置/更新消息的 inline keyboard */
-export async function setReplyMarkup(
+export const setReplyMarkup = async (
   token: string,
   chatId: string,
   messageId: number,
   replyMarkup: unknown,
-): Promise<void> {
+): Promise<void> => {
   const url = `${TG_API_BASE}${token}/editMessageReplyMarkup`;
   await tgPost(
     url,
     { chat_id: chatId, message_id: messageId, reply_markup: replyMarkup },
     "editMessageReplyMarkup",
   );
-}
+};
 
 /** 删除消息（用于去重时撤回重复消息） */
 /** 生成指向 Telegram 群组消息的深链接 */
-export function buildTgMessageLink(chatId: string, messageId: number): string {
+export const buildTgMessageLink = (
+  chatId: string,
+  messageId: number,
+): string => {
   const numericId = chatId.replace(/^-100/, "");
   return `https://t.me/c/${numericId}/${messageId}`;
-}
+};
 
-export async function deleteMessage(
+export const deleteMessage = async (
   token: string,
   chatId: string,
   messageId: number,
-): Promise<void> {
+): Promise<void> => {
   const url = `${TG_API_BASE}${token}/deleteMessage`;
   await tgPost(
     url,
     { chat_id: chatId, message_id: messageId },
     "deleteMessage",
   );
-}
+};
 
-async function sendMediaGroupChunk(
+const sendMediaGroupChunk = async (
   token: string,
   chatId: string,
   caption: string,
   attachments: Attachment[],
   replyToMessageId?: number,
-): Promise<number> {
+): Promise<number> => {
   const form = new FormData();
   form.append("chat_id", chatId);
   if (replyToMessageId)
@@ -398,4 +401,4 @@ async function sendMediaGroupChunk(
       `TG sendMediaGroup ${response.status}: ${errBody.description}`,
     );
   }
-}
+};

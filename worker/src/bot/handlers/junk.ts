@@ -14,7 +14,7 @@ import { InlineKeyboard } from "grammy";
  * "star" 表示未星标（按钮动作是加星），"unstar" 表示已星标。
  * 用 junk_cancel 还原键盘时避免查远端 `isStarred()`。
  */
-function readStarredFromReplyMarkup(replyMarkup: unknown): boolean {
+const readStarredFromReplyMarkup = (replyMarkup: unknown): boolean => {
   if (!replyMarkup || typeof replyMarkup !== "object") return false;
   const rows = (replyMarkup as { inline_keyboard?: unknown }).inline_keyboard;
   if (!Array.isArray(rows)) return false;
@@ -30,7 +30,7 @@ function readStarredFromReplyMarkup(replyMarkup: unknown): boolean {
     }
   }
   return false;
-}
+};
 
 /**
  * 标记为垃圾邮件 inline button，两步确认：
@@ -40,7 +40,7 @@ function readStarredFromReplyMarkup(replyMarkup: unknown): boolean {
  *  - `junk_cancel:s` 点取消 → 从 callback_data 还原 star 状态、重建键盘。*不* 查远端
  *                    isStarred、*不* 动 pin 状态 —— junk 操作保持和 star/pin 解耦
  */
-export function registerJunkHandler(bot: Bot, env: Env) {
+export const registerJunkHandler = (bot: Bot, env: Env) => {
   bot.callbackQuery("junk_mark", async (ctx) => {
     const msg = ctx.callbackQuery.message;
     if (!msg) return;
@@ -120,4 +120,4 @@ export function registerJunkHandler(bot: Bot, env: Env) {
       });
     }
   });
-}
+};

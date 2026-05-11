@@ -10,10 +10,10 @@ import type { WhoamiResponse } from "@worker/api/modules/auth/model";
  * 同一份缓存 —— 一个页面里多个组件（WebLayout 的顶栏 + 业务页自己）各
  * 调一次 `useSession`，实际只发一次请求。
  */
-export function useSession(): {
+export const useSession = (): {
   isLoading: boolean;
   data: WhoamiResponse | null;
-} {
+} => {
   const q = useQuery<WhoamiResponse | null>({
     queryKey: ["session", "whoami"],
     queryFn: async () => {
@@ -33,11 +33,11 @@ export function useSession(): {
     isLoading: q.isLoading,
     data: q.data ?? null,
   };
-}
+};
 
 /** `/login?return_to=<current>` 的 URL —— 方便 "登录" 链接直接用。 */
-export function loginUrlForCurrentPath(): string {
+export const loginUrlForCurrentPath = (): string => {
   if (typeof window === "undefined") return "/login";
   const here = window.location.pathname + window.location.search;
   return `/login?return_to=${encodeURIComponent(here)}`;
-}
+};

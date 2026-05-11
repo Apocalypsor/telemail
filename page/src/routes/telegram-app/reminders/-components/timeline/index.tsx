@@ -9,13 +9,7 @@ import {
 import { DateRow } from "./date-row";
 import { ItemRow } from "./item-row";
 
-// Flat row union: the timeline alternates date headers and items, but they all
-// share the same column layout so a single rail can bridge through both.
-type TimelineRow =
-  | { kind: "date"; key: string; date: Date; count: number }
-  | { kind: "item"; key: string; reminder: Reminder };
-
-export function ReminderTimeline({
+export const ReminderTimeline = ({
   listOnly,
   reminders,
   loading,
@@ -31,7 +25,7 @@ export function ReminderTimeline({
   onDelete: (id: number) => void;
   onEdit: (id: number) => void;
   onOpenMail: (r: Reminder) => void;
-}) {
+}) => {
   // groupRemindersByDate 和 rows 拼装只依赖 reminders；reminders 没变就别重算。
   // useMemo 必须在任何条件 return 之前，才不踩 rules-of-hooks。
   // now 故意每渲染抓一次 —— "isOverdue" / "isImminent" 要看当前时间，缓存反而错。
@@ -130,4 +124,9 @@ export function ReminderTimeline({
       })}
     </div>
   );
-}
+};
+// Flat row union: the timeline alternates date headers and items, but they all
+// share the same column layout so a single rail can bridge through both.
+type TimelineRow =
+  | { kind: "date"; key: string; date: Date; count: number }
+  | { kind: "item"; key: string; reminder: Reminder };

@@ -4,7 +4,7 @@ import { t } from "@worker/i18n";
 import type { Env, TelegramUser } from "@worker/types";
 import { InlineKeyboard } from "grammy";
 
-export function userListText(users: TelegramUser[]): string {
+export const userListText = (users: TelegramUser[]): string => {
   if (users.length === 0) return t("admin:users.noUsers");
 
   let text = `${t("admin:users.title", { count: users.length })}\n\n`;
@@ -15,12 +15,12 @@ export function userListText(users: TelegramUser[]): string {
     text += `${status} ${name}${username}\n   ID: ${u.telegram_id}\n`;
   }
   return text;
-}
+};
 
-export function userListKeyboard(
+export const userListKeyboard = (
   users: TelegramUser[],
   opts?: { showBack?: boolean },
-): InlineKeyboard {
+): InlineKeyboard => {
   const kb = new InlineKeyboard();
   for (const u of users) {
     const name = formatUserName(u);
@@ -37,9 +37,9 @@ export function userListKeyboard(
   }
   if (opts?.showBack) kb.text(t("common:button.back"), "menu");
   return kb;
-}
+};
 
-export async function adminMenuKeyboard(env: Env): Promise<InlineKeyboard> {
+export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
   const failedCount = await countFailedEmails(env.DB);
   const failedLabel =
     failedCount > 0
@@ -57,12 +57,14 @@ export async function adminMenuKeyboard(env: Env): Promise<InlineKeyboard> {
   }
   kb.text(t("common:button.back"), "menu");
   return kb;
-}
+};
 
-export function failedEmailListMessage(items: FailedEmail[]): {
+export const failedEmailListMessage = (
+  items: FailedEmail[],
+): {
   text: string;
   keyboard: InlineKeyboard;
-} {
+} => {
   if (items.length === 0) {
     return {
       text: t("admin:failedEmails.noRecords"),
@@ -95,4 +97,4 @@ export function failedEmailListMessage(items: FailedEmail[]): {
     text: `${t("admin:failedEmails.titleWithCount", { count: items.length })}\n\n${lines.join("\n\n")}`,
     keyboard: kb,
   };
-}
+};

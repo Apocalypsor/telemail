@@ -8,17 +8,12 @@ import { parseHTML } from "linkedom";
 import type { Address } from "postal-mime";
 import TurndownService from "turndown";
 
-const utf8Decoder = new TextDecoder("utf-8", {
-  fatal: false,
-  ignoreBOM: false,
-});
-
 /**
  * 解 quoted-printable —— 先去掉 `=\n` 软换行，再把每段连续的 `=XX=YY...`
  * 收成字节序列、按 UTF-8 解码。逐字节 `String.fromCharCode` 会把多字节序列
  * 炸成 mojibake（`=C2=A9` → `Â©` 而不是 `©`），别走那条路。
  */
-function decodeQuotedPrintable(input: string): string {
+const decodeQuotedPrintable = (input: string): string => {
   return input
     .replace(/=\r?\n/g, "")
     .replace(/(?:=[0-9A-Fa-f]{2})+/g, (run) => {
@@ -28,25 +23,9 @@ function decodeQuotedPrintable(input: string): string {
       }
       return utf8Decoder.decode(bytes);
     });
-}
+};
 
-/** HTML → Markdown 转换器实例（linkedom DOM + turndown） */
-const turndown = new TurndownService({
-  bulletListMarker: "-",
-  codeBlockStyle: "fenced",
-  emDelimiter: "_",
-  strongDelimiter: "**",
-});
-
-// Strip images — Telegram can't render inline images
-turndown.addRule("stripImages", {
-  filter: "img",
-  replacement() {
-    return "";
-  },
-});
-
-export function htmlToMarkdown(html: string): string {
+export const htmlToMarkdown = (html: string): string => {
   // Fallback: decode quoted-printable if the MIME parser left it un-decoded
   if (html.includes("=3D")) html = decodeQuotedPrintable(html);
 
@@ -64,32 +43,32 @@ export function htmlToMarkdown(html: string): string {
     .turndown(document.body)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
+};
 
 /** 修复 Telegram MarkdownV2 易出错片段（例如单独一行的 "***"） */
-function sanitizeTelegramMdV2(md: string): string {
+const sanitizeTelegramMdV2 = (md: string): string => {
   return md.replace(/(^|\n)\*{3,}(?=\n|$)/g, "$1\\*\\*\\*");
-}
+};
 
 /** 标准 Markdown → Telegram MarkdownV2 */
-export function toTelegramMdV2(markdown: string): string {
+export const toTelegramMdV2 = (markdown: string): string => {
   if (!markdown) return "";
   return markdownToMdV2(markdown).trimEnd();
-}
+};
 
-function convertTelegramMdV2Safe(markdown: string): string {
+const convertTelegramMdV2Safe = (markdown: string): string => {
   return sanitizeTelegramMdV2(toTelegramMdV2(markdown));
-}
+};
 
 /**
  * 处理邮件正文：优先将 HTML 转 Markdown，fallback 到纯文本，超长截断并提示。
  * @param maxLen 本次可用的最大字符数（由调用方根据其他部分占用动态计算）
  */
-export function formatBody(
+export const formatBody = (
   text: string | undefined,
   html: string | undefined,
   maxLen: number,
-): string {
+): string => {
   let raw = "";
 
   if (html) {
@@ -125,12 +104,12 @@ export function formatBody(
 
   // 极端兜底：如果回退仍不安全，降级为纯文本。
   return `${escapeMdV2(raw.substring(0, maxLen))}${truncatedHint}`;
-}
+};
 
 // ─── 邮件正文预处理（供 LLM 使用） ──────────────────────────
 
 /** 去除裸 URL 尾部的标点，但保留平衡的括号 */
-function cleanTrailingPunctuation(url: string): string {
+const cleanTrailingPunctuation = (url: string): string => {
   let u = url.replace(/[.,;:!?>]+$/, "");
   while (u.endsWith(")")) {
     const opens = (u.match(/\(/g) || []).length;
@@ -139,10 +118,12 @@ function cleanTrailingPunctuation(url: string): string {
     else break;
   }
   return u;
-}
+};
 
 /** 从文本中提取链接（Markdown 格式 + 裸链接），返回 {label, url} 数组，最多 MAX_LINKS 个 */
-export function extractLinks(text: string): { label: string; url: string }[] {
+export const extractLinks = (
+  text: string,
+): { label: string; url: string }[] => {
   const links: { label: string; url: string }[] = [];
   const seen = new Set<string>();
 
@@ -165,50 +146,72 @@ export function extractLinks(text: string): { label: string; url: string }[] {
   }
 
   return links;
-}
+};
 
 /** 去除文本中的所有超链接（Markdown 链接保留文字，裸链接直接删除） */
-function stripLinks(text: string): string {
+const stripLinks = (text: string): string => {
   let out = text.replace(/\[([^\]]*)\]\(https?:\/\/[^)]*\)/g, "$1");
   out = out.replace(/https?:\/\/\S+/g, "");
   return out;
-}
+};
 
 /** 预处理邮件正文：去首尾空行 + 去链接 + 截断 */
-export function prepareBody(rawBody: string): string {
+export const prepareBody = (rawBody: string): string => {
   const stripped = stripLinks(rawBody)
     .replace(/^\s*\n+/, "")
     .replace(/\n+\s*$/, "");
   return stripped.length > MAX_BODY_CHARS
     ? `${stripped.slice(0, MAX_BODY_CHARS)}...`
     : stripped;
-}
+};
 
 // ─── 邮件正文包装 / 地址格式化 ──────────────────────────────────────────────
 
 /** 将 PostalMime Address 格式化为可读字符串 */
-export function formatAddress(addr: Address): string {
+export const formatAddress = (addr: Address): string => {
   if (addr.address)
     return addr.name ? `${addr.name} <${addr.address}>` : addr.address;
   return addr.name;
-}
+};
 
 /**
  * 邮件 Date 头的安全解析。Gmail 来的是 RFC 5322（"Wed, 29 Apr 2026 …"），IMAP /
  * Outlook 走 PostalMime 来的是 ISO 8601 —— `new Date(...)` 两种都接，但格式有时
  * 残缺，统一收成 Date | null。空 / 解析不出来 → null。
  */
-export function parseEmailDate(input: string | null | undefined): Date | null {
+export const parseEmailDate = (
+  input: string | null | undefined,
+): Date | null => {
   if (!input) return null;
   const d = new Date(input);
   return Number.isNaN(d.getTime()) ? null : d;
-}
+};
 
 /** 将纯文本包裹成可读的 HTML 页面 */
-export function wrapPlainText(text: string): string {
+export const wrapPlainText = (text: string): string => {
   const escaped = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:monospace;white-space:pre-wrap;word-break:break-word;max-width:800px;margin:2em auto;padding:0 1em;line-height:1.5;color:#333}</style></head><body>${escaped}</body></html>`;
-}
+};
+const utf8Decoder = new TextDecoder("utf-8", {
+  fatal: false,
+  ignoreBOM: false,
+});
+
+/** HTML → Markdown 转换器实例（linkedom DOM + turndown） */
+const turndown = new TurndownService({
+  bulletListMarker: "-",
+  codeBlockStyle: "fenced",
+  emDelimiter: "_",
+  strongDelimiter: "**",
+});
+
+// Strip images — Telegram can't render inline images
+turndown.addRule("stripImages", {
+  filter: "img",
+  replacement() {
+    return "";
+  },
+});

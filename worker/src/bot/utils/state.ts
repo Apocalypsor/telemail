@@ -1,10 +1,36 @@
 import type { Env } from "@worker/types";
 
-const BOT_STATE_TTL = 300; // 5 minutes
+// 5 minutes
 
-function botStateKey(userId: string): string {
+const botStateKey = (userId: string): string => {
   return `bot_state:${userId}`;
-}
+};
+
+export const getBotState = async (
+  env: Env,
+  userId: string,
+): Promise<BotInputState | null> => {
+  const raw = await env.EMAIL_KV.get(botStateKey(userId));
+  return raw ? JSON.parse(raw) : null;
+};
+
+export const setBotState = async (
+  env: Env,
+  userId: string,
+  state: BotInputState,
+): Promise<void> => {
+  await env.EMAIL_KV.put(botStateKey(userId), JSON.stringify(state), {
+    expirationTtl: BOT_STATE_TTL,
+  });
+};
+
+export const clearBotState = async (
+  env: Env,
+  userId: string,
+): Promise<void> => {
+  await env.EMAIL_KV.delete(botStateKey(userId));
+};
+const BOT_STATE_TTL = 300;
 
 type BotInputState =
   | { action: "add"; step: "chat_id" }
@@ -36,25 +62,3 @@ type BotInputState =
       imapUser: string;
     }
   | { action: "edit_chatid"; accountId: number };
-
-export async function getBotState(
-  env: Env,
-  userId: string,
-): Promise<BotInputState | null> {
-  const raw = await env.EMAIL_KV.get(botStateKey(userId));
-  return raw ? JSON.parse(raw) : null;
-}
-
-export async function setBotState(
-  env: Env,
-  userId: string,
-  state: BotInputState,
-): Promise<void> {
-  await env.EMAIL_KV.put(botStateKey(userId), JSON.stringify(state), {
-    expirationTtl: BOT_STATE_TTL,
-  });
-}
-
-export async function clearBotState(env: Env, userId: string): Promise<void> {
-  await env.EMAIL_KV.delete(botStateKey(userId));
-}

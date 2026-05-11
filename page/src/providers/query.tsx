@@ -1,6 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
+export const QueryProvider = ({ children }: { children: ReactNode }) => {
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
 // 单例：router context 从模块级拿（不走 React tree），React 组件走 QueryProvider。
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -11,9 +16,3 @@ export const queryClient = new QueryClient({
     },
   },
 });
-
-export function QueryProvider({ children }: { children: ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-}

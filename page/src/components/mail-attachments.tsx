@@ -1,11 +1,4 @@
-interface MailAttachmentItem {
-  id: string;
-  filename: string | null;
-  mimeType: string | null;
-  size: number | null;
-}
-
-function formatBytes(size: number | null): string | null {
+const formatBytes = (size: number | null): string | null => {
   if (size == null || !Number.isFinite(size) || size < 0) return null;
   if (size < 1024) return `${size} B`;
   const units = ["KB", "MB", "GB"];
@@ -15,15 +8,15 @@ function formatBytes(size: number | null): string | null {
     value /= 1024;
   }
   return `${value.toFixed(1)} TB`;
-}
+};
 
-export function MailAttachments({
+export const MailAttachments = ({
   attachments,
   getDownloadUrl,
 }: {
   attachments: MailAttachmentItem[];
   getDownloadUrl: (attachmentId: string) => string;
-}) {
+}) => {
   if (attachments.length === 0) return null;
 
   return (
@@ -60,4 +53,10 @@ export function MailAttachments({
       </ul>
     </section>
   );
+};
+interface MailAttachmentItem {
+  id: string;
+  filename: string | null;
+  mimeType: string | null;
+  size: number | null;
 }

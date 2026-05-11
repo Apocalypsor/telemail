@@ -15,7 +15,7 @@ import { useEffect } from "react";
 //   targetUrl 无  → closeMiniApp 关掉小程序（根页 = 没有上一页可退，直接退出）
 //
 // 非 TG 环境 / 老客户端：SDK 自身的 isAvailable 兜底，全部 no-op。
-export function useBackButton(targetUrl: string | undefined): void {
+export const useBackButton = (targetUrl: string | undefined): void => {
   const router = useRouter();
 
   useEffect(() => {
@@ -30,4 +30,4 @@ export function useBackButton(targetUrl: string | undefined): void {
       if (offBackButtonClick.isAvailable()) offBackButtonClick(handler);
     };
   }, [targetUrl, router]);
-}
+};

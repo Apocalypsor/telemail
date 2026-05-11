@@ -26,22 +26,22 @@ import { type ReactNode, useEffect } from "react";
 
 /** Raw initData 头给 ky 用（`api/client.ts` 注入到 `X-Telegram-Init-Data`）。
  *  非 TG 环境下 SDK 抛 `LaunchParamsRetrieveError`，吞掉返回空串。 */
-export function getInitData(): string {
+export const getInitData = (): string => {
   try {
     return retrieveRawInitData() ?? "";
   } catch {
     return "";
   }
-}
+};
 
-function isMobilePlatform(): boolean {
+const isMobilePlatform = (): boolean => {
   try {
     const p = retrieveLaunchParams().tgWebAppPlatform;
     return p === "ios" || p === "android" || p === "android_x";
   } catch {
     return false;
   }
-}
+};
 
 /**
  * 挂根部一次。`isTMA()` 同步嗅探当前环境是不是 TG WebApp（试着从 URL hash /
@@ -59,7 +59,7 @@ function isMobilePlatform(): boolean {
  * `--tg-viewport-*` CSS 变量，`app.css` 里 body padding sum 两套 inset
  * （safe-area + content-safe-area）避开刘海 / 浮动 chrome。
  */
-export function TelegramProvider({ children }: { children: ReactNode }) {
+export const TelegramProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isTMA()) return;
 
@@ -118,4 +118,4 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return <>{children}</>;
-}
+};

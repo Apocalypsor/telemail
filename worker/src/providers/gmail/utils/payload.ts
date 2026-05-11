@@ -3,21 +3,21 @@ import type { MailAttachmentMeta } from "@worker/types";
 import { base64urlToString } from "@worker/utils/base64url";
 
 /** 从 Gmail payload headers 中提取指定头部 */
-export function extractHeader(
+export const extractHeader = (
   payload: GmailPayload,
   name: string,
-): string | null {
+): string | null => {
   return (
     payload.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())
       ?.value ?? null
   );
-}
+};
 
 /** 递归收集内联图片（body.data 已内嵌的情况） */
-export function collectInlineParts(
+export const collectInlineParts = (
   payload: GmailPayload,
   cidMap: Map<string, string>,
-): void {
+): void => {
   if (!payload) return;
   const contentId = extractHeader(payload, "content-id");
   if (
@@ -32,13 +32,13 @@ export function collectInlineParts(
   if (payload.parts) {
     for (const part of payload.parts) collectInlineParts(part, cidMap);
   }
-}
+};
 
 /** 递归收集需要通过附件 API 获取的内联图片 */
-export function collectInlineAttachmentIds(
+export const collectInlineAttachmentIds = (
   payload: GmailPayload,
   result: { cid: string; mimeType: string; attachmentId: string }[],
-): void {
+): void => {
   if (!payload) return;
   const contentId = extractHeader(payload, "content-id");
   if (
@@ -56,9 +56,9 @@ export function collectInlineAttachmentIds(
   if (payload.parts) {
     for (const part of payload.parts) collectInlineAttachmentIds(part, result);
   }
-}
+};
 
-function isInlinePayload(payload: GmailPayload): boolean {
+const isInlinePayload = (payload: GmailPayload): boolean => {
   const disposition = extractHeader(
     payload,
     "content-disposition",
@@ -69,12 +69,12 @@ function isInlinePayload(payload: GmailPayload): boolean {
     (!!extractHeader(payload, "content-id") &&
       payload.mimeType?.startsWith("image/") === true)
   );
-}
+};
 
-export function collectAttachmentMeta(
+export const collectAttachmentMeta = (
   payload: GmailPayload,
   result: MailAttachmentMeta[] = [],
-): MailAttachmentMeta[] {
+): MailAttachmentMeta[] => {
   if (!payload) return result;
 
   const hasAttachmentContent = !!(
@@ -93,12 +93,12 @@ export function collectAttachmentMeta(
     for (const part of payload.parts) collectAttachmentMeta(part, result);
   }
   return result;
-}
+};
 
-export function collectVisibleAttachmentPayloads(
+export const collectVisibleAttachmentPayloads = (
   payload: GmailPayload,
   result: GmailPayload[] = [],
-): GmailPayload[] {
+): GmailPayload[] => {
   if (!payload) return result;
 
   const hasAttachmentContent = !!(
@@ -113,12 +113,12 @@ export function collectVisibleAttachmentPayloads(
       collectVisibleAttachmentPayloads(part, result);
   }
   return result;
-}
+};
 
-export function findAttachmentPayloadById(
+export const findAttachmentPayloadById = (
   payload: GmailPayload,
   attachmentId: string,
-): GmailPayload | null {
+): GmailPayload | null => {
   if (!payload) return null;
   if (
     payload.body?.attachmentId === attachmentId &&
@@ -133,22 +133,22 @@ export function findAttachmentPayloadById(
     }
   }
   return null;
-}
+};
 
-export function findAttachmentPayloadByIndex(
+export const findAttachmentPayloadByIndex = (
   payload: GmailPayload,
   attachmentId: string,
-): GmailPayload | null {
+): GmailPayload | null => {
   const index = Number(attachmentId);
   if (!Number.isInteger(index) || index < 0) return null;
   return collectVisibleAttachmentPayloads(payload)[index] ?? null;
-}
+};
 
 /** 递归提取 payload 中指定 MIME 类型的内容 */
-export function extractPartByMime(
+export const extractPartByMime = (
   payload: GmailPayload,
   mimeType: string,
-): string | null {
+): string | null => {
   if (!payload) return null;
 
   if (payload.mimeType === mimeType && payload.body?.data) {
@@ -163,4 +163,4 @@ export function extractPartByMime(
   }
 
   return null;
-}
+};

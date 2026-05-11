@@ -1,6 +1,6 @@
 import { Skeleton } from "@heroui/react";
 
-export function MailListSkeleton() {
+export const MailListSkeleton = () => {
   return (
     <div className="space-y-3">
       {[0, 1, 2].map((i) => (
@@ -15,4 +15,4 @@ export function MailListSkeleton() {
       ))}
     </div>
   );
-}
+};

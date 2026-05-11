@@ -19,21 +19,7 @@ import {
   resolveTz,
 } from "./-utils/tz";
 
-// 三件套任缺其一 → 退化为"所有待提醒"列表模式。
-// `back` 由从邮件预览页跳进来时带上，存在则渲染 TG BackButton 跳回。
-const Search = t.Object({
-  accountId: t.Optional(t.Number()),
-  emailMessageId: t.Optional(t.String()),
-  token: t.Optional(t.String()),
-  back: t.Optional(t.String()),
-});
-
-export const Route = createFileRoute("/telegram-app/reminders/")({
-  component: RemindersPage,
-  validateSearch: validateSearch(Search),
-});
-
-function RemindersPage() {
+const RemindersPage = () => {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const navigateToMail = useNavigateToMail();
@@ -158,19 +144,19 @@ function RemindersPage() {
   });
 
   // 删除前要求确认 —— TG popup / 浏览器 window.confirm 由 confirmPopup 统一
-  async function confirmDelete(id: number) {
+  const confirmDelete = async (id: number) => {
     if (!(await confirmPopup("确定删除这条提醒？"))) return;
     setStatus(null);
     deleteMut.mutate(id);
-  }
+  };
 
-  function applyPreset(idx: number) {
+  const applyPreset = (idx: number) => {
     const target = presetToDate(PRESETS[idx].mins, tz);
     const { ymd: y, hm: h } = formatInTz(target, tz);
     setDate(y);
     setTime(h);
     setActivePreset(idx);
-  }
+  };
 
   const minDate = useMemo(() => formatInTz(new Date(), tz).ymd, [tz]);
 
@@ -275,4 +261,17 @@ function RemindersPage() {
       />
     </div>
   );
-}
+};
+// 三件套任缺其一 → 退化为"所有待提醒"列表模式。
+// `back` 由从邮件预览页跳进来时带上，存在则渲染 TG BackButton 跳回。
+const Search = t.Object({
+  accountId: t.Optional(t.Number()),
+  emailMessageId: t.Optional(t.String()),
+  token: t.Optional(t.String()),
+  back: t.Optional(t.String()),
+});
+
+export const Route = createFileRoute("/telegram-app/reminders/")({
+  component: RemindersPage,
+  validateSearch: validateSearch(Search),
+});

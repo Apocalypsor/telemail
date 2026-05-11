@@ -15,21 +15,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { WebMailToolbar } from "./-components/web-toolbar";
 
-const Search = t.Object({
-  accountId: t.Number(),
-  t: t.String(),
-  folder: t.Optional(
-    t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
-  ),
-});
-const validateMailSearch = validateSearch(Search);
-
-export const Route = createFileRoute("/mail/$id/")({
-  component: WebMailPage,
-  validateSearch: validateMailSearch,
-});
-
-function WebMailPage() {
+const WebMailPage = () => {
   const { id: emailMessageId } = Route.useParams();
   const search = Route.useSearch();
   const qc = useQueryClient();
@@ -121,4 +107,17 @@ function WebMailPage() {
       </article>
     </WebLayout>
   );
-}
+};
+const Search = t.Object({
+  accountId: t.Number(),
+  t: t.String(),
+  folder: t.Optional(
+    t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
+  ),
+});
+const validateMailSearch = validateSearch(Search);
+
+export const Route = createFileRoute("/mail/$id/")({
+  component: WebMailPage,
+  validateSearch: validateMailSearch,
+});

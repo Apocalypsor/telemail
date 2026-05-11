@@ -3,10 +3,10 @@ import { PROVIDERS } from "@worker/providers";
 import type { Account } from "@worker/types";
 import { InlineKeyboard } from "grammy";
 
-export function accountDetailText(
+export const accountDetailText = (
   account: Account,
   ownerName?: string,
-): string {
+): string => {
   const klass = PROVIDERS[account.type];
   let text = `${t("accounts:detail.title", { id: account.id })}\n\n`;
   if (account.disabled) {
@@ -37,9 +37,9 @@ export function accountDetailText(
     text += `\n${t("accounts:detail.owner", { name: ownerName || t("common:label.none") })}`;
   }
   return text;
-}
+};
 
-export function accountDetailKeyboard(account: Account): InlineKeyboard {
+export const accountDetailKeyboard = (account: Account): InlineKeyboard => {
   const klass = PROVIDERS[account.type];
   const kb = new InlineKeyboard();
   const toggleLabel = account.disabled
@@ -71,11 +71,11 @@ export function accountDetailKeyboard(account: Account): InlineKeyboard {
     kb.text(t("common:button.backToAccounts"), "accs");
   }
   return kb;
-}
+};
 
-export function formatUserName(user: {
+export const formatUserName = (user: {
   first_name: string;
   last_name?: string | null;
-}): string {
+}): string => {
   return user.first_name + (user.last_name ? ` ${user.last_name}` : "");
-}
+};

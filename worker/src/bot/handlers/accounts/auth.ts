@@ -14,7 +14,7 @@ import { InlineKeyboard } from "grammy";
 import { resolveAccount, resolveOwnerName } from "./utils";
 
 /** 注册 OAuth / push renew / archive 标签管理类回调。 */
-export function registerAuthCallbacks(bot: Bot, env: Env) {
+export const registerAuthCallbacks = (bot: Bot, env: Env) => {
   // OAuth authorization (Gmail / Outlook)
   bot.callbackQuery(/^acc:(\d+):auth$/, async (ctx) => {
     const { accountId, account } = await resolveAccount(
@@ -198,4 +198,4 @@ export function registerAuthCallbacks(bot: Bot, env: Env) {
       text: newId ? t("archive:labelSaved") : t("archive:labelCleared"),
     });
   });
-}
+};

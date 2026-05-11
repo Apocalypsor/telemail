@@ -8,7 +8,7 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 
 /** 归档 inline button callback */
-export function registerArchiveHandler(bot: Bot, env: Env) {
+export const registerArchiveHandler = (bot: Bot, env: Env) => {
   bot.callbackQuery("archive", async (ctx) => {
     const msg = ctx.callbackQuery.message;
     if (!msg) return;
@@ -45,4 +45,4 @@ export function registerArchiveHandler(bot: Bot, env: Env) {
       });
     }
   });
-}
+};

@@ -1,7 +1,7 @@
 import { Spinner } from "@heroui/react";
 import type { Reminder } from "@worker/api/modules/reminders/model";
 
-export function Card({
+export const Card = ({
   it,
   canOpen,
   isOverdue,
@@ -17,7 +17,7 @@ export function Card({
   onOpen: () => void;
   onDelete: () => void;
   onEdit: () => void;
-}) {
+}) => {
   // 内容显示优先级 fallback：备注 > short_summary > 邮件 subject。
   // 取第一个非空，仅显示一行；都为空则 italic 占位。
   const text = it.text.trim();
@@ -88,4 +88,4 @@ export function Card({
       </div>
     </div>
   );
-}
+};

@@ -3,7 +3,7 @@ import { Chip } from "@heroui/react";
 /** 垃圾邮件检测结果卡：左侧圆形 SVG 弧度 gauge 显示置信度（mount 时 stroke
  *  绕一圈展开动画），右侧大字号百分比 + 标签。整卡按 isJunk 走 emerald / red
  *  双色调。 */
-export function ResultCard({
+export const ResultCard = ({
   result,
 }: {
   result: {
@@ -12,7 +12,7 @@ export function ResultCard({
     summary: string;
     tags: string[];
   };
-}) {
+}) => {
   const pct = Math.max(
     0,
     Math.min(100, Math.round(result.junkConfidence * 100)),
@@ -88,9 +88,9 @@ export function ResultCard({
       )}
     </div>
   );
-}
+};
 
-function Gauge({
+const Gauge = ({
   pct,
   finalOffset,
   circumference,
@@ -102,7 +102,7 @@ function Gauge({
   circumference: number;
   radius: number;
   isJunk: boolean;
-}) {
+}) => {
   // 100×100 viewBox 居中圆环。背景轨道 + 前景 stroke。前景 stroke 走 CSS
   // keyframe 从满 dashoffset (= circumference, 即 0%) 滚动到目标 offset
   // (即 pct%)。`--final-offset` 由 React 注入，keyframe 引用它，pct 一变
@@ -157,4 +157,4 @@ function Gauge({
       </div>
     </div>
   );
-}
+};

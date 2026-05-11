@@ -18,7 +18,7 @@ import { InlineKeyboard } from "grammy";
 import { failedEmailListMessage } from "./utils";
 
 /** 注册 failed-emails 管理回调：list / retry-all / fr:N / fd:N / failed_clear。 */
-export function registerFailedEmailCallbacks(bot: Bot, env: Env) {
+export const registerFailedEmailCallbacks = (bot: Bot, env: Env) => {
   // List failed emails
   bot.callbackQuery("failed", async (ctx) => {
     const userId = String(ctx.from.id);
@@ -132,4 +132,4 @@ export function registerFailedEmailCallbacks(bot: Bot, env: Env) {
       text: t("admin:failedEmails.clearedShort"),
     });
   });
-}
+};

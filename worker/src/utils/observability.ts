@@ -4,14 +4,12 @@ import {
   TelegramErrorReporter,
 } from "workers-observability-hub";
 
-type ErrorContext = Record<string, unknown>;
-
 /**
  * Eden treaty 在 `throwHttpError: true` 时抛 `EdenFetchError`（`extends Error`，
  * 带 `.status` / `.value`），但 `.message` 默认就是 `String(value)` —— body 是
  * 对象时变 `"[object Object]"`。这里把它压成可读字符串。
  */
-function formatErrorMessage(error: unknown): string {
+const formatErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     if (
       "status" in error &&
@@ -33,14 +31,14 @@ function formatErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
-}
+};
 
-export async function reportErrorToObservability(
+export const reportErrorToObservability = async (
   env: Env,
   event: string,
   error: unknown,
   context: ErrorContext = {},
-): Promise<void> {
+): Promise<void> => {
   const binding = env.OBS_SERVICE as Fetcher & ObservabilityHubBinding;
   const reporter = new TelegramErrorReporter({
     binding,
@@ -55,4 +53,5 @@ export async function reportErrorToObservability(
     context,
     timestamp: new Date().toISOString(),
   });
-}
+};
+type ErrorContext = Record<string, unknown>;

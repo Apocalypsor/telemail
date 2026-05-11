@@ -11,11 +11,11 @@ import {
 import { reportErrorToObservability } from "@worker/utils/observability";
 
 /** Queue consumer: 按 type 派发邮件投递 / 延迟删 TG 消息等任务 */
-export async function handleQueueBatch(
+export const handleQueueBatch = async (
   batch: MessageBatch<QueueMessage>,
   env: Env,
   ctx: ExecutionContext,
-): Promise<void> {
+): Promise<void> => {
   const waitUntil = ctx.waitUntil.bind(ctx);
   for (const msg of batch.messages) {
     try {
@@ -40,14 +40,14 @@ export async function handleQueueBatch(
       msg.retry();
     }
   }
-}
+};
 
 /** 按账号类型拉取原始邮件并投递到 Telegram */
-async function processEmailMessage(
+const processEmailMessage = async (
   msg: EmailQueueMessage,
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
-): Promise<void> {
+): Promise<void> => {
   const account = await getAccountById(env.DB, msg.accountId);
   if (!account) {
     console.log(
@@ -72,4 +72,4 @@ async function processEmailMessage(
     env,
     waitUntil,
   );
-}
+};

@@ -12,11 +12,11 @@ import { syncStarPinState } from "./reconcile";
 /** 用最新的 reminder count 重建邮件 keyboard 并 setReplyMarkup。
  *  Mini App 创建/删除提醒后调用 —— 让 ⏰ 按钮上的数字立即更新。
  *  没 mapping（邮件没在 TG）或 setReplyMarkup 报 "not modified" 都静默跳过。 */
-export async function refreshEmailKeyboardAfterReminderChange(
+export const refreshEmailKeyboardAfterReminderChange = async (
   env: Env,
   account: Account,
   emailMessageId: string,
-): Promise<void> {
+): Promise<void> => {
   const mappings = await getMappingsByEmailIds(env.DB, account.id, [
     emailMessageId,
   ]);
@@ -51,14 +51,14 @@ export async function refreshEmailKeyboardAfterReminderChange(
       { accountId: account.id, emailMessageId },
     );
   }
-}
+};
 
 /** 批量同步 Telegram 消息的星标按钮状态（starred 列表刷新时调用） */
-export async function syncStarButtonsForMappings(
+export const syncStarButtonsForMappings = async (
   env: Env,
   mappings: MessageMapping[],
   account: Account,
-): Promise<void> {
+): Promise<void> => {
   const canArchive = accountCanArchive(account);
   for (const m of mappings) {
     try {
@@ -98,4 +98,4 @@ export async function syncStarButtonsForMappings(
     }
     await syncStarPinState(env, m.tg_chat_id, m.tg_message_id, true);
   }
-}
+};

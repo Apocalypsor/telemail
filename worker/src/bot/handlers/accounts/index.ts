@@ -19,7 +19,7 @@ import { registerEditCallbacks } from "./edit";
 import { accountListKeyboard, resolveAccount, resolveOwnerName } from "./utils";
 
 /** 主入口：注册 /accounts 命令、列表 + 详情回调，再分发到 auth/edit/add 子模块。 */
-export function registerAccountHandlers(bot: Bot, env: Env) {
+export const registerAccountHandlers = (bot: Bot, env: Env) => {
   // ─── /accounts: 快速查看账号列表 ────────────────────────────────────────
   bot.command("accounts", async (ctx) => {
     const userId = String(ctx.from?.id);
@@ -146,4 +146,4 @@ export function registerAccountHandlers(bot: Bot, env: Env) {
   registerAuthCallbacks(bot, env);
   registerEditCallbacks(bot, env);
   registerAddCallbacks(bot, env);
-}
+};

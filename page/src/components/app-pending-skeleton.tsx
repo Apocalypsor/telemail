@@ -1,9 +1,7 @@
 import { Skeleton } from "@heroui/react";
 import { WebLayout } from "./web-layout";
 
-export type AppPendingSkeletonSurface = "web" | "miniapp";
-
-function AppPendingSkeletonContent() {
+const AppPendingSkeletonContent = () => {
   return (
     <article className="max-w-3xl mx-auto px-4 py-6 space-y-4">
       <Skeleton className="h-9 w-2/3 rounded-md" />
@@ -17,13 +15,13 @@ function AppPendingSkeletonContent() {
       </div>
     </article>
   );
-}
+};
 
-export function AppPendingSkeleton({
+export const AppPendingSkeleton = ({
   surface,
 }: {
   surface?: AppPendingSkeletonSurface;
-}) {
+}) => {
   const resolvedSurface =
     surface ??
     (window.location.pathname.startsWith("/telegram-app") ? "miniapp" : "web");
@@ -37,4 +35,5 @@ export function AppPendingSkeleton({
   }
 
   return <AppPendingSkeletonContent />;
-}
+};
+export type AppPendingSkeletonSurface = "web" | "miniapp";

@@ -5,7 +5,7 @@ import { DEVICE_TZ_VALUE, TZ_GROUPS } from "../-utils/tz";
 
 /** "新建提醒" 表单：日期/时间 + 时区下拉 + 快捷 preset + 备注 + 保存。
  *  纯展示组件，状态由 caller 管。成功 / 失败提示渲染在 page 级 banner，不在这里。 */
-export function ReminderAddSection({
+export const ReminderAddSection = ({
   date,
   time,
   text,
@@ -37,7 +37,7 @@ export function ReminderAddSection({
   onTimezoneChange: (v: string) => void;
   onPreset: (idx: number) => void;
   onSave: () => void;
-}) {
+}) => {
   const inputClass = `text-[15px] ${INPUT_CLASS}`;
 
   return (
@@ -143,4 +143,4 @@ export function ReminderAddSection({
       </div>
     </div>
   );
-}
+};

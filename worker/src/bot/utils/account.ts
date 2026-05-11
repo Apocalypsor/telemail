@@ -10,10 +10,10 @@ import type { Account, Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 
 /** 清理并删除单个邮箱账号（停止 watch/subscription + 删除关联数据 + 删除 DB 记录） */
-export async function cleanupAndDeleteAccount(
+export const cleanupAndDeleteAccount = async (
   env: Env,
   account: Account,
-): Promise<void> {
+): Promise<void> => {
   const provider = getEmailProvider(account, env);
   // 删除前：OAuth providers 停 push；IMAP 是 no-op
   if (account.refresh_token) {
@@ -44,4 +44,4 @@ export async function cleanupAndDeleteAccount(
     // Outlook folder ID 缓存（其他 provider 没写入也无副作用，统一删）
     deleteCachedOutlookFolderIds(env.EMAIL_KV, account.id),
   ]);
-}
+};

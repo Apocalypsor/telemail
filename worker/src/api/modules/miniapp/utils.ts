@@ -8,6 +8,18 @@ import { deleteJunkMappings } from "@worker/utils/message-actions/cleanup";
 import { syncStarButtonsForMappings } from "@worker/utils/message-actions/keyboard";
 import type { MailListType } from "./model";
 
+/** preview URL 要带 folder 提示给 IMAP 定位 UID —— bot mail-list 渲染时用。 */
+export const getPreviewFolder = (
+  type: MailListType,
+): "inbox" | "junk" | "archive" | undefined => {
+  return LIST_DEFS[type].previewFolder;
+};
+
+/** narrow URL param string → 4 种合法 list type。直接用 LIST_DEFS 的 key 集合，
+ *  避免另写一份字面量数组维护双份真相。 */
+export const isMailListType = (s: string): s is MailListType => {
+  return Object.hasOwn(LIST_DEFS, s);
+};
 export const MAX_PER_ACCOUNT = 20;
 
 interface ListDef {
@@ -50,16 +62,3 @@ export const LIST_DEFS: Record<MailListType, ListDef> = {
     previewFolder: "archive",
   },
 };
-
-/** preview URL 要带 folder 提示给 IMAP 定位 UID —— bot mail-list 渲染时用。 */
-export function getPreviewFolder(
-  type: MailListType,
-): "inbox" | "junk" | "archive" | undefined {
-  return LIST_DEFS[type].previewFolder;
-}
-
-/** narrow URL param string → 4 种合法 list type。直接用 LIST_DEFS 的 key 集合，
- *  避免另写一份字面量数组维护双份真相。 */
-export function isMailListType(s: string): s is MailListType {
-  return Object.hasOwn(LIST_DEFS, s);
-}

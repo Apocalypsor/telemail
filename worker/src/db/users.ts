@@ -3,10 +3,8 @@ import { users } from "@worker/db/schema";
 import type { TelegramUser } from "@worker/types";
 import { desc, eq, ne } from "drizzle-orm";
 
-type UserUpdate = Partial<typeof users.$inferInsert>;
-
 /** 登录时 upsert 用户信息（approved 仅在首次 INSERT 时设置，UPDATE 不覆盖） */
-export async function upsertUser(
+export const upsertUser = async (
   d1: D1Database,
   telegramId: string,
   firstName: string,
@@ -14,7 +12,7 @@ export async function upsertUser(
   username?: string,
   photoUrl?: string,
   approved?: number,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   const now = new Date();
   await db
@@ -38,75 +36,70 @@ export async function upsertUser(
         last_login_at: now,
       },
     });
-}
+};
 
 /** 根据 Telegram ID 查询用户 */
-export async function getUserByTelegramId(
+export const getUserByTelegramId = async (
   d1: D1Database,
   telegramId: string,
-): Promise<TelegramUser | null> {
+): Promise<TelegramUser | null> => {
   const db = getDb(d1);
   const [row] = await db
     .select()
     .from(users)
     .where(eq(users.telegram_id, telegramId));
   return row ?? null;
-}
+};
 
 /** 获取所有已登录过的用户 */
-export async function getAllUsers(d1: D1Database): Promise<TelegramUser[]> {
+export const getAllUsers = async (d1: D1Database): Promise<TelegramUser[]> => {
   const db = getDb(d1);
   return db.select().from(users).orderBy(desc(users.last_login_at));
-}
+};
 
 /** 获取除管理员外的所有用户 */
-export async function getNonAdminUsers(
+export const getNonAdminUsers = async (
   d1: D1Database,
   adminTelegramId: string,
-): Promise<TelegramUser[]> {
+): Promise<TelegramUser[]> => {
   const db = getDb(d1);
   return db
     .select()
     .from(users)
     .where(ne(users.telegram_id, adminTelegramId))
     .orderBy(desc(users.last_login_at));
-}
+};
 
 /** 批准用户 */
-export async function approveUser(
+export const approveUser = async (
   d1: D1Database,
   telegramId: string,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db
     .update(users)
     .set({ approved: 1 })
     .where(eq(users.telegram_id, telegramId));
-}
+};
 
 /** 拒绝用户（重置为未批准） */
-export async function rejectUser(
+export const rejectUser = async (
   d1: D1Database,
   telegramId: string,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db
     .update(users)
     .set({ approved: 0 })
     .where(eq(users.telegram_id, telegramId));
-}
-
-export interface UserThingsSettingsUpdate {
-  email: string;
-  password?: string | null;
-}
+};
 
 /** 更新单个用户的 Things Cloud 配置。password omitted 时保留旧值。 */
-export async function updateUserThingsSettings(
+export const updateUserThingsSettings = async (
   d1: D1Database,
   telegramId: string,
   input: UserThingsSettingsUpdate,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   const values: UserUpdate = {
     things_cloud_email: input.email,
@@ -115,26 +108,26 @@ export async function updateUserThingsSettings(
     values.things_cloud_password = input.password;
   }
   await db.update(users).set(values).where(eq(users.telegram_id, telegramId));
-}
+};
 
 /** 记录用户最近一次打开 Mini App 时的设备时区，供跨功能复用。 */
-export async function updateUserTimezone(
+export const updateUserTimezone = async (
   d1: D1Database,
   telegramId: string,
   userTimezone: string,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db
     .update(users)
     .set({ user_timezone: userTimezone })
     .where(eq(users.telegram_id, telegramId));
-}
+};
 
 /** 清空单个用户的 Things Cloud 配置。 */
-export async function clearUserThingsSettings(
+export const clearUserThingsSettings = async (
   d1: D1Database,
   telegramId: string,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db
     .update(users)
@@ -143,13 +136,19 @@ export async function clearUserThingsSettings(
       things_cloud_password: null,
     })
     .where(eq(users.telegram_id, telegramId));
-}
+};
 
 /** 删除用户记录 */
-export async function deleteUser(
+export const deleteUser = async (
   d1: D1Database,
   telegramId: string,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db.delete(users).where(eq(users.telegram_id, telegramId));
+};
+type UserUpdate = Partial<typeof users.$inferInsert>;
+
+export interface UserThingsSettingsUpdate {
+  email: string;
+  password?: string | null;
 }

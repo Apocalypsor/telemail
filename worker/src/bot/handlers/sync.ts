@@ -6,13 +6,11 @@ import { type Account, type Env, QueueMessageType } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 
-const MAX_SYNC_PER_ACCOUNT = 50;
-
 /** 同步单个账号的未读邮件，返回入队数量 */
-async function syncAccount(
+const syncAccount = async (
   env: Env,
   account: Account,
-): Promise<{ enqueued: number; error?: string }> {
+): Promise<{ enqueued: number; error?: string }> => {
   try {
     const provider = getEmailProvider(account, env);
     const unread = await provider.listUnread(MAX_SYNC_PER_ACCOUNT);
@@ -47,10 +45,10 @@ async function syncAccount(
       error: err instanceof Error ? err.message : String(err),
     };
   }
-}
+};
 
 /** 同步用户所有账号的未读邮件 */
-async function syncAllAccounts(env: Env, userId: string): Promise<string> {
+const syncAllAccounts = async (env: Env, userId: string): Promise<string> => {
   const accounts = (await getOwnAccounts(env.DB, userId)).filter(
     (a) => !a.disabled,
   );
@@ -83,9 +81,9 @@ async function syncAllAccounts(env: Env, userId: string): Promise<string> {
       : t("sync:completeNoNew");
 
   return `${header}\n\n${lines.join("\n")}`;
-}
+};
 
-export function registerSyncHandler(bot: Bot, env: Env) {
+export const registerSyncHandler = (bot: Bot, env: Env) => {
   bot.command("sync", async (ctx) => {
     const userId = String(ctx.from?.id);
     const msg = await ctx.reply(t("sync:syncing"));
@@ -99,4 +97,5 @@ export function registerSyncHandler(bot: Bot, env: Env) {
     const result = await syncAllAccounts(env, userId);
     await ctx.reply(result);
   });
-}
+};
+const MAX_SYNC_PER_ACCOUNT = 50;

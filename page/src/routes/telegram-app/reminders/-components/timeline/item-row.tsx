@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { hm } from "../../-utils/timeline";
 import { Card } from "./card";
 
-export function ItemRow({
+export const ItemRow = ({
   it,
   listOnly,
   isFirst,
@@ -27,7 +27,7 @@ export function ItemRow({
   onDelete: () => void;
   onEdit: () => void;
   className: string;
-}) {
+}) => {
   const d = new Date(it.remind_at);
   const time = hm(d);
   const ts = d.getTime();
@@ -87,4 +87,4 @@ export function ItemRow({
       </div>
     </article>
   );
-}
+};

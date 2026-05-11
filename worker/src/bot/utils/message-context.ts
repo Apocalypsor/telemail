@@ -9,18 +9,18 @@ import type { Account, Env } from "@worker/types";
  *
  * 用于 inline button handler（archive / junk / ...）共享的入口样板。
  */
-export async function resolveMessageAccount(
+export const resolveMessageAccount = async (
   env: Env,
   chatId: string,
   tgMessageId: number,
 ): Promise<
   | { ok: true; mapping: MessageMapping; account: Account }
   | { ok: false; error: string }
-> {
+> => {
   const mapping = await getMessageMapping(env.DB, chatId, tgMessageId);
   if (!mapping) return { ok: false, error: t("common:error.mappingNotFound") };
   const account = await getAccountById(env.DB, mapping.account_id);
   if (!account)
     return { ok: false, error: t("common:error.accountNotFoundShort") };
   return { ok: true, mapping, account };
-}
+};

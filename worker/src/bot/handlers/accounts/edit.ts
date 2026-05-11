@@ -28,7 +28,7 @@ import { accountListKeyboard, resolveAccount, resolveOwnerName } from "./utils";
  *  - acc:N:own / edown:N:M — 管理员转让 owner
  *  - acc:N:del / :dy — 删除确认 + 执行
  */
-export function registerEditCallbacks(bot: Bot, env: Env) {
+export const registerEditCallbacks = (bot: Bot, env: Env) => {
   // Toggle account enable / disable
   bot.callbackQuery(/^acc:(\d+):t$/, async (ctx) => {
     const { accountId, admin, account } = await resolveAccount(
@@ -244,4 +244,4 @@ export function registerEditCallbacks(bot: Bot, env: Env) {
       text: t("accounts:edit.ownerAssigned", { owner: newOwner }),
     });
   });
-}
+};

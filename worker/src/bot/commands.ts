@@ -5,34 +5,12 @@ import { memoizeAsync } from "@worker/utils/memoize";
 import { Api } from "grammy";
 import type { BotCommand } from "grammy/types";
 
-// 修改 BOT_COMMANDS / ADMIN_COMMANDS 后更新此版本号，会自动 setMyCommands 同步
-const BOT_COMMANDS_VERSION = 10;
-
-/** Telegram `/` 自动补全菜单里展示的命令 —— 所有用户可见 */
-const BOT_COMMANDS: BotCommand[] = [
-  { command: "start", description: t("commands:start") },
-  { command: "help", description: t("commands:help") },
-  { command: "accounts", description: t("commands:accounts") },
-  { command: "sync", description: t("commands:sync") },
-  { command: "unread", description: t("commands:unread") },
-  { command: "starred", description: t("commands:starred") },
-  { command: "junk", description: t("commands:junk") },
-  { command: "archived", description: t("commands:archived") },
-];
-
-/** 管理员命令 —— 不进 setMyCommands（避免普通用户在补全菜单看到），
- *  只在 `/help` 给管理员的回复里附加列出。 */
-const ADMIN_COMMANDS: BotCommand[] = [
-  { command: "users", description: t("commands:users") },
-  { command: "secrets", description: t("commands:secrets") },
-];
-
-function formatCommandList(commands: BotCommand[]): string {
+const formatCommandList = (commands: BotCommand[]): string => {
   return commands.map((c) => `/${c.command} \\- ${c.description}`).join("\n");
-}
+};
 
 /** 构造 /help 回复文本。管理员额外看到 `ADMIN_COMMANDS` 那一段。 */
-export function helpText(admin: boolean): string {
+export const helpText = (admin: boolean): string => {
   const blocks = [
     t("commands:helpTitle"),
     "",
@@ -57,7 +35,28 @@ export function helpText(admin: boolean): string {
     t("commands:helpFeature6"),
   );
   return blocks.join("\n");
-}
+};
+// 修改 BOT_COMMANDS / ADMIN_COMMANDS 后更新此版本号，会自动 setMyCommands 同步
+const BOT_COMMANDS_VERSION = 10;
+
+/** Telegram `/` 自动补全菜单里展示的命令 —— 所有用户可见 */
+const BOT_COMMANDS: BotCommand[] = [
+  { command: "start", description: t("commands:start") },
+  { command: "help", description: t("commands:help") },
+  { command: "accounts", description: t("commands:accounts") },
+  { command: "sync", description: t("commands:sync") },
+  { command: "unread", description: t("commands:unread") },
+  { command: "starred", description: t("commands:starred") },
+  { command: "junk", description: t("commands:junk") },
+  { command: "archived", description: t("commands:archived") },
+];
+
+/** 管理员命令 —— 不进 setMyCommands（避免普通用户在补全菜单看到），
+ *  只在 `/help` 给管理员的回复里附加列出。 */
+const ADMIN_COMMANDS: BotCommand[] = [
+  { command: "users", description: t("commands:users") },
+  { command: "secrets", description: t("commands:secrets") },
+];
 
 /**
  * 同步 Bot 命令菜单到 Telegram。`memoizeAsync` 保证一个 isolate 生命周期

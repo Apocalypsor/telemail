@@ -1,7 +1,7 @@
 import { Chip } from "@heroui/react";
 import { dateLabel } from "../../-utils/timeline";
 
-export function DateRow({
+export const DateRow = ({
   date,
   count,
   isFirst,
@@ -15,7 +15,7 @@ export function DateRow({
   isLast: boolean;
   nextGap: number;
   className: string;
-}) {
+}) => {
   const label = dateLabel(date);
   const chipClass = label.isToday
     ? "bg-emerald-500 text-emerald-950 font-semibold"
@@ -71,4 +71,4 @@ export function DateRow({
       </div>
     </div>
   );
-}
+};

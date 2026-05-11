@@ -1,5 +1,5 @@
 /**
- * 包一个 async function 使结果在 Worker isolate 生命周期内只算一次 ——
+ * 包一个 async callback 使结果在 Worker isolate 生命周期内只算一次 ——
  * 后续调用直接返回同一份已 resolve 的 Promise，**参数被忽略**。
  *
  * 用途：KV 里存的 bot info / commands version 这种"isolate 生命周期内
@@ -15,9 +15,9 @@
  * 3. memo 没 TTL，靠 isolate 自然销毁失效（Workers 空闲几分钟–几十分钟
  *    或 deploy 触发回收）。需要立即刷新就 deploy。
  */
-export function memoizeAsync<TArgs extends unknown[], TReturn>(
+export const memoizeAsync = <TArgs extends unknown[], TReturn>(
   fn: (...args: TArgs) => Promise<TReturn>,
-): (...args: TArgs) => Promise<TReturn> {
+): ((...args: TArgs) => Promise<TReturn>) => {
   let cached: Promise<TReturn> | null = null;
   return (...args: TArgs): Promise<TReturn> => {
     if (cached) return cached;
@@ -27,4 +27,4 @@ export function memoizeAsync<TArgs extends unknown[], TReturn>(
     });
     return cached;
   };
-}
+};

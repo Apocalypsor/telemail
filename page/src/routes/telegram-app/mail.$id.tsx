@@ -15,24 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 
-// accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
-// folder / back 可选。
-const Search = t.Object({
-  accountId: t.Number(),
-  t: t.String(),
-  folder: t.Optional(
-    t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
-  ),
-  back: t.Optional(t.String()),
-});
-const validateMailSearch = validateSearch(Search);
-
-export const Route = createFileRoute("/telegram-app/mail/$id")({
-  component: MailPreviewPage,
-  validateSearch: validateMailSearch,
-});
-
-function MailPreviewPage() {
+const MailPreviewPage = () => {
   const { id: emailMessageId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -127,7 +110,7 @@ function MailPreviewPage() {
       />
     </>
   );
-}
+};
 
 /**
  * 邮件标题：结构沿用 web 的 `<h1>` 尺寸（text-2xl → text-[32px]）和布局，
@@ -135,13 +118,13 @@ function MailPreviewPage() {
  * 为了让用户看出来可点，标题染 emerald 并带下划线，再加个 `↗` 图标；
  * 无 webMailUrl 时退化成 web 同款的纯 zinc-100 h1。
  */
-function Subject({
+const Subject = ({
   subject,
   webMailUrl,
 }: {
   subject: string;
   webMailUrl: string;
-}) {
+}) => {
   const baseClass =
     "text-2xl sm:text-[28px] md:text-[32px] font-semibold tracking-tight leading-tight break-words mb-4";
 
@@ -149,10 +132,10 @@ function Subject({
     return <h1 className={`${baseClass} text-zinc-100`}>{subject}</h1>;
   }
 
-  function openInBrowser(e: React.MouseEvent) {
+  const openInBrowser = (e: React.MouseEvent) => {
     e.preventDefault();
     openExternalLink(webMailUrl);
-  }
+  };
 
   return (
     <h1 className={baseClass}>
@@ -167,4 +150,20 @@ function Subject({
       </a>
     </h1>
   );
-}
+};
+// accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
+// folder / back 可选。
+const Search = t.Object({
+  accountId: t.Number(),
+  t: t.String(),
+  folder: t.Optional(
+    t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
+  ),
+  back: t.Optional(t.String()),
+});
+const validateMailSearch = validateSearch(Search);
+
+export const Route = createFileRoute("/telegram-app/mail/$id")({
+  component: MailPreviewPage,
+  validateSearch: validateMailSearch,
+});

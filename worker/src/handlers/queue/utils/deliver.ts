@@ -30,13 +30,13 @@ import PostalMime from "postal-mime";
  *  3. 发"最小键盘"消息 → 拿 sentMessageId → 写 mapping → 升级到完整键盘
  *  4. （可选）后台 LLM 分析 + edit message；失败入 `failed_emails` 等 cron 重试
  */
-export async function deliverEmailToTelegram(
+export const deliverEmailToTelegram = async (
   rawEmail: ArrayBuffer,
   emailMessageId: string,
   account: Account,
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
-): Promise<void> {
+): Promise<void> => {
   const tgToken = env.TELEGRAM_BOT_TOKEN;
   const chatId = account.chat_id;
 
@@ -194,4 +194,4 @@ export async function deliverEmailToTelegram(
       }
     })(),
   );
-}
+};

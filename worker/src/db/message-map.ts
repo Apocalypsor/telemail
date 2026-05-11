@@ -3,19 +3,14 @@ import { getDb } from "@worker/db/client";
 import { messageMap } from "@worker/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 
-type MessageMapRow = typeof messageMap.$inferSelect;
-
-/** 对外暴露的 mapping 类型 —— 隐藏 created_at（消费方不需要） */
-export type MessageMapping = Omit<MessageMapRow, "created_at">;
-
 /** 保存 Telegram → 邮件消息映射，返回是否实际插入（false = 重复，被 IGNORE） */
-export async function putMessageMapping(
+export const putMessageMapping = async (
   d1: D1Database,
   mapping: Pick<
     MessageMapping,
     "tg_message_id" | "tg_chat_id" | "email_message_id" | "account_id"
   >,
-): Promise<boolean> {
+): Promise<boolean> => {
   const db = getDb(d1);
   const result = await db
     .insert(messageMap)
@@ -27,14 +22,14 @@ export async function putMessageMapping(
     })
     .onConflictDoNothing();
   return (result.meta?.changes ?? 0) > 0;
-}
+};
 
 /** 根据 Telegram 消息查找对应的邮件消息 */
-export async function getMessageMapping(
+export const getMessageMapping = async (
   d1: D1Database,
   chatId: string,
   tgMessageId: number,
-): Promise<MessageMapping | null> {
+): Promise<MessageMapping | null> => {
   const db = getDb(d1);
   const [row] = await db
     .select()
@@ -46,14 +41,14 @@ export async function getMessageMapping(
       ),
     );
   return row ?? null;
-}
+};
 
 /** 根据邮件 ID 列表批量查找对应的 Telegram 消息映射 */
-export async function getMappingsByEmailIds(
+export const getMappingsByEmailIds = async (
   d1: D1Database,
   accountId: number,
   emailMessageIds: string[],
-): Promise<MessageMapping[]> {
+): Promise<MessageMapping[]> => {
   if (emailMessageIds.length === 0) return [];
   const db = getDb(d1);
   return db
@@ -65,25 +60,25 @@ export async function getMappingsByEmailIds(
         inArray(messageMap.email_message_id, emailMessageIds),
       ),
     );
-}
+};
 
 /** 删除指定账号的所有消息映射 */
-export async function deleteMappingsByAccountId(
+export const deleteMappingsByAccountId = async (
   d1: D1Database,
   accountId: number,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db.delete(messageMap).where(eq(messageMap.account_id, accountId));
-}
+};
 
 /** 删除单封邮件的映射 —— TG 消息被用户从聊天里删了（或失效），需要让
  *  `deliverEmailToTelegram` 重新投递时不要被 `(chat_id, email_message_id,
  *  account_id)` 唯一索引挡住。 */
-export async function deleteMessageMapping(
+export const deleteMessageMapping = async (
   d1: D1Database,
   accountId: number,
   emailMessageId: string,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db
     .delete(messageMap)
@@ -93,15 +88,15 @@ export async function deleteMessageMapping(
         eq(messageMap.email_message_id, emailMessageId),
       ),
     );
-}
+};
 
 /** 更新邮件 short_summary（LLM 分析成功后调用） */
-export async function updateShortSummary(
+export const updateShortSummary = async (
   d1: D1Database,
   accountId: number,
   emailMessageId: string,
   shortSummary: string,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db
     .update(messageMap)
@@ -112,14 +107,14 @@ export async function updateShortSummary(
         eq(messageMap.email_message_id, emailMessageId),
       ),
     );
-}
+};
 
 /** 删除单条消息映射（垃圾邮件删除后清理） */
-export async function deleteMappingByEmailId(
+export const deleteMappingByEmailId = async (
   d1: D1Database,
   emailMessageId: string,
   accountId: number,
-): Promise<void> {
+): Promise<void> => {
   const db = getDb(d1);
   await db
     .delete(messageMap)
@@ -129,4 +124,8 @@ export async function deleteMappingByEmailId(
         eq(messageMap.account_id, accountId),
       ),
     );
-}
+};
+type MessageMapRow = typeof messageMap.$inferSelect;
+
+/** 对外暴露的 mapping 类型 —— 隐藏 created_at（消费方不需要） */
+export type MessageMapping = Omit<MessageMapRow, "created_at">;

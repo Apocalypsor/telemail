@@ -6,11 +6,11 @@ import { normalizeIanaTimeZone } from "@worker/utils/time-zone";
 import { Elysia } from "elysia";
 import { cf } from "./cf";
 
-async function updateUserTimezoneIfChanged(
+const updateUserTimezoneIfChanged = async (
   env: Env,
   user: TelegramUser,
   userTimezone: string | null,
-): Promise<void> {
+): Promise<void> => {
   if (!userTimezone || user.user_timezone === userTimezone) return;
   try {
     await updateUserTimezone(env.DB, user.telegram_id, userTimezone);
@@ -24,8 +24,7 @@ async function updateUserTimezoneIfChanged(
       },
     );
   }
-}
-
+};
 /**
  * Mini App 鉴权：X-Telegram-Init-Data 头验签 + users.approved 检查（管理员豁免）。
  * 失败返回 401 JSON。通过则在 context 里挂 `userId` + `isAdmin`。

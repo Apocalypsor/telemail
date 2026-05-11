@@ -163,11 +163,11 @@ export abstract class EmailProvider {
   }
 
   static createOAuthHandler(config: OAuthProviderConfig): OAuthHandler {
-    async function generateOAuthUrl(
+    const generateOAuthUrl = async (
       env: Env,
       accountId: number,
       callbackUrl: string,
-    ): Promise<string> {
+    ): Promise<string> => {
       const state = crypto.randomUUID();
       await putOAuthState(env.EMAIL_KV, config.statePrefix, state, accountId);
 
@@ -184,24 +184,24 @@ export abstract class EmailProvider {
       }
 
       return authUrl.toString();
-    }
+    };
 
-    async function startOAuth(
+    const startOAuth = async (
       request: Request,
       env: Env,
       accountId: number,
-    ): Promise<Response> {
+    ): Promise<Response> => {
       // start 路由命中 /oauth/:provider/start，callback 就是把 /start 换成 /callback
       const url = new URL(request.url);
       const callbackUrl = `${url.origin}${url.pathname.replace(/\/start$/, "/callback")}`;
       const authorizeUrl = await generateOAuthUrl(env, accountId, callbackUrl);
       return Response.redirect(authorizeUrl, 302);
-    }
+    };
 
-    async function processOAuthCallback(
+    const processOAuthCallback = async (
       request: Request,
       env: Env,
-    ): Promise<OAuthCallbackResult> {
+    ): Promise<OAuthCallbackResult> => {
       const requestUrl = new URL(request.url);
       const code = requestUrl.searchParams.get("code");
       const state = requestUrl.searchParams.get("state");
@@ -346,7 +346,7 @@ export abstract class EmailProvider {
         accountId,
         ownerTelegramId: account?.telegram_user_id ?? null,
       };
-    }
+    };
 
     return {
       name: config.name,

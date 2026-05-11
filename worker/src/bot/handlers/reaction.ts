@@ -4,7 +4,7 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 
 /** 任意 emoji reaction → 标记 Gmail 已读（同时支持群组和频道） */
-export function registerReactionHandler(bot: Bot, env: Env) {
+export const registerReactionHandler = (bot: Bot, env: Env) => {
   // 群组/私聊：per-user reaction
   bot.on("message_reaction", async (ctx) => {
     const chatId = String(ctx.chat.id);
@@ -43,4 +43,4 @@ export function registerReactionHandler(bot: Bot, env: Env) {
       }),
     );
   });
-}
+};

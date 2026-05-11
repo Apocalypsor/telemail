@@ -5,7 +5,7 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 
 /** 刷新邮件 inline button callback */
-export function registerRefreshHandler(bot: Bot, env: Env) {
+export const registerRefreshHandler = (bot: Bot, env: Env) => {
   bot.callbackQuery("refresh", async (ctx) => {
     const msg = ctx.callbackQuery.message;
     if (!msg) return;
@@ -40,4 +40,4 @@ export function registerRefreshHandler(bot: Bot, env: Env) {
       });
     }
   });
-}
+};
