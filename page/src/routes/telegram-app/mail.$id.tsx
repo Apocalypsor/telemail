@@ -1,9 +1,9 @@
 import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
+import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailFab } from "@page/components/mail-fab";
 import { MailMeta } from "@page/components/mail-meta";
-import { MailPreviewSkeleton } from "@page/components/mail-preview-skeleton";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { openExternalLink } from "@page/utils/tg";
 import { Type as t } from "@sinclair/typebox";
@@ -74,7 +74,7 @@ function MailPreviewPage() {
   useBackButton(search.back);
 
   if (q.isLoading) {
-    return <MailPreviewSkeleton />;
+    return <AppPendingSkeleton surface="miniapp" />;
   }
   if (q.isError || !q.data) {
     return <div className="p-5 text-sm text-red-400">邮件加载失败</div>;

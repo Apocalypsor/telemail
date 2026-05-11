@@ -1,9 +1,9 @@
 import { Card } from "@heroui/react";
 import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
+import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailMeta } from "@page/components/mail-meta";
-import { MailPreviewSkeleton } from "@page/components/mail-preview-skeleton";
 import { WebLayout } from "@page/components/web-layout";
 import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,7 +58,7 @@ function WebMailPage() {
   });
 
   if (q.isLoading) {
-    return <MailPreviewSkeleton web />;
+    return <AppPendingSkeleton surface="web" />;
   }
   if (q.isError || !q.data) {
     return (
