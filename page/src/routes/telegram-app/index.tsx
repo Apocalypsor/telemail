@@ -1,4 +1,4 @@
-import { Spinner } from "@heroui/react";
+import { Skeleton } from "@heroui/react";
 import { api } from "@page/api/client";
 import { extractErrorMessage } from "@page/api/utils";
 import { useBackButton } from "@page/hooks/use-back-button";
@@ -91,8 +91,23 @@ function RouterPage() {
     );
   }
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <Spinner size="lg" color="success" />
+    <div className="max-w-xl mx-auto px-3 py-4 sm:p-6 space-y-5">
+      <header className="space-y-2">
+        <Skeleton className="h-8 w-36 rounded-md" />
+        <Skeleton className="h-3 w-44 rounded-md" />
+      </header>
+      <div className="space-y-3">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3"
+          >
+            <Skeleton className="h-4 w-1/2 rounded-md" />
+            <Skeleton className="h-3 w-full rounded-md" />
+            <Skeleton className="h-3 w-4/5 rounded-md" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
