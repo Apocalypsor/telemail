@@ -18,6 +18,13 @@ import type {
   GmailWatchResponse,
 } from "@worker/providers/gmail/types";
 import {
+  collectAttachmentMeta,
+  collectInlineAttachmentIds,
+  collectInlineParts,
+  extractHeader,
+  extractPartByMime,
+  findAttachmentPayloadById,
+  findAttachmentPayloadByIndex,
   getAccessToken,
   gmailBatchGetMetadata,
   gmailGet,
@@ -31,13 +38,11 @@ import type {
 import {
   type Account,
   type Env,
+  type MailAttachmentContent,
   type MailMeta,
   QueueMessageType,
 } from "@worker/types";
-import {
-  base64urlToArrayBuffer,
-  base64urlToString,
-} from "@worker/utils/base64url";
+import { base64urlToArrayBuffer } from "@worker/utils/base64url";
 import { parseEmailDate, wrapPlainText } from "@worker/utils/format";
 import { HTTPError } from "ky";
 
@@ -262,6 +267,7 @@ export class GmailProvider extends EmailProvider {
 
     const cidMap = new Map<string, string>();
     collectInlineParts(msg.payload, cidMap);
+    const attachments = collectAttachmentMeta(msg.payload);
 
     // 需要通过附件 API 获取的内联图片
     const pending: { cid: string; mimeType: string; attachmentId: string }[] =
@@ -283,12 +289,45 @@ export class GmailProvider extends EmailProvider {
       );
     }
 
-    if (html) return { html, cidMap, meta };
+    if (html) return { html, cidMap, meta, attachments };
 
     const plain = extractPartByMime(msg.payload, "text/plain");
-    if (plain) return { html: wrapPlainText(plain), cidMap, meta };
+    if (plain) return { html: wrapPlainText(plain), cidMap, meta, attachments };
 
     return null;
+  }
+
+  async fetchAttachment(
+    messageId: string,
+    attachmentId: string,
+  ): Promise<MailAttachmentContent | null> {
+    const token = await this.token();
+    const msg = await gmailGet<{ payload: GmailPayload }>(
+      token,
+      `/users/me/messages/${messageId}?format=full`,
+    );
+    const part =
+      findAttachmentPayloadById(msg.payload, attachmentId) ??
+      findAttachmentPayloadByIndex(msg.payload, attachmentId);
+    if (!part) return null;
+
+    let content: ArrayBuffer | null = null;
+    if (part.body?.attachmentId) {
+      const att = await gmailGet<{ data?: string }>(
+        token,
+        `/users/me/messages/${messageId}/attachments/${part.body.attachmentId}`,
+      );
+      content = att.data ? base64urlToArrayBuffer(att.data) : null;
+    } else if (part.body?.data) {
+      content = base64urlToArrayBuffer(part.body.data);
+    }
+    if (!content) return null;
+
+    return {
+      filename: part.filename || null,
+      mimeType: part.mimeType ?? null,
+      content,
+    };
   }
 
   // ─── Message actions ──────────────────────────────────────────────────
@@ -539,84 +578,4 @@ export class GmailProvider extends EmailProvider {
       return { id, subject: get("subject"), from: get("from") };
     });
   }
-}
-
-// ─── Gmail payload 解析 helpers ──────────────────────────────────────────────
-
-/** 从 Gmail payload headers 中提取指定头部 */
-function extractHeader(payload: GmailPayload, name: string): string | null {
-  return (
-    payload.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())
-      ?.value ?? null
-  );
-}
-
-/** 递归收集内联图片（body.data 已内嵌的情况） */
-function collectInlineParts(
-  payload: GmailPayload,
-  cidMap: Map<string, string>,
-): void {
-  if (!payload) return;
-  const contentId = payload.headers?.find(
-    (h) => h.name.toLowerCase() === "content-id",
-  )?.value;
-  if (
-    contentId &&
-    payload.body?.data &&
-    payload.mimeType?.startsWith("image/")
-  ) {
-    const cid = contentId.replace(/^<|>$/g, "");
-    const b64 = payload.body.data.replace(/-/g, "+").replace(/_/g, "/");
-    cidMap.set(cid, `data:${payload.mimeType};base64,${b64}`);
-  }
-  if (payload.parts) {
-    for (const part of payload.parts) collectInlineParts(part, cidMap);
-  }
-}
-
-/** 递归收集需要通过附件 API 获取的内联图片 */
-function collectInlineAttachmentIds(
-  payload: GmailPayload,
-  result: { cid: string; mimeType: string; attachmentId: string }[],
-): void {
-  if (!payload) return;
-  const contentId = payload.headers?.find(
-    (h) => h.name.toLowerCase() === "content-id",
-  )?.value;
-  if (
-    contentId &&
-    !payload.body?.data &&
-    payload.body?.attachmentId &&
-    payload.mimeType?.startsWith("image/")
-  ) {
-    result.push({
-      cid: contentId.replace(/^<|>$/g, ""),
-      mimeType: payload.mimeType,
-      attachmentId: payload.body.attachmentId,
-    });
-  }
-  if (payload.parts) {
-    for (const part of payload.parts) collectInlineAttachmentIds(part, result);
-  }
-}
-
-/** 递归提取 payload 中指定 MIME 类型的内容 */
-function extractPartByMime(
-  payload: GmailPayload,
-  mimeType: string,
-): string | null {
-  if (!payload) return null;
-
-  if (payload.mimeType === mimeType && payload.body?.data) {
-    return base64urlToString(payload.body.data);
-  }
-
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      const content = extractPartByMime(part, mimeType);
-      if (content) return content;
-    }
-  }
-
-  return null;
 }

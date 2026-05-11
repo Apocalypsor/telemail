@@ -30,3 +30,19 @@ export function mailContentQueryOptions({
     },
   };
 }
+
+export function buildMailAttachmentUrl({
+  emailMessageId,
+  accountId,
+  token,
+  folder,
+  attachmentId,
+}: MailContentQueryInput & { attachmentId: string }): string {
+  const params = new URLSearchParams({
+    accountId: String(accountId),
+    t: token,
+    attachmentId,
+  });
+  if (folder) params.set("folder", folder);
+  return `/api/mail/${encodeURIComponent(emailMessageId)}/attachment?${params.toString()}`;
+}

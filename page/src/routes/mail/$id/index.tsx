@@ -1,10 +1,14 @@
 import { Card } from "@heroui/react";
 import { validateSearch } from "@page/api/utils";
 import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
+import { MailAttachments } from "@page/components/mail-attachments";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailMeta } from "@page/components/mail-meta";
 import { WebLayout } from "@page/components/web-layout";
-import { mailContentQueryOptions } from "@page/utils/mail-content";
+import {
+  buildMailAttachmentUrl,
+  mailContentQueryOptions,
+} from "@page/utils/mail-content";
 import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -101,6 +105,19 @@ function WebMailPage() {
             useProxy={useProxy}
           />
         </div>
+
+        <MailAttachments
+          attachments={d.attachments}
+          getDownloadUrl={(attachmentId) =>
+            buildMailAttachmentUrl({
+              emailMessageId,
+              accountId: search.accountId,
+              token: search.t,
+              folder: d.folder,
+              attachmentId,
+            })
+          }
+        />
       </article>
     </WebLayout>
   );

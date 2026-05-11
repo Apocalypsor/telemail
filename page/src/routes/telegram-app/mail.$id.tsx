@@ -1,10 +1,14 @@
 import { validateSearch } from "@page/api/utils";
 import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
+import { MailAttachments } from "@page/components/mail-attachments";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailFab } from "@page/components/mail-fab";
 import { MailMeta } from "@page/components/mail-meta";
 import { useBackButton } from "@page/hooks/use-back-button";
-import { mailContentQueryOptions } from "@page/utils/mail-content";
+import {
+  buildMailAttachmentUrl,
+  mailContentQueryOptions,
+} from "@page/utils/mail-content";
 import { openExternalLink } from "@page/utils/tg";
 import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -87,6 +91,19 @@ function MailPreviewPage() {
             useProxy={useProxy}
           />
         </div>
+
+        <MailAttachments
+          attachments={d.attachments}
+          getDownloadUrl={(attachmentId) =>
+            buildMailAttachmentUrl({
+              emailMessageId,
+              accountId: search.accountId,
+              token: search.t,
+              folder: d.folder,
+              attachmentId,
+            })
+          }
+        />
       </article>
 
       <MailFab

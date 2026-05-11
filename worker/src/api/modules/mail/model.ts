@@ -8,6 +8,13 @@ export const MailGetQuery = t.Object({
   ),
 });
 
+export const MailAttachmentQuery = t.Composite([
+  MailGetQuery,
+  t.Object({
+    attachmentId: t.String(),
+  }),
+]);
+
 export const MailParams = t.Object({ id: t.String() });
 
 export const MailActionBody = t.Object({
@@ -36,11 +43,24 @@ const MailMetaResponse = t.Object({
   date: t.Optional(t.Union([t.Date(), t.Null()])),
 });
 
+const MailAttachmentResponse = t.Object({
+  id: t.String(),
+  filename: t.Union([t.String(), t.Null()]),
+  mimeType: t.Union([t.String(), t.Null()]),
+  size: t.Union([t.Number(), t.Null()]),
+});
+
 export const MailGetResponse = t.Object({
   meta: MailMetaResponse,
   accountEmail: t.Union([t.String(), t.Null()]),
   bodyHtml: t.String(),
   bodyHtmlRaw: t.String(),
+  attachments: t.Array(MailAttachmentResponse),
+  folder: t.Union([
+    t.Literal("inbox"),
+    t.Literal("junk"),
+    t.Literal("archive"),
+  ]),
   inJunk: t.Boolean(),
   inArchive: t.Boolean(),
   starred: t.Boolean(),

@@ -13,11 +13,13 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import { Elysia } from "elysia";
 import {
   MailActionBody,
+  MailAttachmentQuery,
   MailGetQuery,
   MailParams,
   MailToggleStarBody,
 } from "./model";
 import { MailService } from "./service";
+import { attachmentBody, contentDisposition } from "./utils";
 
 /**
  * Mail preview API + 6 mutations:
@@ -77,6 +79,8 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
       accountEmail: account.email,
       bodyHtml: result.proxiedHtml,
       bodyHtmlRaw: result.rawHtml,
+      attachments: result.attachments,
+      folder: result.fetchFolder,
       inJunk: result.inJunk,
       inArchive: result.fetchFolder === "archive",
       starred: result.starred,
@@ -87,6 +91,41 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
   },
   { params: MailParams, query: MailGetQuery },
 );
+
+const mailAttachmentGet = new Elysia({
+  name: "controller.mail.attachment.get",
+})
+  .use(cf)
+  .get(
+    "/api/mail/:id/attachment",
+    async ({ env, params, query, status }) => {
+      const ctx = await MailService.resolveContext(
+        env,
+        query.accountId,
+        params.id,
+        query.t,
+      );
+      if (!ctx.ok) return status(ctx.status, { error: ctx.error });
+
+      const provider = getEmailProvider(ctx.account, env);
+      const attachment = await provider.fetchAttachment(
+        ctx.emailMessageId,
+        query.attachmentId,
+        query.folder ?? "inbox",
+      );
+      if (!attachment) return status(404, { error: "Attachment not found" });
+
+      const mime = attachment.mimeType || "application/octet-stream";
+      return new Response(attachmentBody(attachment.content), {
+        headers: {
+          "Content-Type": mime,
+          "Content-Disposition": contentDisposition(attachment.filename),
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    },
+    { params: MailParams, query: MailAttachmentQuery },
+  );
 
 // ─── POST mutations (session OR mini-app auth + token check) ──────────────
 const mailMutations = new Elysia({ name: "controller.mail.mutations" })
@@ -307,4 +346,5 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
 
 export const mailController = new Elysia({ name: "controller.mail" })
   .use(mailGet)
+  .use(mailAttachmentGet)
   .use(mailMutations);

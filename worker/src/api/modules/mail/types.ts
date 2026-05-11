@@ -1,6 +1,6 @@
 /** Mail module 内部 TS 类型声明 —— 装不进 TypeBox model 的 discriminated union /
  *  helper alias 都集中在这里。route schema / wire 形态请看 model.ts。 */
-import type { Account, MailMeta } from "@worker/types";
+import type { Account, MailAttachmentMeta, MailMeta } from "@worker/types";
 
 /** mail preview 拉取时的 folder 来源 —— IMAP UID per-folder 不通用，所以
  *  star/star-toggle / fetchRaw / setFlag 都要带 folder 提示。 */
@@ -27,6 +27,7 @@ export type LoadForRenderingResult =
       rawHtml: string;
       /** 在 rawHtml 基础上再做外链图片代理改写 —— 默认渲染这个 */
       proxiedHtml: string;
+      attachments: MailAttachmentMeta[];
       fetchFolder: Folder;
       inJunk: boolean;
       starred: boolean;
