@@ -59,6 +59,11 @@ export const users = sqliteTable("users", {
   last_login_at: tsMs("last_login_at").notNull().default(nowDefault),
   created_at: tsMs("created_at").notNull().default(nowDefault),
   approved: integer("approved").notNull().default(0),
+  /** Things Cloud per-user settings. Password is never returned by public APIs. */
+  things_cloud_email: text("things_cloud_email"),
+  things_cloud_password: text("things_cloud_password"),
+  /** Last IANA time zone reported by the user's Mini App device. */
+  user_timezone: text("user_timezone"),
 });
 
 export const messageMap = sqliteTable(

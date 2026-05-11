@@ -36,12 +36,10 @@ interface WorkerSecrets {
   LLM_API_KEY?: string;
   /** LLM 模型名称 */
   LLM_MODEL?: string;
-  /** Things Cloud account email（可选，配置后邮件提醒到期时推送 Things 任务） */
-  THINGS_CLOUD_EMAIL?: string;
-  /** Things Cloud password（可选，配合 THINGS_CLOUD_EMAIL 使用） */
-  THINGS_CLOUD_PASSWORD?: string;
   /** Things Cloud API endpoint override（调试用，默认 https://cloud.culturedcode.com） */
   THINGS_CLOUD_ENDPOINT?: string;
+  /** User timezone fallback（IANA 时区，默认 UTC） */
+  DEFAULT_USER_TIMEZONE?: string;
   /** Telegram Webhook Secret（校验 webhook 来源） */
   TELEGRAM_WEBHOOK_SECRET: string;
   /** Worker 对外访问 URL，例如 https://gmail-tg-bridge.xxx.workers.dev（用于生成邮件查看链接） */

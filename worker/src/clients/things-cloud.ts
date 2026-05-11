@@ -19,6 +19,7 @@ export interface ThingsTodoInput {
   title: string;
   notes?: string;
   when?: Date;
+  today?: boolean;
   timeZone?: string;
 }
 
@@ -265,10 +266,19 @@ function createTaskPayload(input: ThingsTodoInput): TaskCreatePayload {
     input.when,
     input.timeZone,
   );
-  const schedule = scheduledDate == null ? 0 : 1;
+  const todayParts = input.today
+    ? partsInTimeZone(new Date(), input.timeZone || "UTC")
+    : null;
+  const todayDate = todayParts
+    ? Math.floor(
+        Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day) / 1000,
+      )
+    : null;
+  const scheduleDate = scheduledDate ?? todayDate;
+  const schedule = scheduleDate == null ? 0 : 1;
   return {
     tp: 0,
-    sr: scheduledDate,
+    sr: scheduleDate,
     dds: null,
     rt: [],
     rmd: null,
@@ -281,7 +291,7 @@ function createTaskPayload(input: ThingsTodoInput): TaskCreatePayload {
     tt: input.title,
     do: 0,
     lai: null,
-    tir: scheduledDate,
+    tir: scheduleDate,
     tg: [],
     agr: [],
     ix: 0,

@@ -14,6 +14,7 @@ import {
   type Reminder,
   updateReminderThingsTaskId,
 } from "@worker/db/reminders";
+import { getUserByTelegramId } from "@worker/db/users";
 import type { Env } from "@worker/types";
 import {
   buildWebMailUrl,
@@ -22,11 +23,14 @@ import {
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { EnrichedReminder } from "./types";
 
-async function getOrCreateThingsAppInstanceId(env: Env): Promise<string> {
-  const cached = await getThingsAppInstanceId(env.EMAIL_KV);
+async function getOrCreateThingsAppInstanceId(
+  env: Env,
+  telegramUserId: string,
+): Promise<string> {
+  const cached = await getThingsAppInstanceId(env.EMAIL_KV, telegramUserId);
   if (cached) return cached;
   const generated = generateThingsAppInstanceId();
-  await putThingsAppInstanceId(env.EMAIL_KV, generated);
+  await putThingsAppInstanceId(env.EMAIL_KV, telegramUserId, generated);
   return generated;
 }
 
@@ -98,13 +102,17 @@ export abstract class RemindersService {
     env: Env,
     reminder: Reminder,
   ): Promise<void> {
-    if (!env.THINGS_CLOUD_EMAIL || !env.THINGS_CLOUD_PASSWORD) return;
     if (reminder.account_id == null || reminder.email_message_id == null)
       return;
 
     try {
       const current = await getReminderById(env.DB, reminder.id);
       if (!current || current.things_task_id) return;
+
+      const user = await getUserByTelegramId(env.DB, reminder.telegram_user_id);
+      const thingsEmail = user?.things_cloud_email?.trim();
+      const thingsPassword = user?.things_cloud_password;
+      if (!thingsEmail || !thingsPassword) return;
 
       const account = await getAccountById(env.DB, reminder.account_id);
       if (!account) return;
@@ -144,15 +152,20 @@ export abstract class RemindersService {
         .join("\n");
 
       const client = new ThingsCloudClient({
-        email: env.THINGS_CLOUD_EMAIL,
-        password: env.THINGS_CLOUD_PASSWORD,
-        appInstanceId: await getOrCreateThingsAppInstanceId(env),
+        email: thingsEmail,
+        password: thingsPassword,
+        appInstanceId: await getOrCreateThingsAppInstanceId(
+          env,
+          reminder.telegram_user_id,
+        ),
         endpoint: env.THINGS_CLOUD_ENDPOINT,
       });
       const createdTaskId = await client.createTodo({
         id: taskId,
         title,
         notes,
+        today: true,
+        timeZone: user.user_timezone || env.DEFAULT_USER_TIMEZONE,
       });
       await updateReminderThingsTaskId(env.DB, reminder.id, createdTaskId);
     } catch (err) {
@@ -162,6 +175,7 @@ export abstract class RemindersService {
         err,
         {
           reminderId: reminder.id,
+          telegramUserId: reminder.telegram_user_id,
           accountId: reminder.account_id,
           emailMessageId: reminder.email_message_id,
         },

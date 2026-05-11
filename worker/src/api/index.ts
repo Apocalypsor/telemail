@@ -5,6 +5,7 @@ import { oauthController } from "@worker/api/modules/oauth";
 import { previewController } from "@worker/api/modules/preview";
 import { providersController } from "@worker/api/modules/providers";
 import { remindersController } from "@worker/api/modules/reminders";
+import { settingsController } from "@worker/api/modules/settings";
 import { telegramController } from "@worker/api/modules/telegram";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { Elysia } from "elysia";
@@ -69,6 +70,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter, name: "telemail" })
   .use(mailController)
   .use(miniAppController)
   .use(remindersController)
+  .use(settingsController)
   .compile();
 
 export type App = typeof app;

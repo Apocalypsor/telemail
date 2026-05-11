@@ -60,15 +60,14 @@
 
 ### Things Cloud（可选）
 
-配置后，邮件提醒到期时会在后台推送创建一条 Things 任务。推送失败只会上报 observability，不影响 Telemail 提醒分发。
+每个用户在 Mini App 里单独保存 Things Cloud 邮箱 / 密码后，邮件提醒到期时会在后台推送创建一条 Things Today 任务。用户设备时区由 Mini App 请求自动上报并记录；推送失败只会上报 observability，不影响 Telemail 提醒分发。
 
 | Secret                    | 说明                                                      |
 | ------------------------- | --------------------------------------------------------- |
-| `THINGS_CLOUD_EMAIL`      | Things Cloud 账号邮箱                                    |
-| `THINGS_CLOUD_PASSWORD`   | Things Cloud 密码                                        |
+| `DEFAULT_USER_TIMEZONE`   | 未记录用户设备时区时的 IANA 时区 fallback，默认 `UTC` |
 | `THINGS_CLOUD_ENDPOINT`   | Things Cloud API endpoint override（调试用，默认官方 endpoint） |
 
-注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径。
+用户 Things Cloud 凭据和 `user_timezone` 存储在 D1 `users` 表，API 不回显密码；每个用户的 Things app instance id 存在 KV。注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径。
 
 ## Cloudflare Bindings
 
@@ -96,5 +95,5 @@
 - `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、`refresh_token` 加密等）
 - `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id)`，幂等去重用
 - `reminders` —— Mini App 设的提醒，可选记录推送到 Things Cloud 的 task UUID
-- `users` —— 登录过 Telegram Login Widget 的用户（`approved` 状态控制访问 web 工具页 `/preview` / `/junk-check`）
+- `users` —— 登录过 Telegram Login Widget 的用户（`approved` 状态控制访问 web 工具页 `/preview` / `/junk-check`），以及可选的 per-user Things Cloud 设置
 - `failed_emails` —— LLM / queue 处理失败的邮件，cron 批量重试
