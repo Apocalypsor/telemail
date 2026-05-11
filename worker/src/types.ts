@@ -88,10 +88,10 @@ export interface MailAttachmentMeta {
   size: number | null;
 }
 
-export interface MailAttachmentContent {
+export interface MailAttachmentDownload {
   filename: string | null;
   mimeType: string | null;
-  content: string | ArrayBuffer | Uint8Array;
+  body: string | ArrayBuffer | ReadableStream<Uint8Array>;
 }
 
 export enum QueueMessageType {

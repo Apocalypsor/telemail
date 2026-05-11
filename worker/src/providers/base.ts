@@ -19,7 +19,8 @@ import type {
   OAuthTokenResponse,
   PreviewContent,
 } from "@worker/providers/types";
-import type { Account, Env, MailAttachmentContent } from "@worker/types";
+import { attachmentBody } from "@worker/providers/utils";
+import type { Account, Env, MailAttachmentDownload } from "@worker/types";
 import {
   formatAddress,
   parseEmailDate,
@@ -127,7 +128,7 @@ export abstract class EmailProvider {
     messageId: string,
     attachmentId: string,
     folder: "inbox" | "junk" | "archive",
-  ): Promise<MailAttachmentContent | null> {
+  ): Promise<MailAttachmentDownload | null> {
     const index = Number(attachmentId);
     if (!Number.isInteger(index) || index < 0) return null;
     const rawEmail = await this.fetchRawEmail(messageId, folder);
@@ -137,7 +138,7 @@ export abstract class EmailProvider {
     return {
       filename: att.filename || null,
       mimeType: att.mimeType || null,
-      content: att.content,
+      body: attachmentBody(att.content),
     };
   }
 

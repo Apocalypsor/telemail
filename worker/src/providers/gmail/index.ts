@@ -17,6 +17,10 @@ import type {
   GmailProfile,
   GmailWatchResponse,
 } from "@worker/providers/gmail/types";
+import { gmailGet, gmailPost } from "@worker/providers/gmail/utils/api";
+import { gmailGetAttachmentDataStream } from "@worker/providers/gmail/utils/attachment-stream";
+import { getAccessToken } from "@worker/providers/gmail/utils/auth";
+import { gmailBatchGetMetadata } from "@worker/providers/gmail/utils/batch";
 import {
   collectAttachmentMeta,
   collectInlineAttachmentIds,
@@ -25,11 +29,7 @@ import {
   extractPartByMime,
   findAttachmentPayloadById,
   findAttachmentPayloadByIndex,
-  getAccessToken,
-  gmailBatchGetMetadata,
-  gmailGet,
-  gmailPost,
-} from "@worker/providers/gmail/utils";
+} from "@worker/providers/gmail/utils/payload";
 import type {
   EmailListItem,
   MessageState,
@@ -38,11 +38,14 @@ import type {
 import {
   type Account,
   type Env,
-  type MailAttachmentContent,
+  type MailAttachmentDownload,
   type MailMeta,
   QueueMessageType,
 } from "@worker/types";
-import { base64urlToArrayBuffer } from "@worker/utils/base64url";
+import {
+  base64urlToArrayBuffer,
+  base64urlToByteStream,
+} from "@worker/utils/base64url";
 import { parseEmailDate, wrapPlainText } from "@worker/utils/format";
 import { HTTPError } from "ky";
 
@@ -300,7 +303,7 @@ export class GmailProvider extends EmailProvider {
   async fetchAttachment(
     messageId: string,
     attachmentId: string,
-  ): Promise<MailAttachmentContent | null> {
+  ): Promise<MailAttachmentDownload | null> {
     const token = await this.token();
     const msg = await gmailGet<{ payload: GmailPayload }>(
       token,
@@ -311,22 +314,22 @@ export class GmailProvider extends EmailProvider {
       findAttachmentPayloadByIndex(msg.payload, attachmentId);
     if (!part) return null;
 
-    let content: ArrayBuffer | null = null;
+    let body: MailAttachmentDownload["body"] | null = null;
     if (part.body?.attachmentId) {
-      const att = await gmailGet<{ data?: string }>(
+      body = await gmailGetAttachmentDataStream(
         token,
-        `/users/me/messages/${messageId}/attachments/${part.body.attachmentId}`,
+        messageId,
+        part.body.attachmentId,
       );
-      content = att.data ? base64urlToArrayBuffer(att.data) : null;
     } else if (part.body?.data) {
-      content = base64urlToArrayBuffer(part.body.data);
+      body = base64urlToByteStream(part.body.data);
     }
-    if (!content) return null;
+    if (!body) return null;
 
     return {
       filename: part.filename || null,
       mimeType: part.mimeType ?? null,
-      content,
+      body,
     };
   }
 

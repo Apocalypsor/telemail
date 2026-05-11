@@ -19,7 +19,7 @@ import {
   MailToggleStarBody,
 } from "./model";
 import { MailService } from "./service";
-import { attachmentBody, contentDisposition } from "./utils";
+import { contentDisposition } from "./utils";
 
 /**
  * Mail preview API + 6 mutations:
@@ -116,7 +116,7 @@ const mailAttachmentGet = new Elysia({
       if (!attachment) return status(404, { error: "Attachment not found" });
 
       const mime = attachment.mimeType || "application/octet-stream";
-      return new Response(attachmentBody(attachment.content), {
+      return new Response(attachment.body, {
         headers: {
           "Content-Type": mime,
           "Content-Disposition": contentDisposition(attachment.filename),
