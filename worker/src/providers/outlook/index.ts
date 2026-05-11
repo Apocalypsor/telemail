@@ -24,17 +24,22 @@ import type {
   GraphMessageList,
 } from "@worker/providers/outlook/types";
 import {
-  fetchRawMime,
-  getAccessToken,
-  graphBatch,
   graphGet,
   graphPatch,
   graphPost,
-} from "@worker/providers/outlook/utils";
-import type { MessageState } from "@worker/providers/types";
+} from "@worker/providers/outlook/utils/api";
+import {
+  buildOutlookAttachmentMeta,
+  fetchOutlookAttachmentStream,
+} from "@worker/providers/outlook/utils/attachments";
+import { getAccessToken } from "@worker/providers/outlook/utils/auth";
+import { graphBatch } from "@worker/providers/outlook/utils/batch";
+import { fetchRawMime } from "@worker/providers/outlook/utils/mime";
+import type { MessageState, PreviewContent } from "@worker/providers/types";
 import {
   type EmailQueueMessage,
   type Env,
+  type MailAttachmentDownload,
   QueueMessageType,
 } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
@@ -232,6 +237,35 @@ export class OutlookProvider extends EmailProvider {
 
   async fetchRawEmail(messageId: string): Promise<ArrayBuffer> {
     return fetchRawMime(await this.token(), messageId);
+  }
+
+  async fetchForPreview(
+    messageId: string,
+    folder: "inbox" | "junk" | "archive",
+  ): Promise<PreviewContent | null> {
+    const token = await this.token();
+    const [preview, attachments] = await Promise.all([
+      super.fetchForPreview(messageId, folder),
+      buildOutlookAttachmentMeta(token, messageId),
+    ]);
+    return preview ? { ...preview, attachments } : null;
+  }
+
+  async fetchAttachment(
+    messageId: string,
+    attachmentId: string,
+  ): Promise<MailAttachmentDownload | null> {
+    const result = await fetchOutlookAttachmentStream(
+      await this.token(),
+      messageId,
+      attachmentId,
+    );
+    if (!result) return null;
+    return {
+      filename: result.attachment.name ?? null,
+      mimeType: result.attachment.contentType ?? "application/octet-stream",
+      body: result.body,
+    };
   }
 
   // ─── Message actions ──────────────────────────────────────────────────

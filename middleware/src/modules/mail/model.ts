@@ -37,6 +37,13 @@ export const FetchBody = t.Object({
   archiveFolder: t.Optional(t.String()),
 });
 
+export const AttachmentBody = t.Composite([
+  FetchBody,
+  t.Object({
+    attachmentId: t.String(),
+  }),
+]);
+
 export const FlagBody = t.Object({
   accountId: t.Number(),
   rfcMessageId: t.String(),
