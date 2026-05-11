@@ -13,7 +13,8 @@ import {
   htmlToMarkdown,
   toTelegramMdV2,
 } from "@worker/utils/format";
-import { escapeMdV2, wrapExpandableQuote } from "@worker/utils/markdown-v2";
+import { escapeMdV2 } from "@worker/utils/markdown-v2";
+import { extractVerificationCode } from "@worker/utils/verification-code";
 
 /**
  * 邮件 → Telegram 消息的格式化层 —— deliver / retry 共用。
@@ -59,6 +60,9 @@ const buildTelegramHeader = (
   return lines.join("\n");
 };
 
+export const buildVerificationCodeSection = (code: string): string =>
+  `*${t("bridge:verificationCode")}*  \`${escapeMdV2(code)}\`\n\n`;
+
 /** 从解析后的邮件中提取 TG 消息所需的各项内容（subject / header / 渲染好的正文 / LLM 用的纯文本） */
 export const prepareEmailContent = (
   email: {
@@ -83,14 +87,18 @@ export const prepareEmailContent = (
     subject,
     account.email ?? undefined,
   );
+  const plainBody = getEmailPlainBody(email);
+  const verificationCode = extractVerificationCode(subject, plainBody);
+  const codeSection = verificationCode
+    ? buildVerificationCodeSection(verificationCode)
+    : "";
   const charLimit = isCaption ? TG_CAPTION_LIMIT : TG_MSG_LIMIT;
   const bodyBudget = Math.max(
-    Math.floor((charLimit - header.length) * 0.9),
+    Math.floor((charLimit - header.length - codeSection.length) * 0.9),
     100,
   );
   const formattedBody = formatBody(email.text, email.html, bodyBudget);
-  const plainBody = getEmailPlainBody(email);
-  return { subject, header, formattedBody, plainBody };
+  return { subject, header, formattedBody, plainBody, verificationCode };
 };
 
 /** 调用 LLM 分析邮件并编辑 Telegram 消息（验证码 / 摘要 + 标签），返回分析结果 */
@@ -103,8 +111,8 @@ export const editMessageWithAnalysis = async (
   header: string,
   subject: string,
   plainBody: string,
-  formattedBody: string,
   keyboard: unknown,
+  verificationCode: string | null,
 ): Promise<EmailAnalysis> => {
   const editMsg = (newText: string) =>
     isCaption
@@ -133,16 +141,10 @@ export const editMessageWithAnalysis = async (
       ? `\n\n${result.tags.map((tag: string) => `\\#${escapeMdV2(tag.replace(/\s+/g, "_"))}`).join("  ")}`
       : "";
 
-  if (result.verificationCode && formattedBody) {
-    const codeSection = `*${t("bridge:verificationCode")}*  \`${escapeMdV2(result.verificationCode)}\`\n\n`;
-    await editMsg(
-      header + codeSection + wrapExpandableQuote(formattedBody) + tagsLine,
-    );
-    console.log("Verification code extracted");
-    return result;
-  }
-
   const summarySection = `*${escapeMdV2(t("bridge:aiSummary"))}*\n\n${toTelegramMdV2(result.summary)}`;
-  await editMsg(header + summarySection + tagsLine);
+  const codeSection = verificationCode
+    ? buildVerificationCodeSection(verificationCode)
+    : "";
+  await editMsg(header + codeSection + summarySection + tagsLine);
   return result;
 };

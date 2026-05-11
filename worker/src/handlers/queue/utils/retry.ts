@@ -39,7 +39,7 @@ const reanalyzeEmail = async (
   const parser = new PostalMime();
   const email = await parser.parse(rawEmail);
 
-  const { subject, header, formattedBody, plainBody } = prepareEmailContent(
+  const { subject, header, plainBody, verificationCode } = prepareEmailContent(
     email,
     account,
     isCaption,
@@ -65,8 +65,8 @@ const reanalyzeEmail = async (
     header,
     subject,
     plainBody,
-    formattedBody,
     keyboard,
+    verificationCode,
   );
   if (analysis.shortSummary) {
     await updateShortSummary(

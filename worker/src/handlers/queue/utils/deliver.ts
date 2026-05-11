@@ -11,6 +11,7 @@ import {
 import { putFailedEmail } from "@worker/db/failed-emails";
 import { putMessageMapping, updateShortSummary } from "@worker/db/message-map";
 import {
+  buildVerificationCodeSection,
   editMessageWithAnalysis,
   prepareEmailContent,
 } from "@worker/handlers/queue/utils/format";
@@ -59,12 +60,12 @@ export const deliverEmailToTelegram = async (
 
   const hasAttachments = !!(email.attachments && email.attachments.length > 0);
   const hasSingleAttachment = hasAttachments && email.attachments?.length === 1;
-  const { subject, header, formattedBody, plainBody } = prepareEmailContent(
-    email,
-    account,
-    hasSingleAttachment,
-  );
-  const text = header + wrapExpandableQuote(formattedBody);
+  const { subject, header, formattedBody, plainBody, verificationCode } =
+    prepareEmailContent(email, account, hasSingleAttachment);
+  const codeSection = verificationCode
+    ? buildVerificationCodeSection(verificationCode)
+    : "";
+  const text = header + codeSection + wrapExpandableQuote(formattedBody);
 
   const hasLlm = !!(env.LLM_API_URL && env.LLM_API_KEY && env.LLM_MODEL);
 
@@ -154,8 +155,8 @@ export const deliverEmailToTelegram = async (
           header,
           subject,
           plainBody,
-          formattedBody,
           fullKeyboard,
+          verificationCode,
         );
         if (analysis.shortSummary) {
           await updateShortSummary(

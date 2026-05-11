@@ -61,7 +61,7 @@ Queue Consumer 拉取原始 RFC 2822 邮件（Gmail REST / Outlook Graph / IMAP 
 <details>
 <summary><strong>AI 摘要 + 垃圾检测</strong>（点击展开）</summary>
 
-配好 `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` 后，新邮件发到 Telegram 后会异步调用 LLM 生成摘要和标签，编辑原消息替换正文；标签以 `#Tag` 形式附在末尾。垃圾检测高置信度（≥ 0.8）自动加 `#Junk` 标签（不会自动移动或删除）。
+配好 `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` 后，新邮件发到 Telegram 后会异步调用 LLM 生成摘要和标签，编辑原消息替换正文；标签以 `#Tag` 形式附在末尾。验证码会先用规则提取并随正文首发，LLM 摘要完成后仍和验证码一起显示。垃圾检测高置信度（≥ 0.8）自动加 `#Junk` 标签（不会自动移动或删除）。
 
 </details>
 
