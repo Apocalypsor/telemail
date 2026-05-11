@@ -1,8 +1,9 @@
-import { Card, Skeleton } from "@heroui/react";
+import { Card } from "@heroui/react";
 import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailMeta } from "@page/components/mail-meta";
+import { MailPreviewSkeleton } from "@page/components/mail-preview-skeleton";
 import { WebLayout } from "@page/components/web-layout";
 import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -57,21 +58,7 @@ function WebMailPage() {
   });
 
   if (q.isLoading) {
-    return (
-      <WebLayout>
-        <article className="space-y-4">
-          <Skeleton className="h-9 w-2/3 rounded-md" />
-          <Skeleton className="h-4 w-1/3 rounded-md" />
-          <Skeleton className="h-4 w-1/2 rounded-md" />
-          <Card className="mt-8 bg-zinc-900 border border-zinc-800 p-6 space-y-3">
-            <Skeleton className="h-4 w-full rounded-md" />
-            <Skeleton className="h-4 w-11/12 rounded-md" />
-            <Skeleton className="h-4 w-10/12 rounded-md" />
-            <Skeleton className="h-4 w-9/12 rounded-md" />
-          </Card>
-        </article>
-      </WebLayout>
-    );
+    return <MailPreviewSkeleton web />;
   }
   if (q.isError || !q.data) {
     return (

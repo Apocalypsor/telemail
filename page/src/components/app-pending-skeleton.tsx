@@ -1,7 +1,14 @@
 import { Skeleton } from "@heroui/react";
+import { MailPreviewSkeleton } from "./mail-preview-skeleton";
 
 export function AppPendingSkeleton() {
-  const isMiniApp = window.location.pathname.startsWith("/telegram-app");
+  const pathname = window.location.pathname;
+  const isMiniApp = pathname.startsWith("/telegram-app");
+
+  if (pathname.startsWith("/telegram-app/mail/"))
+    return <MailPreviewSkeleton />;
+
+  if (pathname.startsWith("/mail/")) return <MailPreviewSkeleton web />;
 
   if (isMiniApp) {
     return (

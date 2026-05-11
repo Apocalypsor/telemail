@@ -1,9 +1,9 @@
-import { Skeleton } from "@heroui/react";
 import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailFab } from "@page/components/mail-fab";
 import { MailMeta } from "@page/components/mail-meta";
+import { MailPreviewSkeleton } from "@page/components/mail-preview-skeleton";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { openExternalLink } from "@page/utils/tg";
 import { Type as t } from "@sinclair/typebox";
@@ -74,19 +74,7 @@ function MailPreviewPage() {
   useBackButton(search.back);
 
   if (q.isLoading) {
-    return (
-      <article className="max-w-3xl mx-auto px-4 py-6 animate-pulse space-y-4">
-        <Skeleton className="h-9 w-2/3 rounded-md" />
-        <Skeleton className="h-4 w-1/3 rounded-md" />
-        <Skeleton className="h-4 w-1/2 rounded-md" />
-        <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-          <Skeleton className="h-4 w-full rounded-md" />
-          <Skeleton className="h-4 w-11/12 rounded-md" />
-          <Skeleton className="h-4 w-10/12 rounded-md" />
-          <Skeleton className="h-4 w-9/12 rounded-md" />
-        </div>
-      </article>
-    );
+    return <MailPreviewSkeleton />;
   }
   if (q.isError || !q.data) {
     return <div className="p-5 text-sm text-red-400">邮件加载失败</div>;
