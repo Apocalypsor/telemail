@@ -63,6 +63,7 @@ function isInlinePayload(payload: GmailPayload): boolean {
     payload,
     "content-disposition",
   )?.toLowerCase();
+  if (disposition?.startsWith("attachment")) return false;
   return (
     disposition?.startsWith("inline") === true ||
     (!!extractHeader(payload, "content-id") &&
@@ -81,7 +82,7 @@ export function collectAttachmentMeta(
   );
   if (hasAttachmentContent && payload.filename && !isInlinePayload(payload)) {
     result.push({
-      id: payload.body?.attachmentId ?? String(result.length),
+      id: String(result.length),
       filename: payload.filename,
       mimeType: payload.mimeType ?? null,
       size: payload.body?.size ?? null,

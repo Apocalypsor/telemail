@@ -137,11 +137,20 @@ export async function gmailGetAttachmentDataStream(
   attachmentId: string,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const resp = await http.get(
-    `${GMAIL_API}/users/me/messages/${messageId}/attachments/${attachmentId}`,
+    `${GMAIL_API}/users/me/messages/${encodeURIComponent(
+      messageId,
+    )}/attachments/${encodeURIComponent(attachmentId)}`,
     {
       headers: { Authorization: `Bearer ${token}` },
+      throwHttpErrors: false,
     },
   );
+  if (resp.status === 404) return null;
+  if (!resp.ok) {
+    throw new Error(
+      `Gmail attachment download failed: ${resp.status} ${await resp.text()}`,
+    );
+  }
   if (!resp.body) return null;
   return gmailAttachmentDataJsonStream(resp.body);
 }

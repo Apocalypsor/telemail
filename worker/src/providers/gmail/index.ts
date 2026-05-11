@@ -281,7 +281,9 @@ export class GmailProvider extends EmailProvider {
         pending.map(async ({ cid, mimeType, attachmentId }) => {
           const att = await gmailGet<{ data?: string }>(
             token,
-            `/users/me/messages/${messageId}/attachments/${attachmentId}`,
+            `/users/me/messages/${encodeURIComponent(
+              messageId,
+            )}/attachments/${encodeURIComponent(attachmentId)}`,
           );
           if (att.data) {
             // Gmail 返回的是 base64url，转为标准 base64
