@@ -1,11 +1,11 @@
 /** Reminders 模块的业务用例编排。目前只有一项：list 接口的 enrich 流程
  *  （给 reminder 行附加 mail_token + email_summary）。 */
 import { MailService } from "@worker/api/modules/mail/service";
+import { ThingsCloudClient } from "@worker/clients/things-cloud";
 import {
   deriveThingsUuid,
   generateThingsAppInstanceId,
-  ThingsCloudClient,
-} from "@worker/clients/things-cloud";
+} from "@worker/clients/things-cloud/utils";
 import { getAccountById } from "@worker/db/accounts";
 import { getThingsAppInstanceId, putThingsAppInstanceId } from "@worker/db/kv";
 import { getMappingsByEmailIds } from "@worker/db/message-map";

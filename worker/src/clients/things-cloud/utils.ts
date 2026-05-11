@@ -1,103 +1,16 @@
-import { http } from "@worker/clients/http";
+import {
+  APP_ID,
+  BASE58_ALPHABET,
+  THINGS_USER_AGENT,
+} from "@worker/clients/things-cloud/constants";
+import type {
+  TaskCreatePayload,
+  ThingsTodoInput,
+  WireExtension,
+  WireNote,
+} from "@worker/clients/things-cloud/types";
 
-const DEFAULT_ENDPOINT = "https://cloud.culturedcode.com";
-const THINGS_USER_AGENT = "ThingsMac/32209501";
-const THINGS_SCHEMA = "301";
-const APP_ID = "com.culturedcode.ThingsMac";
-const BASE58_ALPHABET =
-  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-export interface ThingsCloudConfig {
-  email: string;
-  password: string;
-  appInstanceId: string;
-  endpoint?: string;
-}
-
-export interface ThingsTodoInput {
-  id?: string;
-  title: string;
-  notes?: string;
-  when?: Date;
-  today?: boolean;
-  timeZone?: string;
-}
-
-interface VerifyResponse {
-  "history-key"?: string;
-}
-
-interface ItemsResponse {
-  schema?: number;
-  "current-item-index"?: number;
-  "latest-total-content-size"?: number;
-}
-
-interface CommitResponse {
-  "server-head-index"?: number;
-}
-
-interface WireNote {
-  _t: "tx";
-  ch: number;
-  v: string;
-  t: 1;
-}
-
-interface WireExtension {
-  sn: Record<string, never>;
-  _t: "oo";
-}
-
-interface TaskCreatePayload {
-  tp: number;
-  sr: number | null;
-  dds: number | null;
-  rt: string[];
-  rmd: number | null;
-  ss: number;
-  tr: boolean;
-  dl: string[];
-  icp: boolean;
-  st: number;
-  ar: string[];
-  tt: string;
-  do: number;
-  lai: number | null;
-  tir: number | null;
-  tg: string[];
-  agr: string[];
-  ix: number;
-  cd: number;
-  lt: boolean;
-  icc: number;
-  md: number | null;
-  ti: number;
-  dd: number | null;
-  ato: number | null;
-  nt: WireNote;
-  icsd: number | null;
-  pr: string[];
-  rp: string | null;
-  acrd: number | null;
-  sp: number | null;
-  sb: number;
-  rr: null;
-  xx: WireExtension;
-}
-
-interface WriteEnvelope {
-  t: 0;
-  e: "Task6";
-  p: TaskCreatePayload;
-}
-
-interface SyncedHistory {
-  id: string;
-  latestServerIndex: number;
-}
-
-function endpointUrl(endpoint: string, path: string): string {
+export function endpointUrl(endpoint: string, path: string): string {
   return `${endpoint.replace(/\/+$/, "")}${path}`;
 }
 
@@ -122,7 +35,7 @@ function thingsClientInfoHeader(): string {
   );
 }
 
-function commonHeaders(): Record<string, string> {
+export function commonHeaders(): Record<string, string> {
   return {
     "User-Agent": THINGS_USER_AGENT,
     Accept: "application/json",
@@ -261,7 +174,7 @@ function thingsSchedule(
   return { scheduledDate, alarmOffset };
 }
 
-function createTaskPayload(input: ThingsTodoInput): TaskCreatePayload {
+export function createTaskPayload(input: ThingsTodoInput): TaskCreatePayload {
   const { scheduledDate, alarmOffset } = thingsSchedule(
     input.when,
     input.timeZone,
@@ -312,93 +225,4 @@ function createTaskPayload(input: ThingsTodoInput): TaskCreatePayload {
     rr: null,
     xx: extension(),
   };
-}
-
-export class ThingsCloudClient {
-  private readonly endpoint: string;
-  private readonly email: string;
-  private readonly password: string;
-  private readonly appInstanceId: string;
-
-  constructor(config: ThingsCloudConfig) {
-    this.endpoint = config.endpoint ?? DEFAULT_ENDPOINT;
-    this.email = config.email;
-    this.password = config.password;
-    this.appInstanceId = config.appInstanceId;
-  }
-
-  async verify(): Promise<VerifyResponse> {
-    return await http
-      .get(
-        endpointUrl(
-          this.endpoint,
-          `/version/1/account/${encodeURIComponent(this.email)}`,
-        ),
-        {
-          headers: {
-            ...commonHeaders(),
-            Authorization: `Password ${this.password}`,
-          },
-        },
-      )
-      .json<VerifyResponse>();
-  }
-
-  async ownSyncedHistory(): Promise<SyncedHistory> {
-    const account = await this.verify();
-    const historyKey = account["history-key"];
-    if (!historyKey)
-      throw new Error("Things Cloud response has no history key");
-
-    const items = await http
-      .get(
-        endpointUrl(this.endpoint, `/version/1/history/${historyKey}/items`),
-        {
-          headers: commonHeaders(),
-          searchParams: { "start-index": "0" },
-        },
-      )
-      .json<ItemsResponse>();
-
-    return {
-      id: historyKey,
-      latestServerIndex: items["current-item-index"] ?? 0,
-    };
-  }
-
-  async createTodo(input: ThingsTodoInput): Promise<string> {
-    const history = await this.ownSyncedHistory();
-    const id = input.id ?? generateThingsUuid();
-    const envelope: WriteEnvelope = {
-      t: 0,
-      e: "Task6",
-      p: createTaskPayload(input),
-    };
-    const body: Record<string, WriteEnvelope> = { [id]: envelope };
-    const response = await http
-      .post(
-        endpointUrl(this.endpoint, `/version/1/history/${history.id}/commit`),
-        {
-          headers: {
-            ...commonHeaders(),
-            "Content-Type": "application/json; charset=UTF-8",
-            "Content-Encoding": "UTF-8",
-            Schema: THINGS_SCHEMA,
-            "Push-Priority": "5",
-            "App-Instance-Id": this.appInstanceId,
-            "App-Id": APP_ID,
-          },
-          searchParams: {
-            "ancestor-index": String(history.latestServerIndex),
-            _cnt: "1",
-          },
-          json: body,
-        },
-      )
-      .json<CommitResponse>();
-    if (typeof response["server-head-index"] !== "number") {
-      throw new Error("Things Cloud commit response has no server head index");
-    }
-    return id;
-  }
 }
