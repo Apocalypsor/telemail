@@ -1,4 +1,3 @@
-import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { QueryProvider, queryClient } from "@page/providers/query";
 import { TelegramProvider } from "@page/providers/telegram";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
@@ -22,7 +21,6 @@ import "./styles/app.css";
 const router = createRouter({
   routeTree,
   context: { queryClient },
-  defaultPendingComponent: AppPendingSkeleton,
   defaultPreload: "intent",
 });
 

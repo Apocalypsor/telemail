@@ -12,6 +12,15 @@ export interface RouterContext {
 function RootLayout() {
   // pathname 作 key 让路由切换时 div 重挂，触发 page-enter 动画
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isMiniApp = pathname.startsWith("/telegram-app");
+
+  if (isMiniApp) {
+    return (
+      <div>
+        <Outlet />
+      </div>
+    );
+  }
 
   return (
     <div key={pathname} data-page-enter>

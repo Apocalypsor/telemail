@@ -1,10 +1,10 @@
-import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
 import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailFab } from "@page/components/mail-fab";
 import { MailMeta } from "@page/components/mail-meta";
 import { useBackButton } from "@page/hooks/use-back-button";
+import { mailContentQueryOptions } from "@page/utils/mail-content";
 import { openExternalLink } from "@page/utils/tg";
 import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,10 +21,11 @@ const Search = t.Object({
   ),
   back: t.Optional(t.String()),
 });
+const validateMailSearch = validateSearch(Search);
 
 export const Route = createFileRoute("/telegram-app/mail/$id")({
   component: MailPreviewPage,
-  validateSearch: validateSearch(Search),
+  validateSearch: validateMailSearch,
 });
 
 function MailPreviewPage() {
@@ -48,27 +49,13 @@ function MailPreviewPage() {
   // MailBodyFrame 根据这个值决定渲染 proxiedHtml 还是 rawHtml。
   const [useProxy, setUseProxy] = useState(true);
 
-  const queryKey = [
-    "mail-preview",
+  const queryOptions = mailContentQueryOptions({
     emailMessageId,
-    search.accountId,
-    search.folder,
-  ];
-
-  const q = useQuery({
-    queryKey,
-    queryFn: async () => {
-      const { data, error } = await api.api.mail({ id: emailMessageId }).get({
-        query: {
-          accountId: String(search.accountId),
-          t: search.t,
-          folder: search.folder,
-        },
-      });
-      if (error) throw error;
-      return data;
-    },
+    accountId: search.accountId,
+    token: search.t,
+    folder: search.folder,
   });
+  const q = useQuery(queryOptions);
 
   // BackButton：URL 带 ?back= 时显示并跳回该 URL；没有就隐藏（从 bot 按钮直接进来）
   useBackButton(search.back);
@@ -117,7 +104,9 @@ function MailPreviewPage() {
         useProxy={useProxy}
         onToggleProxy={() => setUseProxy((v) => !v)}
         onSetReminder={onSetReminder}
-        onChanged={() => qc.invalidateQueries({ queryKey })}
+        onChanged={() =>
+          qc.invalidateQueries({ queryKey: queryOptions.queryKey })
+        }
       />
     </>
   );

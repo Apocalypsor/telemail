@@ -1,10 +1,10 @@
 import { Card } from "@heroui/react";
-import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
 import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailMeta } from "@page/components/mail-meta";
 import { WebLayout } from "@page/components/web-layout";
+import { mailContentQueryOptions } from "@page/utils/mail-content";
 import { Type as t } from "@sinclair/typebox";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -18,10 +18,11 @@ const Search = t.Object({
     t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
   ),
 });
+const validateMailSearch = validateSearch(Search);
 
 export const Route = createFileRoute("/mail/$id/")({
   component: WebMailPage,
-  validateSearch: validateSearch(Search),
+  validateSearch: validateMailSearch,
 });
 
 function WebMailPage() {
@@ -34,26 +35,14 @@ function WebMailPage() {
 
   // Cache key 和 Mini App `/telegram-app/mail/$id` 共用 —— 同一个 API
   // (`ROUTE_MAIL_API`)，shape 相同，本来就该共享缓存。
-  const queryKey = [
-    "mail-preview",
+  const queryOptions = mailContentQueryOptions({
     emailMessageId,
-    search.accountId,
-    search.folder,
-  ];
-
+    accountId: search.accountId,
+    token: search.t,
+    folder: search.folder,
+  });
   const q = useQuery({
-    queryKey,
-    queryFn: async () => {
-      const { data, error } = await api.api.mail({ id: emailMessageId }).get({
-        query: {
-          accountId: String(search.accountId),
-          t: search.t,
-          folder: search.folder,
-        },
-      });
-      if (error) throw error;
-      return data;
-    },
+    ...queryOptions,
     retry: false,
   });
 
@@ -97,7 +86,9 @@ function WebMailPage() {
           folder={search.folder}
           useProxy={useProxy}
           onToggleProxy={() => setUseProxy((v) => !v)}
-          onChanged={() => qc.invalidateQueries({ queryKey })}
+          onChanged={() =>
+            qc.invalidateQueries({ queryKey: queryOptions.queryKey })
+          }
         />
 
         {/* 正文直接包在原生 div 里 —— HeroUI Card 默认带内边距，iframe 会
