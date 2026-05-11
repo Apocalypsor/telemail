@@ -1,5 +1,6 @@
 import { treaty } from "@elysiajs/eden";
 import { getInitData } from "@page/providers/telegram";
+import { getDeviceTimeZone } from "@page/utils/time-zone";
 import type { App } from "@worker/api";
 
 /**
@@ -17,8 +18,12 @@ export const api = treaty<App>(
   typeof window !== "undefined" ? window.location.origin : "http://localhost",
   {
     headers: () => {
+      const headers: Record<string, string> = {};
       const initData = getInitData();
-      return initData ? { "X-Telegram-Init-Data": initData } : {};
+      if (initData) headers["X-Telegram-Init-Data"] = initData;
+      const timeZone = getDeviceTimeZone();
+      if (timeZone) headers["X-Telemail-User-Time-Zone"] = timeZone;
+      return headers;
     },
     fetch: { credentials: "same-origin" },
   },

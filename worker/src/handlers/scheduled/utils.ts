@@ -1,3 +1,4 @@
+import { RemindersService } from "@worker/api/modules/reminders/service";
 import { pinChatMessage, sendTextMessage } from "@worker/clients/telegram";
 import { getAccountById } from "@worker/db/accounts";
 import { deleteMessageMapping } from "@worker/db/message-map";
@@ -76,6 +77,11 @@ export async function dispatchDueReminders(
     due.map(async (r) => {
       try {
         if (r.account_id != null && r.email_message_id != null) {
+          waitUntil(
+            RemindersService.pushThingsTaskForDueEmailReminder(env, r).catch(
+              () => {},
+            ),
+          );
           await sendEmailReminder(env, r, waitUntil);
         } else {
           await sendGenericReminder(env, r);

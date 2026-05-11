@@ -3,6 +3,8 @@ import { users } from "@worker/db/schema";
 import type { TelegramUser } from "@worker/types";
 import { desc, eq, ne } from "drizzle-orm";
 
+type UserUpdate = Partial<typeof users.$inferInsert>;
+
 /** 登录时 upsert 用户信息（approved 仅在首次 INSERT 时设置，UPDATE 不覆盖） */
 export async function upsertUser(
   d1: D1Database,
@@ -91,6 +93,55 @@ export async function rejectUser(
   await db
     .update(users)
     .set({ approved: 0 })
+    .where(eq(users.telegram_id, telegramId));
+}
+
+export interface UserThingsSettingsUpdate {
+  email: string;
+  password?: string | null;
+}
+
+/** 更新单个用户的 Things Cloud 配置。password omitted 时保留旧值。 */
+export async function updateUserThingsSettings(
+  d1: D1Database,
+  telegramId: string,
+  input: UserThingsSettingsUpdate,
+): Promise<void> {
+  const db = getDb(d1);
+  const values: UserUpdate = {
+    things_cloud_email: input.email,
+  };
+  if (input.password !== undefined) {
+    values.things_cloud_password = input.password;
+  }
+  await db.update(users).set(values).where(eq(users.telegram_id, telegramId));
+}
+
+/** 记录用户最近一次打开 Mini App 时的设备时区，供跨功能复用。 */
+export async function updateUserTimezone(
+  d1: D1Database,
+  telegramId: string,
+  userTimezone: string,
+): Promise<void> {
+  const db = getDb(d1);
+  await db
+    .update(users)
+    .set({ user_timezone: userTimezone })
+    .where(eq(users.telegram_id, telegramId));
+}
+
+/** 清空单个用户的 Things Cloud 配置。 */
+export async function clearUserThingsSettings(
+  d1: D1Database,
+  telegramId: string,
+): Promise<void> {
+  const db = getDb(d1);
+  await db
+    .update(users)
+    .set({
+      things_cloud_email: null,
+      things_cloud_password: null,
+    })
     .where(eq(users.telegram_id, telegramId));
 }
 

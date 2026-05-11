@@ -1,7 +1,30 @@
-import { getUserByTelegramId } from "@worker/db/users";
+import { getUserByTelegramId, updateUserTimezone } from "@worker/db/users";
+import type { Env, TelegramUser } from "@worker/types";
+import { reportErrorToObservability } from "@worker/utils/observability";
 import { verifyTgInitData } from "@worker/utils/tg-init-data";
+import { normalizeIanaTimeZone } from "@worker/utils/time-zone";
 import { Elysia } from "elysia";
 import { cf } from "./cf";
+
+async function updateUserTimezoneIfChanged(
+  env: Env,
+  user: TelegramUser,
+  userTimezone: string | null,
+): Promise<void> {
+  if (!userTimezone || user.user_timezone === userTimezone) return;
+  try {
+    await updateUserTimezone(env.DB, user.telegram_id, userTimezone);
+  } catch (err) {
+    await reportErrorToObservability(
+      env,
+      "miniapp.user_timezone_update_failed",
+      err,
+      {
+        telegramUserId: user.telegram_id,
+      },
+    );
+  }
+}
 
 /**
  * Mini App 鉴权：X-Telegram-Init-Data 头验签 + users.approved 检查（管理员豁免）。
@@ -17,12 +40,20 @@ export const authMiniApp = new Elysia({ name: "auth-miniapp" })
     if (!tgUser) return status(401, { error: "Unauthorized" });
 
     const telegramId = String(tgUser.id);
+    const userTimezone = normalizeIanaTimeZone(
+      headers["x-telemail-user-time-zone"],
+    );
     const isAdmin = telegramId === env.ADMIN_TELEGRAM_ID;
-    if (isAdmin) return { userId: telegramId, isAdmin };
+    if (isAdmin) {
+      const dbUser = await getUserByTelegramId(env.DB, telegramId);
+      if (dbUser) await updateUserTimezoneIfChanged(env, dbUser, userTimezone);
+      return { userId: telegramId, isAdmin };
+    }
 
     const dbUser = await getUserByTelegramId(env.DB, telegramId);
     if (!dbUser || dbUser.approved !== 1) {
       return status(401, { error: "Unauthorized" });
     }
+    await updateUserTimezoneIfChanged(env, dbUser, userTimezone);
     return { userId: telegramId, isAdmin };
   });

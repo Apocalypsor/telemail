@@ -1,3 +1,5 @@
+import { getDeviceTimeZoneOrDefault } from "@page/utils/time-zone";
+
 /**
  * 时区工具：UI 端 wall-clock ↔ UTC instant 互转 + 下拉用的精选 IANA 列表。
  *
@@ -105,11 +107,7 @@ export const TZ_GROUPS: TzGroup[] = COMMON_TZS_BY_REGION.map(
 );
 
 export function getDeviceTz(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  } catch {
-    return "UTC";
-  }
+  return getDeviceTimeZoneOrDefault();
 }
 
 export function resolveTz(value: string): string {

@@ -133,6 +133,19 @@ export async function updatePendingReminder(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+/** 记录推送到 Things Cloud 后的 task UUID。 */
+export async function updateReminderThingsTaskId(
+  d1: D1Database,
+  id: number,
+  thingsTaskId: string,
+): Promise<void> {
+  const db = getDb(d1);
+  await db
+    .update(reminders)
+    .set({ things_task_id: thingsTaskId })
+    .where(eq(reminders.id, id));
+}
+
 /** 删除某用户的待发送提醒（不允许删别人的，所以 WHERE 双重约束） */
 export async function deletePendingReminder(
   d1: D1Database,

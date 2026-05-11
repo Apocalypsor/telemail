@@ -114,6 +114,15 @@ bun wrangler secret put GMAIL_PUSH_SECRET
 
 `WORKER_URL` 不是敏感值，但 Gmail / Outlook 的 Bot 授权链接、Outlook webhook subscription、邮件查看 / 提醒按钮都会用它拼公开 URL；生产环境建议始终配置为最终同源域名。
 
+可选：如果要覆盖 Things Cloud API endpoint 或默认 Today 时区，再配置：
+
+```sh
+bun wrangler secret put THINGS_CLOUD_ENDPOINT     # 调试用，通常不需要
+bun wrangler secret put DEFAULT_USER_TIMEZONE     # 未记录用户设备时区时的 fallback，例如 America/New_York
+```
+
+Things Cloud 账号不是全局 Worker secret；每个用户在 Mini App 的 Things 设置页保存自己的邮箱 / 密码。用户设备时区会随 Mini App 请求自动记录。
+
 ## 5. Worker 部署
 
 如果本次发布包含 D1 schema / migrations 变更，先从仓库根应用远端迁移：

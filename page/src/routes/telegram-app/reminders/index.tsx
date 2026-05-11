@@ -1,12 +1,13 @@
 import { api } from "@page/api/client";
 import { extractErrorMessage, validateSearch } from "@page/api/utils";
 import { useBackButton } from "@page/hooks/use-back-button";
+import { useSettingsButton } from "@page/hooks/use-bottom-button";
 import { useNavigateToMail } from "@page/hooks/use-navigate-to-mail";
 import { confirmPopup, notifyHaptic } from "@page/utils/tg";
 import { Type as t } from "@sinclair/typebox";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ReminderAddSection } from "./-components/add-section";
 import { ReminderEmailCard } from "./-components/email-card";
 import { ReminderTimeline } from "./-components/timeline";
@@ -37,6 +38,9 @@ function RemindersPage() {
   const navigate = useNavigate();
   const navigateToMail = useNavigateToMail();
   const listOnly = !search.accountId || !search.emailMessageId || !search.token;
+  const openSettings = useCallback(() => {
+    navigate({ to: "/telegram-app/settings" });
+  }, [navigate]);
 
   const qc = useQueryClient();
   const [status, setStatus] = useState<{
@@ -172,6 +176,7 @@ function RemindersPage() {
 
   // 主菜单 / deep link 直达 → 不显示 BackButton；从邮件页带 ?back= 进来 → 显示并跳回
   useBackButton(search.back);
+  useSettingsButton(openSettings);
 
   const reminders = remindersQuery.data?.reminders ?? [];
 
@@ -187,7 +192,7 @@ function RemindersPage() {
               共{" "}
               <span className="text-emerald-400 font-semibold">
                 {reminders.length}
-              </span>{" "}
+              </span>
               条
             </span>
           )}
