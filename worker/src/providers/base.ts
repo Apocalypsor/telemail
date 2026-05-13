@@ -12,6 +12,7 @@ import {
 } from "@worker/db/kv";
 import type {
   EmailListItem,
+  EmailListPage,
   MessageState,
   OAuthCallbackResult,
   OAuthHandler,
@@ -19,7 +20,7 @@ import type {
   OAuthTokenResponse,
   PreviewContent,
 } from "@worker/providers/types";
-import { attachmentBody } from "@worker/providers/utils";
+import { attachmentBody, parseOffsetCursor } from "@worker/providers/utils";
 import type { Account, Env, MailAttachmentDownload } from "@worker/types";
 import {
   formatAddress,
@@ -80,6 +81,62 @@ export abstract class EmailProvider {
     maxResults?: number,
   ): Promise<EmailListItem[]>;
 
+  async listUnreadPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return this.pageByOffset(
+      (limit) => this.listUnread(limit),
+      maxResults,
+      cursor,
+    );
+  }
+
+  async listStarredPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return this.pageByOffset(
+      (limit) => this.listStarred(limit),
+      maxResults,
+      cursor,
+    );
+  }
+
+  async listJunkPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return this.pageByOffset(
+      (limit) => this.listJunk(limit),
+      maxResults,
+      cursor,
+    );
+  }
+
+  async listArchivedPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return this.pageByOffset(
+      (limit) => this.listArchived(limit),
+      maxResults,
+      cursor,
+    );
+  }
+
+  async searchMessagesPage(
+    query: string,
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return this.pageByOffset(
+      (limit) => this.searchMessages(query, limit),
+      maxResults,
+      cursor,
+    );
+  }
+
   abstract markAsJunk(messageId: string): Promise<void>;
 
   abstract markAllAsRead(
@@ -102,6 +159,20 @@ export abstract class EmailProvider {
     messageId: string,
     folder?: "inbox" | "junk" | "archive",
   ): Promise<ArrayBuffer>;
+
+  private async pageByOffset(
+    fetcher: (maxResults: number) => Promise<EmailListItem[]>,
+    maxResults: number,
+    cursor: string | undefined,
+  ): Promise<EmailListPage> {
+    const offset = parseOffsetCursor(cursor);
+    const items = await fetcher(offset + maxResults + 1);
+    return {
+      items: items.slice(offset, offset + maxResults),
+      nextCursor:
+        items.length > offset + maxResults ? String(offset + maxResults) : null,
+    };
+  }
 
   async fetchForPreview(
     messageId: string,

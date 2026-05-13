@@ -33,7 +33,7 @@ export const normalizePageLimit = (limit: number | undefined): number => {
 
 export const parseAccountCursor = (
   raw: string | undefined,
-): Map<number, number> | undefined => {
+): Map<number, string> | undefined => {
   if (!raw) return undefined;
 
   const parsed = JSON.parse(raw) as unknown;
@@ -41,20 +41,14 @@ export const parseAccountCursor = (
     throw new Error("Invalid cursor");
   }
 
-  const cursorByAccount = new Map<number, number>();
-  for (const [accountIdRaw, offsetRaw] of Object.entries(parsed)) {
+  const cursorByAccount = new Map<number, string>();
+  for (const [accountIdRaw, cursorRaw] of Object.entries(parsed)) {
     const accountId = Number(accountIdRaw);
-    const offset =
-      typeof offsetRaw === "number" ? offsetRaw : Number(String(offsetRaw));
-    if (
-      !Number.isInteger(accountId) ||
-      accountId <= 0 ||
-      !Number.isInteger(offset) ||
-      offset < 0
-    ) {
+    const cursor = typeof cursorRaw === "string" ? cursorRaw : "";
+    if (!Number.isInteger(accountId) || accountId <= 0 || !cursor) {
       throw new Error("Invalid cursor");
     }
-    cursorByAccount.set(accountId, offset);
+    cursorByAccount.set(accountId, cursor);
   }
 
   return cursorByAccount;
@@ -62,6 +56,11 @@ export const parseAccountCursor = (
 
 interface ListDef {
   fetcher: (p: EmailProvider, maxResults: number) => Promise<EmailListItem[]>;
+  pageFetcher: (
+    p: EmailProvider,
+    maxResults: number,
+    cursor?: string,
+  ) => Promise<{ items: EmailListItem[]; nextCursor: string | null }>;
   errorEvent: string;
   /** junk/archive 列表：TG 消息可能已被删除，不返回 tgLink */
   hideTgLinks?: boolean;
@@ -78,16 +77,21 @@ interface ListDef {
 export const LIST_DEFS: Record<MailListType, ListDef> = {
   unread: {
     fetcher: (p, maxResults) => p.listUnread(maxResults),
+    pageFetcher: (p, maxResults, cursor) =>
+      p.listUnreadPage(maxResults, cursor),
     errorEvent: "bot.unread_query_failed",
   },
   starred: {
     fetcher: (p, maxResults) => p.listStarred(maxResults),
+    pageFetcher: (p, maxResults, cursor) =>
+      p.listStarredPage(maxResults, cursor),
     errorEvent: "bot.starred_query_failed",
     afterMappings: (env, mappings, account) =>
       syncStarButtonsForMappings(env, mappings, account),
   },
   junk: {
     fetcher: (p, maxResults) => p.listJunk(maxResults),
+    pageFetcher: (p, maxResults, cursor) => p.listJunkPage(maxResults, cursor),
     errorEvent: "bot.junk_query_failed",
     hideTgLinks: true,
     previewFolder: "junk",
@@ -95,6 +99,8 @@ export const LIST_DEFS: Record<MailListType, ListDef> = {
   },
   archived: {
     fetcher: (p, maxResults) => p.listArchived(maxResults),
+    pageFetcher: (p, maxResults, cursor) =>
+      p.listArchivedPage(maxResults, cursor),
     errorEvent: "bot.archived_query_failed",
     hideTgLinks: true,
     previewFolder: "archive",

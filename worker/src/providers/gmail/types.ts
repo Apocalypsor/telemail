@@ -19,6 +19,7 @@ export interface GmailMessage {
 
 export interface GmailMessageList {
   messages?: { id: string }[];
+  nextPageToken?: string;
 }
 
 export interface GmailWatchResponse {

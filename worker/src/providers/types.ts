@@ -7,8 +7,15 @@ import type { Account, Env, MailAttachmentMeta, MailMeta } from "@worker/types";
 export interface EmailListItem {
   id: string;
   subject?: string;
-  /** 发件人，已格式化为 `Name <addr>` 或裸 addr。仅 search 类列表填充。 */
+  /** 发件人，已格式化为 `Name <addr>` 或裸 addr。 */
   from?: string;
+  /** 收件人，多个地址用逗号连接。 */
+  to?: string;
+}
+
+export interface EmailListPage {
+  items: EmailListItem[];
+  nextCursor: string | null;
 }
 
 /** 邮件当前所在位置 —— 对账时用这个值决定 TG 侧如何处理 */

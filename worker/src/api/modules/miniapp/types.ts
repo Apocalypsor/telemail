@@ -3,7 +3,7 @@ import type { MailListAccountResult, MailListType } from "./model";
 
 export interface MailListPageOptions {
   limit?: number;
-  cursorByAccount?: Map<number, number>;
+  cursorByAccount?: Map<number, string>;
 }
 
 /** `MiniappService.getMailList` 返回 —— `pendingSideEffects` 给调用方用

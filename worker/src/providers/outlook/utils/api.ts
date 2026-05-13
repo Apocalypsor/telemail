@@ -3,8 +3,9 @@ import { MS_GRAPH_API } from "@worker/constants";
 
 /** 调用 Graph API (GET) */
 export const graphGet = async <T>(token: string, path: string): Promise<T> => {
+  const url = path.startsWith("http") ? path : `${MS_GRAPH_API}${path}`;
   return http
-    .get(`${MS_GRAPH_API}${path}`, {
+    .get(url, {
       headers: { Authorization: `Bearer ${token}` },
     })
     .json() as Promise<T>;

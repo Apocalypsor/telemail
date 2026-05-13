@@ -20,7 +20,12 @@ import type {
 import { gmailGet, gmailPost } from "@worker/providers/gmail/utils/api";
 import { gmailGetAttachmentDataStream } from "@worker/providers/gmail/utils/attachment-stream";
 import { getAccessToken } from "@worker/providers/gmail/utils/auth";
-import { gmailBatchGetMetadata } from "@worker/providers/gmail/utils/batch";
+import {
+  listGmailMessagesByLabel,
+  listGmailMessagesByLabelPage,
+  listGmailMessagesByQuery,
+  listGmailMessagesByQueryPage,
+} from "@worker/providers/gmail/utils/list";
 import {
   collectAttachmentMeta,
   collectInlineAttachmentIds,
@@ -31,7 +36,7 @@ import {
   findAttachmentPayloadByIndex,
 } from "@worker/providers/gmail/utils/payload";
 import type {
-  EmailListItem,
+  EmailListPage,
   MessageState,
   PreviewContent,
 } from "@worker/providers/types";
@@ -409,38 +414,93 @@ export class GmailProvider extends EmailProvider {
 
   async listUnread(maxResults: number = 20) {
     const token = await this.token();
-    return this.listByQuery(token, `is:unread`, maxResults);
+    return listGmailMessagesByQuery(token, "is:unread", maxResults);
+  }
+
+  async listUnreadPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listGmailMessagesByQueryPage(
+      await this.token(),
+      "is:unread",
+      maxResults,
+      cursor,
+    );
   }
 
   async listStarred(maxResults: number = 20) {
     const token = await this.token();
-    return this.listByQuery(token, `is:starred`, maxResults);
+    return listGmailMessagesByQuery(token, "is:starred", maxResults);
+  }
+
+  async listStarredPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listGmailMessagesByQueryPage(
+      await this.token(),
+      "is:starred",
+      maxResults,
+      cursor,
+    );
   }
 
   async listJunk(maxResults: number = 20) {
     const token = await this.token();
-    return this.listByQuery(token, `in:spam`, maxResults);
+    return listGmailMessagesByQuery(token, "in:spam", maxResults);
+  }
+
+  async listJunkPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listGmailMessagesByQueryPage(
+      await this.token(),
+      "in:spam",
+      maxResults,
+      cursor,
+    );
   }
 
   async searchMessages(query: string, maxResults: number = 20) {
     // Gmail `q=` 直接吃用户原文（from:/subject:/has: 等高级语法都支持）。
-    const token = await this.token();
-    const data = await gmailGet<GmailMessageList>(
-      token,
-      `/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+    return listGmailMessagesByQuery(await this.token(), query, maxResults);
+  }
+
+  async searchMessagesPage(
+    query: string,
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    // Gmail `q=` 直接吃用户原文（from:/subject:/has: 等高级语法都支持）。
+    return listGmailMessagesByQueryPage(
+      await this.token(),
+      query,
+      maxResults,
+      cursor,
     );
-    return this.hydrateListItems(token, data.messages);
   }
 
   async listArchived(maxResults: number = 20) {
     const labelId = this.account.archive_folder;
     if (!labelId) return [];
     const token = await this.token();
-    const data = await gmailGet<GmailMessageList>(
-      token,
-      `/users/me/messages?labelIds=${encodeURIComponent(labelId)}&maxResults=${maxResults}`,
+    return listGmailMessagesByLabel(token, labelId, maxResults);
+  }
+
+  async listArchivedPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    const labelId = this.account.archive_folder;
+    if (!labelId) return { items: [], nextCursor: null };
+    return listGmailMessagesByLabelPage(
+      await this.token(),
+      labelId,
+      maxResults,
+      cursor,
     );
-    return this.hydrateListItems(token, data.messages);
   }
 
   async markAllAsRead(maxResults: number = 20) {
@@ -545,42 +605,5 @@ export class GmailProvider extends EmailProvider {
       removeLabelIds: ["SPAM"],
     });
     return ids.length;
-  }
-
-  private async listByQuery(token: string, query: string, maxResults: number) {
-    const data = await gmailGet<GmailMessageList>(
-      token,
-      `/users/me/messages?q=${query}&maxResults=${maxResults}`,
-    );
-    return this.hydrateListItems(token, data.messages);
-  }
-
-  /**
-   * 把 `messages.list` 返回的 `[{id, threadId}]` 用一次 batch metadata fetch
-   * 补全成带 subject + from 的列表项 —— 替代 N 次并发 `messages.get`。
-   *
-   * 三处 list/search 调用面共用这个：listByQuery（unread/starred/junk）、
-   * listArchived、searchMessages。subject + from 一直一起取，反正 batch
-   * 响应体大小可忽略；前端是否展示 from 由 UI 决定，list 页不渲染就当不存在。
-   * 单条 sub-request 失败（404 等）会从 metaMap 里缺失，对应项只回 `{ id }`。
-   */
-  private async hydrateListItems(
-    token: string,
-    messages: { id: string }[] | undefined,
-  ): Promise<EmailListItem[]> {
-    if (!messages || messages.length === 0) return [];
-    const ids = messages.map((m) => m.id);
-    const metaMap = await gmailBatchGetMetadata(token, ids, [
-      "Subject",
-      "From",
-    ]);
-    return ids.map((id) => {
-      const msg = metaMap.get(id);
-      if (!msg) return { id };
-      const headers = msg.payload?.headers ?? [];
-      const get = (n: string) =>
-        headers.find((h) => h.name.toLowerCase() === n)?.value;
-      return { id, subject: get("subject"), from: get("from") };
-    });
   }
 }

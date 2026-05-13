@@ -28,7 +28,7 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
       const type = params.type;
       if (!isMailListType(type))
         return status(400, { error: "Unknown list type" });
-      let cursorByAccount: Map<number, number> | undefined;
+      let cursorByAccount: Map<number, string> | undefined;
       try {
         cursorByAccount = parseAccountCursor(query.cursor);
       } catch {
@@ -67,7 +67,7 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
       const q = (query.q ?? "").trim();
       if (!q) return status(400, { error: "缺少搜索关键词" });
       if (q.length > 200) return status(400, { error: "关键词过长" });
-      let cursorByAccount: Map<number, number> | undefined;
+      let cursorByAccount: Map<number, string> | undefined;
       try {
         cursorByAccount = parseAccountCursor(query.cursor);
       } catch {

@@ -1,7 +1,10 @@
 import { Spinner } from "@heroui/react";
 import { api } from "@page/api/client";
 import { extractErrorMessage, validateSearch } from "@page/api/utils";
-import { MailListFlat } from "@page/components/mail-list-flat";
+import {
+  MailListAddressMeta,
+  MailListFlat,
+} from "@page/components/mail-list-flat";
 import { MailListSkeleton } from "@page/components/mail-list-skeleton";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { useInfiniteScrollSentinel } from "@page/hooks/use-infinite-scroll-sentinel";
@@ -148,23 +151,16 @@ const SearchPage = () => {
             errors={accountErrors}
             errorLabel={(r) => `搜索失败：${r.error}`}
           >
-            {(it, accountLabel) => (
+            {(it) => (
               <button
                 type="button"
                 onClick={() => navigateToMail(it.accountId, it.id, it.token)}
                 className="block w-full text-left px-4 py-3 hover:bg-zinc-800/60 active:bg-zinc-800 transition-colors"
               >
-                <div className="text-sm text-zinc-100 break-words">
+                <div className="text-sm text-emerald-300 break-words">
                   {it.title || "(无主题)"}
                 </div>
-                {it.from && (
-                  <div className="text-xs text-zinc-500 break-words mt-1">
-                    {it.from}
-                  </div>
-                )}
-                <div className="mt-1.5 text-[11px] leading-4 text-zinc-500 break-words">
-                  {accountLabel}
-                </div>
+                <MailListAddressMeta item={it} />
               </button>
             )}
           </MailListFlat>

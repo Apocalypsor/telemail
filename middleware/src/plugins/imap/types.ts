@@ -8,11 +8,12 @@ export type MessageLocation = "inbox" | "junk" | "archive" | "deleted";
 export interface MessageSummary {
   id: string;
   subject?: string;
+  from?: string;
+  to?: string;
 }
 
-/** `searchMessages` 返回的结果：在 `MessageSummary` 基础上附带 from / date 用于排序展示。 */
+/** `searchMessages` 返回的结果：在 `MessageSummary` 基础上附带 date 用于排序展示。 */
 export interface SearchResultMessage extends MessageSummary {
-  from?: string;
   date?: string;
 }
 

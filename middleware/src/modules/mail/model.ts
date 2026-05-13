@@ -58,6 +58,7 @@ export const FlagBody = t.Object({
 export const ListBody = t.Object({
   accountId: t.Number(),
   maxResults: t.Optional(t.Number()),
+  offset: t.Optional(t.Number()),
 });
 
 export const ArchiveBody = t.Object({
@@ -79,6 +80,7 @@ export const ListFolderBody = t.Object({
   /** 可选，不传则同 archive 的探测逻辑 */
   folder: t.Optional(t.String()),
   maxResults: t.Optional(t.Number()),
+  offset: t.Optional(t.Number()),
 });
 
 export const SearchBody = t.Object({
@@ -86,6 +88,7 @@ export const SearchBody = t.Object({
   /** 用户输入的关键词；空白由 plugin 内部过滤 */
   query: t.String(),
   maxResults: t.Optional(t.Number()),
+  offset: t.Optional(t.Number()),
 });
 
 export const LocateBody = t.Object({

@@ -1,7 +1,10 @@
 import { Spinner } from "@heroui/react";
 import { api } from "@page/api/client";
 import { extractErrorMessage } from "@page/api/utils";
-import { MailListFlat } from "@page/components/mail-list-flat";
+import {
+  MailListAddressMeta,
+  MailListFlat,
+} from "@page/components/mail-list-flat";
 import { MailListSkeleton } from "@page/components/mail-list-skeleton";
 import { MAIL_LIST_TITLES, MAIL_LIST_TYPES } from "@page/constants";
 import { useBackButton } from "@page/hooks/use-back-button";
@@ -177,7 +180,7 @@ const MailListPage = () => {
             errors={accountErrors}
             errorLabel={() => "查询失败"}
           >
-            {(it, accountLabel) => (
+            {(it) => (
               <button
                 type="button"
                 onClick={() =>
@@ -187,12 +190,10 @@ const MailListPage = () => {
                 }
                 className="block w-full text-left px-4 py-3 hover:bg-zinc-800/60 active:bg-zinc-800 transition-colors"
               >
-                <div className="text-sm text-zinc-100 break-words">
+                <div className="text-sm text-emerald-300 break-words">
                   {it.title || "(无主题)"}
                 </div>
-                <div className="mt-1.5 text-[11px] leading-4 text-zinc-500 break-words">
-                  {accountLabel}
-                </div>
+                <MailListAddressMeta item={it} />
               </button>
             )}
           </MailListFlat>

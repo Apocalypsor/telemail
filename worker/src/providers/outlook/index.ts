@@ -34,8 +34,20 @@ import {
 } from "@worker/providers/outlook/utils/attachments";
 import { getAccessToken } from "@worker/providers/outlook/utils/auth";
 import { graphBatch } from "@worker/providers/outlook/utils/batch";
+import {
+  buildOutlookArchivedListPath,
+  buildOutlookJunkListPath,
+  buildOutlookSearchListPath,
+  buildOutlookStarredListPath,
+  buildOutlookUnreadListPath,
+  listOutlookMessagesPage,
+} from "@worker/providers/outlook/utils/list";
 import { fetchRawMime } from "@worker/providers/outlook/utils/mime";
-import type { MessageState, PreviewContent } from "@worker/providers/types";
+import type {
+  EmailListPage,
+  MessageState,
+  PreviewContent,
+} from "@worker/providers/types";
 import {
   type EmailQueueMessage,
   type Env,
@@ -407,59 +419,81 @@ export class OutlookProvider extends EmailProvider {
   }
 
   async listUnread(maxResults: number = 20) {
-    const data = await graphGet<GraphMessageList>(
+    return (await this.listUnreadPage(maxResults)).items;
+  }
+
+  async listUnreadPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listOutlookMessagesPage(
       await this.token(),
-      `/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$select=id,subject&$top=${maxResults}`,
+      buildOutlookUnreadListPath(maxResults),
+      cursor,
     );
-    if (!data.value) return [];
-    return data.value.map((m) => ({ id: m.id, subject: m.subject }));
   }
 
   async listStarred(maxResults: number = 20) {
-    const data = await graphGet<GraphMessageList>(
+    return (await this.listStarredPage(maxResults)).items;
+  }
+
+  async listStarredPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listOutlookMessagesPage(
       await this.token(),
-      `/me/messages?$filter=flag/flagStatus eq 'flagged'&$select=id,subject&$top=${maxResults}`,
+      buildOutlookStarredListPath(maxResults),
+      cursor,
     );
-    if (!data.value) return [];
-    return data.value.map((m) => ({ id: m.id, subject: m.subject }));
   }
 
   async listJunk(maxResults: number = 20) {
-    const data = await graphGet<GraphMessageList>(
+    return (await this.listJunkPage(maxResults)).items;
+  }
+
+  async listJunkPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listOutlookMessagesPage(
       await this.token(),
-      `/me/mailFolders('JunkEmail')/messages?$select=id,subject&$top=${maxResults}`,
+      buildOutlookJunkListPath(maxResults),
+      cursor,
     );
-    if (!data.value) return [];
-    return data.value.map((m) => ({ id: m.id, subject: m.subject }));
   }
 
   async listArchived(maxResults: number = 20) {
-    const data = await graphGet<GraphMessageList>(
+    return (await this.listArchivedPage(maxResults)).items;
+  }
+
+  async listArchivedPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listOutlookMessagesPage(
       await this.token(),
-      `/me/mailFolders('archive')/messages?$select=id,subject&$top=${maxResults}`,
+      buildOutlookArchivedListPath(maxResults),
+      cursor,
     );
-    if (!data.value) return [];
-    return data.value.map((m) => ({ id: m.id, subject: m.subject }));
   }
 
   async searchMessages(query: string, maxResults: number = 20) {
+    return (await this.searchMessagesPage(query, maxResults)).items;
+  }
+
+  async searchMessagesPage(
+    query: string,
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
     // Graph `$search` 用 KQL：双引号包住整个 query 走全文检索（subject + body + from + ...）。
     // 注：$search 不能与 $filter / $orderby 同用 —— 所以这里没法限定文件夹，是全 mailbox 范围。
-    const escaped = query.replace(/"/g, '\\"');
-    const data = await graphGet<GraphMessageList>(
+    return listOutlookMessagesPage(
       await this.token(),
-      `/me/messages?$search=${encodeURIComponent(`"${escaped}"`)}&$select=id,subject,from&$top=${maxResults}`,
+      buildOutlookSearchListPath(query, maxResults),
+      cursor,
     );
-    if (!data.value) return [];
-    return data.value.map((m) => {
-      const ea = m.from?.emailAddress;
-      const from = ea?.address
-        ? ea.name
-          ? `${ea.name} <${ea.address}>`
-          : ea.address
-        : ea?.name;
-      return { id: m.id, subject: m.subject, from };
-    });
   }
 
   async markAsJunk(messageId: string) {

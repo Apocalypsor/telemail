@@ -40,16 +40,18 @@ export abstract class MiniappService {
       activeAccounts.map(async (account) => {
         try {
           const provider = getEmailProvider(account, env);
-          const offset = cursorByAccount?.get(account.id) ?? 0;
-          const fetchCount = paginated ? offset + limit + 1 : MAX_PER_ACCOUNT;
-          const msgs = await def.fetcher(provider, fetchCount);
-          const pageMsgs = paginated
-            ? msgs.slice(offset, offset + limit)
-            : msgs;
-          const nextCursor =
-            paginated && msgs.length > offset + limit
-              ? String(offset + limit)
-              : null;
+          const page = paginated
+            ? await def.pageFetcher(
+                provider,
+                limit,
+                cursorByAccount?.get(account.id),
+              )
+            : {
+                items: await def.fetcher(provider, MAX_PER_ACCOUNT),
+                nextCursor: null,
+              };
+          const pageMsgs = page.items;
+          const nextCursor = page.nextCursor;
 
           if (pageMsgs.length === 0)
             return {
@@ -84,6 +86,8 @@ export abstract class MiniappService {
                 tgMessageId: !def.hideTgLinks
                   ? mapping?.tg_message_id
                   : undefined,
+                from: msg.from,
+                to: msg.to,
               };
             }),
           );
@@ -145,16 +149,18 @@ export abstract class MiniappService {
       activeAccounts.map(async (account) => {
         try {
           const provider = getEmailProvider(account, env);
-          const offset = cursorByAccount?.get(account.id) ?? 0;
-          const fetchCount = paginated ? offset + limit + 1 : MAX_PER_ACCOUNT;
-          const msgs = await provider.searchMessages(trimmed, fetchCount);
-          const pageMsgs = paginated
-            ? msgs.slice(offset, offset + limit)
-            : msgs;
-          const nextCursor =
-            paginated && msgs.length > offset + limit
-              ? String(offset + limit)
-              : null;
+          const page = paginated
+            ? await provider.searchMessagesPage(
+                trimmed,
+                limit,
+                cursorByAccount?.get(account.id),
+              )
+            : {
+                items: await provider.searchMessages(trimmed, MAX_PER_ACCOUNT),
+                nextCursor: null,
+              };
+          const pageMsgs = page.items;
+          const nextCursor = page.nextCursor;
 
           if (pageMsgs.length === 0)
             return {
@@ -188,6 +194,7 @@ export abstract class MiniappService {
                 tgChatId: mapping?.tg_chat_id,
                 tgMessageId: mapping?.tg_message_id,
                 from: msg.from,
+                to: msg.to,
               };
             }),
           );
