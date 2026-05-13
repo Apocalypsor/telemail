@@ -1,3 +1,4 @@
+import { api } from "@page/api/client";
 import { validateSearch } from "@page/api/utils";
 import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { MailAttachments } from "@page/components/mail-attachments";
@@ -105,6 +106,26 @@ const MailPreviewPage = () => {
         webMailUrl={d.webMailUrl}
         tgMessageLink={d.tgMessageLink}
         useProxy={useProxy}
+        onRefresh={
+          d.tgMessageLink
+            ? async () => {
+                const { error } = await api.api
+                  .mail({ id: emailMessageId })
+                  .refresh.post({
+                    accountId: search.accountId,
+                    token: search.t,
+                  });
+                if (error) {
+                  const value = error.value as { error?: string } | string;
+                  throw new Error(
+                    typeof value === "string"
+                      ? value
+                      : (value.error ?? "刷新失败"),
+                  );
+                }
+              }
+            : undefined
+        }
         onToggleProxy={() => setUseProxy((v) => !v)}
         onSetReminder={onSetReminder}
         onChanged={() =>

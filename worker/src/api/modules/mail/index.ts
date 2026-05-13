@@ -4,6 +4,7 @@ import { buildEmailKeyboard } from "@worker/bot/keyboards";
 import { buildTgMessageLink, setReplyMarkup } from "@worker/clients/telegram";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { deliverEmailToTelegram } from "@worker/handlers/queue/utils/deliver";
+import { refreshEmail } from "@worker/handlers/queue/utils/retry";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import { buildWebMailUrl } from "@worker/utils/mail-token";
 import { markEmailAsRead } from "@worker/utils/message-actions/actions";
@@ -26,6 +27,7 @@ import { contentDisposition } from "./utils";
  *  - GET    /api/mail/:id              token-only auth → preview JSON
  *  - POST   /api/mail/:id/move-to-inbox | trash | mark-as-junk | archive | unarchive | toggle-star
  *           三件套 (accountId/token) + session OR mini-app auth → 校验 owner → 执行
+ *  - POST   /api/mail/:id/refresh      同样鉴权 → 重新跑 LLM 分析并编辑 TG 消息
  *
  * 鉴权拆两路：
  *  - GET 走 token only（持有 token = 有权看，不要求登录）
@@ -145,6 +147,61 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
       }
       return { account: ctx.account, emailMessageId: ctx.emailMessageId };
     },
+  )
+
+  .post(
+    "/api/mail/:id/refresh",
+    async ({ env, executionCtx, account, emailMessageId, status }) => {
+      try {
+        if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL) {
+          return status(400, { ok: false, error: "LLM 未配置" });
+        }
+
+        const mailMappings = await getMappingsByEmailIds(env.DB, account.id, [
+          emailMessageId,
+        ]);
+        const mapping = mailMappings[0];
+        if (!mapping) {
+          return status(404, {
+            ok: false,
+            error: "Telegram message mapping not found",
+          });
+        }
+
+        executionCtx.waitUntil(
+          (async () => {
+            const result = await refreshEmail(
+              env,
+              mapping.tg_chat_id,
+              mapping.tg_message_id,
+            );
+            if (!result.ok) {
+              await reportErrorToObservability(
+                env,
+                "preview.refresh_failed",
+                new Error(result.reason),
+                { accountId: account.id },
+              );
+            }
+          })().catch((err) =>
+            reportErrorToObservability(env, "preview.refresh_failed", err, {
+              accountId: account.id,
+            }),
+          ),
+        );
+
+        return {
+          ok: true,
+          message: "已开始后台刷新",
+        };
+      } catch (err) {
+        await reportErrorToObservability(env, "preview.refresh_failed", err, {
+          accountId: account.id,
+        });
+        return status(500, { ok: false, error: "刷新失败" });
+      }
+    },
+    { params: MailParams, body: MailActionBody },
   )
 
   .post(

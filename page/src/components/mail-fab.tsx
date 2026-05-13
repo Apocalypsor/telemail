@@ -28,8 +28,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  *     多项 → "🔗 更多" popup
  *     单项 → 按钮直接做
  *     无   → 隐藏
- *   SettingsButton (右上角 ⋮) → 切 CORS 图片代理；老客户端无此按钮 → 退化到
- *                              SecondaryButton extras 末位
+ *   SettingsButton (右上角 ⋮) → 刷新邮件 / 切 CORS 图片代理；老客户端无此
+ *                              按钮 → 退化到 SecondaryButton extras 末位
  *
  * popup 有 3 按钮硬上限，所以邮件状态动作和工具操作拆到两个原生按钮里。
  *
@@ -51,6 +51,7 @@ export const MailFab = ({
   webMailUrl,
   tgMessageLink,
   useProxy,
+  onRefresh,
   onToggleProxy,
   onSetReminder,
   onChanged,
@@ -66,33 +67,58 @@ export const MailFab = ({
     return () => window.clearTimeout(timeout);
   }, [status]);
 
-  // 图片代理走 TG SettingsButton（右上角 ⋮）。Bot API 7.0+；不可用 → 回落到
+  // 设置菜单走 TG SettingsButton（右上角 ⋮）。Bot API 7.0+；不可用 → 回落到
   // SecondaryButton extras 末位。注：还需 @BotFather 把 bot menu button 配为
   // "settings" 才会显示 —— 部署时检查。
   const hasSettingsButton = showSettingsButton.isAvailable();
-  // 点 SettingsButton 弹 popup 让用户明确开/关，避免误触盲翻。popup 不可用 →
-  // 退化到直接 toggle。
+  const refreshMail = useCallback(async () => {
+    if (!onRefresh) return;
+    try {
+      await onRefresh();
+      notifyHaptic("success");
+    } catch (err) {
+      notifyHaptic("error");
+      await alertPopup(
+        err instanceof Error ? err.message : "刷新失败，请稍后再试",
+      );
+    }
+  }, [onRefresh]);
+  // 点 SettingsButton 弹设置 popup。popup 不可用 → 退化到刷新邮件（没有刷新
+  // 回调时再退回到图片代理 toggle）。
   const onSettingsClick = useCallback(async () => {
     if (!showPopup.isAvailable()) {
-      onToggleProxy();
+      if (onRefresh) {
+        await refreshMail();
+      } else {
+        onToggleProxy();
+      }
       return;
     }
     const id = await showPopup({
-      title: "🖼 图片代理",
+      title: "设置",
       message: useProxy
-        ? "当前：🟢 开启\n\n✨ 外部图片走代理加载，绕过防盗链"
-        : "当前：⚪️ 关闭\n\n⚠️ 直接加载外部图片，部分可能显示破损",
+        ? "图片代理：🟢 开启\n外部图片走代理加载，绕过防盗链"
+        : "图片代理：⚪️ 关闭\n直接加载外部图片，部分可能显示破损",
       buttons: [
+        ...(onRefresh
+          ? [
+              {
+                id: "refresh",
+                type: "default",
+                text: "🔄 刷新邮件",
+              } satisfies ShowPopupOptionsButton,
+            ]
+          : []),
         {
-          id: "toggle",
+          id: "toggle-proxy",
           type: "default",
           text: useProxy ? "🚫 关闭代理" : "✅ 开启代理",
         },
-        { id: "cancel", type: "cancel" },
       ],
     });
-    if (id === "toggle") onToggleProxy();
-  }, [useProxy, onToggleProxy]);
+    if (id === "refresh") await refreshMail();
+    if (id === "toggle-proxy") onToggleProxy();
+  }, [useProxy, onRefresh, refreshMail, onToggleProxy]);
   useSettingsButton(hasSettingsButton ? onSettingsClick : undefined);
   const { starred, done, pending, run } = useMailActions({
     emailMessageId,
@@ -276,7 +302,7 @@ export const MailFab = ({
 
   const extras = useMemo<ExtraDef[]>(() => {
     const list: ExtraDef[] = [];
-    // 提醒在最前 —— 用户最常用；toggle-proxy 走 SettingsButton（右上角 ⋮），
+    // 提醒在最前 —— 用户最常用；刷新/图片代理走 SettingsButton（右上角 ⋮），
     // 不挤 popup 三槽位。老 TG 客户端无 SettingsButton → 回落到 extras 末位。
     // label 尽量短（≤ 6 字符）—— TG Desktop popup 按总文本宽度决定排列，
     // 长 label 会让 3 项强制换成竖排 + 右对齐，跟 Main 的横排不一致。
@@ -285,18 +311,28 @@ export const MailFab = ({
     if (webMailUrl) list.push({ id: "share", label: "📤 分享", run: doShare });
     if (tgMessageLink)
       list.push({ id: "tg-link", label: "💬 原消息", run: doOpenTg });
-    if (!hasSettingsButton)
+    if (!hasSettingsButton && onRefresh) {
+      list.push({
+        id: "refresh",
+        label: "🔄 刷新",
+        run: refreshMail,
+      });
+    }
+    if (!hasSettingsButton) {
       list.push({
         id: "toggle-proxy",
         label: useProxy ? "🖼 关图片代理" : "🖼 开图片代理",
         run: onToggleProxy,
       });
+    }
     return list;
   }, [
     onSetReminder,
     webMailUrl,
     tgMessageLink,
     hasSettingsButton,
+    onRefresh,
+    refreshMail,
     useProxy,
     doShare,
     doOpenTg,
@@ -364,6 +400,8 @@ export interface MailFabProps {
   tgMessageLink?: string | null;
   /** 当前 CORS 图片代理是否开启 —— 决定 SettingsButton/extras 里 toggle 文案 */
   useProxy: boolean;
+  /** 重新拉取当前邮件预览；点 TG SettingsButton（或老版本退化的 extras 项）调用 */
+  onRefresh?: () => Promise<void>;
   /** 切换 CORS 图片代理；点 TG SettingsButton（或老版本退化的 extras 项）调用 */
   onToggleProxy: () => void;
   /** 跳到提醒页（带 back URL）；undefined → 隐藏 ⏰ 入口 */
@@ -384,12 +422,12 @@ interface ActionDef {
   doneLabel?: string;
 }
 
-type ExtraId = "reminder" | "share" | "tg-link" | "toggle-proxy";
+type ExtraId = "reminder" | "share" | "tg-link" | "refresh" | "toggle-proxy";
 
 interface ExtraDef {
   id: ExtraId;
   label: string;
-  run: () => void;
+  run: () => unknown;
 }
 
 interface ActionStatus {
