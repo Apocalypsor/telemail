@@ -8,6 +8,7 @@ import { THEME_COLORS } from "@page/styles/theme";
 import {
   alertPopup,
   closeMiniAppSafe,
+  confirmPopup,
   notifyHaptic,
   openTgLink,
 } from "@page/utils/tg";
@@ -16,7 +17,7 @@ import {
   showPopup,
   showSettingsButton,
 } from "@telegram-apps/sdk-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
  * 邮件预览页的操作入口 —— 用 TG 原生 MainButton + SecondaryButton +
@@ -32,9 +33,9 @@ import { useCallback, useMemo } from "react";
  *
  * popup 有 3 按钮硬上限，所以邮件状态动作和工具操作拆到两个原生按钮里。
  *
- * 成功后：HapticFeedback + onChanged() refetch 数据；terminal 动作（归档/删除/
- * 标垃圾/移出归档/移回）成功后 MainButton 自隐藏，SecondaryButton 保持（分享
- * 一封已归档的邮件仍有意义）。
+ * 成功后：HapticFeedback + onChanged() refetch 数据 + 原生 popup；
+ * terminal 动作（归档/删除/标垃圾/移出归档/移回）成功后先显示短暂完成态，
+ * 再隐藏 MainButton，SecondaryButton 保持（分享一封已归档的邮件仍有意义）。
  * 失败：alertPopup(error) 弹原生 popup。
  */
 export const MailFab = ({
@@ -54,6 +55,17 @@ export const MailFab = ({
   onSetReminder,
   onChanged,
 }: MailFabProps) => {
+  const [status, setStatus] = useState<ActionStatus | null>(null);
+
+  useEffect(() => {
+    if (!status) return;
+    const timeout = window.setTimeout(
+      () => setStatus(null),
+      status.terminal ? TERMINAL_STATUS_DURATION_MS : STATUS_DURATION_MS,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [status]);
+
   // 图片代理走 TG SettingsButton（右上角 ⋮）。Bot API 7.0+；不可用 → 回落到
   // SecondaryButton extras 末位。注：还需 @BotFather 把 bot menu button 配为
   // "settings" 才会显示 —— 部署时检查。
@@ -101,6 +113,7 @@ export const MailFab = ({
           label: "📥 移出归档",
           type: "default",
           terminal: true,
+          doneLabel: "✓ 已移出归档",
         },
       ];
     }
@@ -117,12 +130,15 @@ export const MailFab = ({
           label: "📥 移到收件箱",
           type: "default",
           terminal: true,
+          doneLabel: "✓ 已移回收件箱",
         },
         {
           id: "trash",
           label: "🗑 删除邮件",
           type: "destructive",
           terminal: true,
+          confirmText: "删除这封邮件？此操作可能不可撤销。",
+          doneLabel: "✓ 已删除",
         },
       ];
     }
@@ -141,6 +157,7 @@ export const MailFab = ({
         label: "📥 归档",
         type: "default",
         terminal: true,
+        doneLabel: "✓ 已归档",
       });
     }
     list.push({
@@ -148,6 +165,8 @@ export const MailFab = ({
       label: "🚫 标记为垃圾",
       type: "destructive",
       terminal: true,
+      confirmText: "把这封邮件标记为垃圾邮件？它会从当前收件箱视图移出。",
+      doneLabel: "✓ 已标垃圾",
     });
     return list;
   }, [inArchive, inJunk, canArchive, starred]);
@@ -159,20 +178,38 @@ export const MailFab = ({
    */
   const runWithFeedback = useCallback(
     async (action: MailAction) => {
+      if (pending || done) return;
+      const actionDef = actions.find((x) => x.id === action);
+      if (
+        actionDef?.confirmText &&
+        !(await confirmPopup(actionDef.confirmText))
+      ) {
+        return;
+      }
+
+      setStatus(null);
       const starredNext = action === "toggle-star" ? !starred : undefined;
       const r = await run(action, starredNext);
       if (r.ok) {
+        const message = r.message ?? "操作成功";
+        setStatus({
+          kind: "ok",
+          terminal: actionDef?.terminal === true,
+          doneLabel: actionDef?.doneLabel,
+        });
         notifyHaptic("success");
+        await alertPopup(message);
       } else {
+        const message = r.error ?? "操作失败";
         notifyHaptic("error");
-        await alertPopup(r.error ?? "操作失败");
+        await alertPopup(message);
       }
     },
-    [run, starred],
+    [actions, done, pending, run, starred],
   );
 
   const handleMainButtonClick = useCallback(async () => {
-    if (actions.length === 0) return;
+    if (pending || done || actions.length === 0) return;
     if (actions.length === 1) {
       // 单动作：MainButton 直接执行，不走 popup
       runWithFeedback(actions[0].id);
@@ -197,19 +234,22 @@ export const MailFab = ({
     if (!id) return;
     const a = actions.find((x) => x.id === id);
     if (a) runWithFeedback(a.id);
-  }, [actions, runWithFeedback]);
+  }, [actions, done, pending, runWithFeedback]);
 
-  const mainButtonText = done
-    ? undefined
-    : actions.length === 1
-      ? actions[0].label
-      : "⚡ 操作";
+  const mainButtonText =
+    done && status?.kind === "ok"
+      ? (status.doneLabel ?? "✓ 已处理")
+      : done
+        ? undefined
+        : actions.length === 1
+          ? actions[0].label
+          : "⚡ 操作";
 
   useMainButton({
     text: mainButtonText,
     onClick: handleMainButtonClick,
     loading: pending,
-    disabled: pending,
+    disabled: pending || done,
     // Main 用 emerald accent（和 web / miniapp UI 主色一致），
     // 和 Secondary 的中性灰拉开差距
     color: THEME_COLORS.accent,
@@ -304,7 +344,6 @@ export const MailFab = ({
     textColor: THEME_COLORS.neutralOn,
   });
 
-  // 没渲染任何 DOM —— UI 全在 TG 宿主
   return null;
 };
 export interface MailFabProps {
@@ -339,6 +378,10 @@ interface ActionDef {
   type: "default" | "destructive";
   /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 MainButton 隐藏 */
   terminal: boolean;
+  /** 破坏性动作执行前的确认提示 */
+  confirmText?: string;
+  /** terminal 动作完成后 MainButton 的短暂完成态文案 */
+  doneLabel?: string;
 }
 
 type ExtraId = "reminder" | "share" | "tg-link" | "toggle-proxy";
@@ -348,3 +391,12 @@ interface ExtraDef {
   label: string;
   run: () => void;
 }
+
+interface ActionStatus {
+  kind: "ok";
+  terminal: boolean;
+  doneLabel?: string;
+}
+
+const STATUS_DURATION_MS = 2400;
+const TERMINAL_STATUS_DURATION_MS = 3600;

@@ -35,7 +35,7 @@ export const confirmPopup = async (message: string): Promise<boolean> => {
       });
       return id === "ok";
     } catch {
-      return false;
+      return window.confirm(message);
     }
   }
   return window.confirm(message);
@@ -51,6 +51,7 @@ export const alertPopup = async (message: string): Promise<void> => {
       });
       return;
     } catch {
+      window.alert(message);
       return;
     }
   }

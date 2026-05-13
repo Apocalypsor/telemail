@@ -4,6 +4,7 @@ import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { MailAttachments } from "@page/components/mail-attachments";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailMeta } from "@page/components/mail-meta";
+import { MailStatusBadges } from "@page/components/mail-status-badges";
 import { WebLayout } from "@page/components/web-layout";
 import {
   buildMailAttachmentUrl,
@@ -62,6 +63,8 @@ const WebMailPage = () => {
             {d.meta.subject}
           </h1>
         )}
+
+        <MailStatusBadges starred={d.starred} />
 
         <MailMeta meta={d.meta} accountEmail={d.accountEmail} />
 

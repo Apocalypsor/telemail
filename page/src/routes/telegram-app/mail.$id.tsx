@@ -4,6 +4,7 @@ import { MailAttachments } from "@page/components/mail-attachments";
 import { MailBodyFrame } from "@page/components/mail-body-frame";
 import { MailFab } from "@page/components/mail-fab";
 import { MailMeta } from "@page/components/mail-meta";
+import { MailStatusBadges } from "@page/components/mail-status-badges";
 import { useBackButton } from "@page/hooks/use-back-button";
 import {
   buildMailAttachmentUrl,
@@ -64,6 +65,8 @@ const MailPreviewPage = () => {
         {d.meta.subject && (
           <Subject subject={d.meta.subject} webMailUrl={d.webMailUrl} />
         )}
+
+        <MailStatusBadges starred={d.starred} />
 
         <MailMeta meta={d.meta} accountEmail={d.accountEmail} />
 
