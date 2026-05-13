@@ -1,7 +1,7 @@
 import { retryAllFailedEmails } from "@worker/handlers/queue/utils/retry";
 import { dispatchDueReminders } from "@worker/handlers/scheduled/utils";
 import { renewAllPush } from "@worker/providers";
-import { checkImapBridgeHealth } from "@worker/providers/imap/utils";
+import { checkImapBridgeHealth } from "@worker/providers/imap/utils/client";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 

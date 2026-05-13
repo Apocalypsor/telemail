@@ -15,4 +15,5 @@ export const AccountBody = t.Object({
 export const ListBody = t.Object({
   accountId: t.Number(),
   maxResults: t.Optional(t.Number()),
+  offset: t.Optional(t.Number()),
 });

@@ -5,8 +5,13 @@ import {
   bridgeCall,
   bridgeClient,
   syncAccounts,
-} from "@worker/providers/imap/utils";
-import type { EmailListItem, MessageState } from "@worker/providers/types";
+} from "@worker/providers/imap/utils/client";
+import { listImapBridgePage } from "@worker/providers/imap/utils/list";
+import type {
+  EmailListItem,
+  EmailListPage,
+  MessageState,
+} from "@worker/providers/types";
 import {
   type Env,
   type MailAttachmentDownload,
@@ -164,6 +169,19 @@ export class ImapProvider extends EmailProvider {
     return data.messages ?? [];
   }
 
+  async listUnreadPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
+      this.bridge.api.unread.post({
+        accountId: this.account.id,
+        maxResults: limit,
+        offset,
+      }),
+    );
+  }
+
   async listStarred(maxResults: number = 20) {
     const data = await bridgeCall(
       this.bridge.api.starred.post({
@@ -172,6 +190,19 @@ export class ImapProvider extends EmailProvider {
       }),
     );
     return data.messages ?? [];
+  }
+
+  async listStarredPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
+      this.bridge.api.starred.post({
+        accountId: this.account.id,
+        maxResults: limit,
+        offset,
+      }),
+    );
   }
 
   async listJunk(maxResults: number = 20) {
@@ -184,6 +215,19 @@ export class ImapProvider extends EmailProvider {
     return data.messages ?? [];
   }
 
+  async listJunkPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
+      this.bridge.api.junk.post({
+        accountId: this.account.id,
+        maxResults: limit,
+        offset,
+      }),
+    );
+  }
+
   async listArchived(maxResults: number = 20): Promise<EmailListItem[]> {
     const data = await bridgeCall(
       this.bridge.api["list-folder"].post({
@@ -193,6 +237,20 @@ export class ImapProvider extends EmailProvider {
       }),
     );
     return data.messages ?? [];
+  }
+
+  async listArchivedPage(
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
+      this.bridge.api["list-folder"].post({
+        accountId: this.account.id,
+        folder: this.account.archive_folder ?? undefined,
+        maxResults: limit,
+        offset,
+      }),
+    );
   }
 
   async searchMessages(
@@ -207,6 +265,21 @@ export class ImapProvider extends EmailProvider {
       }),
     );
     return data.messages ?? [];
+  }
+
+  async searchMessagesPage(
+    query: string,
+    maxResults: number = 20,
+    cursor?: string,
+  ): Promise<EmailListPage> {
+    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
+      this.bridge.api.search.post({
+        accountId: this.account.id,
+        query,
+        maxResults: limit,
+        offset,
+      }),
+    );
   }
 
   async markAllAsRead(_maxResults?: number) {

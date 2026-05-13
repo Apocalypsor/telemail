@@ -1,16 +1,32 @@
 import { Spinner } from "@heroui/react";
 import { api } from "@page/api/client";
 import { extractErrorMessage } from "@page/api/utils";
-import { MailListByAccount } from "@page/components/mail-list-by-account";
+import {
+  MailListAddressMeta,
+  MailListFlat,
+} from "@page/components/mail-list-flat";
 import { MailListSkeleton } from "@page/components/mail-list-skeleton";
 import { MAIL_LIST_TITLES, MAIL_LIST_TYPES } from "@page/constants";
 import { useBackButton } from "@page/hooks/use-back-button";
+import { useInfiniteScrollSentinel } from "@page/hooks/use-infinite-scroll-sentinel";
 import { useNavigateToMail } from "@page/hooks/use-navigate-to-mail";
+import {
+  collectMailListErrors,
+  encodeMailListCursor,
+  flattenMailListPages,
+  getNextMailListCursor,
+  MAIL_LIST_PAGE_SIZE,
+  type MailListCursor,
+} from "@page/utils/mail-list-pagination";
 import { confirmPopup, notifyHaptic } from "@page/utils/tg";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import type { MailListType } from "@worker/api/modules/miniapp/model";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 const isMailListType = (s: string): s is MailListType => {
   return (MAIL_LIST_TYPES as readonly string[]).includes(s);
@@ -39,15 +55,23 @@ const MailListPage = () => {
     [listType],
   );
 
-  const listQuery = useQuery({
+  const listQuery = useInfiniteQuery({
     queryKey: ["mail-list", listType],
-    queryFn: async () => {
+    initialPageParam: undefined as MailListCursor | undefined,
+    queryFn: async ({ pageParam }) => {
+      const cursor = encodeMailListCursor(pageParam);
       const { data, error } = await api.api["mini-app"]
         .list({ type: listType })
-        .get();
+        .get({
+          query: {
+            limit: MAIL_LIST_PAGE_SIZE,
+            ...(cursor ? { cursor } : {}),
+          },
+        });
       if (error) throw error;
       return data;
     },
+    getNextPageParam: getNextMailListCursor,
   });
 
   const bulkMut = useMutation({
@@ -74,9 +98,22 @@ const MailListPage = () => {
     bulkMut.mutate();
   };
 
-  const data = listQuery.data;
+  const items = flattenMailListPages(listQuery.data?.pages);
+  const accountErrors = collectMailListErrors(listQuery.data?.pages);
   const isError = listQuery.isError;
   const isRefreshing = listQuery.isFetching;
+  const handleLoadMore = useCallback(() => {
+    if (!listQuery.hasNextPage || listQuery.isFetchingNextPage) return;
+    void listQuery.fetchNextPage();
+  }, [
+    listQuery.fetchNextPage,
+    listQuery.hasNextPage,
+    listQuery.isFetchingNextPage,
+  ]);
+  const loadMoreRef = useInfiniteScrollSentinel({
+    enabled: Boolean(listQuery.hasNextPage && !listQuery.isFetchingNextPage),
+    onLoadMore: handleLoadMore,
+  });
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
@@ -123,7 +160,7 @@ const MailListPage = () => {
               : "text-zinc-500"
         }`}
       >
-        {meta?.msg ?? (data?.total != null ? `共 ${data.total} 封` : "")}
+        {meta?.msg ?? (items.length > 0 ? `已载入 ${items.length} 封` : "")}
       </div>
 
       {listQuery.isLoading ? (
@@ -132,26 +169,47 @@ const MailListPage = () => {
         <div className="rounded-2xl border border-red-900/50 bg-red-950/30 p-10 text-center text-sm text-red-400">
           查询失败
         </div>
-      ) : !data?.total ? (
+      ) : items.length === 0 && accountErrors.length === 0 ? (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-10 text-center text-sm text-zinc-500">
           暂无邮件
         </div>
       ) : (
-        <MailListByAccount results={data.results} errorLabel={() => "查询失败"}>
-          {(it, accountId) => (
-            <button
-              type="button"
-              onClick={() =>
-                navigateToMail(accountId, it.id, it.token, {
-                  folder: folderHint || undefined,
-                })
-              }
-              className="block w-full text-left px-4 py-3 text-sm text-zinc-100 break-words hover:bg-zinc-800/60 active:bg-zinc-800 transition-colors"
-            >
-              {it.title || "(无主题)"}
-            </button>
-          )}
-        </MailListByAccount>
+        <>
+          <MailListFlat
+            items={items}
+            errors={accountErrors}
+            errorLabel={() => "查询失败"}
+          >
+            {(it) => (
+              <button
+                type="button"
+                onClick={() =>
+                  navigateToMail(it.accountId, it.id, it.token, {
+                    folder: folderHint || undefined,
+                  })
+                }
+                className="block w-full text-left px-4 py-3 hover:bg-zinc-800/60 active:bg-zinc-800 transition-colors"
+              >
+                <div className="text-sm text-emerald-300 break-words">
+                  {it.title || "(无主题)"}
+                </div>
+                <MailListAddressMeta item={it} />
+              </button>
+            )}
+          </MailListFlat>
+          <div
+            ref={loadMoreRef}
+            className="min-h-10 flex items-center justify-center"
+          >
+            {listQuery.isFetchingNextPage ? (
+              <Spinner size="sm" />
+            ) : listQuery.hasNextPage ? (
+              <span className="text-xs text-zinc-600">继续加载</span>
+            ) : (
+              <span className="text-xs text-zinc-700">已全部载入</span>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

@@ -4,10 +4,12 @@ export interface GraphMessage {
   parentFolderId?: string;
   flag?: { flagStatus: string };
   from?: { emailAddress?: { name?: string; address?: string } };
+  toRecipients?: Array<{ emailAddress?: { name?: string; address?: string } }>;
 }
 
 export interface GraphMessageList {
   value?: GraphMessage[];
+  "@odata.nextLink"?: string;
 }
 
 export interface GraphFolder {

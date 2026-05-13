@@ -13,6 +13,7 @@ export const junkController = new Elysia({ name: "controller.junk" })
       const messages = await imap.listJunk(
         body.accountId,
         body.maxResults ?? 20,
+        body.offset ?? 0,
       );
       return { messages };
     },

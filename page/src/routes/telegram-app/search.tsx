@@ -1,15 +1,27 @@
 import { Spinner } from "@heroui/react";
 import { api } from "@page/api/client";
 import { extractErrorMessage, validateSearch } from "@page/api/utils";
-import { MailListByAccount } from "@page/components/mail-list-by-account";
+import {
+  MailListAddressMeta,
+  MailListFlat,
+} from "@page/components/mail-list-flat";
 import { MailListSkeleton } from "@page/components/mail-list-skeleton";
 import { useBackButton } from "@page/hooks/use-back-button";
+import { useInfiniteScrollSentinel } from "@page/hooks/use-infinite-scroll-sentinel";
 import { useNavigateToMail } from "@page/hooks/use-navigate-to-mail";
 import { INPUT_CLASS } from "@page/styles/inputs";
+import {
+  collectMailListErrors,
+  encodeMailListCursor,
+  flattenMailListPages,
+  getNextMailListCursor,
+  MAIL_LIST_PAGE_SIZE,
+  type MailListCursor,
+} from "@page/utils/mail-list-pagination";
 import { Type as t } from "@sinclair/typebox";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const SearchPage = () => {
   const { q: urlQ } = Route.useSearch();
@@ -27,19 +39,26 @@ const SearchPage = () => {
 
   const q = (urlQ ?? "").trim();
 
-  const searchQuery = useQuery({
+  const searchQuery = useInfiniteQuery({
     queryKey: ["search", q],
     enabled: q.length > 0,
+    initialPageParam: undefined as MailListCursor | undefined,
     // 搜索结果在用户停留期间认为是新鲜的；切回页面不重新打 provider
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
+      const cursor = encodeMailListCursor(pageParam);
       const { data, error } = await api.api["mini-app"].search.get({
-        query: { q },
+        query: {
+          q,
+          limit: MAIL_LIST_PAGE_SIZE,
+          ...(cursor ? { cursor } : {}),
+        },
       });
       if (error) throw error;
       return data;
     },
+    getNextPageParam: getNextMailListCursor,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -49,7 +68,24 @@ const SearchPage = () => {
     navigate({ to: "/telegram-app/search", search: { q: next } });
   };
 
-  const data = searchQuery.data;
+  const pages = searchQuery.data?.pages;
+  const firstPage = pages?.[0];
+  const items = flattenMailListPages(pages);
+  const accountErrors = collectMailListErrors(pages);
+  const handleLoadMore = useCallback(() => {
+    if (!searchQuery.hasNextPage || searchQuery.isFetchingNextPage) return;
+    void searchQuery.fetchNextPage();
+  }, [
+    searchQuery.fetchNextPage,
+    searchQuery.hasNextPage,
+    searchQuery.isFetchingNextPage,
+  ]);
+  const loadMoreRef = useInfiniteScrollSentinel({
+    enabled: Boolean(
+      searchQuery.hasNextPage && !searchQuery.isFetchingNextPage,
+    ),
+    onLoadMore: handleLoadMore,
+  });
   // 用 async extractErrorMessage 拉响应 body 里的 `error` 字段（比裸 message
   // 信息量大得多）。结果存 state 里，error 变化时刷新。
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -96,39 +132,51 @@ const SearchPage = () => {
         }`}
       >
         {errMsg ??
-          (data
-            ? `找到 ${data.total} 封匹配 “${data.query}”`
+          (firstPage
+            ? `已载入 ${items.length} 封匹配 “${firstPage.query}”`
             : "支持跨所有账号检索（Gmail / Outlook 走原生搜索语法）")}
       </div>
 
       {!q ? null : searchQuery.isLoading ? (
         <MailListSkeleton />
-      ) : !data ? null : !data.total ? (
+      ) : !firstPage ? null : items.length === 0 &&
+        accountErrors.length === 0 ? (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-10 text-center text-sm text-zinc-500">
           无匹配邮件
         </div>
       ) : (
-        <MailListByAccount
-          results={data.results}
-          errorLabel={(r) => `搜索失败：${r.error}`}
-        >
-          {(it, accountId) => (
-            <button
-              type="button"
-              onClick={() => navigateToMail(accountId, it.id, it.token)}
-              className="block w-full text-left px-4 py-3 hover:bg-zinc-800/60 active:bg-zinc-800 transition-colors"
-            >
-              <div className="text-sm text-zinc-100 break-words">
-                {it.title || "(无主题)"}
-              </div>
-              {it.from && (
-                <div className="text-xs text-zinc-500 break-words mt-1">
-                  {it.from}
+        <>
+          <MailListFlat
+            items={items}
+            errors={accountErrors}
+            errorLabel={(r) => `搜索失败：${r.error}`}
+          >
+            {(it) => (
+              <button
+                type="button"
+                onClick={() => navigateToMail(it.accountId, it.id, it.token)}
+                className="block w-full text-left px-4 py-3 hover:bg-zinc-800/60 active:bg-zinc-800 transition-colors"
+              >
+                <div className="text-sm text-emerald-300 break-words">
+                  {it.title || "(无主题)"}
                 </div>
-              )}
-            </button>
-          )}
-        </MailListByAccount>
+                <MailListAddressMeta item={it} />
+              </button>
+            )}
+          </MailListFlat>
+          <div
+            ref={loadMoreRef}
+            className="min-h-10 flex items-center justify-center"
+          >
+            {searchQuery.isFetchingNextPage ? (
+              <Spinner size="sm" />
+            ) : searchQuery.hasNextPage ? (
+              <span className="text-xs text-zinc-600">继续加载</span>
+            ) : (
+              <span className="text-xs text-zinc-700">已全部载入</span>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

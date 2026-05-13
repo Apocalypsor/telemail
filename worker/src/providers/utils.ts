@@ -19,6 +19,12 @@ export const attachmentBody = (
   });
 };
 
+export const parseOffsetCursor = (cursor: string | undefined): number => {
+  if (!cursor) return 0;
+  const offset = Number(cursor);
+  return Number.isInteger(offset) && offset > 0 ? offset : 0;
+};
+
 /**
  * 用 refresh_token 交换 access_token（KV 缓存，按账号隔离）。
  * Gmail / Outlook 两个 OAuth provider 的刷新逻辑共用这一个实现——差异仅是

@@ -1,13 +1,15 @@
 import { http } from "@worker/clients/http";
 import type { GmailMessage } from "@worker/providers/gmail/types";
 
+const GMAIL_BATCH_LIMIT = 100;
+
 /**
  * Gmail Batch API：把 N 个 `messages.get?format=METADATA` 合并成一个 multipart/mixed
- * 请求，整体一次响应解出来。用在 search/list 这类需要批量取 subject/from 的场景，
+ * 请求，整体一次响应解出来。用在 search/list 这类需要批量取 subject/from/to 的场景，
  * 替代 N 次并发 GET —— 避免 burst rate-limit 触发偶发"无主题"，也省 Workers 子请求配额。
  *
  * 限制：
- *  - Gmail batch 单批上限 100 个 sub-request（调用方自己保证 ≤ 100）。
+ *  - Gmail batch 单批上限 100 个 sub-request；这里自动切批。
  *  - sub-request 失败（404 / 5xx / 错误体）会被静默跳过 —— map 里就没那条 id，
  *    调用方按 missing 处理（兜底成 `(无主题)`）。
  *  - 仅 GET / 只读用法是安全的：整个 batch POST 失败就抛，调用方决定是否重试。
@@ -23,6 +25,19 @@ export const gmailBatchGetMetadata = async (
   metadataHeaders: string[],
 ): Promise<Map<string, GmailMessage>> => {
   if (messageIds.length === 0) return new Map();
+  if (messageIds.length > GMAIL_BATCH_LIMIT) {
+    const merged = new Map<string, GmailMessage>();
+    for (let i = 0; i < messageIds.length; i += GMAIL_BATCH_LIMIT) {
+      const chunk = messageIds.slice(i, i + GMAIL_BATCH_LIMIT);
+      const chunkMap = await gmailBatchGetMetadata(
+        token,
+        chunk,
+        metadataHeaders,
+      );
+      for (const [id, message] of chunkMap) merged.set(id, message);
+    }
+    return merged;
+  }
 
   const boundary = `batch_${crypto.randomUUID()}`;
   const headerQs = metadataHeaders

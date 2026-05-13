@@ -21,6 +21,7 @@ import {
 import {
   findUidByMessageId,
   findUidInMailbox,
+  formatEnvelopeAddresses,
   locateMessage,
   searchAndFetch,
 } from "./utils/search";
@@ -248,27 +249,30 @@ const Imap = {
   async listUnread(
     accountId: number,
     maxResults: number = 20,
+    offset: number = 0,
   ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listUnread");
-    return searchAndFetch(conn, "INBOX", { seen: false }, maxResults);
+    return searchAndFetch(conn, "INBOX", { seen: false }, maxResults, offset);
   },
 
   async listStarred(
     accountId: number,
     maxResults: number = 20,
+    offset: number = 0,
   ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listStarred");
-    return searchAndFetch(conn, "INBOX", { flagged: true }, maxResults);
+    return searchAndFetch(conn, "INBOX", { flagged: true }, maxResults, offset);
   },
 
   async listJunk(
     accountId: number,
     maxResults: number = 20,
+    offset: number = 0,
   ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listJunk");
     const junkPath = await findJunkFolder(conn);
     if (!junkPath) return [];
-    return searchAndFetch(conn, junkPath, { all: true }, maxResults);
+    return searchAndFetch(conn, junkPath, { all: true }, maxResults, offset);
   },
 
   /**
@@ -281,6 +285,7 @@ const Imap = {
     accountId: number,
     query: string,
     maxResults: number = 20,
+    offset: number = 0,
   ): Promise<SearchResultMessage[]> {
     const conn = connectionManager.requireConnection(accountId, "search");
     const trimmed = query.trim();
@@ -307,7 +312,7 @@ const Imap = {
         if (!result || !Array.isArray(result) || result.length === 0) continue;
         const uids = (result as number[])
           .sort((a, b) => b - a)
-          .slice(0, maxResults);
+          .slice(0, offset + maxResults);
         const fetched = await conn.client.fetchAll(
           uids.join(","),
           { envelope: true },
@@ -315,17 +320,11 @@ const Imap = {
         );
         for (const msg of fetched) {
           if (!msg.envelope?.messageId) continue;
-          // envelope.from 是 [{ name, address }, ...]；取第一个发件人，兼顾 name-only / addr-only
-          const f = msg.envelope.from?.[0];
-          const from = f?.address
-            ? f.name
-              ? `${f.name} <${f.address}>`
-              : f.address
-            : (f?.name ?? undefined);
           all.push({
             id: msg.envelope.messageId,
             subject: msg.envelope.subject ?? undefined,
-            from,
+            from: formatEnvelopeAddresses(msg.envelope.from),
+            to: formatEnvelopeAddresses(msg.envelope.to),
             date: msg.envelope.date
               ? new Date(msg.envelope.date).toISOString()
               : undefined,
@@ -350,13 +349,14 @@ const Imap = {
       dedup.push(m);
     }
     dedup.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-    return dedup.slice(0, maxResults);
+    return dedup.slice(offset, offset + maxResults);
   },
 
   async listFolder(
     accountId: number,
     folder: string | undefined,
     maxResults: number = 20,
+    offset: number = 0,
   ): Promise<MessageSummary[]> {
     const conn = connectionManager.requireConnection(accountId, "listFolder");
 
@@ -377,7 +377,7 @@ const Imap = {
       );
       return [];
     }
-    return searchAndFetch(conn, resolved, { all: true }, maxResults);
+    return searchAndFetch(conn, resolved, { all: true }, maxResults, offset);
   },
 
   async archiveMessage(

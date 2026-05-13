@@ -2,6 +2,26 @@ import type { ActiveConnection } from "@middleware/connections/types";
 import type { ImapFlow } from "imapflow";
 import type { MessageHit, MessageSummary } from "../types";
 
+type EnvelopeAddress = {
+  name?: string;
+  address?: string;
+};
+
+export const formatEnvelopeAddresses = (
+  addresses: EnvelopeAddress[] | undefined,
+): string | undefined => {
+  const formatted = addresses
+    ?.map((addr) =>
+      addr.address
+        ? addr.name
+          ? `${addr.name} <${addr.address}>`
+          : addr.address
+        : addr.name,
+    )
+    .filter((value): value is string => !!value);
+  return formatted && formatted.length > 0 ? formatted.join(", ") : undefined;
+};
+
 /**
  * 调用方已经持有当前 mailbox lock（`getMailboxLock` 之后）—— 在已 SELECT 的
  * mailbox 里按 RFC 822 Message-Id 找 UID。`rfcMessageId` 透传给 SEARCH HEADER，
@@ -55,6 +75,7 @@ export const searchAndFetch = async (
   folder: string,
   searchQuery: Record<string, unknown>,
   maxResults: number,
+  offset: number = 0,
 ): Promise<MessageSummary[]> => {
   const lock = await conn.client.getMailboxLock(folder);
   try {
@@ -62,7 +83,7 @@ export const searchAndFetch = async (
     if (!result || !Array.isArray(result)) return [];
     const uids = (result as number[])
       .sort((a: number, b: number) => b - a)
-      .slice(0, maxResults);
+      .slice(offset, offset + maxResults);
     if (uids.length === 0) return [];
 
     const range = uids.join(",");
@@ -77,6 +98,8 @@ export const searchAndFetch = async (
       .map((msg) => ({
         id: msg.envelope?.messageId as string,
         subject: msg.envelope?.subject ?? undefined,
+        from: formatEnvelopeAddresses(msg.envelope?.from),
+        to: formatEnvelopeAddresses(msg.envelope?.to),
       }));
   } finally {
     lock.release();

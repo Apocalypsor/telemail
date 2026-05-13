@@ -7,8 +7,12 @@ import type { Env } from "@worker/types";
 import { generateMailTokenById } from "@worker/utils/mail-token";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { MailListItem, MailListType } from "./model";
-import type { MailListResult, MailSearchResult } from "./types";
-import { LIST_DEFS, MAX_PER_ACCOUNT } from "./utils";
+import type {
+  MailListPageOptions,
+  MailListResult,
+  MailSearchResult,
+} from "./types";
+import { LIST_DEFS, MAX_PER_ACCOUNT, normalizePageLimit } from "./utils";
 
 export abstract class MiniappService {
   /** 拉取 user 所有启用账号的邮件列表 + 生成共享访问 token + 收集副作用。
@@ -17,38 +21,58 @@ export abstract class MiniappService {
     env: Env,
     userId: string,
     type: MailListType,
+    options?: MailListPageOptions,
   ): Promise<MailListResult> {
     const def = LIST_DEFS[type];
+    const paginated = !!options;
+    const limit = normalizePageLimit(options?.limit);
+    const cursorByAccount = options?.cursorByAccount;
     const accounts = (await getOwnAccounts(env.DB, userId)).filter(
       (a) => !a.disabled,
     );
+    const activeAccounts = cursorByAccount
+      ? accounts.filter((account) => cursorByAccount.has(account.id))
+      : accounts;
 
     const pendingSideEffects: (() => Promise<void>)[] = [];
 
     const results = await Promise.all(
-      accounts.map(async (account) => {
+      activeAccounts.map(async (account) => {
         try {
           const provider = getEmailProvider(account, env);
-          const msgs = await def.fetcher(provider);
-          if (msgs.length === 0)
+          const page = paginated
+            ? await def.pageFetcher(
+                provider,
+                limit,
+                cursorByAccount?.get(account.id),
+              )
+            : {
+                items: await def.fetcher(provider, MAX_PER_ACCOUNT),
+                nextCursor: null,
+              };
+          const pageMsgs = page.items;
+          const nextCursor = page.nextCursor;
+
+          if (pageMsgs.length === 0)
             return {
               accountId: account.id,
               accountEmail: account.email,
               items: [],
               total: 0,
+              nextCursor,
             };
 
           const mappings = await getMappingsByEmailIds(
             env.DB,
             account.id,
-            msgs.map((m) => m.id),
+            pageMsgs.map((m) => m.id),
           );
           const mappingMap = new Map(
             mappings.map((m) => [m.email_message_id, m]),
           );
 
           const items: MailListItem[] = await Promise.all(
-            msgs.map(async (msg) => {
+            pageMsgs.map(async (msg) => {
               const mapping = mappingMap.get(msg.id);
               return {
                 id: msg.id,
@@ -62,6 +86,8 @@ export abstract class MiniappService {
                 tgMessageId: !def.hideTgLinks
                   ? mapping?.tg_message_id
                   : undefined,
+                from: msg.from,
+                to: msg.to,
               };
             }),
           );
@@ -77,7 +103,8 @@ export abstract class MiniappService {
             accountId: account.id,
             accountEmail: account.email,
             items,
-            total: msgs.length,
+            total: items.length,
+            nextCursor,
           };
         } catch (err) {
           await reportErrorToObservability(env, def.errorEvent, err, {
@@ -88,6 +115,7 @@ export abstract class MiniappService {
             accountEmail: account.email,
             items: [],
             total: 0,
+            nextCursor: null,
             error: err instanceof Error ? err.message : String(err),
           };
         }
@@ -104,36 +132,56 @@ export abstract class MiniappService {
     env: Env,
     userId: string,
     query: string,
+    options?: MailListPageOptions,
   ): Promise<MailSearchResult> {
     const trimmed = query.trim();
+    const paginated = !!options;
+    const limit = normalizePageLimit(options?.limit);
+    const cursorByAccount = options?.cursorByAccount;
     const accounts = (await getOwnAccounts(env.DB, userId)).filter(
       (a) => !a.disabled,
     );
+    const activeAccounts = cursorByAccount
+      ? accounts.filter((account) => cursorByAccount.has(account.id))
+      : accounts;
 
     const results = await Promise.all(
-      accounts.map(async (account) => {
+      activeAccounts.map(async (account) => {
         try {
           const provider = getEmailProvider(account, env);
-          const msgs = await provider.searchMessages(trimmed, MAX_PER_ACCOUNT);
-          if (msgs.length === 0)
+          const page = paginated
+            ? await provider.searchMessagesPage(
+                trimmed,
+                limit,
+                cursorByAccount?.get(account.id),
+              )
+            : {
+                items: await provider.searchMessages(trimmed, MAX_PER_ACCOUNT),
+                nextCursor: null,
+              };
+          const pageMsgs = page.items;
+          const nextCursor = page.nextCursor;
+
+          if (pageMsgs.length === 0)
             return {
               accountId: account.id,
               accountEmail: account.email,
               items: [],
               total: 0,
+              nextCursor,
             };
 
           const mappings = await getMappingsByEmailIds(
             env.DB,
             account.id,
-            msgs.map((m) => m.id),
+            pageMsgs.map((m) => m.id),
           );
           const mappingMap = new Map(
             mappings.map((m) => [m.email_message_id, m]),
           );
 
           const items: MailListItem[] = await Promise.all(
-            msgs.map(async (msg) => {
+            pageMsgs.map(async (msg) => {
               const mapping = mappingMap.get(msg.id);
               return {
                 id: msg.id,
@@ -146,6 +194,7 @@ export abstract class MiniappService {
                 tgChatId: mapping?.tg_chat_id,
                 tgMessageId: mapping?.tg_message_id,
                 from: msg.from,
+                to: msg.to,
               };
             }),
           );
@@ -154,7 +203,8 @@ export abstract class MiniappService {
             accountId: account.id,
             accountEmail: account.email,
             items,
-            total: msgs.length,
+            total: items.length,
+            nextCursor,
           };
         } catch (err) {
           await reportErrorToObservability(env, "bot.search_failed", err, {
@@ -165,6 +215,7 @@ export abstract class MiniappService {
             accountEmail: account.email,
             items: [],
             total: 0,
+            nextCursor: null,
             error: err instanceof Error ? err.message : String(err),
           };
         }

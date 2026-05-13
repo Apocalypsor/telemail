@@ -1,10 +1,24 @@
 import { http } from "@worker/clients/http";
-import { MS_GRAPH_API } from "@worker/constants";
+import { MS_GRAPH_API, MS_GRAPH_API_BETA } from "@worker/constants";
+
+const resolveGraphUrl = (path: string): string => {
+  if (!path.startsWith("http")) return `${MS_GRAPH_API}${path}`;
+  if (
+    path === MS_GRAPH_API ||
+    path.startsWith(`${MS_GRAPH_API}/`) ||
+    path === MS_GRAPH_API_BETA ||
+    path.startsWith(`${MS_GRAPH_API_BETA}/`)
+  ) {
+    return path;
+  }
+  throw new Error("Invalid Microsoft Graph URL");
+};
 
 /** 调用 Graph API (GET) */
 export const graphGet = async <T>(token: string, path: string): Promise<T> => {
+  const url = resolveGraphUrl(path);
   return http
-    .get(`${MS_GRAPH_API}${path}`, {
+    .get(url, {
       headers: { Authorization: `Bearer ${token}` },
     })
     .json() as Promise<T>;

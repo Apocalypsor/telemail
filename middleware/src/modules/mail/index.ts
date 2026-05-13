@@ -94,6 +94,7 @@ export const mailController = new Elysia({ name: "controller.mail" })
       const messages = await imap.listUnread(
         body.accountId,
         body.maxResults ?? 20,
+        body.offset ?? 0,
       );
       return { messages };
     },
@@ -106,6 +107,7 @@ export const mailController = new Elysia({ name: "controller.mail" })
       const messages = await imap.listStarred(
         body.accountId,
         body.maxResults ?? 20,
+        body.offset ?? 0,
       );
       return { messages };
     },
@@ -133,6 +135,7 @@ export const mailController = new Elysia({ name: "controller.mail" })
         body.accountId,
         body.folder,
         body.maxResults ?? 20,
+        body.offset ?? 0,
       );
       return { messages };
     },
@@ -176,6 +179,7 @@ export const mailController = new Elysia({ name: "controller.mail" })
         body.accountId,
         body.query,
         body.maxResults ?? 20,
+        body.offset ?? 0,
       );
       return { messages };
     },
