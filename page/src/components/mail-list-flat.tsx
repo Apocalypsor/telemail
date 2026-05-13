@@ -1,6 +1,13 @@
 import type { FlatMailListItem } from "@page/utils/mail-list-pagination";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import type { MailListAccountResult } from "@worker/api/modules/miniapp/model";
-import type { ReactNode } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 const formatEmailOnly = (value: string | undefined): string | undefined => {
   if (!value) return undefined;
@@ -33,6 +40,34 @@ export const MailListFlat = ({
   errorLabel: (result: MailListAccountResult) => string;
   children: (item: FlatMailListItem) => ReactNode;
 }) => {
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const rowVirtualizer = useWindowVirtualizer<HTMLLIElement>({
+    count: items.length,
+    estimateSize: () => 92,
+    getItemKey: (index) => `${items[index].accountId}:${items[index].id}`,
+    overscan: 8,
+    scrollMargin,
+  });
+  const updateScrollMargin = useCallback(() => {
+    const node = listRef.current;
+    if (!node) return;
+    const next = node.getBoundingClientRect().top + window.scrollY;
+    setScrollMargin((current) => (current === next ? current : next));
+  }, []);
+
+  useLayoutEffect(() => {
+    updateScrollMargin();
+  });
+
+  useLayoutEffect(() => {
+    updateScrollMargin();
+    window.addEventListener("resize", updateScrollMargin);
+    return () => window.removeEventListener("resize", updateScrollMargin);
+  }, [updateScrollMargin]);
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
       {errors && errors.length > 0 && (
@@ -50,10 +85,31 @@ export const MailListFlat = ({
           ))}
         </div>
       )}
-      <ul className="divide-y divide-zinc-800">
-        {items.map((item) => (
-          <li key={`${item.accountId}:${item.id}`}>{children(item)}</li>
-        ))}
+      <ul
+        ref={listRef}
+        className="relative"
+        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+      >
+        {virtualItems.map((virtualItem) => {
+          const item = items[virtualItem.index];
+          return (
+            <li
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={rowVirtualizer.measureElement}
+              className={`absolute left-0 top-0 w-full ${
+                virtualItem.index > 0 ? "border-t border-zinc-800" : ""
+              }`}
+              style={{
+                transform: `translateY(${
+                  virtualItem.start - rowVirtualizer.options.scrollMargin
+                }px)`,
+              }}
+            >
+              {children(item)}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
