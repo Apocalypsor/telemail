@@ -38,7 +38,7 @@ const JunkCheckPage = () => {
   const inputClass = `w-full text-sm ${INPUT_CLASS}`;
 
   return (
-    <SessionGatedWebLayout subtitle="垃圾邮件检测">
+    <SessionGatedWebLayout>
       <section className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-xl font-semibold text-zinc-100">

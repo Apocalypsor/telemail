@@ -29,7 +29,7 @@ const PreviewPage = () => {
   const data = mut.data;
 
   return (
-    <SessionGatedWebLayout subtitle="HTML → MarkdownV2">
+    <SessionGatedWebLayout contentWidth="wide">
       <section>
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>
@@ -122,7 +122,9 @@ const Pane = ({
         </div>
         <span className="text-xs text-zinc-600 tabular-nums">{sideLabel}</span>
       </div>
-      <div className="h-72 sm:h-96 lg:h-[480px]">{children}</div>
+      <div className="h-[420px] sm:h-[560px] lg:h-[calc(100vh-220px)] lg:min-h-[620px]">
+        {children}
+      </div>
     </div>
   );
 };

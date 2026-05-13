@@ -1,28 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
-import {
-  createRootRouteWithContext,
-  Outlet,
-  useRouterState,
-} from "@tanstack/react-router";
+import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 
 const RootLayout = () => {
-  // pathname 作 key 让路由切换时 div 重挂，触发 page-enter 动画
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isMiniApp = pathname.startsWith("/telegram-app");
-
-  if (isMiniApp) {
-    return (
-      <div>
-        <Outlet />
-      </div>
-    );
-  }
-
-  return (
-    <div key={pathname} data-page-enter>
-      <Outlet />
-    </div>
-  );
+  return <Outlet />;
 };
 export interface RouterContext {
   queryClient: QueryClient;

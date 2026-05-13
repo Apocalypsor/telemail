@@ -13,7 +13,7 @@ const LoginPage = () => {
 
   if (search.denied) {
     return (
-      <WebLayout subtitle="访问被拒绝">
+      <WebLayout>
         <Card className="max-w-md mx-auto mt-16 bg-red-950/30 border border-red-900/50 p-8 text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-500/20 text-3xl mx-auto mb-4">
             🚫
@@ -35,7 +35,7 @@ const LoginPage = () => {
   }
 
   return (
-    <WebLayout subtitle="登录">
+    <WebLayout>
       <Card className="max-w-md mx-auto mt-16 bg-zinc-900 border border-zinc-800 p-8 text-center">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-3xl mx-auto mb-4">
           🔐

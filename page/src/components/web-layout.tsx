@@ -2,45 +2,85 @@ import { Dropdown } from "@heroui/react";
 import { api } from "@page/api/client";
 import { loginUrlForCurrentPath, useSession } from "@page/hooks/use-session";
 import { useMutation } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
+const WEB_NAV_LINKS = [
+  { to: "/preview", label: "HTML 预览" },
+  { to: "/junk-check", label: "垃圾检测" },
+] as const;
+
+export type WebLayoutContentWidth = "default" | "wide";
 
 /**
  * 非 Mini App 的 web 页面共用的外壳 —— 固定深色、zinc/emerald。顶栏左边
- * Telemail wordmark + 可选 subtitle，右边展示当前登录状态（未登录 "登录"
- * pill 链接到 `/login?return_to=<current>`，登录了显示头像首字母 + first name
- * + chevron，点击下拉出 "登出"）。
+ * Telemail wordmark + 登录后可见的 Web 工具导航；右边展示
+ * 当前登录状态（未登录 "登录" pill 链接到 `/login?return_to=<current>`，
+ * 登录了显示头像首字母 + first name + chevron，点击下拉出 "登出"）。
  */
 export const WebLayout = ({
-  subtitle,
   children,
+  contentWidth = "default",
 }: {
-  /** 可选副标题，显示在 wordmark 旁边（比如 "工具"） */
-  subtitle?: string;
   children: ReactNode;
+  contentWidth?: WebLayoutContentWidth;
 }) => {
+  const session = useSession();
+  const contentMaxWidthClass =
+    contentWidth === "wide" ? "max-w-7xl" : "max-w-5xl";
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
       <header className="sticky top-0 z-20 bg-zinc-950/80 backdrop-blur">
         <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-baseline gap-3 min-w-0">
+          <div className="flex flex-1 items-center gap-5 min-w-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
             <Link
               to="/"
-              className="text-lg font-semibold tracking-tight text-emerald-400 hover:text-emerald-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 rounded"
+              className="shrink-0 text-lg font-semibold tracking-tight text-emerald-400 hover:text-emerald-300 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 rounded"
             >
               Telemail
             </Link>
-            {subtitle && (
-              <span className="text-sm text-zinc-500 truncate">{subtitle}</span>
-            )}
+            {session.data && <WebTopNav />}
           </div>
-          <AuthStatus />
+          <AuthStatus session={session} />
         </div>
       </header>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main
+        className={`${contentMaxWidthClass} mx-auto px-4 sm:px-6 py-6 sm:py-8`}
+      >
         {children}
       </main>
     </div>
+  );
+};
+
+const WebTopNav = () => {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  return (
+    <nav
+      aria-label="Web 工具"
+      className="flex shrink-0 items-center gap-5 sm:gap-7"
+    >
+      {WEB_NAV_LINKS.map((item) => {
+        const active =
+          pathname === item.to ||
+          (item.to === "/junk-check" && pathname === "/junk-check/");
+
+        return (
+          <Link
+            key={item.to}
+            to={item.to}
+            aria-current={active ? "page" : undefined}
+            className={`shrink-0 rounded text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:text-[15px] ${
+              active ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-200"
+            }`}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 };
 
@@ -52,9 +92,11 @@ export const WebLayout = ({
  *   的窄按钮（hover 背景变深），popover 是紧凑的 zinc-900 卡片，里面
  *   只有一项 "登出"
  */
-const AuthStatus = () => {
-  const session = useSession();
-
+const AuthStatus = ({
+  session,
+}: {
+  session: ReturnType<typeof useSession>;
+}) => {
   const logoutMut = useMutation({
     mutationFn: async () => {
       await api.api.session.logout.post();
