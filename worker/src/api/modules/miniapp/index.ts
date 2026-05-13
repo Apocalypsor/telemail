@@ -5,9 +5,9 @@ import {
   trashAllJunkEmails,
 } from "@worker/utils/message-actions/actions";
 import { Elysia } from "elysia";
-import { ListParams, SearchQuery } from "./model";
+import { ListParams, ListQuery, SearchQuery } from "./model";
 import { MiniappService } from "./service";
-import { isMailListType } from "./utils";
+import { isMailListType, parseAccountCursor } from "./utils";
 
 /**
  * Mini App 通用 API:
@@ -24,12 +24,21 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
 
   .get(
     "/api/mini-app/list/:type",
-    async ({ env, executionCtx, userId, params, status }) => {
+    async ({ env, executionCtx, userId, params, query, status }) => {
       const type = params.type;
       if (!isMailListType(type))
         return status(400, { error: "Unknown list type" });
+      let cursorByAccount: Map<number, number> | undefined;
+      try {
+        cursorByAccount = parseAccountCursor(query.cursor);
+      } catch {
+        return status(400, { error: "Invalid cursor" });
+      }
 
-      const result = await MiniappService.getMailList(env, userId, type);
+      const result = await MiniappService.getMailList(env, userId, type, {
+        limit: query.limit,
+        cursorByAccount,
+      });
       if (result.pendingSideEffects.length > 0) {
         executionCtx.waitUntil(
           Promise.allSettled(result.pendingSideEffects.map((t) => t())),
@@ -41,7 +50,7 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
         total: result.total,
       };
     },
-    { params: ListParams },
+    { params: ListParams, query: ListQuery },
   )
 
   .post("/api/mini-app/mark-all-as-read", async ({ env, userId }) => {
@@ -58,7 +67,16 @@ export const miniAppController = new Elysia({ name: "controller.miniapp" })
       const q = (query.q ?? "").trim();
       if (!q) return status(400, { error: "缺少搜索关键词" });
       if (q.length > 200) return status(400, { error: "关键词过长" });
-      return await MiniappService.searchMail(env, userId, q);
+      let cursorByAccount: Map<number, number> | undefined;
+      try {
+        cursorByAccount = parseAccountCursor(query.cursor);
+      } catch {
+        return status(400, { error: "Invalid cursor" });
+      }
+      return await MiniappService.searchMail(env, userId, q, {
+        limit: query.limit,
+        cursorByAccount,
+      });
     },
     { query: SearchQuery },
   );

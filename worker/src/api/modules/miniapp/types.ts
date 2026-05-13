@@ -1,6 +1,11 @@
 /** Miniapp module 内部 TS 类型。route schema / wire 形态在 model.ts。 */
 import type { MailListAccountResult, MailListType } from "./model";
 
+export interface MailListPageOptions {
+  limit?: number;
+  cursorByAccount?: Map<number, number>;
+}
+
 /** `MiniappService.getMailList` 返回 —— `pendingSideEffects` 给调用方用
  *  `ctx.waitUntil` 在响应后台跑（如 starred 同步键盘 / junk 清 mapping）。 */
 export interface MailListResult {

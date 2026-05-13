@@ -1,7 +1,15 @@
 import { t, type UnwrapSchema } from "elysia";
 
 export const ListParams = t.Object({ type: t.String() });
-export const SearchQuery = t.Object({ q: t.Optional(t.String()) });
+export const ListQuery = t.Object({
+  limit: t.Optional(t.Number()),
+  cursor: t.Optional(t.String()),
+});
+export const SearchQuery = t.Object({
+  q: t.Optional(t.String()),
+  limit: t.Optional(t.Number()),
+  cursor: t.Optional(t.String()),
+});
 
 export const MailListType = t.Union([
   t.Literal("unread"),
@@ -26,6 +34,7 @@ export const MailListAccountResult = t.Object({
   accountEmail: t.Union([t.String(), t.Null()]),
   items: t.Array(MailListItem),
   total: t.Number(),
+  nextCursor: t.Optional(t.Union([t.String(), t.Null()])),
   error: t.Optional(t.String()),
 });
 export type MailListAccountResult = UnwrapSchema<typeof MailListAccountResult>;

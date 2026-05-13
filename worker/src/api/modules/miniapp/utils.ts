@@ -21,9 +21,47 @@ export const isMailListType = (s: string): s is MailListType => {
   return Object.hasOwn(LIST_DEFS, s);
 };
 export const MAX_PER_ACCOUNT = 20;
+export const MAX_PAGE_SIZE = 50;
+
+export const normalizePageLimit = (limit: number | undefined): number => {
+  if (!Number.isFinite(limit)) return MAX_PER_ACCOUNT;
+  return Math.min(
+    Math.max(Math.trunc(limit ?? MAX_PER_ACCOUNT), 1),
+    MAX_PAGE_SIZE,
+  );
+};
+
+export const parseAccountCursor = (
+  raw: string | undefined,
+): Map<number, number> | undefined => {
+  if (!raw) return undefined;
+
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid cursor");
+  }
+
+  const cursorByAccount = new Map<number, number>();
+  for (const [accountIdRaw, offsetRaw] of Object.entries(parsed)) {
+    const accountId = Number(accountIdRaw);
+    const offset =
+      typeof offsetRaw === "number" ? offsetRaw : Number(String(offsetRaw));
+    if (
+      !Number.isInteger(accountId) ||
+      accountId <= 0 ||
+      !Number.isInteger(offset) ||
+      offset < 0
+    ) {
+      throw new Error("Invalid cursor");
+    }
+    cursorByAccount.set(accountId, offset);
+  }
+
+  return cursorByAccount;
+};
 
 interface ListDef {
-  fetcher: (p: EmailProvider) => Promise<EmailListItem[]>;
+  fetcher: (p: EmailProvider, maxResults: number) => Promise<EmailListItem[]>;
   errorEvent: string;
   /** junk/archive 列表：TG 消息可能已被删除，不返回 tgLink */
   hideTgLinks?: boolean;
@@ -39,24 +77,24 @@ interface ListDef {
 
 export const LIST_DEFS: Record<MailListType, ListDef> = {
   unread: {
-    fetcher: (p) => p.listUnread(MAX_PER_ACCOUNT),
+    fetcher: (p, maxResults) => p.listUnread(maxResults),
     errorEvent: "bot.unread_query_failed",
   },
   starred: {
-    fetcher: (p) => p.listStarred(MAX_PER_ACCOUNT),
+    fetcher: (p, maxResults) => p.listStarred(maxResults),
     errorEvent: "bot.starred_query_failed",
     afterMappings: (env, mappings, account) =>
       syncStarButtonsForMappings(env, mappings, account),
   },
   junk: {
-    fetcher: (p) => p.listJunk(MAX_PER_ACCOUNT),
+    fetcher: (p, maxResults) => p.listJunk(maxResults),
     errorEvent: "bot.junk_query_failed",
     hideTgLinks: true,
     previewFolder: "junk",
     afterMappings: (env, mappings) => deleteJunkMappings(env, mappings),
   },
   archived: {
-    fetcher: (p) => p.listArchived(MAX_PER_ACCOUNT),
+    fetcher: (p, maxResults) => p.listArchived(maxResults),
     errorEvent: "bot.archived_query_failed",
     hideTgLinks: true,
     previewFolder: "archive",
