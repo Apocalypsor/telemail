@@ -5,3 +5,4 @@
 export const ROUTE_MINI_APP_REMINDERS = "/telegram-app/reminders";
 export const ROUTE_MINI_APP_LIST = "/telegram-app/list/:type";
 export const ROUTE_MINI_APP_SEARCH = "/telegram-app/search";
+export const ROUTE_MINI_APP_ACCOUNTS = "/telegram-app/accounts";
