@@ -7,8 +7,12 @@ import { deliverEmailToTelegram } from "@worker/handlers/queue/utils/deliver";
 import { refreshEmail } from "@worker/handlers/queue/utils/retry";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import { buildWebMailUrl } from "@worker/utils/mail-token";
-import { markEmailAsRead } from "@worker/utils/message-actions/actions";
-import { cleanupTgForEmail } from "@worker/utils/message-actions/cleanup";
+import {
+  archiveEmailAndCleanup,
+  markEmailAsJunkAndCleanup,
+  markEmailAsRead,
+  trashEmailAndCleanup,
+} from "@worker/utils/message-actions/actions";
 import { syncStarPinState } from "@worker/utils/message-actions/reconcile";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { Elysia } from "elysia";
@@ -59,15 +63,13 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
       markEmailAsRead(env, account, emailMessageId, result.fetchFolder),
     );
 
-    const webMailUrl = env.WORKER_URL
-      ? buildWebMailUrl(
-          env.WORKER_URL,
-          emailMessageId,
-          account.id,
-          token,
-          result.fetchFolder !== "inbox" ? result.fetchFolder : undefined,
-        )
-      : "";
+    const webMailUrl = buildWebMailUrl(
+      env.WORKER_URL,
+      emailMessageId,
+      account.id,
+      token,
+      result.fetchFolder !== "inbox" ? result.fetchFolder : undefined,
+    );
     const mailMappings = await getMappingsByEmailIds(env.DB, account.id, [
       emailMessageId,
     ]);
@@ -247,9 +249,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
     "/api/mail/:id/trash",
     async ({ env, account, emailMessageId, status }) => {
       try {
-        const provider = getEmailProvider(account, env);
-        await provider.trashMessage(emailMessageId);
-        await cleanupTgForEmail(env, account.id, emailMessageId);
+        await trashEmailAndCleanup(env, account, emailMessageId);
         return { ok: true, message: "已删除" };
       } catch (err) {
         await reportErrorToObservability(env, "preview.trash_failed", err, {
@@ -265,10 +265,9 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
     "/api/mail/:id/mark-as-junk",
     async ({ env, executionCtx, account, emailMessageId, status }) => {
       try {
-        const provider = getEmailProvider(account, env);
-        executionCtx.waitUntil(markEmailAsRead(env, account, emailMessageId));
-        await provider.markAsJunk(emailMessageId);
-        await cleanupTgForEmail(env, account.id, emailMessageId);
+        await markEmailAsJunkAndCleanup(env, account, emailMessageId, {
+          waitUntil: executionCtx.waitUntil.bind(executionCtx),
+        });
         return { ok: true, message: "已标记为垃圾邮件" };
       } catch (err) {
         await reportErrorToObservability(env, "preview.mark_junk_failed", err, {
@@ -290,10 +289,9 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
         });
       }
       try {
-        const provider = getEmailProvider(account, env);
-        executionCtx.waitUntil(markEmailAsRead(env, account, emailMessageId));
-        await provider.archiveMessage(emailMessageId);
-        await cleanupTgForEmail(env, account.id, emailMessageId);
+        await archiveEmailAndCleanup(env, account, emailMessageId, {
+          waitUntil: executionCtx.waitUntil.bind(executionCtx),
+        });
         return { ok: true, message: "已归档" };
       } catch (err) {
         await reportErrorToObservability(env, "preview.archive_failed", err, {

@@ -1,9 +1,8 @@
 import { resolveMessageAccount } from "@worker/bot/utils/message-context";
 import { t } from "@worker/i18n";
-import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import { accountCanArchive } from "@worker/providers";
 import type { Env } from "@worker/types";
-import { markEmailAsRead } from "@worker/utils/message-actions/actions";
-import { cleanupTgForEmail } from "@worker/utils/message-actions/cleanup";
+import { archiveEmailAndCleanup } from "@worker/utils/message-actions/actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 
@@ -30,11 +29,7 @@ export const registerArchiveHandler = (bot: Bot, env: Env) => {
         return;
       }
 
-      const provider = getEmailProvider(account, env);
-      // 归档的同时标已读（用户已看过，邮件即将离开收件箱）
-      await markEmailAsRead(env, account, mapping.email_message_id);
-      await provider.archiveMessage(mapping.email_message_id);
-      await cleanupTgForEmail(env, account.id, mapping.email_message_id);
+      await archiveEmailAndCleanup(env, account, mapping.email_message_id);
 
       await ctx.answerCallbackQuery({ text: t("archive:archived") });
       console.log(`Archived: email=${mapping.email_message_id}`);

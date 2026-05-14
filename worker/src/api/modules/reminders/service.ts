@@ -125,14 +125,12 @@ export abstract class RemindersService {
         reminder.email_message_id,
         reminder.account_id,
       );
-      const mailUrl = env.WORKER_URL
-        ? buildWebMailUrl(
-            env.WORKER_URL,
-            reminder.email_message_id,
-            reminder.account_id,
-            token,
-          )
-        : null;
+      const mailUrl = buildWebMailUrl(
+        env.WORKER_URL,
+        reminder.email_message_id,
+        reminder.account_id,
+        token,
+      );
       const title = reminder.text || reminder.email_subject || "Email reminder";
       const notes = [
         reminder.text && reminder.text !== title

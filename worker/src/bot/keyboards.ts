@@ -70,8 +70,6 @@ export const buildEmailKeyboard = async (
   tgMessageId: number,
 ): Promise<InlineKeyboard> => {
   const kb = addCoreButtons(new InlineKeyboard(), starred, canArchive);
-  if (!env.WORKER_URL) return kb;
-
   const base = env.WORKER_URL;
   const [mailToken, reminderCount] = await Promise.all([
     generateMailTokenById(env.ADMIN_SECRET, emailMessageId, accountId),

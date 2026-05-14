@@ -84,7 +84,7 @@ export const registerAddCallbacks = (bot: Bot, env: Env) => {
         const account = await createAccount(env.DB, state.chatId, userId, type);
         await clearBotState(env, userId);
 
-        const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
+        const origin = env.WORKER_URL.replace(/\/$/, "");
         const oauthUrl = await oauth.generateOAuthUrl(
           env,
           account.id,

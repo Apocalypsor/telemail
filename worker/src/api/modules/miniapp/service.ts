@@ -1,5 +1,4 @@
-/** Miniapp 模块业务编排：list / search 两个 use-case。bot 的 mail-list
- *  rendering 也复用这层 —— bot 直接 `MiniappService.getMailList(...)`。 */
+/** Miniapp 模块业务编排：list / search 两个 use-case。 */
 import { getOwnAccounts } from "@worker/db/accounts";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { getEmailProvider } from "@worker/providers";
@@ -15,8 +14,7 @@ import type {
 import { LIST_DEFS, MAX_PER_ACCOUNT, normalizePageLimit } from "./utils";
 
 export abstract class MiniappService {
-  /** 拉取 user 所有启用账号的邮件列表 + 生成共享访问 token + 收集副作用。
-   *  miniapp `/api/mini-app/list/:type` 与 bot `mail-list` 双消费。 */
+  /** 拉取 user 所有启用账号的邮件列表 + 生成共享访问 token + 收集副作用。 */
   static async getMailList(
     env: Env,
     userId: string,

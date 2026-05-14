@@ -1,10 +1,9 @@
 import { buildEmailKeyboard } from "@worker/bot/keyboards";
 import { resolveMessageAccount } from "@worker/bot/utils/message-context";
 import { t } from "@worker/i18n";
-import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import { accountCanArchive } from "@worker/providers";
 import type { Env } from "@worker/types";
-import { markEmailAsRead } from "@worker/utils/message-actions/actions";
-import { cleanupTgForEmail } from "@worker/utils/message-actions/cleanup";
+import { markEmailAsJunkAndCleanup } from "@worker/utils/message-actions/actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
@@ -73,12 +72,7 @@ export const registerJunkHandler = (bot: Bot, env: Env) => {
         return;
       }
       const { mapping, account } = resolved;
-
-      const provider = getEmailProvider(account, env);
-      // 标垃圾的同时标已读（用户已看过，邮件即将离开收件箱）
-      await markEmailAsRead(env, account, mapping.email_message_id);
-      await provider.markAsJunk(mapping.email_message_id);
-      await cleanupTgForEmail(env, account.id, mapping.email_message_id);
+      await markEmailAsJunkAndCleanup(env, account, mapping.email_message_id);
 
       await ctx.answerCallbackQuery({ text: t("junk:markedAsJunk") });
       console.log(`Marked as junk: email=${mapping.email_message_id}`);

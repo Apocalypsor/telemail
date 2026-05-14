@@ -43,7 +43,7 @@ interface WorkerSecrets {
   /** Telegram Webhook Secret（校验 webhook 来源） */
   TELEGRAM_WEBHOOK_SECRET: string;
   /** Worker 对外访问 URL，例如 https://gmail-tg-bridge.xxx.workers.dev（用于生成邮件查看链接） */
-  WORKER_URL?: string;
+  WORKER_URL: string;
   /** IMAP 中间件 URL，例如 https://middleware.example.com */
   IMAP_BRIDGE_URL?: string;
   /** IMAP 中间件共享密钥（Bearer token） */

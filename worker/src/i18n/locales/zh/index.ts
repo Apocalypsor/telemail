@@ -6,7 +6,6 @@ import commands from "./commands";
 import common from "./common";
 import junk from "./junk";
 import keyboards from "./keyboards";
-import mailList from "./mailList";
 import reminders from "./reminders";
 import star from "./star";
 import start from "./start";
@@ -21,7 +20,6 @@ export default {
   common,
   junk,
   keyboards,
-  mailList,
   reminders,
   star,
   start,

@@ -5,6 +5,7 @@ import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { InlineKeyboard } from "grammy";
+import { cleanupTgForEmail } from "./cleanup";
 import { syncStarPinState } from "./reconcile";
 
 /** 切换星标并返回新的 keyboard */
@@ -61,6 +62,57 @@ export const markEmailAsRead = async (
       emailMessageId,
     });
   }
+};
+
+const scheduleOrAwait = async (
+  promise: Promise<unknown>,
+  waitUntil?: (p: Promise<unknown>) => void,
+): Promise<void> => {
+  if (waitUntil) {
+    waitUntil(promise);
+    return;
+  }
+  await promise;
+};
+
+export const markEmailAsJunkAndCleanup = async (
+  env: Env,
+  account: Account,
+  emailMessageId: string,
+  options?: MailMutationOptions,
+): Promise<void> => {
+  await scheduleOrAwait(
+    markEmailAsRead(env, account, emailMessageId, options?.folder),
+    options?.waitUntil,
+  );
+  const provider = getEmailProvider(account, env);
+  await provider.markAsJunk(emailMessageId);
+  await cleanupTgForEmail(env, account.id, emailMessageId);
+};
+
+export const archiveEmailAndCleanup = async (
+  env: Env,
+  account: Account,
+  emailMessageId: string,
+  options?: MailMutationOptions,
+): Promise<void> => {
+  await scheduleOrAwait(
+    markEmailAsRead(env, account, emailMessageId, options?.folder),
+    options?.waitUntil,
+  );
+  const provider = getEmailProvider(account, env);
+  await provider.archiveMessage(emailMessageId);
+  await cleanupTgForEmail(env, account.id, emailMessageId);
+};
+
+export const trashEmailAndCleanup = async (
+  env: Env,
+  account: Account,
+  emailMessageId: string,
+): Promise<void> => {
+  const provider = getEmailProvider(account, env);
+  await provider.trashMessage(emailMessageId);
+  await cleanupTgForEmail(env, account.id, emailMessageId);
 };
 
 /** 通过 Telegram 消息标记对应邮件为已读 */
@@ -144,3 +196,8 @@ export const trashAllJunkEmails = async (
 type ToggleStarResult =
   | { ok: true; keyboard: InlineKeyboard; emailMessageId: string }
   | { ok: false; reason: string };
+
+interface MailMutationOptions {
+  folder?: "inbox" | "junk" | "archive";
+  waitUntil?: (p: Promise<unknown>) => void;
+}

@@ -18,35 +18,21 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 
-/** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/用户管理。
- *  /start 默认私聊，inline web_app 按钮在私聊有效；没配 WORKER_URL 时回退
- *  到 callback 查询。 */
+/** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/用户管理。 */
 const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
   const kb = new InlineKeyboard();
-  if (env.WORKER_URL) {
-    const base = env.WORKER_URL.replace(/\/$/, "");
-    const listUrl = (type: string) =>
-      `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
-    kb.row()
-      .webApp(t("keyboards:menu.unread"), listUrl("unread"))
-      .webApp(t("keyboards:menu.starred"), listUrl("starred"))
-      .row()
-      .webApp(t("keyboards:menu.junk"), listUrl("junk"))
-      .webApp(t("keyboards:menu.archived"), listUrl("archived"))
-      .row()
-      .webApp(
-        t("keyboards:menu.reminders"),
-        `${base}${ROUTE_MINI_APP_REMINDERS}`,
-      )
-      .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
-  } else {
-    kb.row()
-      .text(t("keyboards:menu.unread"), "unread")
-      .text(t("keyboards:menu.starred"), "starred")
-      .row()
-      .text(t("keyboards:menu.junk"), "junk")
-      .text(t("keyboards:menu.archived"), "archived");
-  }
+  const base = env.WORKER_URL.replace(/\/$/, "");
+  const listUrl = (type: string) =>
+    `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
+  kb.row()
+    .webApp(t("keyboards:menu.unread"), listUrl("unread"))
+    .webApp(t("keyboards:menu.starred"), listUrl("starred"))
+    .row()
+    .webApp(t("keyboards:menu.junk"), listUrl("junk"))
+    .webApp(t("keyboards:menu.archived"), listUrl("archived"))
+    .row()
+    .webApp(t("keyboards:menu.reminders"), `${base}${ROUTE_MINI_APP_REMINDERS}`)
+    .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
   kb.row()
     .text(t("keyboards:menu.sync"), "sync")
     .text(t("keyboards:menu.accountManagement"), "accs")

@@ -50,13 +50,13 @@
 
 兼容 OpenAI、Groq、OpenRouter、vLLM、Ollama（`http://host:11434/v1`）等任何提供 `/chat/completions` 端点的服务。
 
-### Mini App / Web 预览（可选，但强烈推荐）
+### Mini App / Web 预览（可选）
 
 | Secret                   | 说明                                                            |
 | ------------------------ | --------------------------------------------------------------- |
 | `TG_MINI_APP_SHORT_NAME` | BotFather `/newapp` 注册的 Mini App short name（群聊 deep link 用） |
 
-`WORKER_URL` 未配 → Gmail / Outlook Bot 授权链接、Outlook webhook subscription、邮件消息里的"👁 查看原文 / ⏰ 提醒"按钮都不可用。`TG_MINI_APP_SHORT_NAME` 未配 → 私聊仍可用 Mini App 按钮；群聊只保留裸 web "👁 查看原文"链接，不显示 ⏰ 提醒入口。
+`WORKER_URL` 属于核心必填项；Bot 管理面板、OAuth callback、Outlook webhook subscription、邮件预览和提醒入口都会依赖它。`TG_MINI_APP_SHORT_NAME` 未配 → 私聊仍可用 Mini App 按钮；群聊只保留裸 web "👁 查看原文"链接，不显示 ⏰ 提醒入口。
 
 ### Things Cloud（可选）
 

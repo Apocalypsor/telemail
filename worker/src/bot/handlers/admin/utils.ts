@@ -55,14 +55,12 @@ export const buildSecretsText = (env: Env): string => {
   for (const { label, value } of secrets) {
     lines.push(``, escapeMdV2(label), `\`${codeEsc(value)}\``);
   }
-  if (env.WORKER_URL) {
-    const url = `${env.WORKER_URL.replace(/\/$/, "")}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
-    lines.push(
-      ``,
-      escapeMdV2(t("admin:secrets.webhookUrlLabel")),
-      `\`${codeEsc(url)}\``,
-    );
-  }
+  const url = `${env.WORKER_URL.replace(/\/$/, "")}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
+  lines.push(
+    ``,
+    escapeMdV2(t("admin:secrets.webhookUrlLabel")),
+    `\`${codeEsc(url)}\``,
+  );
 
   lines.push(
     ``,
@@ -86,11 +84,9 @@ export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
     .row()
     .text(t("admin:secrets.button"), "secrets")
     .row();
-  if (env.WORKER_URL) {
-    const base = env.WORKER_URL.replace(/\/$/, "");
-    kb.url(t("admin:htmlPreview"), `${base}/preview`).row();
-    kb.url(t("admin:junkCheck"), `${base}/junk-check`).row();
-  }
+  const base = env.WORKER_URL.replace(/\/$/, "");
+  kb.url(t("admin:htmlPreview"), `${base}/preview`).row();
+  kb.url(t("admin:junkCheck"), `${base}/junk-check`).row();
   kb.text(t("common:button.back"), "menu");
   return kb;
 };

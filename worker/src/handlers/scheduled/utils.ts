@@ -124,24 +124,20 @@ const sendEmailReminder = async (
   const text = lines.join("\n");
 
   // 查看邮件按钮：Mini App URL（私聊 web_app inline 按钮有效）。
-  // 没配 WORKER_URL 时不放按钮 —— 用户自己从邮件 TG 消息找原文。
-  let replyMarkup: unknown;
-  if (env.WORKER_URL) {
-    const token = await generateMailTokenById(
-      env.ADMIN_SECRET,
-      emailMessageId,
-      accountId,
-    );
-    const url = buildMiniAppMailUrl(
-      env.WORKER_URL,
-      emailMessageId,
-      accountId,
-      token,
-    );
-    replyMarkup = {
-      inline_keyboard: [[{ text: t("reminders:viewMail"), web_app: { url } }]],
-    };
-  }
+  const token = await generateMailTokenById(
+    env.ADMIN_SECRET,
+    emailMessageId,
+    accountId,
+  );
+  const url = buildMiniAppMailUrl(
+    env.WORKER_URL,
+    emailMessageId,
+    accountId,
+    token,
+  );
+  const replyMarkup = {
+    inline_keyboard: [[{ text: t("reminders:viewMail"), web_app: { url } }]],
+  };
 
   await sendTextMessage(
     env.TELEGRAM_BOT_TOKEN,

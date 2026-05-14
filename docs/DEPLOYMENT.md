@@ -112,7 +112,7 @@ bun wrangler secret put GMAIL_PUBSUB_TOPIC
 bun wrangler secret put GMAIL_PUSH_SECRET
 ```
 
-`WORKER_URL` 不是敏感值，但 Gmail / Outlook 的 Bot 授权链接、Outlook webhook subscription、邮件查看 / 提醒按钮都会用它拼公开 URL；生产环境建议始终配置为最终同源域名。
+`WORKER_URL` 不是敏感值，但 Bot 管理面板、Gmail / Outlook 授权链接、Outlook webhook subscription、邮件查看 / 提醒按钮都会用它拼公开 URL；生产环境必须配置为最终同源域名。
 
 可选：如果要覆盖 Things Cloud API endpoint 或默认 Today 时区，再配置：
 
@@ -207,10 +207,9 @@ BotFather：
 - `/setdomain` 设为 `example.com`
 - `/newapp` 注册 Mini App，Web App URL 填 `https://example.com/telegram-app`，short name 记下来
 
-如果 §4.4 还没配置 `WORKER_URL`，这里补成最终同源域名；`TG_MINI_APP_SHORT_NAME` 填刚才的 short name：
+确认 §4.4 的 `WORKER_URL` 已经是最终同源域名；`TG_MINI_APP_SHORT_NAME` 填刚才的 short name：
 
 ```sh
-bun wrangler secret put WORKER_URL
 bun wrangler secret put TG_MINI_APP_SHORT_NAME
 ```
 

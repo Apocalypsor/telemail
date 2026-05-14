@@ -8,13 +8,6 @@ import { deleteJunkMappings } from "@worker/utils/message-actions/cleanup";
 import { syncStarButtonsForMappings } from "@worker/utils/message-actions/keyboard";
 import type { MailListType } from "./model";
 
-/** preview URL 要带 folder 提示给 IMAP 定位 UID —— bot mail-list 渲染时用。 */
-export const getPreviewFolder = (
-  type: MailListType,
-): "inbox" | "junk" | "archive" | undefined => {
-  return LIST_DEFS[type].previewFolder;
-};
-
 /** narrow URL param string → 4 种合法 list type。直接用 LIST_DEFS 的 key 集合，
  *  避免另写一份字面量数组维护双份真相。 */
 export const isMailListType = (s: string): s is MailListType => {
@@ -64,8 +57,6 @@ interface ListDef {
   errorEvent: string;
   /** junk/archive 列表：TG 消息可能已被删除，不返回 tgLink */
   hideTgLinks?: boolean;
-  /** preview URL 需要带 folder 提示给 IMAP 定位 UID（per-folder） */
-  previewFolder?: "inbox" | "junk" | "archive";
   /** 列出后的副作用 —— starred: 同步键盘；junk: 清 mapping；其余无 */
   afterMappings?: (
     env: Env,
@@ -94,7 +85,6 @@ export const LIST_DEFS: Record<MailListType, ListDef> = {
     pageFetcher: (p, maxResults, cursor) => p.listJunkPage(maxResults, cursor),
     errorEvent: "bot.junk_query_failed",
     hideTgLinks: true,
-    previewFolder: "junk",
     afterMappings: (env, mappings) => deleteJunkMappings(env, mappings),
   },
   archived: {
@@ -103,6 +93,5 @@ export const LIST_DEFS: Record<MailListType, ListDef> = {
       p.listArchivedPage(maxResults, cursor),
     errorEvent: "bot.archived_query_failed",
     hideTgLinks: true,
-    previewFolder: "archive",
   },
 };

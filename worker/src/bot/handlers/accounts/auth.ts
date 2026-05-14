@@ -33,7 +33,7 @@ export const registerAuthCallbacks = (bot: Bot, env: Env) => {
       });
 
     try {
-      const origin = env.WORKER_URL?.replace(/\/$/, "") || "";
+      const origin = env.WORKER_URL.replace(/\/$/, "");
       const callbackUrl = `${origin}/oauth/${account.type}/callback`;
       const oauthUrl = await oauth.generateOAuthUrl(
         env,

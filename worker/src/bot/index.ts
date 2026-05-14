@@ -3,7 +3,6 @@ import { registerAdminHandlers } from "@worker/bot/handlers/admin";
 import { registerArchiveHandler } from "@worker/bot/handlers/archive";
 import { registerInputHandler } from "@worker/bot/handlers/input";
 import { registerJunkHandler } from "@worker/bot/handlers/junk";
-import { registerMailListHandlers } from "@worker/bot/handlers/mail-list";
 import { registerPinCleanupHandler } from "@worker/bot/handlers/pin-cleanup";
 import { registerReactionHandler } from "@worker/bot/handlers/reaction";
 import { registerRefreshHandler } from "@worker/bot/handlers/refresh";
@@ -20,11 +19,7 @@ import { Api, Bot } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
 
 /** 创建 grammY Bot 实例（仅用于 webhook 接收端） */
-export const createBot = (
-  env: Env,
-  botInfo: UserFromGetMe,
-  runtime: BotRuntime,
-) => {
+export const createBot = (env: Env, botInfo: UserFromGetMe) => {
   const bot = new Bot(env.TELEGRAM_BOT_TOKEN, { botInfo });
 
   bot.catch(async (err) => {
@@ -55,16 +50,12 @@ export const createBot = (
   registerArchiveHandler(bot, env);
   registerRefreshHandler(bot, env);
   registerSyncHandler(bot, env);
-  registerMailListHandlers(bot, env, runtime);
   registerPinCleanupHandler(bot, env);
   // 输入处理必须最后注册（catch-all text handler）
   registerInputHandler(bot, env);
 
   return bot;
 };
-export interface BotRuntime {
-  waitUntil: (p: Promise<unknown>) => void;
-}
 
 /**
  * 从 KV 获取 botInfo，首次调用时从 Telegram API 拉取并缓存。

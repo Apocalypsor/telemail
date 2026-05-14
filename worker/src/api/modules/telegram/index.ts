@@ -32,9 +32,7 @@ export const telegramController = new Elysia({ name: "controller.telegram" })
       executionCtx.waitUntil(syncBotCommands(env).catch(() => {}));
 
       const botInfo = await getBotInfo(env);
-      const bot = createBot(env, botInfo, {
-        waitUntil: executionCtx.waitUntil.bind(executionCtx),
-      });
+      const bot = createBot(env, botInfo);
       try {
         await bot.handleUpdate(body as Update);
       } catch {
