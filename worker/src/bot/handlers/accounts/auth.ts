@@ -1,7 +1,9 @@
 import {
   accountDetailKeyboard,
   accountDetailText,
-} from "@worker/bot/utils/formatters";
+  resolveAccount,
+  resolveOwnerName,
+} from "@worker/bot/utils/account";
 import { setArchiveFolder } from "@worker/db/accounts";
 import { putOAuthBotMsg } from "@worker/db/kv";
 import { t } from "@worker/i18n";
@@ -11,7 +13,6 @@ import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import { resolveAccount, resolveOwnerName } from "./utils";
 
 /** 注册 OAuth / push renew / archive 标签管理类回调。 */
 export const registerAuthCallbacks = (bot: Bot, env: Env) => {

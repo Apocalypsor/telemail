@@ -3,7 +3,7 @@ import {
   clearBotState,
   getBotState,
   setBotState,
-} from "@worker/bot/utils/state";
+} from "@worker/bot/utils/input-state";
 import {
   createImapAccount,
   getAuthorizedAccount,

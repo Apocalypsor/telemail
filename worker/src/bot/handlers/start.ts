@@ -5,7 +5,7 @@ import {
 } from "@page/paths";
 import { helpText } from "@worker/bot/commands";
 import { isAdmin } from "@worker/bot/utils/auth";
-import { formatUserName } from "@worker/bot/utils/formatters";
+import { formatUserName } from "@worker/bot/utils/user-format";
 import {
   approveUser,
   getUserByTelegramId,

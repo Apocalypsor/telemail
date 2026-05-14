@@ -18,7 +18,7 @@ import {
   prepareEmailContent,
 } from "@worker/utils/mail-delivery/format";
 import { wrapExpandableQuote } from "@worker/utils/markdown-v2";
-import { syncStarPinState } from "@worker/utils/message-actions/reconcile";
+import { syncStarPinState } from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 

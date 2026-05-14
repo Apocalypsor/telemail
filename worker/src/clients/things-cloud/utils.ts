@@ -10,6 +10,8 @@ import type {
   WireNote,
 } from "@worker/clients/things-cloud/types";
 
+let crcTable: Uint32Array | null = null;
+
 export const endpointUrl = (endpoint: string, path: string): string => {
   return `${endpoint.replace(/\/+$/, "")}${path}`;
 };
@@ -226,4 +228,3 @@ export const createTaskPayload = (
     xx: extension(),
   };
 };
-let crcTable: Uint32Array | null = null;

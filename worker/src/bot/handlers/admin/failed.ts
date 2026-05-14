@@ -1,5 +1,6 @@
+import { failedEmailListMessage } from "@worker/bot/utils/admin";
 import { isAdmin } from "@worker/bot/utils/auth";
-import { clearBotState } from "@worker/bot/utils/state";
+import { clearBotState } from "@worker/bot/utils/input-state";
 import {
   deleteAllFailedEmails,
   deleteFailedEmail,
@@ -15,7 +16,6 @@ import {
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import { failedEmailListMessage } from "./utils";
 
 /** 注册 failed-emails 管理回调：list / retry-all / fr:N / fd:N / failed_clear。 */
 export const registerFailedEmailCallbacks = (bot: Bot, env: Env) => {

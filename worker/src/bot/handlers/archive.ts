@@ -2,7 +2,7 @@ import { resolveMessageAccount } from "@worker/bot/utils/message-context";
 import { t } from "@worker/i18n";
 import { accountCanArchive } from "@worker/providers";
 import type { Env } from "@worker/types";
-import { archiveEmailAndCleanup } from "@worker/utils/message-actions/actions";
+import { archiveEmailAndCleanup } from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 

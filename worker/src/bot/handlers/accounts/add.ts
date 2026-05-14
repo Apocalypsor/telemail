@@ -2,7 +2,7 @@ import {
   clearBotState,
   getBotState,
   setBotState,
-} from "@worker/bot/utils/state";
+} from "@worker/bot/utils/input-state";
 import { createAccount } from "@worker/db/accounts";
 import { putOAuthBotMsg } from "@worker/db/kv";
 import { t } from "@worker/i18n";

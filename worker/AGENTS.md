@@ -5,7 +5,7 @@ Cloudflare Worker (Elysia + grammY). Cross-workspace rules in [root AGENTS.md](.
 ## Layout (`src/`)
 
 - **`api/`** — HTTP layer (Elysia). Module / plugin file rules in root [AGENTS.md](../AGENTS.md) "Elysia layout". `api/index.ts` composes the tree with `CloudflareAdapter` + `.compile()` and exports `type App` for Eden.
-- **`bot/`** — Telegram bot (grammY). Self-contained tree, **no** sub-`services/`. Helpers live in the **nearest** `utils/`: feature-internal (≥2 files inside one `handlers/<feature>/`) → `bot/handlers/<feature>/utils.ts`; cross-feature → `bot/utils/`.
+- **`bot/`** — Telegram bot (grammY). Self-contained tree, **no** sub-`services/`. Handler folders should stay focused on callback/command registration; shared or extracted bot helper code lives in `bot/utils/` with purpose-named files.
 - **`handlers/`** — non-HTTP entry points (queue consumer + cron).
 - **`clients/`** — outbound HTTP: shared `ky` instance + hand-written external API wrappers.
 - **`providers/`** — email provider impls (Gmail / Outlook / IMAP), abstract base in `base.ts`. `index.ts` is the dispatcher (`PROVIDERS` map + helper fns); no barrel re-exports of classes or types. Per-provider differences stay on the class — **never `branch on account.type` outside `providers/`**.

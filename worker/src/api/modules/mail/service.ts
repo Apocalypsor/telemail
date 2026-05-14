@@ -7,11 +7,12 @@ import { getCachedMailData, putCachedMailData } from "@worker/db/kv";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { getEmailProvider, PROVIDERS } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
-import { proxyImages, replaceCidReferences } from "@worker/utils/mail-html";
+import { proxyImages } from "@worker/utils/mail/image-proxy";
+import { replaceCidReferences } from "@worker/utils/mail/mime";
 import {
   generateMailTokenById,
   verifyMailTokenById,
-} from "@worker/utils/mail-token";
+} from "@worker/utils/mail/token";
 import type {
   Folder,
   LoadForRenderingResult,

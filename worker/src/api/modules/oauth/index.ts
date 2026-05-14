@@ -3,7 +3,7 @@ import { cf } from "@worker/api/plugins/cf";
 import {
   accountDetailKeyboard,
   accountDetailText,
-} from "@worker/bot/utils/formatters";
+} from "@worker/bot/utils/account";
 import { getAccountById } from "@worker/db/accounts";
 import { deleteOAuthBotMsg, getOAuthBotMsg } from "@worker/db/kv";
 import { Elysia } from "elysia";

@@ -2,7 +2,7 @@
 
 import { http } from "@worker/clients/http";
 import { LLM_TIMEOUT_MS, MAX_LINKS } from "@worker/constants";
-import { extractLinks, prepareBody } from "@worker/utils/format";
+import { extractLinks, prepareBody } from "@worker/utils/mail/llm-input";
 
 /** 从逗号分隔的 API Key 列表中随机选一个 */
 const pickRandomKey = (apiKeys: string): string => {

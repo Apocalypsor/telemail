@@ -1,6 +1,6 @@
 import { SESSION_COOKIE_NAME } from "@worker/constants";
 import { getUserByTelegramId } from "@worker/db/users";
-import { verifySessionCookie } from "@worker/utils/session";
+import { verifySessionCookie } from "@worker/utils/auth";
 import { Elysia, status } from "elysia";
 import { cf } from "./cf";
 

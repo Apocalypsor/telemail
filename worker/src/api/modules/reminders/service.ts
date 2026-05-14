@@ -19,7 +19,7 @@ import type { Env } from "@worker/types";
 import {
   buildWebMailUrl,
   generateMailTokenById,
-} from "@worker/utils/mail-token";
+} from "@worker/utils/mail/token";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { resolveUserTimeZone } from "@worker/utils/time-zone";
 import type { EnrichedReminder } from "./types";

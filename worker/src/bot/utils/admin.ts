@@ -1,4 +1,4 @@
-import { formatUserName } from "@worker/bot/utils/formatters";
+import { formatUserName } from "@worker/bot/utils/user-format";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
 import type { Env, TelegramUser } from "@worker/types";
@@ -8,6 +8,53 @@ import { InlineKeyboard } from "grammy";
 export const SECRETS_AUTO_DELETE_SECONDS = 60;
 
 const codeEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+
+export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
+  const failedCount = await countFailedEmails(env.DB);
+  const failedLabel =
+    failedCount > 0
+      ? t("admin:failedEmails.titleWithCount", { count: failedCount })
+      : t("admin:failedEmails.title");
+  const kb = new InlineKeyboard()
+    .text(failedLabel, "failed")
+    .row()
+    .text(t("admin:renewWatch"), "walla")
+    .row()
+    .text(t("admin:secrets.button"), "secrets")
+    .row();
+  const base = env.WORKER_URL.replace(/\/$/, "");
+  kb.url(t("admin:htmlPreview"), `${base}/preview`).row();
+  kb.url(t("admin:junkCheck"), `${base}/junk-check`).row();
+  kb.text(t("common:button.back"), "menu");
+  return kb;
+};
+
+export const buildSecretsText = (env: Env): string => {
+  const secrets: Array<{ label: string; value: string }> = [
+    { label: "TELEGRAM_WEBHOOK_SECRET", value: env.TELEGRAM_WEBHOOK_SECRET },
+    { label: "ADMIN_SECRET", value: env.ADMIN_SECRET },
+    { label: "ADMIN_TELEGRAM_ID", value: env.ADMIN_TELEGRAM_ID },
+  ];
+
+  const lines: string[] = [`*${escapeMdV2(t("admin:secrets.title"))}*`];
+  for (const { label, value } of secrets) {
+    lines.push(``, escapeMdV2(label), `\`${codeEsc(value)}\``);
+  }
+  const url = `${env.WORKER_URL.replace(/\/$/, "")}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
+  lines.push(
+    ``,
+    escapeMdV2(t("admin:secrets.webhookUrlLabel")),
+    `\`${codeEsc(url)}\``,
+  );
+
+  lines.push(
+    ``,
+    t("admin:secrets.autoDeleteHint", {
+      seconds: SECRETS_AUTO_DELETE_SECONDS,
+    }),
+  );
+  return lines.join("\n");
+};
 
 export const userListText = (users: TelegramUser[]): string => {
   if (users.length === 0) return t("admin:users.noUsers");
@@ -41,53 +88,6 @@ export const userListKeyboard = (
     kb.row();
   }
   if (opts?.showBack) kb.text(t("common:button.back"), "menu");
-  return kb;
-};
-
-export const buildSecretsText = (env: Env): string => {
-  const secrets: Array<{ label: string; value: string }> = [
-    { label: "TELEGRAM_WEBHOOK_SECRET", value: env.TELEGRAM_WEBHOOK_SECRET },
-    { label: "ADMIN_SECRET", value: env.ADMIN_SECRET },
-    { label: "ADMIN_TELEGRAM_ID", value: env.ADMIN_TELEGRAM_ID },
-  ];
-
-  const lines: string[] = [`*${escapeMdV2(t("admin:secrets.title"))}*`];
-  for (const { label, value } of secrets) {
-    lines.push(``, escapeMdV2(label), `\`${codeEsc(value)}\``);
-  }
-  const url = `${env.WORKER_URL.replace(/\/$/, "")}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
-  lines.push(
-    ``,
-    escapeMdV2(t("admin:secrets.webhookUrlLabel")),
-    `\`${codeEsc(url)}\``,
-  );
-
-  lines.push(
-    ``,
-    t("admin:secrets.autoDeleteHint", {
-      seconds: SECRETS_AUTO_DELETE_SECONDS,
-    }),
-  );
-  return lines.join("\n");
-};
-
-export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
-  const failedCount = await countFailedEmails(env.DB);
-  const failedLabel =
-    failedCount > 0
-      ? t("admin:failedEmails.titleWithCount", { count: failedCount })
-      : t("admin:failedEmails.title");
-  const kb = new InlineKeyboard()
-    .text(failedLabel, "failed")
-    .row()
-    .text(t("admin:renewWatch"), "walla")
-    .row()
-    .text(t("admin:secrets.button"), "secrets")
-    .row();
-  const base = env.WORKER_URL.replace(/\/$/, "");
-  kb.url(t("admin:htmlPreview"), `${base}/preview`).row();
-  kb.url(t("admin:junkCheck"), `${base}/junk-check`).row();
-  kb.text(t("common:button.back"), "menu");
   return kb;
 };
 

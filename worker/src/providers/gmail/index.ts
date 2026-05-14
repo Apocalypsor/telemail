@@ -52,7 +52,7 @@ import {
   base64urlToArrayBuffer,
   base64urlToByteStream,
 } from "@worker/utils/base64url";
-import { parseEmailDate, wrapPlainText } from "@worker/utils/format";
+import { parseEmailDate, wrapPlainText } from "@worker/utils/mail/body";
 import { HTTPError } from "ky";
 
 export class GmailProvider extends EmailProvider {

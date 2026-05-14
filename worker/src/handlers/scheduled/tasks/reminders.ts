@@ -15,13 +15,13 @@ import {
 import { t } from "@worker/i18n";
 import { getEmailProvider } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
-import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import {
   buildMiniAppMailUrl,
   generateMailTokenById,
-} from "@worker/utils/mail-token";
+} from "@worker/utils/mail/token";
+import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
-import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions/keyboard";
+import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 
 export class DueRemindersTask extends ScheduledTask {

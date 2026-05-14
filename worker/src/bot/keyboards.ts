@@ -7,7 +7,7 @@ import {
   buildMiniAppRemindersUrl,
   buildWebMailUrl,
   generateMailTokenById,
-} from "@worker/utils/mail-token";
+} from "@worker/utils/mail/token";
 import { InlineKeyboard } from "grammy";
 
 // ── 邮件信息键盘（星标 / 查看原文）─────────────────────────────────────────

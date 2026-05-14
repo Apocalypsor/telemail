@@ -1,11 +1,14 @@
-import { cleanupAndDeleteAccount } from "@worker/bot/utils/account";
-import { isAdmin } from "@worker/bot/utils/auth";
 import {
   accountDetailKeyboard,
   accountDetailText,
-  formatUserName,
-} from "@worker/bot/utils/formatters";
-import { clearBotState, setBotState } from "@worker/bot/utils/state";
+  accountListKeyboard,
+  cleanupAndDeleteAccount,
+  resolveAccount,
+  resolveOwnerName,
+} from "@worker/bot/utils/account";
+import { isAdmin } from "@worker/bot/utils/auth";
+import { clearBotState, setBotState } from "@worker/bot/utils/input-state";
+import { formatUserName } from "@worker/bot/utils/user-format";
 import {
   getAuthorizedAccount,
   getOwnAccounts,
@@ -20,7 +23,6 @@ import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import { accountListKeyboard, resolveAccount, resolveOwnerName } from "./utils";
 
 /** 注册编辑 / 删除类回调：
  *  - acc:N:t — 启用/停用切换

@@ -1,9 +1,12 @@
-import { isAdmin } from "@worker/bot/utils/auth";
 import {
   accountDetailKeyboard,
   accountDetailText,
-} from "@worker/bot/utils/formatters";
-import { clearBotState } from "@worker/bot/utils/state";
+  accountListKeyboard,
+  resolveAccount,
+  resolveOwnerName,
+} from "@worker/bot/utils/account";
+import { isAdmin } from "@worker/bot/utils/auth";
+import { clearBotState } from "@worker/bot/utils/input-state";
 import {
   getAllAccounts,
   getOwnAccounts,
@@ -15,7 +18,6 @@ import type { Bot } from "grammy";
 import { registerAddCallbacks } from "./add";
 import { registerAuthCallbacks } from "./auth";
 import { registerEditCallbacks } from "./edit";
-import { accountListKeyboard, resolveAccount, resolveOwnerName } from "./utils";
 
 /** 注册账号管理列表 + 详情回调，再分发到 auth/edit/add 子模块。 */
 export const registerAccountHandlers = (bot: Bot, env: Env) => {

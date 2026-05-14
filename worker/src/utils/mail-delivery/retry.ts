@@ -18,7 +18,7 @@ import {
   editMessageWithAnalysis,
   prepareEmailContent,
 } from "@worker/utils/mail-delivery/format";
-import { reconcileMessageState } from "@worker/utils/message-actions/reconcile";
+import { reconcileMessageState } from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 

@@ -4,8 +4,10 @@ import type { MessageMapping } from "@worker/db/message-map";
 import type { EmailProvider } from "@worker/providers/base";
 import type { EmailListItem } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
-import { deleteJunkMappings } from "@worker/utils/message-actions/cleanup";
-import { syncStarButtonsForMappings } from "@worker/utils/message-actions/keyboard";
+import {
+  deleteJunkMappings,
+  syncStarButtonsForMappings,
+} from "@worker/utils/message-actions";
 import type { MailListType } from "./model";
 
 /** narrow URL param string → 4 种合法 list type。直接用 LIST_DEFS 的 key 集合，

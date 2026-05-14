@@ -1,6 +1,7 @@
 import { cleanupAndDeleteAccount } from "@worker/bot/utils/account";
+import { userListKeyboard, userListText } from "@worker/bot/utils/admin";
 import { isAdmin } from "@worker/bot/utils/auth";
-import { formatUserName } from "@worker/bot/utils/formatters";
+import { formatUserName } from "@worker/bot/utils/user-format";
 import { getOwnAccounts } from "@worker/db/accounts";
 import {
   approveUser,
@@ -13,7 +14,6 @@ import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import { userListKeyboard, userListText } from "./utils";
 
 /** 删除用户及其绑定的所有邮箱账号 */
 const deleteUserWithAccounts = async (

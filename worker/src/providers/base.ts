@@ -27,12 +27,12 @@ import {
   formatAddress,
   parseEmailDate,
   wrapPlainText,
-} from "@worker/utils/format";
+} from "@worker/utils/mail/body";
 import {
   buildAttachmentMetaFromMime,
   buildCidMapFromAttachments,
   visibleMailAttachments,
-} from "@worker/utils/mail-html";
+} from "@worker/utils/mail/mime";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 

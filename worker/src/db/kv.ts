@@ -1,5 +1,5 @@
 import type { MailAttachmentMeta, MailMeta } from "@worker/types";
-import { parseEmailDate } from "@worker/utils/format";
+import { parseEmailDate } from "@worker/utils/mail/body";
 
 // 30 天 —— well-known folder ID 在账号生命周期内稳定
 

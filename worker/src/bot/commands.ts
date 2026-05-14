@@ -1,7 +1,7 @@
+import { memoizeAsync } from "@worker/bot/utils/memoize";
 import { getBotCommandsVersion, putBotCommandsVersion } from "@worker/db/kv";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
-import { memoizeAsync } from "@worker/utils/memoize";
 import { Api } from "grammy";
 import type { BotCommand } from "grammy/types";
 

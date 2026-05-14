@@ -3,7 +3,7 @@ import { getOwnAccounts } from "@worker/db/accounts";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { getEmailProvider } from "@worker/providers";
 import type { Env } from "@worker/types";
-import { generateMailTokenById } from "@worker/utils/mail-token";
+import { generateMailTokenById } from "@worker/utils/mail/token";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { MailListItem, MailListType } from "./model";
 import type {

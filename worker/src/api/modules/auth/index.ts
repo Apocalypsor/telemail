@@ -7,7 +7,7 @@ import {
   type TelegramLoginData,
   verifySessionCookie,
   verifyTelegramLogin,
-} from "@worker/utils/session";
+} from "@worker/utils/auth";
 import { Elysia } from "elysia";
 import { LoginCallbackQuery } from "./model";
 import { resolveSameOriginRedirectUrl } from "./utils";

@@ -1,7 +1,7 @@
 import { getUserByTelegramId, updateUserTimezone } from "@worker/db/users";
 import type { Env, TelegramUser } from "@worker/types";
+import { verifyTgInitData } from "@worker/utils/auth";
 import { reportErrorToObservability } from "@worker/utils/observability";
-import { verifyTgInitData } from "@worker/utils/tg-init-data";
 import { normalizeIanaTimeZone } from "@worker/utils/time-zone";
 import { Elysia } from "elysia";
 import { cf } from "./cf";

@@ -3,7 +3,7 @@ import { cf } from "@worker/api/plugins/cf";
 import {
   markAllAsRead,
   trashAllJunkEmails,
-} from "@worker/utils/message-actions/actions";
+} from "@worker/utils/message-actions";
 import { Elysia } from "elysia";
 import { ListParams, ListQuery, SearchQuery } from "./model";
 import { MiniappService } from "./service";
