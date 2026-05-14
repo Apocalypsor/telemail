@@ -9,7 +9,6 @@ import {
   getOwnAccounts,
   getVisibleAccounts,
 } from "@worker/db/accounts";
-import { getUserByTelegramId } from "@worker/db/users";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import type { Bot } from "grammy";
@@ -18,32 +17,8 @@ import { registerAuthCallbacks } from "./auth";
 import { registerEditCallbacks } from "./edit";
 import { accountListKeyboard, resolveAccount, resolveOwnerName } from "./utils";
 
-/** 主入口：注册 /accounts 命令、列表 + 详情回调，再分发到 auth/edit/add 子模块。 */
+/** 注册账号管理列表 + 详情回调，再分发到 auth/edit/add 子模块。 */
 export const registerAccountHandlers = (bot: Bot, env: Env) => {
-  // ─── /accounts: 快速查看账号列表 ────────────────────────────────────────
-  bot.command("accounts", async (ctx) => {
-    const userId = String(ctx.from?.id);
-    const admin = isAdmin(userId, env);
-
-    if (!admin) {
-      const user = await getUserByTelegramId(env.DB, userId);
-      if (!user || user.approved !== 1) {
-        return ctx.reply(t("common:admin.awaitingApproval"));
-      }
-    }
-
-    const accounts = admin
-      ? await getOwnAccounts(env.DB, userId)
-      : await getVisibleAccounts(env.DB, userId, false);
-    const text =
-      accounts.length > 0
-        ? t("accounts:list.myAccounts", { count: accounts.length })
-        : t("accounts:list.noAccounts");
-    return ctx.reply(text, {
-      reply_markup: accountListKeyboard(accounts, { isAdmin: admin }),
-    });
-  });
-
   // Account list (default: own accounts only)
   bot.callbackQuery("accs", async (ctx) => {
     const userId = String(ctx.from.id);
@@ -81,40 +56,6 @@ export const registerAccountHandlers = (bot: Bot, env: Env) => {
         showAll: true,
         showBack: true,
       }),
-    });
-    await ctx.answerCallbackQuery();
-  });
-
-  // Account list (admin: show all accounts, standalone from /accounts)
-  bot.callbackQuery("accs:all:s", async (ctx) => {
-    const userId = String(ctx.from.id);
-    await clearBotState(env, userId);
-    if (!isAdmin(userId, env))
-      return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
-
-    const accounts = await getAllAccounts(env.DB);
-    const text = t("accounts:list.allAccounts", { count: accounts.length });
-    await ctx.editMessageText(text, {
-      reply_markup: accountListKeyboard(accounts, {
-        isAdmin: true,
-        showAll: true,
-      }),
-    });
-    await ctx.answerCallbackQuery();
-  });
-
-  // Account list (standalone: collapse back to own accounts)
-  bot.callbackQuery("accs:s", async (ctx) => {
-    const userId = String(ctx.from.id);
-    await clearBotState(env, userId);
-    const accounts = await getOwnAccounts(env.DB, userId);
-
-    const text =
-      accounts.length > 0
-        ? t("accounts:list.myAccounts", { count: accounts.length })
-        : t("accounts:list.noAccounts");
-    await ctx.editMessageText(text, {
-      reply_markup: accountListKeyboard(accounts, { isAdmin: true }),
     });
     await ctx.answerCallbackQuery();
   });

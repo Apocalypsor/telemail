@@ -110,7 +110,7 @@ export interface EmailQueueMessage {
   emailMessageId: string;
 }
 
-/** 延迟删除 Telegram 消息（用于 /secrets 自销毁等） */
+/** 延迟删除 Telegram 消息（用于 Secrets 面板自销毁等） */
 export interface DeleteTgMessageQueueMessage {
   type: QueueMessageType.DeleteTgMessage;
   chatId: string;

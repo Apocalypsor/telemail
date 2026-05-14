@@ -57,12 +57,11 @@ export const accountListKeyboard = (
   }
   kb.text(t("accounts:list.addAccount"), "add").row();
   if (options?.isAdmin) {
-    const back = options.showBack ? "" : ":s";
     kb.text(
       options.showAll
         ? t("accounts:list.collapse")
         : t("accounts:list.viewAll"),
-      options.showAll ? `accs${back}` : `accs:all${back}`,
+      options.showAll ? "accs" : "accs:all",
     ).row();
   }
   if (options?.showBack) kb.text(t("common:button.back"), "menu");

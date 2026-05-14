@@ -7,8 +7,8 @@ export const isAdmin = (userId: string, env: Env): boolean => {
 };
 
 /** 全局命令中间件：把 `/cmd` 形式的消息限制为仅私聊。
- *  群 / 频道里发 /accounts /sync /unread 等会泄漏用户私人数据；/start 在那里跑
- *  还会触发 upsertUser 用频道/群成员的 ctx.from 引入未授权注册路径。
+ *  群 / 频道里发命令可能泄漏用户私人数据；/start 在那里跑还会触发
+ *  upsertUser 用频道/群成员的 ctx.from 引入未授权注册路径。
  *
  *  用 `ctx.msg`（grammY 的统一 getter）拿当前更新里的消息体，覆盖 message /
  *  editedMessage / channelPost / editedChannelPost 四种来源 —— 频道里发的

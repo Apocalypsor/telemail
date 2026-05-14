@@ -2,7 +2,12 @@ import { formatUserName } from "@worker/bot/utils/formatters";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
 import type { Env, TelegramUser } from "@worker/types";
+import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import { InlineKeyboard } from "grammy";
+
+export const SECRETS_AUTO_DELETE_SECONDS = 60;
+
+const codeEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
 
 export const userListText = (users: TelegramUser[]): string => {
   if (users.length === 0) return t("admin:users.noUsers");
@@ -39,6 +44,35 @@ export const userListKeyboard = (
   return kb;
 };
 
+export const buildSecretsText = (env: Env): string => {
+  const secrets: Array<{ label: string; value: string }> = [
+    { label: "TELEGRAM_WEBHOOK_SECRET", value: env.TELEGRAM_WEBHOOK_SECRET },
+    { label: "ADMIN_SECRET", value: env.ADMIN_SECRET },
+    { label: "ADMIN_TELEGRAM_ID", value: env.ADMIN_TELEGRAM_ID },
+  ];
+
+  const lines: string[] = [`*${escapeMdV2(t("admin:secrets.title"))}*`];
+  for (const { label, value } of secrets) {
+    lines.push(``, escapeMdV2(label), `\`${codeEsc(value)}\``);
+  }
+  if (env.WORKER_URL) {
+    const url = `${env.WORKER_URL.replace(/\/$/, "")}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
+    lines.push(
+      ``,
+      escapeMdV2(t("admin:secrets.webhookUrlLabel")),
+      `\`${codeEsc(url)}\``,
+    );
+  }
+
+  lines.push(
+    ``,
+    t("admin:secrets.autoDeleteHint", {
+      seconds: SECRETS_AUTO_DELETE_SECONDS,
+    }),
+  );
+  return lines.join("\n");
+};
+
 export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
   const failedCount = await countFailedEmails(env.DB);
   const failedLabel =
@@ -49,6 +83,8 @@ export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
     .text(failedLabel, "failed")
     .row()
     .text(t("admin:renewWatch"), "walla")
+    .row()
+    .text(t("admin:secrets.button"), "secrets")
     .row();
   if (env.WORKER_URL) {
     const base = env.WORKER_URL.replace(/\/$/, "");

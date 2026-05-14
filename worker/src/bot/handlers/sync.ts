@@ -84,13 +84,6 @@ const syncAllAccounts = async (env: Env, userId: string): Promise<string> => {
 };
 
 export const registerSyncHandler = (bot: Bot, env: Env) => {
-  bot.command("sync", async (ctx) => {
-    const userId = String(ctx.from?.id);
-    const msg = await ctx.reply(t("sync:syncing"));
-    const result = await syncAllAccounts(env, userId);
-    await ctx.api.editMessageText(msg.chat.id, msg.message_id, result);
-  });
-
   bot.callbackQuery("sync", async (ctx) => {
     const userId = String(ctx.from.id);
     await ctx.answerCallbackQuery({ text: t("sync:syncingShort") });

@@ -20,7 +20,7 @@ import { InlineKeyboard } from "grammy";
 
 /** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/用户管理。
  *  /start 默认私聊，inline web_app 按钮在私聊有效；没配 WORKER_URL 时回退
- *  到文本命令（callback_data 对应 /unread 等路由）。 */
+ *  到 callback 查询。 */
 const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
   const kb = new InlineKeyboard();
   if (env.WORKER_URL) {
@@ -115,8 +115,7 @@ export const registerStartHandlers = (bot: Bot, env: Env) => {
 
   // ─── /help ────────────────────────────────────────────────────────────────
   bot.command("help", async (ctx) => {
-    const admin = isAdmin(String(ctx.from?.id), env);
-    return ctx.reply(helpText(admin), { parse_mode: "MarkdownV2" });
+    return ctx.reply(helpText(), { parse_mode: "MarkdownV2" });
   });
 
   // ─── Main menu callback ──────────────────────────────────────────────────

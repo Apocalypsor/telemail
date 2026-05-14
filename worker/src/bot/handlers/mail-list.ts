@@ -1,4 +1,3 @@
-import { ROUTE_MINI_APP_LIST } from "@page/paths";
 import type { MailListType } from "@worker/api/modules/miniapp/model";
 import { MiniappService } from "@worker/api/modules/miniapp/service";
 import type { MailListResult } from "@worker/api/modules/miniapp/types";
@@ -108,41 +107,6 @@ const register = (
       })(),
     );
   };
-
-  bot.command(def.type, async (ctx) => {
-    const display = DISPLAY[def.type];
-    // 配了 WORKER_URL 就回一个 web_app 按钮打开 Mini App（私聊有效）。
-    // 没配则回退到老的文本回复路径。
-    if (env.WORKER_URL) {
-      const url = `${env.WORKER_URL.replace(/\/$/, "")}${ROUTE_MINI_APP_LIST.replace(":type", def.type)}`;
-      return ctx.reply(
-        t("mailList:intro", { icon: display.icon, label: display.label }),
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: t("mailList:openInMiniApp", { label: display.label }),
-                  web_app: { url },
-                },
-              ],
-            ],
-          },
-        },
-      );
-    }
-    const userId = String(ctx.from?.id);
-    const msg = await ctx.reply(
-      t("mailList:querying", { label: display.label }),
-    );
-    const { text, hasItems, pendingSideEffects } = await queryAndFormat(userId);
-    await ctx.api.editMessageText(msg.chat.id, msg.message_id, text, {
-      parse_mode: "MarkdownV2",
-      link_preview_options: { is_disabled: true },
-      ...replyMarkupOpt(hasItems),
-    });
-    schedule(pendingSideEffects);
-  });
 
   bot.callbackQuery(def.type, async (ctx) => {
     const userId = String(ctx.from.id);

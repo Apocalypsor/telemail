@@ -23,7 +23,7 @@ Decision tree for a new file: HTTP route → `api/modules/<feature>/`; bot comma
 - **Env / waitUntil**: in Elysia handlers, destructure `{ env, executionCtx, waitUntil }` from context (provided by `cf` plugin). Outside HTTP context, `import { env } from "cloudflare:workers"`. Don't pass `env: Env` through new function signatures unless interfacing with framework-agnostic services.
 - **Bot commands**: private chat only by default — `bot/index.ts` registers `registerPrivateOnlyCommandGuard` as a global guard (also covers `channel_post`). New commands don't need to re-check; `callback_query` is unaffected.
 - **State reconciliation**: all "remote → TG" syncs go through `reconcileMessageState`; star pin goes through `syncStarPinState`. **Don't** patch state in multiple places.
-- **Disable/enable**: `accounts.disabled` pauses an account without deleting data. Enforcement points include the queue consumer, push renewal, mail-list, `/sync`, and `getImapAccounts`.
+- **Disable/enable**: `accounts.disabled` pauses an account without deleting data. Enforcement points include the queue consumer, push renewal, mail-list, manual sync callback, and `getImapAccounts`.
 - **IMAP message id = RFC 822 Message-Id** (not the per-folder UID). The bridge takes `rfcMessageId` everywhere; UIDs aren't stable across folders. Emails without Message-Id are dropped. Gmail / Outlook keep their native ids.
 - **Archive**: `provider.archiveMessage(id)` + `accountCanArchive(account)`. Gmail needs the user to pick a label (`accounts.archive_folder`); without one `canArchive()` returns false.
 - **Cron**: single `* * * * *` trigger. Reminders dispatch every minute; `getUTCMinutes() === 0` gates the hourly batch; midnight renews all push subscriptions.

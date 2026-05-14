@@ -86,20 +86,16 @@ Queue Consumer 拉取原始 RFC 2822 邮件（Gmail REST / Outlook Graph / IMAP 
 
 ## Bot 命令
 
-| 命令        | 说明             |
-| ----------- | ---------------- |
-| `/start`    | 打开管理面板     |
-| `/help`     | 查看帮助信息     |
-| `/accounts` | 查看我的邮箱账号 |
-| `/sync`     | 同步所有邮箱     |
-| `/unread`   | 查看未读邮件     |
-| `/starred`  | 查看星标邮件     |
-| `/junk`     | 查看垃圾邮件     |
-| `/archived` | 查看归档邮件     |
+Bot 只保留主入口和帮助，其它常用功能通过 `/start` 面板进入。
+
+| 命令     | 说明         |
+| -------- | ------------ |
+| `/start` | 打开管理面板 |
+| `/help`  | 查看帮助信息 |
 
 命令菜单通过 `setMyCommands` API 自动注册到 Telegram（webhook 收到消息时异步触发，KV 版本号不变则跳过）。修改 `worker/src/bot/commands.ts` 的 `BOT_COMMANDS` 后递增 `BOT_COMMANDS_VERSION` 即可，部署后发任意消息给 Bot 生效。
 
-管理员另有几条不出现在公开菜单里的命令（`/users`、`/secrets` 等），定义在 `commands.ts` 的 `ADMIN_COMMANDS`，`/help` 里管理员可见。
+管理员功能通过 `/start` 面板里的管理入口访问；Secrets 藏在 **全局操作** 里，不作为 slash command 暴露。
 
 ## 许可证
 

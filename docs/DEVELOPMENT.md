@@ -70,7 +70,7 @@ bun typecheck             # tsc on worker + page + middleware
 
 一次性 setup：
 
-1. **拿 Telegram user id**：在生产 bot 私聊里发 `/secrets`，找 `ADMIN_TELEGRAM_ID`（消息 60 秒后自销毁）。
+1. **拿 Telegram user id**：在生产 bot 私聊里打开 `/start` → **全局操作** → **Secrets**，找 `ADMIN_TELEGRAM_ID`（消息 60 秒后自销毁）。
 2. **创建 `worker/.dev.vars`**（已 gitignore）：
 
    ```

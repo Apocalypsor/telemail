@@ -9,21 +9,14 @@ const formatCommandList = (commands: BotCommand[]): string => {
   return commands.map((c) => `/${c.command} \\- ${c.description}`).join("\n");
 };
 
-/** 构造 /help 回复文本。管理员额外看到 `ADMIN_COMMANDS` 那一段。 */
-export const helpText = (admin: boolean): string => {
+/** 构造 /help 回复文本。 */
+export const helpText = (): string => {
   const blocks = [
     t("commands:helpTitle"),
     "",
     t("commands:helpCommands"),
     formatCommandList(BOT_COMMANDS),
   ];
-  if (admin) {
-    blocks.push(
-      "",
-      t("commands:helpAdminCommands"),
-      formatCommandList(ADMIN_COMMANDS),
-    );
-  }
   blocks.push(
     "",
     t("commands:helpFeatures"),
@@ -36,26 +29,14 @@ export const helpText = (admin: boolean): string => {
   );
   return blocks.join("\n");
 };
-// 修改 BOT_COMMANDS / ADMIN_COMMANDS 后更新此版本号，会自动 setMyCommands 同步
-const BOT_COMMANDS_VERSION = 10;
+// 修改 BOT_COMMANDS 后更新此版本号，会自动 setMyCommands 同步
+const BOT_COMMANDS_VERSION = 11;
 
-/** Telegram `/` 自动补全菜单里展示的命令 —— 所有用户可见 */
+/** Telegram `/` 自动补全菜单里展示的命令 —— 所有用户可见。
+ *  具体功能入口集中放进 /start 面板，避免命令菜单过长。 */
 const BOT_COMMANDS: BotCommand[] = [
   { command: "start", description: t("commands:start") },
   { command: "help", description: t("commands:help") },
-  { command: "accounts", description: t("commands:accounts") },
-  { command: "sync", description: t("commands:sync") },
-  { command: "unread", description: t("commands:unread") },
-  { command: "starred", description: t("commands:starred") },
-  { command: "junk", description: t("commands:junk") },
-  { command: "archived", description: t("commands:archived") },
-];
-
-/** 管理员命令 —— 不进 setMyCommands（避免普通用户在补全菜单看到），
- *  只在 `/help` 给管理员的回复里附加列出。 */
-const ADMIN_COMMANDS: BotCommand[] = [
-  { command: "users", description: t("commands:users") },
-  { command: "secrets", description: t("commands:secrets") },
 ];
 
 /**
