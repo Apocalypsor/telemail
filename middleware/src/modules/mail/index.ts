@@ -102,6 +102,15 @@ export const mailController = new Elysia({ name: "controller.mail" })
   )
 
   .post(
+    "/unread-count",
+    async ({ body, imap }) => {
+      const count = await imap.countUnread(body.accountId);
+      return { count };
+    },
+    { body: AccountBody },
+  )
+
+  .post(
     "/starred",
     async ({ body, imap }) => {
       const messages = await imap.listStarred(

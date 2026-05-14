@@ -3,9 +3,14 @@ import type {
   GraphMessageList,
 } from "@worker/providers/outlook/types";
 import { graphGet } from "@worker/providers/outlook/utils/api";
-import type { EmailListItem, EmailListPage } from "@worker/providers/types";
+import type {
+  EmailCount,
+  EmailListItem,
+  EmailListPage,
+} from "@worker/providers/types";
 
 const OUTLOOK_LIST_SELECT = "id,subject,from,toRecipients";
+const OUTLOOK_COUNT_PAGE_SIZE = 100;
 
 type GraphEmailAddress = { name?: string; address?: string };
 
@@ -33,11 +38,17 @@ const toEmailListItem = (message: GraphMessage): EmailListItem => ({
 export const buildOutlookUnreadListPath = (maxResults: number): string =>
   `/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
 
+export const buildOutlookUnreadCountPath = (maxResults: number): string =>
+  `/me/mailFolders('Inbox')/messages?$filter=isRead eq false&$select=id&$top=${maxResults}`;
+
 export const buildOutlookStarredListPath = (maxResults: number): string =>
   `/me/messages?$filter=flag/flagStatus eq 'flagged'&$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
 
 export const buildOutlookJunkListPath = (maxResults: number): string =>
   `/me/mailFolders('JunkEmail')/messages?$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
+
+export const buildOutlookJunkCountPath = (maxResults: number): string =>
+  `/me/mailFolders('JunkEmail')/messages?$select=id&$top=${maxResults}`;
 
 export const buildOutlookArchivedListPath = (maxResults: number): string =>
   `/me/mailFolders('archive')/messages?$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
@@ -60,4 +71,28 @@ export const listOutlookMessagesPage = async (
     items: (data.value ?? []).map(toEmailListItem),
     nextCursor: data["@odata.nextLink"] ?? null,
   };
+};
+
+export const countOutlookMessagesByPath = async (
+  token: string,
+  pathBuilder: (maxResults: number) => string,
+  maxCount: number,
+): Promise<EmailCount> => {
+  const limit = Math.max(1, Math.trunc(maxCount));
+  let count = 0;
+  let cursor: string | undefined;
+
+  while (count < limit) {
+    const path =
+      cursor ?? pathBuilder(Math.min(OUTLOOK_COUNT_PAGE_SIZE, limit - count));
+    const data = await graphGet<GraphMessageList>(token, path);
+    const pageCount = data.value?.length ?? 0;
+    count += pageCount;
+
+    if (!data["@odata.nextLink"]) return { count, truncated: false };
+    if (pageCount === 0) return { count, truncated: true };
+    cursor = data["@odata.nextLink"];
+  }
+
+  return { count, truncated: !!cursor };
 };

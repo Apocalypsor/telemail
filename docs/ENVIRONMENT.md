@@ -60,11 +60,10 @@
 
 ### Things Cloud（可选）
 
-每个用户在 Mini App 里单独保存 Things Cloud 邮箱 / 密码后，邮件提醒到期时会在后台推送创建一条 Things Today 任务。用户设备时区由 Mini App 请求自动上报并记录；推送失败只会上报 observability，不影响 Telemail 提醒分发。
+每个用户在 Mini App 里单独保存 Things Cloud 邮箱 / 密码后，邮件提醒到期时会在后台推送创建一条 Things Today 任务。用户设备时区由 Mini App 请求自动上报并记录；推送失败只会上报 observability，不影响 Telemail 提醒分发。同一个 `user_timezone` 也用于每天本地 19:00 的晚间邮件摘要。
 
 | Secret                    | 说明                                                      |
 | ------------------------- | --------------------------------------------------------- |
-| `DEFAULT_USER_TIMEZONE`   | 未记录用户设备时区时的 IANA 时区 fallback，默认 `UTC` |
 | `THINGS_CLOUD_ENDPOINT`   | Things Cloud API endpoint override（调试用，默认官方 endpoint） |
 
 用户 Things Cloud 凭据和 `user_timezone` 存储在 D1 `users` 表，API 不回显密码；每个用户的 Things app instance id 存在 KV。注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径。
@@ -82,9 +81,10 @@
 
 ## Cron Triggers
 
-`"triggers": { "crons": ["* * * * *"] }` —— 每分钟一次，`worker/src/handlers/scheduled/index.ts` 内部按 `getUTCMinutes() === 0` 区分轻 / 重任务：
+`"triggers": { "crons": ["* * * * *"] }` —— 每分钟一次，scheduled tasks 各自声明 `shouldRun` 条件：
 
 - **每分钟**：分发到期的 Mini App 提醒
+- **每 15 分钟**：按用户本地时区检查是否到 19:00，发送未读 / 垃圾邮件摘要（都为 0 时跳过）
 - **每小时**（`minute === 0`）：检查 IMAP Bridge 健康、重试失败的 LLM 摘要
 - **每天 UTC 0 点**（额外）：为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）
 

@@ -21,6 +21,15 @@ export const junkController = new Elysia({ name: "controller.junk" })
   )
 
   .post(
+    "/junk-count",
+    async ({ body, imap }) => {
+      const count = await imap.countJunk(body.accountId);
+      return { count };
+    },
+    { body: AccountBody },
+  )
+
+  .post(
     "/is-junk",
     async ({ body, imap }) => {
       const junk = await imap.isJunk(body.accountId, body.rfcMessageId);

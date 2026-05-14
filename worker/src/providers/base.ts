@@ -11,6 +11,7 @@ import {
   putOAuthState,
 } from "@worker/db/kv";
 import type {
+  EmailCount,
   EmailListItem,
   EmailListPage,
   MessageState,
@@ -36,6 +37,9 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 
 export abstract class EmailProvider {
+  private static readonly DEFAULT_COUNT_LIMIT = 1000;
+  private static readonly COUNT_PAGE_SIZE = 100;
+
   protected account: Account;
   protected env: Env;
 
@@ -80,6 +84,20 @@ export abstract class EmailProvider {
     query: string,
     maxResults?: number,
   ): Promise<EmailListItem[]>;
+
+  async countUnread(maxCount?: number): Promise<EmailCount> {
+    return this.countByPage(
+      (limit, cursor) => this.listUnreadPage(limit, cursor),
+      maxCount,
+    );
+  }
+
+  async countJunk(maxCount?: number): Promise<EmailCount> {
+    return this.countByPage(
+      (limit, cursor) => this.listJunkPage(limit, cursor),
+      maxCount,
+    );
+  }
 
   async listUnreadPage(
     maxResults: number = 20,
@@ -134,6 +152,34 @@ export abstract class EmailProvider {
       (limit) => this.searchMessages(query, limit),
       maxResults,
       cursor,
+    );
+  }
+
+  private async countByPage(
+    fetchPage: (maxResults: number, cursor?: string) => Promise<EmailListPage>,
+    maxCount: number | undefined,
+  ): Promise<EmailCount> {
+    const limit = this.normalizeCountLimit(maxCount);
+    let count = 0;
+    let cursor: string | undefined;
+
+    while (count < limit) {
+      const pageSize = Math.min(EmailProvider.COUNT_PAGE_SIZE, limit - count);
+      const page = await fetchPage(pageSize, cursor);
+      count += page.items.length;
+
+      if (!page.nextCursor) return { count, truncated: false };
+      if (page.items.length === 0) return { count, truncated: true };
+      cursor = page.nextCursor;
+    }
+
+    return { count, truncated: !!cursor };
+  }
+
+  protected normalizeCountLimit(maxCount: number | undefined): number {
+    return Math.max(
+      1,
+      Math.trunc(maxCount ?? EmailProvider.DEFAULT_COUNT_LIMIT),
     );
   }
 

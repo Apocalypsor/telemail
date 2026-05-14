@@ -19,6 +19,7 @@ import {
   resolveFolderForHint,
 } from "./utils/folders";
 import {
+  countSearchResults,
   findUidByMessageId,
   findUidInMailbox,
   formatEnvelopeAddresses,
@@ -255,6 +256,11 @@ const Imap = {
     return searchAndFetch(conn, "INBOX", { seen: false }, maxResults, offset);
   },
 
+  async countUnread(accountId: number): Promise<number> {
+    const conn = connectionManager.requireConnection(accountId, "countUnread");
+    return countSearchResults(conn, "INBOX", { seen: false });
+  },
+
   async listStarred(
     accountId: number,
     maxResults: number = 20,
@@ -273,6 +279,13 @@ const Imap = {
     const junkPath = await findJunkFolder(conn);
     if (!junkPath) return [];
     return searchAndFetch(conn, junkPath, { all: true }, maxResults, offset);
+  },
+
+  async countJunk(accountId: number): Promise<number> {
+    const conn = connectionManager.requireConnection(accountId, "countJunk");
+    const junkPath = await findJunkFolder(conn);
+    if (!junkPath) return 0;
+    return countSearchResults(conn, junkPath, { all: true });
   },
 
   /**

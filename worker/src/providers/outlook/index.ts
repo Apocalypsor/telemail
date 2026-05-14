@@ -36,10 +36,13 @@ import { getAccessToken } from "@worker/providers/outlook/utils/auth";
 import { graphBatch } from "@worker/providers/outlook/utils/batch";
 import {
   buildOutlookArchivedListPath,
+  buildOutlookJunkCountPath,
   buildOutlookJunkListPath,
   buildOutlookSearchListPath,
   buildOutlookStarredListPath,
+  buildOutlookUnreadCountPath,
   buildOutlookUnreadListPath,
+  countOutlookMessagesByPath,
   listOutlookMessagesPage,
 } from "@worker/providers/outlook/utils/list";
 import { fetchRawMime } from "@worker/providers/outlook/utils/mime";
@@ -422,6 +425,14 @@ export class OutlookProvider extends EmailProvider {
     return (await this.listUnreadPage(maxResults)).items;
   }
 
+  async countUnread(maxCount?: number) {
+    return countOutlookMessagesByPath(
+      await this.token(),
+      buildOutlookUnreadCountPath,
+      this.normalizeCountLimit(maxCount),
+    );
+  }
+
   async listUnreadPage(
     maxResults: number = 20,
     cursor?: string,
@@ -450,6 +461,14 @@ export class OutlookProvider extends EmailProvider {
 
   async listJunk(maxResults: number = 20) {
     return (await this.listJunkPage(maxResults)).items;
+  }
+
+  async countJunk(maxCount?: number) {
+    return countOutlookMessagesByPath(
+      await this.token(),
+      buildOutlookJunkCountPath,
+      this.normalizeCountLimit(maxCount),
+    );
   }
 
   async listJunkPage(

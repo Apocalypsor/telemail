@@ -21,6 +21,7 @@ import {
   generateMailTokenById,
 } from "@worker/utils/mail-token";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { resolveUserTimeZone } from "@worker/utils/time-zone";
 import type { EnrichedReminder } from "./types";
 
 const getOrCreateThingsAppInstanceId = async (
@@ -162,7 +163,7 @@ export abstract class RemindersService {
         title,
         notes,
         today: true,
-        timeZone: user.user_timezone || env.DEFAULT_USER_TIMEZONE,
+        timeZone: resolveUserTimeZone(user.user_timezone),
       });
       await updateReminderThingsTaskId(env.DB, reminder.id, createdTaskId);
     } catch (err) {

@@ -4,7 +4,13 @@ import type {
 } from "@worker/providers/gmail/types";
 import { gmailGet } from "@worker/providers/gmail/utils/api";
 import { gmailBatchGetMetadata } from "@worker/providers/gmail/utils/batch";
-import type { EmailListItem, EmailListPage } from "@worker/providers/types";
+import type {
+  EmailCount,
+  EmailListItem,
+  EmailListPage,
+} from "@worker/providers/types";
+
+const GMAIL_COUNT_PAGE_SIZE = 100;
 
 const getHeader = (message: GmailMessage, name: string): string | undefined => {
   const lowerName = name.toLowerCase();
@@ -75,6 +81,36 @@ export const listGmailMessagesByQueryPage = async (
     items: await hydrateGmailListItems(token, data.messages),
     nextCursor: data.nextPageToken ?? null,
   };
+};
+
+export const countGmailMessagesByQuery = async (
+  token: string,
+  query: string,
+  maxCount: number,
+): Promise<EmailCount> => {
+  const limit = Math.max(1, Math.trunc(maxCount));
+  let count = 0;
+  let pageToken: string | undefined;
+
+  while (count < limit) {
+    const params = new URLSearchParams({
+      q: query,
+      maxResults: String(Math.min(GMAIL_COUNT_PAGE_SIZE, limit - count)),
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const data = await gmailGet<GmailMessageList>(
+      token,
+      `/users/me/messages?${params.toString()}`,
+    );
+    const pageCount = data.messages?.length ?? 0;
+    count += pageCount;
+
+    if (!data.nextPageToken) return { count, truncated: false };
+    if (pageCount === 0) return { count, truncated: true };
+    pageToken = data.nextPageToken;
+  }
+
+  return { count, truncated: !!pageToken };
 };
 
 export const listGmailMessagesByLabel = async (

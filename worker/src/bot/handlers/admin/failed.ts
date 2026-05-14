@@ -6,12 +6,12 @@ import {
   getAllFailedEmails,
   getFailedEmail,
 } from "@worker/db/failed-emails";
+import { t } from "@worker/i18n";
+import type { Env } from "@worker/types";
 import {
   retryAllFailedEmails,
   retryFailedEmail,
-} from "@worker/handlers/queue/utils/retry";
-import { t } from "@worker/i18n";
-import type { Env } from "@worker/types";
+} from "@worker/utils/mail-delivery/retry";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";

@@ -1,7 +1,7 @@
 import { app } from "@worker/api";
 import type { RequestWithCtx } from "@worker/api/plugins/cf";
-import { handleQueueBatch } from "@worker/handlers/queue";
-import { handleScheduled } from "@worker/handlers/scheduled";
+import queueHandler from "@worker/handlers/queue";
+import scheduledHandler from "@worker/handlers/scheduled";
 import type { Env, QueueMessage } from "@worker/types";
 
 export default {
@@ -23,7 +23,7 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ): Promise<void> {
-    await handleQueueBatch(batch, env, ctx);
+    await queueHandler(batch, env, ctx);
   },
 
   async scheduled(
@@ -31,6 +31,6 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ): Promise<void> {
-    ctx.waitUntil(handleScheduled(event, env, ctx));
+    ctx.waitUntil(scheduledHandler(event, env, ctx));
   },
 };

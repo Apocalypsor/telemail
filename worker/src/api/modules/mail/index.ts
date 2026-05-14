@@ -3,9 +3,9 @@ import { cf } from "@worker/api/plugins/cf";
 import { buildEmailKeyboard } from "@worker/bot/keyboards";
 import { buildTgMessageLink, setReplyMarkup } from "@worker/clients/telegram";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
-import { deliverEmailToTelegram } from "@worker/handlers/queue/utils/deliver";
-import { refreshEmail } from "@worker/handlers/queue/utils/retry";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
+import { refreshEmail } from "@worker/utils/mail-delivery/retry";
 import { buildWebMailUrl } from "@worker/utils/mail-token";
 import {
   archiveEmailAndCleanup,

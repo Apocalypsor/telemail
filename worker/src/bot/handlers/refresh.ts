@@ -1,6 +1,6 @@
-import { refreshEmail } from "@worker/handlers/queue/utils/retry";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
+import { refreshEmail } from "@worker/utils/mail-delivery/retry";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 

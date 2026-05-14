@@ -10,14 +10,14 @@ import {
   type MessageMapping,
   updateShortSummary,
 } from "@worker/db/message-map";
-import {
-  editMessageWithAnalysis,
-  prepareEmailContent,
-} from "@worker/handlers/queue/utils/format";
 import { t } from "@worker/i18n";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
 import type { MessageLocation } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
+import {
+  editMessageWithAnalysis,
+  prepareEmailContent,
+} from "@worker/utils/mail-delivery/format";
 import { reconcileMessageState } from "@worker/utils/message-actions/reconcile";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";

@@ -10,13 +10,13 @@ import {
 } from "@worker/clients/telegram";
 import { putFailedEmail } from "@worker/db/failed-emails";
 import { putMessageMapping, updateShortSummary } from "@worker/db/message-map";
+import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import type { Account, Env } from "@worker/types";
 import {
   buildVerificationCodeSection,
   editMessageWithAnalysis,
   prepareEmailContent,
-} from "@worker/handlers/queue/utils/format";
-import { accountCanArchive, getEmailProvider } from "@worker/providers";
-import type { Account, Env } from "@worker/types";
+} from "@worker/utils/mail-delivery/format";
 import { wrapExpandableQuote } from "@worker/utils/markdown-v2";
 import { syncStarPinState } from "@worker/utils/message-actions/reconcile";
 import { reportErrorToObservability } from "@worker/utils/observability";

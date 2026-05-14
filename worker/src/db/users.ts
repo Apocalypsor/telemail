@@ -57,6 +57,18 @@ export const getAllUsers = async (d1: D1Database): Promise<TelegramUser[]> => {
   return db.select().from(users).orderBy(desc(users.last_login_at));
 };
 
+/** 获取所有已批准用户 */
+export const getApprovedUsers = async (
+  d1: D1Database,
+): Promise<TelegramUser[]> => {
+  const db = getDb(d1);
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.approved, 1))
+    .orderBy(desc(users.last_login_at));
+};
+
 /** 获取除管理员外的所有用户 */
 export const getNonAdminUsers = async (
   d1: D1Database,

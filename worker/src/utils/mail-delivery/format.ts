@@ -17,7 +17,7 @@ import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import { extractVerificationCode } from "@worker/utils/verification-code";
 
 /**
- * 邮件 → Telegram 消息的格式化层 —— deliver / retry 共用。
+ * 邮件 → Telegram 消息的格式化层 —— delivery / retry 共用。
  * 纯计算 + 一个 LLM-edit side effect，不读 D1 / KV，不下结论性写入；
  * 调用方负责拼装、写 mapping、维护 keyboard。
  */

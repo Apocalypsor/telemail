@@ -21,6 +21,7 @@ import { gmailGet, gmailPost } from "@worker/providers/gmail/utils/api";
 import { gmailGetAttachmentDataStream } from "@worker/providers/gmail/utils/attachment-stream";
 import { getAccessToken } from "@worker/providers/gmail/utils/auth";
 import {
+  countGmailMessagesByQuery,
   listGmailMessagesByLabel,
   listGmailMessagesByLabelPage,
   listGmailMessagesByQuery,
@@ -417,6 +418,15 @@ export class GmailProvider extends EmailProvider {
     return listGmailMessagesByQuery(token, "is:unread", maxResults);
   }
 
+  async countUnread(maxCount?: number) {
+    const token = await this.token();
+    return countGmailMessagesByQuery(
+      token,
+      "is:unread",
+      this.normalizeCountLimit(maxCount),
+    );
+  }
+
   async listUnreadPage(
     maxResults: number = 20,
     cursor?: string,
@@ -449,6 +459,15 @@ export class GmailProvider extends EmailProvider {
   async listJunk(maxResults: number = 20) {
     const token = await this.token();
     return listGmailMessagesByQuery(token, "in:spam", maxResults);
+  }
+
+  async countJunk(maxCount?: number) {
+    const token = await this.token();
+    return countGmailMessagesByQuery(
+      token,
+      "in:spam",
+      this.normalizeCountLimit(maxCount),
+    );
   }
 
   async listJunkPage(

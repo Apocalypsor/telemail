@@ -18,6 +18,11 @@ export interface EmailListPage {
   nextCursor: string | null;
 }
 
+export interface EmailCount {
+  count: number;
+  truncated: boolean;
+}
+
 /** 邮件当前所在位置 —— 对账时用这个值决定 TG 侧如何处理 */
 export type MessageLocation = "inbox" | "junk" | "archive" | "deleted";
 

@@ -8,6 +8,7 @@ import {
 } from "@worker/providers/imap/utils/client";
 import { listImapBridgePage } from "@worker/providers/imap/utils/list";
 import type {
+  EmailCount,
   EmailListItem,
   EmailListPage,
   MessageState,
@@ -169,6 +170,15 @@ export class ImapProvider extends EmailProvider {
     return data.messages ?? [];
   }
 
+  async countUnread(): Promise<EmailCount> {
+    const data = await bridgeCall(
+      this.bridge.api["unread-count"].post({
+        accountId: this.account.id,
+      }),
+    );
+    return { count: data.count, truncated: false };
+  }
+
   async listUnreadPage(
     maxResults: number = 20,
     cursor?: string,
@@ -213,6 +223,15 @@ export class ImapProvider extends EmailProvider {
       }),
     );
     return data.messages ?? [];
+  }
+
+  async countJunk(): Promise<EmailCount> {
+    const data = await bridgeCall(
+      this.bridge.api["junk-count"].post({
+        accountId: this.account.id,
+      }),
+    );
+    return { count: data.count, truncated: false };
   }
 
   async listJunkPage(

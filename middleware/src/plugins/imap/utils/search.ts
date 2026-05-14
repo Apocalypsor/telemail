@@ -105,3 +105,17 @@ export const searchAndFetch = async (
     lock.release();
   }
 };
+
+export const countSearchResults = async (
+  conn: ActiveConnection,
+  folder: string,
+  searchQuery: Record<string, unknown>,
+): Promise<number> => {
+  const lock = await conn.client.getMailboxLock(folder);
+  try {
+    const result = await conn.client.search(searchQuery, { uid: true });
+    return Array.isArray(result) ? result.length : 0;
+  } finally {
+    lock.release();
+  }
+};

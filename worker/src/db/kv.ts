@@ -258,6 +258,30 @@ export const putBotCommandsVersion = async (
   await kv.put(KV_BOT_COMMANDS_VERSION_KEY, version);
 };
 
+// ─── Daily Mail Summary ────────────────────────────────────────────────────
+
+export const hasDailyMailSummaryProcessed = async (
+  kv: KVNamespace,
+  telegramUserId: string,
+  localDate: string,
+): Promise<boolean> => {
+  return !!(await kv.get(
+    `${KV_DAILY_MAIL_SUMMARY_PREFIX}${telegramUserId}:${localDate}`,
+  ));
+};
+
+export const putDailyMailSummaryProcessed = async (
+  kv: KVNamespace,
+  telegramUserId: string,
+  localDate: string,
+): Promise<void> => {
+  await kv.put(
+    `${KV_DAILY_MAIL_SUMMARY_PREFIX}${telegramUserId}:${localDate}`,
+    "1",
+    { expirationTtl: DAILY_MAIL_SUMMARY_TTL },
+  );
+};
+
 // ─── Things Cloud ───────────────────────────────────────────────────────────
 
 export const getThingsAppInstanceId = async (
@@ -293,6 +317,7 @@ const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
 const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
 const KV_BOT_INFO_KEY = "telegram:bot_info";
 const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
+const KV_DAILY_MAIL_SUMMARY_PREFIX = "daily_mail_summary:";
 const KV_THINGS_APP_INSTANCE_ID_PREFIX = "things:app_instance_id:";
 
 // ─── TTLs ───────────────────────────────────────────────────────────────────
@@ -301,6 +326,7 @@ const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天
 const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
 const BOT_INFO_TTL = 86400 * 30; // 30 天
 const OUTLOOK_FOLDERS_TTL = 86400 * 30;
+const DAILY_MAIL_SUMMARY_TTL = 86400 * 3; // 3 天
 
 interface CachedMailData {
   html: string;
