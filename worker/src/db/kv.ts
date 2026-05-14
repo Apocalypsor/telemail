@@ -1,8 +1,3 @@
-import type { MailAttachmentMeta, MailMeta } from "@worker/types";
-import { parseEmailDate } from "@worker/utils/mail/body";
-
-// 30 天 —— well-known folder ID 在账号生命周期内稳定
-
 // ─── Access Token Cache ─────────────────────────────────────────────────────
 
 const kvAccessTokenKey = (accountId: number): string => {
@@ -32,56 +27,6 @@ export const deleteCachedAccessToken = async (
   accountId: number,
 ): Promise<void> => {
   await kv.delete(kvAccessTokenKey(accountId));
-};
-
-// ─── Mail HTML Cache ────────────────────────────────────────────────────────
-
-// 同一封邮件在 INBOX / junk / archive 的渲染可能不同（folder 提示 IMAP 去哪个
-// 文件夹拉 raw），所以 folder 要进 key。emailMessageId 是 provider 原生邮件 id。
-const kvMailHtmlKey = (
-  accountId: number,
-  folder: string,
-  emailMessageId: string,
-): string => {
-  return `mail_html:${accountId}:${folder}:${emailMessageId}`;
-};
-
-export const getCachedMailData = async (
-  kv: KVNamespace,
-  accountId: number,
-  folder: string,
-  emailMessageId: string,
-): Promise<CachedMailData | null> => {
-  const raw = await kv.get(kvMailHtmlKey(accountId, folder, emailMessageId));
-  if (!raw) return null;
-  let wire: CachedMailDataWire;
-  try {
-    wire = JSON.parse(raw) as CachedMailDataWire;
-  } catch {
-    // 兼容旧格式（纯 HTML 字符串）
-    return { html: raw };
-  }
-  if (!wire.meta) return { html: wire.html, attachments: wire.attachments };
-  const { date, ...rest } = wire.meta;
-  return {
-    html: wire.html,
-    meta: { ...rest, date: parseEmailDate(date) },
-    attachments: wire.attachments,
-  };
-};
-
-export const putCachedMailData = async (
-  kv: KVNamespace,
-  accountId: number,
-  folder: string,
-  emailMessageId: string,
-  data: CachedMailData,
-): Promise<void> => {
-  await kv.put(
-    kvMailHtmlKey(accountId, folder, emailMessageId),
-    JSON.stringify(data),
-    { expirationTtl: MAIL_HTML_CACHE_TTL },
-  );
 };
 
 // ─── OAuth State ────────────────────────────────────────────────────────────
@@ -322,25 +267,10 @@ const KV_THINGS_APP_INSTANCE_ID_PREFIX = "things:app_instance_id:";
 
 // ─── TTLs ───────────────────────────────────────────────────────────────────
 
-const MAIL_HTML_CACHE_TTL = 60 * 60 * 24 * 7; // 7 天
 const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
 const BOT_INFO_TTL = 86400 * 30; // 30 天
 const OUTLOOK_FOLDERS_TTL = 86400 * 30;
 const DAILY_MAIL_SUMMARY_TTL = 86400 * 3; // 3 天
-
-interface CachedMailData {
-  html: string;
-  meta?: MailMeta;
-  attachments?: MailAttachmentMeta[];
-}
-
-/** wire 形态：JSON.stringify 把 meta.date 编成 ISO 字符串落盘，所以读回来必须先用
- *  `string` 处理、再 revive 成 Date 才符合 `MailMeta` 的类型。 */
-type CachedMailDataWire = {
-  html: string;
-  meta?: Omit<MailMeta, "date"> & { date?: string | null };
-  attachments?: MailAttachmentMeta[];
-};
 
 // ─── OAuth Bot Message (回写 Bot 消息位置) ──────────────────────────────────
 

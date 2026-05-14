@@ -1,9 +1,8 @@
-/** Mail 模块的业务用例编排 —— 跨 token / DB / KV / provider / HTML 处理几个子系统。
+/** Mail 模块的业务用例编排 —— 跨 token / DB / provider / HTML 处理几个子系统。
  *  按 [Elysia best-practice](https://elysiajs.com/essential/best-practice.html#service)
  *  非 request-dependent service 形态：`abstract class` + static method，
  *  调用方 `MailService.foo(env, ...)`。不实例化、不持状态。 */
 import { getAccountById } from "@worker/db/accounts";
-import { getCachedMailData, putCachedMailData } from "@worker/db/kv";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { getEmailProvider, PROVIDERS } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
@@ -64,8 +63,8 @@ export abstract class MailService {
     };
   }
 
-  /** 拿邮件渲染所需的全部数据：folder 推断 → KV 缓存命中或 provider 现拉
-   *  → CID 内联 → 写回 KV → 图片代理。GET /api/mail/:id handler 唯一 caller。 */
+  /** 拿邮件渲染所需的全部数据：folder 推断 → provider 现拉 → CID 内联 → 图片代理。
+   *  GET /api/mail/:id handler 唯一 caller；页面侧由 React Query 负责缓存。 */
   static async loadForRendering(
     env: Env,
     account: Account,
@@ -88,25 +87,6 @@ export abstract class MailService {
       .isStarred(emailMessageId, fetchFolder)
       .catch(() => false);
 
-    const cached = await getCachedMailData(
-      env.EMAIL_KV,
-      account.id,
-      fetchFolder,
-      emailMessageId,
-    );
-    if (cached?.attachments) {
-      return {
-        ok: true,
-        meta: cached.meta ?? {},
-        rawHtml: cached.html,
-        proxiedHtml: await proxyImages(cached.html, env.ADMIN_SECRET),
-        attachments: cached.attachments,
-        fetchFolder,
-        inJunk,
-        starred,
-      };
-    }
-
     if (PROVIDERS[account.type].oauth && !account.refresh_token)
       return { ok: false, status: 403, reason: "Account not authorized" };
 
@@ -115,13 +95,6 @@ export abstract class MailService {
       return { ok: false, status: 404, reason: "No content in this email" };
 
     const html = replaceCidReferences(result.html, result.cidMap);
-    await putCachedMailData(
-      env.EMAIL_KV,
-      account.id,
-      fetchFolder,
-      emailMessageId,
-      { html, meta: result.meta, attachments: result.attachments },
-    );
     return {
       ok: true,
       meta: result.meta ?? {},
@@ -136,7 +109,7 @@ export abstract class MailService {
 
   /** 给定一封邮件，找它在 Telegram 里的位置（chat / message id）和展示用的 subject。
    *  用于群聊 deep-link、reminder 创建时回写邮件上下文等场景。
-   *  subject 来源优先级：mapping.short_summary（LLM 一句话摘要）→ KV 缓存 → provider 现拉。 */
+   *  subject 来源优先级：mapping.short_summary（LLM 一句话摘要）→ provider 现拉。 */
   static async lookupContext(
     env: Env,
     account: Account,
@@ -150,21 +123,6 @@ export abstract class MailService {
     let subject: string | null = m?.short_summary ?? null;
 
     if (subject == null) {
-      for (const folder of ["inbox", "junk", "archive"] as const) {
-        const cached = await getCachedMailData(
-          env.EMAIL_KV,
-          account.id,
-          folder,
-          emailMessageId,
-        );
-        if (cached?.meta?.subject) {
-          subject = cached.meta.subject;
-          break;
-        }
-      }
-    }
-
-    if (subject == null) {
       const needsAuth = PROVIDERS[account.type].oauth && !account.refresh_token;
       if (!needsAuth) {
         try {
@@ -175,17 +133,6 @@ export abstract class MailService {
           );
           if (result?.meta?.subject) {
             subject = result.meta.subject;
-            await putCachedMailData(
-              env.EMAIL_KV,
-              account.id,
-              "inbox",
-              emailMessageId,
-              {
-                html: result.html,
-                meta: result.meta,
-                attachments: result.attachments,
-              },
-            ).catch(() => {});
           }
         } catch {
           // 拉不到就算了，subject 留 null 由调用方决定 fallback
