@@ -1,4 +1,5 @@
 import {
+  ROUTE_MINI_APP_ACCOUNTS,
   ROUTE_MINI_APP_LIST,
   ROUTE_MINI_APP_REMINDERS,
   ROUTE_MINI_APP_SEARCH,
@@ -35,7 +36,10 @@ const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
     .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
   kb.row()
     .text(t("keyboards:menu.sync"), "sync")
-    .text(t("keyboards:menu.accountManagement"), "accs")
+    .webApp(
+      t("keyboards:menu.accountManagement"),
+      `${base}${ROUTE_MINI_APP_ACCOUNTS}`,
+    )
     .row();
   if (admin) {
     kb.text(t("keyboards:menu.userManagement"), "users")

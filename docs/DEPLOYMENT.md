@@ -112,7 +112,7 @@ bun wrangler secret put GMAIL_PUBSUB_TOPIC
 bun wrangler secret put GMAIL_PUSH_SECRET
 ```
 
-`WORKER_URL` 不是敏感值，但 Bot 管理面板、Gmail / Outlook 授权链接、Outlook webhook subscription、邮件查看 / 提醒按钮都会用它拼公开 URL；生产环境必须配置为最终同源域名。
+`WORKER_URL` 不是敏感值，但 Mini App 账号管理、Gmail / Outlook 授权链接、Outlook webhook subscription、邮件查看 / 提醒按钮都会用它拼公开 URL；生产环境必须配置为最终同源域名。
 
 可选：如果要覆盖 Things Cloud API endpoint，再配置：
 
@@ -275,10 +275,10 @@ docker compose pull && docker compose up -d
 
 ## 7. 添加邮箱账号
 
-通过 Telegram Bot 管理：
+通过 Telegram Mini App 管理：
 
-1. 向 Bot 发送 `/start` → **账号管理** → **添加账号**
-2. 选择账号类型（Gmail / Outlook / IMAP），按提示完成配置
+1. 向 Bot 发送 `/start` → **账号管理** 打开 Mini App
+2. 在 Mini App 里选择账号类型（Gmail / Outlook / IMAP），填写 Chat ID 和必要配置
 3. Gmail / Outlook 需完成 OAuth 授权（先确保 `WORKER_URL` 已配置，且 OAuth redirect URI 指向同一域名）；IMAP 需填写服务器信息和密码
 4. 授权成功后自动创建 webhook 订阅，新邮件实时推送到 Telegram
 

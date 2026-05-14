@@ -56,7 +56,7 @@
 | ------------------------ | --------------------------------------------------------------- |
 | `TG_MINI_APP_SHORT_NAME` | BotFather `/newapp` 注册的 Mini App short name（群聊 deep link 用） |
 
-`WORKER_URL` 属于核心必填项；Bot 管理面板、OAuth callback、Outlook webhook subscription、邮件预览和提醒入口都会依赖它。`TG_MINI_APP_SHORT_NAME` 未配 → 私聊仍可用 Mini App 按钮；群聊只保留裸 web "👁 查看原文"链接，不显示 ⏰ 提醒入口。
+`WORKER_URL` 属于核心必填项；Mini App 账号管理、OAuth callback、Outlook webhook subscription、邮件预览和提醒入口都会依赖它。`TG_MINI_APP_SHORT_NAME` 未配 → 私聊仍可用 Mini App 按钮；群聊只保留裸 web "👁 查看原文"链接，不显示 ⏰ 提醒入口。
 
 ### Things Cloud（可选）
 
