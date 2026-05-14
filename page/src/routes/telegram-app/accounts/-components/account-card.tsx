@@ -45,10 +45,8 @@ export const AccountCard = ({
   onDelete,
   onSetArchiveLabel,
 }: AccountCardProps) => {
-  const [chatOpen, setChatOpen] = useState(false);
   const [chatId, setChatId] = useState(account.chatId);
   const [ownerId, setOwnerId] = useState(account.ownerTelegramId ?? "");
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiveLabelId, setArchiveLabelId] = useState(
     account.archiveFolder ?? "",
   );
@@ -61,7 +59,7 @@ export const AccountCard = ({
 
   const labelsQuery = useQuery({
     queryKey: ["account-archive-labels", account.id],
-    enabled: archiveOpen && account.needsArchiveSetup && account.authorized,
+    enabled: account.needsArchiveSetup && account.authorized,
     queryFn: async () => {
       const { data, error } = await api.api
         .accounts({ id: String(account.id) })
@@ -73,122 +71,65 @@ export const AccountCard = ({
 
   const archiveLabel =
     account.archiveFolderName || account.archiveFolder || "未设置";
-  const title = account.email || `#${account.id}`;
 
   return (
-    <article className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-      <header className="border-b border-zinc-800 bg-zinc-950/30 px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-zinc-100 break-words">
-                {title}
-              </h2>
-              <StatusPill active={!account.disabled}>
-                {account.disabled ? "已禁用" : "启用中"}
-              </StatusPill>
-              {account.oauth && (
-                <StatusPill active={account.authorized}>
-                  {account.authorized ? "已授权" : "未授权"}
-                </StatusPill>
-              )}
-            </div>
-            <div className="mt-1 text-xs text-zinc-500">
-              #{account.id} · {account.typeName}
-            </div>
-          </div>
-          {busy && <Spinner size="sm" color="success" />}
-        </div>
-      </header>
-
-      <div className="p-4 space-y-4">
-        <dl className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-2 text-sm">
-          <Meta label="Chat ID" value={account.chatId} />
-          {account.ownerTelegramId && (
-            <Meta
-              label="Owner"
-              value={account.ownerName || account.ownerTelegramId}
-            />
-          )}
-          {account.imapHost && (
-            <Meta
-              label="Server"
-              value={`${account.imapHost}:${account.imapPort ?? ""}${
-                account.imapSecure ? " TLS" : ""
-              }`}
-            />
-          )}
-          {account.imapUser && <Meta label="User" value={account.imapUser} />}
-          {account.needsArchiveSetup && (
-            <Meta label="Archive" value={archiveLabel} />
-          )}
-        </dl>
-
-        <div className="grid grid-cols-2 gap-2">
+    <article className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-5">
+      <dl className="grid grid-cols-[88px_1fr] gap-x-3 gap-y-2 text-sm">
+        <dt className="text-zinc-500">Status</dt>
+        <dd className="min-w-0 flex flex-wrap gap-2">
+          <StatusPill active={!account.disabled}>
+            {account.disabled ? "已禁用" : "启用中"}
+          </StatusPill>
           {account.oauth && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onAuthorize(account.id)}
-              className="min-h-10 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 text-sm font-semibold text-emerald-300 active:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {account.authorized ? "重新授权" : "授权"}
-            </button>
+            <StatusPill active={account.authorized}>
+              {account.authorized ? "已授权" : "未授权"}
+            </StatusPill>
           )}
-          {account.oauth && account.authorized && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onRenewPush(account.id)}
-              className="min-h-10 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm font-semibold text-zinc-300 active:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              续订 Watch
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onToggleDisabled(account.id, !account.disabled)}
-            className="min-h-10 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm font-semibold text-zinc-300 active:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {account.disabled ? "启用" : "禁用"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onDelete(account)}
-            className="min-h-10 rounded-lg border border-red-900/60 bg-red-950/35 px-3 text-sm font-semibold text-red-300 active:bg-red-950/60 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            删除
-          </button>
-        </div>
+          {busy && <Spinner size="sm" color="success" />}
+        </dd>
+        <Meta label="Email" value={account.email || `#${account.id}`} />
+        <Meta label="Type" value={account.typeName} />
+        {account.imapHost && (
+          <Meta
+            label="Server"
+            value={`${account.imapHost}:${account.imapPort ?? ""}${
+              account.imapSecure ? " TLS" : ""
+            }`}
+          />
+        )}
+        {account.imapUser && <Meta label="User" value={account.imapUser} />}
+        {account.ownerTelegramId && (
+          <Meta
+            label="Owner"
+            value={account.ownerName || account.ownerTelegramId}
+          />
+        )}
+        {account.needsArchiveSetup && (
+          <Meta label="Archive" value={archiveLabel} />
+        )}
+      </dl>
 
+      <div className="border-t border-zinc-800 pt-4 space-y-4">
         <section className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setChatOpen((value) => !value)}
-            className="text-sm font-semibold text-zinc-300 active:text-emerald-300"
-          >
-            {chatOpen ? "收起 Chat ID" : "编辑 Chat ID"}
-          </button>
-          {chatOpen && (
-            <div className="grid grid-cols-[1fr_auto] gap-2">
-              <input
-                value={chatId}
-                inputMode="numeric"
-                onChange={(event) => setChatId(event.target.value)}
-                className={`min-w-0 text-[15px] ${INPUT_CLASS}`}
-              />
-              <button
-                type="button"
-                disabled={busy || chatId.trim() === account.chatId}
-                onClick={() => onUpdateChatId(account.id, chatId)}
-                className="min-w-[64px] rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-emerald-950 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                保存
-              </button>
-            </div>
-          )}
+          <span className="block text-sm font-semibold text-zinc-300">
+            Chat ID
+          </span>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <input
+              value={chatId}
+              inputMode="numeric"
+              onChange={(event) => setChatId(event.target.value)}
+              className={`min-w-0 text-[15px] ${INPUT_CLASS}`}
+            />
+            <button
+              type="button"
+              disabled={busy || chatId.trim() === account.chatId}
+              onClick={() => onUpdateChatId(account.id, chatId)}
+              className="min-w-[64px] rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-emerald-950 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              保存
+            </button>
+          </div>
         </section>
 
         {users.length > 0 && (
@@ -227,28 +168,61 @@ export const AccountCard = ({
 
         {account.needsArchiveSetup && account.authorized && (
           <section className="space-y-2">
-            <button
-              type="button"
-              onClick={() => setArchiveOpen((value) => !value)}
-              className="text-sm font-semibold text-zinc-300 active:text-emerald-300"
-            >
-              {archiveOpen ? "收起归档标签" : "设置归档标签"}
-            </button>
-            {archiveOpen && (
-              <ArchivePicker
-                value={archiveLabelId}
-                loading={labelsQuery.isLoading}
-                error={labelsQuery.error}
-                labels={labelsQuery.data ?? []}
-                busy={busy}
-                onChange={setArchiveLabelId}
-                onSave={() =>
-                  onSetArchiveLabel(account.id, archiveLabelId || null)
-                }
-              />
-            )}
+            <span className="block text-sm font-semibold text-zinc-300">
+              归档标签
+            </span>
+            <ArchivePicker
+              value={archiveLabelId}
+              loading={labelsQuery.isLoading}
+              error={labelsQuery.error}
+              labels={labelsQuery.data ?? []}
+              busy={busy}
+              onChange={setArchiveLabelId}
+              onSave={() =>
+                onSetArchiveLabel(account.id, archiveLabelId || null)
+              }
+            />
           </section>
         )}
+      </div>
+
+      <div className="border-t border-zinc-800 pt-4 grid grid-cols-2 gap-2">
+        {account.oauth && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onAuthorize(account.id)}
+            className="min-h-10 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 text-sm font-semibold text-emerald-300 active:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {account.authorized ? "重新授权" : "授权"}
+          </button>
+        )}
+        {account.oauth && account.authorized && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onRenewPush(account.id)}
+            className="min-h-10 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm font-semibold text-zinc-300 active:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            续订 Watch
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onToggleDisabled(account.id, !account.disabled)}
+          className="min-h-10 rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm font-semibold text-zinc-300 active:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {account.disabled ? "启用" : "禁用"}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onDelete(account)}
+          className="min-h-10 rounded-lg border border-red-900/60 bg-red-950/35 px-3 text-sm font-semibold text-red-300 active:bg-red-950/60 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          删除
+        </button>
       </div>
     </article>
   );
