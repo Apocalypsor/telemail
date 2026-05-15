@@ -85,12 +85,18 @@ export abstract class ComposeService {
 
     const recipients = parseEmailAddressList(body.to);
     const draftHtml = markdownToHtml(draftBody);
+    const textBody = replyDefaults
+      ? appendReplyQuoteText(draftBody, replyDefaults.quote.text)
+      : draftBody;
+    const htmlBody = replyDefaults
+      ? appendReplyQuoteHtml(draftHtml, replyDefaults.quote.html)
+      : draftHtml;
     const input: ComposeMailInput = {
       to:
         recipients.length > 0 ? recipients : (replyDefaults?.recipients ?? []),
       subject: body.subject.trim() || replyDefaults?.subject || "",
-      body: draftBody,
-      html: draftHtml,
+      body: textBody,
+      html: htmlBody,
     };
     if (input.to.length === 0) {
       return { ok: false, status: 400, error: "请填写有效收件人" };
@@ -279,6 +285,7 @@ export abstract class ComposeService {
       recipients: original.replyRecipients,
       subject: buildReplySubject(original.meta.subject),
       originalContext: ComposeService.buildOriginalContext(original),
+      quote: buildReplyQuote(original),
     };
   }
 }
@@ -322,5 +329,95 @@ type ReplyDefaultsResult =
       recipients: string[];
       subject: string;
       originalContext: OriginalEmailContext;
+      quote: ReplyQuote;
     }
   | { ok: false; status: 400 | 403 | 404 | 500; error: string };
+
+type ReplyQuote = {
+  text: string;
+  html: string;
+};
+
+const appendReplyQuoteText = (body: string, quote: string): string => {
+  return `${body.trimEnd()}\n\n${quote}`;
+};
+
+const appendReplyQuoteHtml = (body: string, quote: string): string => {
+  return `${body}${quote}`;
+};
+
+const buildReplyQuote = (
+  original: Extract<LoadForRenderingResult, { ok: true }>,
+): ReplyQuote => {
+  const body = buildOriginalBodyMarkdown(original.rawHtml);
+  const header = buildReplyQuoteHeader(original.meta);
+  const text = `${header}\n${quotePlainText(body)}`;
+  const html =
+    `<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#6b7280">` +
+    `<div style="margin:0 0 12px">${escapeHtml(header)}</div>` +
+    `<blockquote type="cite" style="margin:0;padding-left:12px;border-left:3px solid #d1d5db;color:#6b7280">` +
+    htmlLineBreaks(body) +
+    `</blockquote>` +
+    `</div>`;
+  return { text, html };
+};
+
+const buildReplyQuoteHeader = (
+  meta: Extract<LoadForRenderingResult, { ok: true }>["meta"],
+): string => {
+  const from = meta.from?.trim();
+  const date = formatReplyQuoteDate(meta.date);
+  if (from && date) return `On ${date}, ${from} wrote:`;
+  if (from) return `${from} wrote:`;
+  if (date) return `On ${date}, the original sender wrote:`;
+  return "Original message:";
+};
+
+const formatReplyQuoteDate = (date: Date | null | undefined): string | null => {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+};
+
+const quotePlainText = (body: string): string => {
+  return body
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+};
+
+const htmlLineBreaks = (value: string): string => {
+  return escapeHtml(value).replace(/\n/g, "<br>");
+};
+
+const escapeHtml = (value: string): string => {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return char;
+    }
+  });
+};
+
+const buildOriginalBodyMarkdown = (html: string): string => {
+  try {
+    return htmlToMarkdown(html).replace(/\s+\n/g, "\n").trim();
+  } catch {
+    return html
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+\n/g, "\n")
+      .trim();
+  }
+};
