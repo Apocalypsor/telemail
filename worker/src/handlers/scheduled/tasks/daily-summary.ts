@@ -1,3 +1,4 @@
+import { ROUTE_MINI_APP_LIST } from "@page/paths";
 import { sendTextMessage } from "@worker/clients/telegram";
 import { getOwnAccounts } from "@worker/db/accounts";
 import {
@@ -16,6 +17,7 @@ import { type Account, AccountType, type Env } from "@worker/types";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { resolveUserTimeZone } from "@worker/utils/time-zone";
+import { InlineKeyboard } from "grammy";
 
 interface LocalDateTime {
   date: string;
@@ -147,6 +149,28 @@ export class DailyMailSummaryTask extends ScheduledTask {
     ].join("\n");
   }
 
+  private buildDailySummaryKeyboard(
+    env: Env,
+    counts: MailCounts,
+  ): InlineKeyboard | undefined {
+    const kb = new InlineKeyboard();
+    const base = env.WORKER_URL.replace(/\/$/, "");
+    const listUrl = (type: "unread" | "junk"): string =>
+      `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
+    let hasButtons = false;
+
+    if (counts.unread.count > 0) {
+      kb.webApp(t("keyboards:menu.unread"), listUrl("unread"));
+      hasButtons = true;
+    }
+    if (counts.junk.count > 0) {
+      kb.webApp(t("keyboards:menu.junk"), listUrl("junk"));
+      hasButtons = true;
+    }
+
+    return hasButtons ? kb : undefined;
+  }
+
   private async countAccountMail(
     env: Env,
     account: Account,
@@ -221,6 +245,7 @@ export class DailyMailSummaryTask extends ScheduledTask {
       env.TELEGRAM_BOT_TOKEN,
       telegramUserId,
       this.buildDailySummaryText(counts),
+      this.buildDailySummaryKeyboard(env, counts),
     );
     await putDailyMailSummaryProcessed(env.EMAIL_KV, telegramUserId, localDate);
   }

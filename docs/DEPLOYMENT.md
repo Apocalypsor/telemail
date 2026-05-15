@@ -282,7 +282,7 @@ docker compose pull && docker compose up -d
 3. Gmail / Outlook 需完成 OAuth 授权（先确保 `WORKER_URL` 已配置，且 OAuth redirect URI 指向同一域名）；IMAP 需填写服务器信息和密码
 4. 授权成功后自动创建 webhook 订阅，新邮件实时推送到 Telegram
 
-后续 Cron Trigger 会自动维护：每分钟分发到期提醒，并按用户本地时区在 19:00 发送未读 / 垃圾邮件摘要；每小时检查 IMAP 中间件健康并重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
+后续 Cron Trigger 会自动维护：每分钟分发到期提醒，并按用户本地时区在 19:00 发送未读 / 垃圾邮件摘要（非零列表会附 Mini App 入口）；每小时检查 IMAP 中间件健康并重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
 
 ## 8. CI/CD（GitHub Actions）
 

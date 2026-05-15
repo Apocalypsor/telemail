@@ -52,7 +52,7 @@ Queue Consumer 拉取原始 RFC 2822 邮件（Gmail REST / Outlook Graph / IMAP 
 
 每条邮件消息附带 inline keyboard：⭐ 星标 / 🚫 垃圾 / 📥 归档 / 🔄 刷新。星标同时自动标记已读 + 置顶（取消星标 → 取消置顶）；标记垃圾移到垃圾邮件文件夹 + 删除 Telegram 消息；归档移出收件箱（Gmail 需先在账号详情指定标签）；刷新先和远端对账（邮件被移到垃圾 / 归档 / 删除 → 清理 TG 消息），仍在收件箱才重新拉取 + LLM 分析。
 
-`WORKER_URL` 是必填，用来生成 ⏰ 提醒 + 👁 查看原文等 Mini App 入口。私聊里直接打开 Mini App；群聊走 `t.me/<bot>/<short>?startapp=...` deep link（需配 `TG_MINI_APP_SHORT_NAME`，未配时群聊只保留 web 查看原文）。Mini App 里能管理邮箱账号、看邮件预览（带星标 / 归档 / 删除等 FAB），设提醒，浏览未读 / 星标 / 垃圾 / 归档列表；列表和搜索会随滚动继续加载，并在每封邮件上用不同颜色显示发件人和收件人。每个用户可在 Mini App 里单独配置 Things Cloud；邮件提醒到期时会创建一条 Things Today 任务。Cron 会按每个用户记录的时区，在本地 19:00 私聊发送晚间邮件摘要；未读和垃圾都为 0 时跳过。
+`WORKER_URL` 是必填，用来生成 ⏰ 提醒 + 👁 查看原文等 Mini App 入口。私聊里直接打开 Mini App；群聊走 `t.me/<bot>/<short>?startapp=...` deep link（需配 `TG_MINI_APP_SHORT_NAME`，未配时群聊只保留 web 查看原文）。Mini App 里能管理邮箱账号、看邮件预览（带星标 / 归档 / 删除等 FAB），设提醒，浏览未读 / 星标 / 垃圾 / 归档列表；列表和搜索会随滚动继续加载，并在每封邮件上用不同颜色显示发件人和收件人。每个用户可在 Mini App 里单独配置 Things Cloud；邮件提醒到期时会创建一条 Things Today 任务。Cron 会按每个用户记录的时区，在本地 19:00 私聊发送晚间邮件摘要；未读和垃圾都为 0 时跳过，非零列表会附带对应的 Mini App 按钮。
 
 频道 / 群组里对邮件消息加 emoji reaction 会自动标记对应邮件为已读。
 
@@ -71,7 +71,7 @@ Queue Consumer 拉取原始 RFC 2822 邮件（Gmail REST / Outlook Graph / IMAP 
 单个 `* * * * *` Cron Trigger：
 
 - 每分钟：分发到期的 Mini App 提醒
-- 每 15 分钟：按用户本地时区检查是否到 19:00，发送晚间未读 / 垃圾邮件摘要
+- 每 15 分钟：按用户本地时区检查是否到 19:00，发送晚间未读 / 垃圾邮件摘要，并给非零列表附 Mini App 入口
 - 每小时（minute=0）：检查 IMAP Bridge 健康、重试失败的 LLM 摘要
 - 每天 UTC 0 点（额外）：为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）
 

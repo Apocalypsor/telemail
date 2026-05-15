@@ -84,7 +84,7 @@
 `"triggers": { "crons": ["* * * * *"] }` —— 每分钟一次，scheduled tasks 各自声明 `shouldRun` 条件：
 
 - **每分钟**：分发到期的 Mini App 提醒
-- **每 15 分钟**：按用户本地时区检查是否到 19:00，发送未读 / 垃圾邮件摘要（都为 0 时跳过）
+- **每 15 分钟**：按用户本地时区检查是否到 19:00，发送未读 / 垃圾邮件摘要（都为 0 时跳过；非零列表会附 Mini App 入口）
 - **每小时**（`minute === 0`）：检查 IMAP Bridge 健康、重试失败的 LLM 摘要
 - **每天 UTC 0 点**（额外）：为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）
 
