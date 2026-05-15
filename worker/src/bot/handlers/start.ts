@@ -1,5 +1,6 @@
 import {
   ROUTE_MINI_APP_ACCOUNTS,
+  ROUTE_MINI_APP_COMPOSE,
   ROUTE_MINI_APP_LIST,
   ROUTE_MINI_APP_REMINDERS,
   ROUTE_MINI_APP_SEARCH,
@@ -19,30 +20,33 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 
-/** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号 / 全局管理。 */
+/** 主菜单键盘：写邮件 + 邮件列表 + 提醒 Mini App 入口 + 账号 / 全局管理。 */
 const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
   const kb = new InlineKeyboard();
   const base = env.WORKER_URL.replace(/\/$/, "");
   const listUrl = (type: string) =>
     `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
-  kb.row()
-    .webApp(t("keyboards:menu.unread"), listUrl("unread"))
+  kb.webApp(t("keyboards:menu.unread"), listUrl("unread"))
     .webApp(t("keyboards:menu.starred"), listUrl("starred"))
     .row()
     .webApp(t("keyboards:menu.junk"), listUrl("junk"))
     .webApp(t("keyboards:menu.archived"), listUrl("archived"))
     .row()
-    .webApp(t("keyboards:menu.reminders"), `${base}${ROUTE_MINI_APP_REMINDERS}`)
+    .webApp(t("keyboards:menu.compose"), `${base}${ROUTE_MINI_APP_COMPOSE}`)
     .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
   kb.row()
-    .text(t("keyboards:menu.sync"), "sync")
+    .webApp(t("keyboards:menu.reminders"), `${base}${ROUTE_MINI_APP_REMINDERS}`)
     .webApp(
       t("keyboards:menu.accountManagement"),
       `${base}${ROUTE_MINI_APP_ACCOUNTS}`,
     )
     .row();
   if (admin) {
-    kb.text(t("keyboards:menu.globalManagement"), "admin").row();
+    kb.text(t("keyboards:menu.sync"), "sync")
+      .text(t("keyboards:menu.globalManagement"), "admin")
+      .row();
+  } else {
+    kb.text(t("keyboards:menu.sync"), "sync").row();
   }
   return kb;
 };
