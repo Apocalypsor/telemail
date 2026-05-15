@@ -146,10 +146,6 @@ export const ComposePage = ({ search }: { search: ComposeSearch }) => {
       setBody(data.body);
       if (data.subject) setSubject(data.subject);
       setPreviewOpen(true);
-      setStatus({
-        msg: data.subject ? "正文和主题已优化" : "正文已优化",
-        kind: "ok",
-      });
       notifyHaptic("success");
     },
     onError: async (err) => {
