@@ -37,7 +37,10 @@ export const registerUserCallbacks = (bot: Bot, env: Env) => {
     }
     const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
     await ctx.editMessageText(userListText(users), {
-      reply_markup: userListKeyboard(users, { showBack: true }),
+      reply_markup: userListKeyboard(users, {
+        backTarget: "admin",
+        showBack: true,
+      }),
     });
     await ctx.answerCallbackQuery();
   });
@@ -69,7 +72,10 @@ export const registerUserCallbacks = (bot: Bot, env: Env) => {
     // Refresh user list
     const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
     await ctx.editMessageText(userListText(users), {
-      reply_markup: userListKeyboard(users, { showBack: true }),
+      reply_markup: userListKeyboard(users, {
+        backTarget: "admin",
+        showBack: true,
+      }),
     });
     await ctx.answerCallbackQuery({ text: "✅" });
   });
@@ -93,7 +99,10 @@ export const registerUserCallbacks = (bot: Bot, env: Env) => {
     // Refresh user list
     const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
     await ctx.editMessageText(userListText(users), {
-      reply_markup: userListKeyboard(users, { showBack: true }),
+      reply_markup: userListKeyboard(users, {
+        backTarget: "admin",
+        showBack: true,
+      }),
     });
     await ctx.answerCallbackQuery({ text: t("admin:users.processed") });
   });
@@ -134,7 +143,10 @@ export const registerUserCallbacks = (bot: Bot, env: Env) => {
 
     const users = await getNonAdminUsers(env.DB, env.ADMIN_TELEGRAM_ID);
     await ctx.editMessageText(userListText(users), {
-      reply_markup: userListKeyboard(users, { showBack: true }),
+      reply_markup: userListKeyboard(users, {
+        backTarget: "admin",
+        showBack: true,
+      }),
     });
     await ctx.answerCallbackQuery({ text: t("admin:users.deleted") });
   });

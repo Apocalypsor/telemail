@@ -183,6 +183,7 @@ export const MailFab = ({
         label: "📥 归档",
         type: "default",
         terminal: true,
+        confirmText: "归档这封邮件？它会从当前收件箱视图移出。",
         doneLabel: "✓ 已归档",
       });
     }
@@ -416,7 +417,7 @@ interface ActionDef {
   type: "default" | "destructive";
   /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 MainButton 隐藏 */
   terminal: boolean;
-  /** 破坏性动作执行前的确认提示 */
+  /** 需要二次确认的动作提示 */
   confirmText?: string;
   /** terminal 动作完成后 MainButton 的短暂完成态文案 */
   doneLabel?: string;

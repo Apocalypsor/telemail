@@ -16,6 +16,8 @@ export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
       ? t("admin:failedEmails.titleWithCount", { count: failedCount })
       : t("admin:failedEmails.title");
   const kb = new InlineKeyboard()
+    .text(t("keyboards:menu.userManagement"), "users")
+    .row()
     .text(failedLabel, "failed")
     .row()
     .text(t("admin:renewWatch"), "walla")
@@ -71,7 +73,7 @@ export const userListText = (users: TelegramUser[]): string => {
 
 export const userListKeyboard = (
   users: TelegramUser[],
-  opts?: { showBack?: boolean },
+  opts?: { backTarget?: "admin" | "menu"; showBack?: boolean },
 ): InlineKeyboard => {
   const kb = new InlineKeyboard();
   for (const u of users) {
@@ -87,7 +89,8 @@ export const userListKeyboard = (
     }
     kb.row();
   }
-  if (opts?.showBack) kb.text(t("common:button.back"), "menu");
+  if (opts?.showBack)
+    kb.text(t("common:button.back"), opts.backTarget ?? "menu");
   return kb;
 };
 

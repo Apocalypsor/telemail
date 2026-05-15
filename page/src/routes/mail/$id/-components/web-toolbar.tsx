@@ -56,6 +56,12 @@ export const WebMailToolbar = ({
   });
 
   const runWithFeedback = async (action: MailAction, starredNext?: boolean) => {
+    if (
+      action === "archive" &&
+      !window.confirm("归档这封邮件？它会从当前收件箱视图移出。")
+    ) {
+      return;
+    }
     setMsg(null);
     const r = await runAction(action, starredNext);
     setMsg(

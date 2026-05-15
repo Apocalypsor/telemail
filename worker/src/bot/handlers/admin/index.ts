@@ -14,7 +14,7 @@ import { registerFailedEmailCallbacks } from "./failed";
 import { registerUserCallbacks } from "./users";
 
 export const registerAdminHandlers = (bot: Bot, env: Env) => {
-  // Secrets panel (admin only, hidden behind /start -> global ops)
+  // Secrets panel (admin only, hidden behind /start -> global management)
   bot.callbackQuery("secrets", async (ctx) => {
     const userId = String(ctx.from.id);
     if (!isAdmin(userId, env)) {
@@ -37,7 +37,7 @@ export const registerAdminHandlers = (bot: Bot, env: Env) => {
     });
   });
 
-  // Admin operations menu
+  // Global management menu
   bot.callbackQuery("admin", async (ctx) => {
     const userId = String(ctx.from.id);
     if (!isAdmin(userId, env)) {
