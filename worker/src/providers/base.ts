@@ -11,6 +11,7 @@ import {
   putOAuthState,
 } from "@worker/db/kv";
 import type {
+  ComposeMailInput,
   EmailCount,
   EmailListItem,
   EmailListPage,
@@ -33,6 +34,7 @@ import {
   buildCidMapFromAttachments,
   visibleMailAttachments,
 } from "@worker/utils/mail/mime";
+import { replyRecipientsFromPostal } from "@worker/utils/mail/send";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import PostalMime from "postal-mime";
 
@@ -42,6 +44,10 @@ export abstract class EmailProvider {
 
   protected account: Account;
   protected env: Env;
+
+  static canSend(_account: Account): boolean {
+    return true;
+  }
 
   constructor(account: Account, env: Env) {
     this.account = account;
@@ -84,6 +90,14 @@ export abstract class EmailProvider {
     query: string,
     maxResults?: number,
   ): Promise<EmailListItem[]>;
+
+  abstract sendMail(input: ComposeMailInput): Promise<void>;
+
+  abstract replyToMessage(
+    messageId: string,
+    input: ComposeMailInput,
+    folder?: "inbox" | "junk" | "archive",
+  ): Promise<void>;
 
   async countUnread(maxCount?: number): Promise<EmailCount> {
     return this.countByPage(
@@ -238,6 +252,7 @@ export abstract class EmailProvider {
         to: email.to?.map(formatAddress).join(", ") ?? null,
         date: parseEmailDate(email.date),
       },
+      replyRecipients: replyRecipientsFromPostal(email.replyTo, email.from),
     };
   }
 

@@ -19,7 +19,7 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 
-/** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/用户管理。 */
+/** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号 / 全局管理。 */
 const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
   const kb = new InlineKeyboard();
   const base = env.WORKER_URL.replace(/\/$/, "");
@@ -42,9 +42,7 @@ const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
     )
     .row();
   if (admin) {
-    kb.text(t("keyboards:menu.userManagement"), "users")
-      .text(t("keyboards:menu.globalOps"), "admin")
-      .row();
+    kb.text(t("keyboards:menu.globalManagement"), "admin").row();
   }
   return kb;
 };

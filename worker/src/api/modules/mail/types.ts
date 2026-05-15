@@ -28,6 +28,8 @@ export type LoadForRenderingResult =
       /** 在 rawHtml 基础上再做外链图片代理改写 —— 默认渲染这个 */
       proxiedHtml: string;
       attachments: MailAttachmentMeta[];
+      /** 解析 Reply-To，缺失时回退 From，用于写邮件 Mini App 预填回复收件人。 */
+      replyRecipients: string[];
       fetchFolder: Folder;
       inJunk: boolean;
       starred: boolean;

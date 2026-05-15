@@ -56,6 +56,7 @@ export const MailGetResponse = t.Object({
   bodyHtml: t.String(),
   bodyHtmlRaw: t.String(),
   attachments: t.Array(MailAttachmentResponse),
+  replyRecipients: t.Array(t.String()),
   folder: t.Union([
     t.Literal("inbox"),
     t.Literal("junk"),
@@ -65,6 +66,7 @@ export const MailGetResponse = t.Object({
   inArchive: t.Boolean(),
   starred: t.Boolean(),
   canArchive: t.Boolean(),
+  canReply: t.Boolean(),
   webMailUrl: t.String(),
   tgMessageLink: t.Union([t.String(), t.Null()]),
 });

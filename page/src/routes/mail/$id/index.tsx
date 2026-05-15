@@ -75,7 +75,9 @@ const WebMailPage = () => {
           starred={d.starred}
           inJunk={d.inJunk}
           inArchive={d.inArchive}
-          canArchive={d.canArchive}
+          subject={d.meta.subject ?? null}
+          replyRecipients={d.replyRecipients}
+          canReply={d.canReply}
           folder={search.folder}
           useProxy={useProxy}
           onToggleProxy={() => setUseProxy((v) => !v)}

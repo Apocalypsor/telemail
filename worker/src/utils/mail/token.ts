@@ -71,3 +71,13 @@ export const buildMiniAppRemindersUrl = (
 ): string => {
   return `${workerUrl.replace(/\/$/, "")}/telegram-app/reminders?accountId=${accountId}&emailMessageId=${encodeURIComponent(emailMessageId)}&token=${encodeURIComponent(token)}`;
 };
+
+/** Mini App 写邮件页 URL：用于从邮件键盘 / 预览页进入回复模式。 */
+export const buildMiniAppComposeUrl = (
+  workerUrl: string,
+  emailMessageId: string,
+  accountId: number,
+  token: string,
+): string => {
+  return `${workerUrl.replace(/\/$/, "")}/telegram-app/compose?accountId=${accountId}&replyEmailMessageId=${encodeURIComponent(emailMessageId)}&token=${encodeURIComponent(token)}`;
+};

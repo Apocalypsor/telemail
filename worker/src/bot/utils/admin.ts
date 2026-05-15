@@ -1,3 +1,4 @@
+import { ROUTE_MINI_APP_COMPOSE } from "@page/paths";
 import { formatUserName } from "@worker/bot/utils/user-format";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
@@ -15,14 +16,18 @@ export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
     failedCount > 0
       ? t("admin:failedEmails.titleWithCount", { count: failedCount })
       : t("admin:failedEmails.title");
+  const base = env.WORKER_URL.replace(/\/$/, "");
   const kb = new InlineKeyboard()
+    .webApp(t("admin:compose"), `${base}${ROUTE_MINI_APP_COMPOSE}`)
+    .row()
+    .text(t("keyboards:menu.userManagement"), "users")
+    .row()
     .text(failedLabel, "failed")
     .row()
     .text(t("admin:renewWatch"), "walla")
     .row()
     .text(t("admin:secrets.button"), "secrets")
     .row();
-  const base = env.WORKER_URL.replace(/\/$/, "");
   kb.url(t("admin:htmlPreview"), `${base}/preview`).row();
   kb.url(t("admin:junkCheck"), `${base}/junk-check`).row();
   kb.text(t("common:button.back"), "menu");
@@ -71,7 +76,7 @@ export const userListText = (users: TelegramUser[]): string => {
 
 export const userListKeyboard = (
   users: TelegramUser[],
-  opts?: { showBack?: boolean },
+  opts?: { showBack?: boolean; backCallback?: string },
 ): InlineKeyboard => {
   const kb = new InlineKeyboard();
   for (const u of users) {
@@ -87,7 +92,8 @@ export const userListKeyboard = (
     }
     kb.row();
   }
-  if (opts?.showBack) kb.text(t("common:button.back"), "menu");
+  if (opts?.showBack)
+    kb.text(t("common:button.back"), opts.backCallback ?? "admin");
   return kb;
 };
 

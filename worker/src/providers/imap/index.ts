@@ -8,6 +8,7 @@ import {
 } from "@worker/providers/imap/utils/client";
 import { listImapBridgePage } from "@worker/providers/imap/utils/list";
 import type {
+  ComposeMailInput,
   EmailCount,
   EmailListItem,
   EmailListPage,
@@ -32,6 +33,10 @@ import { base64ToArrayBuffer } from "@worker/utils/base64url";
  */
 export class ImapProvider extends EmailProvider {
   static displayName = "IMAP";
+
+  static canSend(): boolean {
+    return false;
+  }
 
   /** 账号状态变化后立即通知 bridge reconcile（不等下次 sync） */
   async onPersistedChange() {
@@ -82,6 +87,17 @@ export class ImapProvider extends EmailProvider {
     return folder === "archive"
       ? (this.account.archive_folder ?? undefined)
       : undefined;
+  }
+
+  async sendMail(_input: ComposeMailInput): Promise<void> {
+    throw new Error("IMAP 账号暂不支持写邮件");
+  }
+
+  async replyToMessage(
+    _messageId: string,
+    _input: ComposeMailInput,
+  ): Promise<void> {
+    throw new Error("IMAP 账号暂不支持写邮件");
   }
 
   async markAsRead(messageId: string, folder?: "inbox" | "junk" | "archive") {

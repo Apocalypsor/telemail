@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
  * 唯一会落到这里。读 `start_param` 前缀决定跳哪去：
  *   r_<chatId>_<tgMsgId>  → /telegram-app/reminders?accountId=&emailMessageId=&token=
  *   m_<chatId>_<tgMsgId>  → /telegram-app/mail/$id?accountId=&t=
+ *   c_<chatId>_<tgMsgId>  → /telegram-app/compose?accountId=&replyEmailMessageId=&token=
  *   <chatId>_<tgMsgId>    → /telegram-app/reminders（兼容旧按钮，无前缀 = reminder）
  *   无 start_param         → /telegram-app/reminders（列表模式，主菜单"我的提醒"）
  */
@@ -58,6 +59,16 @@ const RouterPage = () => {
             to: "/telegram-app/mail/$id",
             params: { id: ctx.emailMessageId },
             search: { accountId: ctx.accountId, t: ctx.token },
+            replace: true,
+          });
+        } else if (feature === "c") {
+          navigate({
+            to: "/telegram-app/compose",
+            search: {
+              accountId: ctx.accountId,
+              replyEmailMessageId: ctx.emailMessageId,
+              token: ctx.token,
+            },
             replace: true,
           });
         } else {

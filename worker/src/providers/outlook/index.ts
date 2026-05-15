@@ -47,6 +47,7 @@ import {
 } from "@worker/providers/outlook/utils/list";
 import { fetchRawMime } from "@worker/providers/outlook/utils/mime";
 import type {
+  ComposeMailInput,
   EmailListPage,
   MessageState,
   PreviewContent,
@@ -57,8 +58,27 @@ import {
   type MailAttachmentDownload,
   QueueMessageType,
 } from "@worker/types";
+import { buildReplyReferences } from "@worker/utils/mail/send";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { HTTPError } from "ky";
+
+const normalizeMessageId = (
+  value: string | null | undefined,
+): string | null => {
+  const sanitized = (value ?? "").replace(/[\r\n]+/g, " ").trim();
+  if (!sanitized) return null;
+  return sanitized.startsWith("<") ? sanitized : `<${sanitized}>`;
+};
+
+const graphHeaderValue = (
+  message: GraphMessage,
+  name: string,
+): string | undefined => {
+  const target = name.toLowerCase();
+  return message.internetMessageHeaders?.find(
+    (header) => header.name?.toLowerCase() === target,
+  )?.value;
+};
 
 export class OutlookProvider extends EmailProvider {
   static displayName = "Outlook";
@@ -281,6 +301,55 @@ export class OutlookProvider extends EmailProvider {
       mimeType: result.attachment.contentType ?? "application/octet-stream",
       body: result.body,
     };
+  }
+
+  private graphRecipients(addresses: string[]) {
+    return addresses.map((address) => ({ emailAddress: { address } }));
+  }
+
+  async sendMail(input: ComposeMailInput): Promise<void> {
+    await graphPost(await this.token(), "/me/sendMail", {
+      message: {
+        subject: input.subject,
+        body: { contentType: "Text", content: input.body },
+        toRecipients: this.graphRecipients(input.to),
+      },
+      saveToSentItems: true,
+    });
+  }
+
+  async replyToMessage(
+    messageId: string,
+    input: ComposeMailInput,
+  ): Promise<void> {
+    const token = await this.token();
+    const original = await graphGet<GraphMessage>(
+      token,
+      `/me/messages/${messageId}?$select=internetMessageId,internetMessageHeaders`,
+    );
+    const inReplyTo = normalizeMessageId(original.internetMessageId);
+    const references = buildReplyReferences(
+      graphHeaderValue(original, "references"),
+      original.internetMessageId,
+    );
+    const internetMessageHeaders = [
+      ...(inReplyTo ? [{ name: "In-Reply-To", value: inReplyTo }] : []),
+      ...(references.length > 0
+        ? [{ name: "References", value: references.join(" ") }]
+        : []),
+    ];
+
+    await graphPost(token, "/me/sendMail", {
+      message: {
+        subject: input.subject,
+        body: { contentType: "Text", content: input.body },
+        toRecipients: this.graphRecipients(input.to),
+        ...(internetMessageHeaders.length > 0
+          ? { internetMessageHeaders }
+          : {}),
+      },
+      saveToSentItems: true,
+    });
   }
 
   // ─── Message actions ──────────────────────────────────────────────────

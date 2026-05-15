@@ -1,10 +1,17 @@
 export interface GraphMessage {
   id: string;
   subject?: string;
+  internetMessageId?: string;
+  internetMessageHeaders?: GraphInternetMessageHeader[];
   parentFolderId?: string;
   flag?: { flagStatus: string };
   from?: { emailAddress?: { name?: string; address?: string } };
   toRecipients?: Array<{ emailAddress?: { name?: string; address?: string } }>;
+}
+
+export interface GraphInternetMessageHeader {
+  name?: string;
+  value?: string;
 }
 
 export interface GraphMessageList {

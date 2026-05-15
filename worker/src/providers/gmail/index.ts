@@ -37,6 +37,7 @@ import {
   findAttachmentPayloadByIndex,
 } from "@worker/providers/gmail/utils/payload";
 import type {
+  ComposeMailInput,
   EmailListPage,
   MessageState,
   PreviewContent,
@@ -53,6 +54,12 @@ import {
   base64urlToByteStream,
 } from "@worker/utils/base64url";
 import { parseEmailDate, wrapPlainText } from "@worker/utils/mail/body";
+import {
+  buildReplyReferences,
+  buildTextMimeMessage,
+  mimeToBase64Url,
+  replyRecipientsFromHeaders,
+} from "@worker/utils/mail/send";
 import { HTTPError } from "ky";
 
 export class GmailProvider extends EmailProvider {
@@ -262,16 +269,21 @@ export class GmailProvider extends EmailProvider {
   /** Gmail 走 API 直接取结构化 payload，比 fetchRawEmail + PostalMime 高效 */
   async fetchForPreview(messageId: string): Promise<PreviewContent | null> {
     const token = await this.token();
-    const msg = await gmailGet<{ payload: GmailPayload }>(
+    const msg = await gmailGet<GmailMessage>(
       token,
       `/users/me/messages/${messageId}?format=full`,
     );
+    if (!msg.payload) return null;
     const meta: MailMeta = {
       subject: extractHeader(msg.payload, "subject"),
       from: extractHeader(msg.payload, "from"),
       to: extractHeader(msg.payload, "to"),
       date: parseEmailDate(extractHeader(msg.payload, "date")),
     };
+    const replyRecipients = replyRecipientsFromHeaders(
+      extractHeader(msg.payload, "reply-to"),
+      meta.from,
+    );
     const html = extractPartByMime(msg.payload, "text/html");
 
     const cidMap = new Map<string, string>();
@@ -300,10 +312,17 @@ export class GmailProvider extends EmailProvider {
       );
     }
 
-    if (html) return { html, cidMap, meta, attachments };
+    if (html) return { html, cidMap, meta, attachments, replyRecipients };
 
     const plain = extractPartByMime(msg.payload, "text/plain");
-    if (plain) return { html: wrapPlainText(plain), cidMap, meta, attachments };
+    if (plain)
+      return {
+        html: wrapPlainText(plain),
+        cidMap,
+        meta,
+        attachments,
+        replyRecipients,
+      };
 
     return null;
   }
@@ -339,6 +358,59 @@ export class GmailProvider extends EmailProvider {
       mimeType: part.mimeType ?? null,
       body,
     };
+  }
+
+  private async sendRawMessage(
+    input: ComposeMailInput & {
+      inReplyTo?: string | null;
+      references?: string[] | null;
+      threadId?: string | null;
+    },
+  ): Promise<void> {
+    const raw = mimeToBase64Url(
+      buildTextMimeMessage({
+        from: this.account.email,
+        to: input.to,
+        subject: input.subject,
+        body: input.body,
+        inReplyTo: input.inReplyTo,
+        references: input.references,
+      }),
+    );
+    const body: Record<string, unknown> = { raw };
+    if (input.threadId) body.threadId = input.threadId;
+    await gmailPost(await this.token(), "/users/me/messages/send", body);
+  }
+
+  async sendMail(input: ComposeMailInput): Promise<void> {
+    await this.sendRawMessage(input);
+  }
+
+  async replyToMessage(
+    messageId: string,
+    input: ComposeMailInput,
+  ): Promise<void> {
+    const original = await gmailGet<GmailMessage>(
+      await this.token(),
+      `/users/me/messages/${messageId}?format=full`,
+    );
+    const payload = original.payload;
+    const originalMessageId = payload
+      ? extractHeader(payload, "message-id")
+      : null;
+    const references = payload
+      ? buildReplyReferences(
+          extractHeader(payload, "references"),
+          originalMessageId,
+        )
+      : [];
+
+    await this.sendRawMessage({
+      ...input,
+      inReplyTo: originalMessageId,
+      references,
+      threadId: original.threadId,
+    });
   }
 
   // ─── Message actions ──────────────────────────────────────────────────

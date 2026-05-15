@@ -3,7 +3,11 @@ import { cf } from "@worker/api/plugins/cf";
 import { buildEmailKeyboard } from "@worker/bot/keyboards";
 import { buildTgMessageLink, setReplyMarkup } from "@worker/clients/telegram";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
-import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import {
+  accountCanArchive,
+  accountCanSend,
+  getEmailProvider,
+} from "@worker/providers";
 import { buildWebMailUrl } from "@worker/utils/mail/token";
 import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import { refreshEmail } from "@worker/utils/mail-delivery/retry";
@@ -84,11 +88,13 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
       bodyHtml: result.proxiedHtml,
       bodyHtmlRaw: result.rawHtml,
       attachments: result.attachments,
+      replyRecipients: result.replyRecipients,
       folder: result.fetchFolder,
       inJunk: result.inJunk,
       inArchive: result.fetchFolder === "archive",
       starred: result.starred,
       canArchive: accountCanArchive(account),
+      canReply: accountCanSend(account) && !account.disabled,
       webMailUrl,
       tgMessageLink,
     };

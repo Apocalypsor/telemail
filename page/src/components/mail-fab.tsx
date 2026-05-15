@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  * 邮件预览页的操作入口 —— 用 TG 原生 MainButton + SecondaryButton +
  * SettingsButton + showPopup 做，**不渲染任何 DOM**。
  *
- *   MainButton "⚡ 操作"     → popup: 星标 / 归档 / 标垃圾（按邮件状态）
+ *   MainButton "⚡ 操作"     → popup: 星标 / 回复 / 标垃圾（按邮件状态）
  *   SecondaryButton          → 设置提醒 + 分享 + 跳 TG 原消息
  *     多项 → "🔗 更多" popup
  *     单项 → 按钮直接做
@@ -34,7 +34,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  * popup 有 3 按钮硬上限，所以邮件状态动作和工具操作拆到两个原生按钮里。
  *
  * 成功后：HapticFeedback + onChanged() refetch 数据 + 原生 popup；
- * terminal 动作（归档/删除/标垃圾/移出归档/移回）成功后先显示短暂完成态，
+ * terminal 动作（删除/标垃圾/移出归档/移回）成功后先显示短暂完成态，
  * 再隐藏 MainButton，SecondaryButton 保持（分享一封已归档的邮件仍有意义）。
  * 失败：alertPopup(error) 弹原生 popup。
  */
@@ -45,7 +45,6 @@ export const MailFab = ({
   starred: initialStarred,
   inJunk,
   inArchive,
-  canArchive,
   folder,
   subject,
   webMailUrl,
@@ -54,6 +53,7 @@ export const MailFab = ({
   onRefresh,
   onToggleProxy,
   onSetReminder,
+  onReply,
   onChanged,
 }: MailFabProps) => {
   const [status, setStatus] = useState<ActionStatus | null>(null);
@@ -177,13 +177,12 @@ export const MailFab = ({
         terminal: false,
       },
     ];
-    if (canArchive) {
+    if (onReply) {
       list.push({
-        id: "archive",
-        label: "📥 归档",
+        id: "reply",
+        label: "↩️ 回复",
         type: "default",
-        terminal: true,
-        doneLabel: "✓ 已归档",
+        terminal: false,
       });
     }
     list.push({
@@ -195,7 +194,7 @@ export const MailFab = ({
       doneLabel: "✓ 已标垃圾",
     });
     return list;
-  }, [inArchive, inJunk, canArchive, starred]);
+  }, [inArchive, inJunk, onReply, starred]);
 
   /**
    * 跑一个动作，处理 TG 端的 Haptic + 错误 alert。useMailActions 的 hook
@@ -203,7 +202,11 @@ export const MailFab = ({
    * 反馈 UI。toggle-star 用 hook 当前 starred 计算下一态。
    */
   const runWithFeedback = useCallback(
-    async (action: MailAction) => {
+    async (action: ActionId) => {
+      if (action === "reply") {
+        onReply?.();
+        return;
+      }
       if (pending || done) return;
       const actionDef = actions.find((x) => x.id === action);
       if (
@@ -231,7 +234,7 @@ export const MailFab = ({
         await alertPopup(message);
       }
     },
-    [actions, done, pending, run, starred],
+    [actions, done, onReply, pending, run, starred],
   );
 
   const handleMainButtonClick = useCallback(async () => {
@@ -389,7 +392,6 @@ export interface MailFabProps {
   starred: boolean;
   inJunk: boolean;
   inArchive: boolean;
-  canArchive: boolean;
   /** 邮件当前所在 folder —— toggle-star 透传给后端，IMAP 用以选对 mailbox */
   folder?: "inbox" | "junk" | "archive";
   /** 邮件主题；用于分享时的预设文字 */
@@ -406,21 +408,25 @@ export interface MailFabProps {
   onToggleProxy: () => void;
   /** 跳到提醒页（带 back URL）；undefined → 隐藏 ⏰ 入口 */
   onSetReminder?: () => void;
+  /** 跳到写邮件 Mini App 的回复模式。 */
+  onReply?: () => void;
   /** FAB 动作成功后通知父组件 refetch 预览数据；交给 caller 处理 */
   onChanged?: () => void;
 }
 
 interface ActionDef {
-  id: MailAction;
+  id: ActionId;
   label: string;
   type: "default" | "destructive";
-  /** 执行后邮件就离开当前视图了（归档 / 垃圾 / 删除等），之后 MainButton 隐藏 */
+  /** 执行后邮件就离开当前视图了（垃圾 / 删除 / 移动等），之后 MainButton 隐藏 */
   terminal: boolean;
   /** 破坏性动作执行前的确认提示 */
   confirmText?: string;
   /** terminal 动作完成后 MainButton 的短暂完成态文案 */
   doneLabel?: string;
 }
+
+type ActionId = MailAction | "reply";
 
 type ExtraId = "reminder" | "share" | "tg-link" | "refresh" | "toggle-proxy";
 

@@ -1,10 +1,11 @@
 import { Chip } from "@heroui/react";
 import { type MailAction, useMailActions } from "@page/hooks/use-mail-actions";
 import { useSession } from "@page/hooks/use-session";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AccentButton } from "./accent-button";
 
-/** Web 版邮件 toolbar：星标 / 归档 / 标垃圾 / 图片代理切换。
+/** Web 版邮件 toolbar：星标 / 回复 / 标垃圾 / 图片代理切换。
  *  miniapp 那一套用 TG 原生 Main+SecondaryButton 走 popup；web 这套是真 DOM
  *  按钮平铺。共用 useMailActions hook 控制状态转换和后端调用。
  *
@@ -17,8 +18,10 @@ export const WebMailToolbar = ({
   starred: initialStarred,
   inJunk,
   inArchive,
-  canArchive,
   folder,
+  subject,
+  replyRecipients,
+  canReply,
   useProxy,
   onToggleProxy,
   onChanged,
@@ -29,7 +32,9 @@ export const WebMailToolbar = ({
   starred: boolean;
   inJunk: boolean;
   inArchive: boolean;
-  canArchive: boolean;
+  subject?: string | null;
+  replyRecipients: string[];
+  canReply: boolean;
   /** toggle-star 透传给后端，IMAP 用以选对 mailbox */
   folder?: "inbox" | "junk" | "archive";
   useProxy: boolean;
@@ -37,6 +42,7 @@ export const WebMailToolbar = ({
   onChanged: () => void;
 }) => {
   const session = useSession();
+  const navigate = useNavigate();
   const [msg, setMsg] = useState<{ text: string; kind: "ok" | "error" } | null>(
     null,
   );
@@ -67,6 +73,21 @@ export const WebMailToolbar = ({
 
   const isDisabled = done || pending;
   const canMutateMail = !!session.data;
+  const openReply = () => {
+    const back = window.location.pathname + window.location.search;
+    navigate({
+      to: "/telegram-app/compose",
+      search: {
+        accountId,
+        to: replyRecipients.join(", "),
+        subject: buildReplySubject(subject),
+        replyEmailMessageId: emailMessageId,
+        token,
+        ...(folder ? { folder } : {}),
+        back,
+      },
+    });
+  };
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
@@ -105,12 +126,12 @@ export const WebMailToolbar = ({
         />
       ) : canMutateMail ? (
         <>
-          {canArchive && (
+          {canReply && (
             <AccentButton
-              label="📥 归档"
+              label="↩️ 回复"
               tone="neutral"
               isDisabled={isDisabled}
-              onPress={() => runWithFeedback("archive")}
+              onPress={openReply}
             />
           )}
           <AccentButton
@@ -143,4 +164,9 @@ export const WebMailToolbar = ({
       )}
     </div>
   );
+};
+
+const buildReplySubject = (subject: string | null | undefined): string => {
+  const base = subject?.trim() || "(no subject)";
+  return /^\s*re\s*:/i.test(base) ? base : `Re: ${base}`;
 };

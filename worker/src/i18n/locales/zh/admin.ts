@@ -1,6 +1,6 @@
 export default {
   menu: {
-    title: "⚙️ 全局操作",
+    title: "🌐 全局管理",
   },
   users: {
     noUsers: "👥 暂无用户",
@@ -14,8 +14,8 @@ export default {
   },
   watch: {
     renewing: "⏳ 正在续订...",
-    renewed: "⚙️ 全局操作\n\n✅ 所有 Watch 已续订",
-    failed: "⚙️ 全局操作\n\n❌ Watch 续订失败",
+    renewed: "🌐 全局管理\n\n✅ 所有 Watch 已续订",
+    failed: "🌐 全局管理\n\n❌ Watch 续订失败",
   },
   failedEmails: {
     title: "📋 失败邮件",
@@ -32,6 +32,7 @@ export default {
     clearedShort: "已清空",
   },
   renewWatch: "🔄 续订所有 Watch",
+  compose: "✉️ 写邮件",
   htmlPreview: "🔍 HTML 预览工具",
   junkCheck: "🚫 垃圾邮件检测",
   secrets: {

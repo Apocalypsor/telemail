@@ -3,6 +3,7 @@ import { countPendingRemindersForEmail } from "@worker/db/reminders";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import {
+  buildMiniAppComposeUrl,
   buildMiniAppMailUrl,
   buildMiniAppRemindersUrl,
   buildWebMailUrl,
@@ -28,15 +29,12 @@ export const buildInitialEmailKeyboard = (): InlineKeyboard => {
 const addCoreButtons = (
   kb: InlineKeyboard,
   starred: boolean,
-  canArchive: boolean,
 ): InlineKeyboard => {
   kb.text(
     t(starred ? "keyboards:mail.starred" : "keyboards:mail.star"),
     starred ? "unstar" : "star",
   );
   kb.text(t("keyboards:mail.junk"), "junk_mark");
-  if (canArchive) kb.text(t("keyboards:mail.archive"), "archive");
-  kb.text(t("keyboards:mail.refresh"), "refresh");
   return kb;
 };
 
@@ -65,11 +63,11 @@ export const buildEmailKeyboard = async (
   emailMessageId: string,
   accountId: number,
   starred: boolean,
-  canArchive: boolean,
+  _canArchive: boolean,
   chatId: string,
   tgMessageId: number,
 ): Promise<InlineKeyboard> => {
-  const kb = addCoreButtons(new InlineKeyboard(), starred, canArchive);
+  const kb = addCoreButtons(new InlineKeyboard(), starred);
   const base = env.WORKER_URL;
   const [mailToken, reminderCount] = await Promise.all([
     generateMailTokenById(env.ADMIN_SECRET, emailMessageId, accountId),
@@ -78,6 +76,7 @@ export const buildEmailKeyboard = async (
   ]);
   const remindBtn = remindLabel(reminderCount);
   const viewLabel = t("keyboards:mail.viewOriginal");
+  const replyLabel = t("keyboards:mail.reply");
 
   // 👁 / ⏰ 都走 Mini App ——`web_app` 按钮在所有平台 (macos / tdesktop /
   // ios / android) 都直接在 Mini App 内打开；不再做桌面跳浏览器的分流。
@@ -88,10 +87,18 @@ export const buildEmailKeyboard = async (
     accountId,
     mailToken,
   );
+  const miniAppComposeUrl = buildMiniAppComposeUrl(
+    base,
+    emailMessageId,
+    accountId,
+    mailToken,
+  );
 
   // 私聊：直接用 Mini App URL（web_app inline button 仅私聊有效）
   if (!chatId.startsWith("-")) {
-    kb.row()
+    kb.webApp(replyLabel, miniAppComposeUrl)
+      .text(t("keyboards:mail.refresh"), "refresh")
+      .row()
       .webApp(
         remindBtn,
         buildMiniAppRemindersUrl(base, emailMessageId, accountId, mailToken),
@@ -113,13 +120,18 @@ export const buildEmailKeyboard = async (
         .catch(() => null)
     : null;
   if (shortName && username) {
-    const deepLink = (feature: "r" | "m") =>
+    const deepLink = (feature: "r" | "m" | "c") =>
       `https://t.me/${username}/${shortName}?startapp=${feature}_${chatId}_${tgMessageId}`;
-    kb.row().url(remindBtn, deepLink("r")).url(viewLabel, deepLink("m"));
+    kb.url(replyLabel, deepLink("c"))
+      .text(t("keyboards:mail.refresh"), "refresh")
+      .row()
+      .url(remindBtn, deepLink("r"))
+      .url(viewLabel, deepLink("m"));
     return kb;
   }
   // 未配 Mini App short name：群聊降级到裸 web 链接（无 ⏰ 能力）
-  kb.row().url(
+  kb.text(t("keyboards:mail.refresh"), "refresh").row();
+  kb.url(
     viewLabel,
     buildWebMailUrl(base, emailMessageId, accountId, mailToken),
   );

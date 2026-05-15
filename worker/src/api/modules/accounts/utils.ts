@@ -1,6 +1,10 @@
 import { getAuthorizedAccount } from "@worker/db/accounts";
 import { getUserByTelegramId } from "@worker/db/users";
-import { accountCanArchive, PROVIDERS } from "@worker/providers";
+import {
+  accountCanArchive,
+  accountCanSend,
+  PROVIDERS,
+} from "@worker/providers";
 import type { Account, AccountType, Env, TelegramUser } from "@worker/types";
 import type {
   AccountProviderOption,
@@ -86,6 +90,7 @@ export const toAccountResponse = async (
     authorized: oauth ? !!account.refresh_token : true,
     oauth: !!oauth,
     oauthProviderName: oauth?.name ?? null,
+    canSend: accountCanSend(account),
     needsArchiveSetup: klass.needsArchiveSetup,
     canArchive: accountCanArchive(account),
     archiveFolder: account.archive_folder,

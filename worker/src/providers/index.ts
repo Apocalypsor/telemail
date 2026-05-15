@@ -19,6 +19,11 @@ export const accountCanArchive = (account: Account): boolean => {
   return PROVIDERS[account.type].canArchive(account);
 };
 
+/** 根据 account 判断能否通过 Telemail 发送邮件。 */
+export const accountCanSend = (account: Account): boolean => {
+  return PROVIDERS[account.type].canSend(account);
+};
+
 /** 为所有已授权且未禁用的账号续订推送通知 */
 export const renewAllPush = async (env: Env): Promise<void> => {
   const accounts = await getAllAccounts(env.DB);

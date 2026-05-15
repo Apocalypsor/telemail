@@ -57,6 +57,21 @@ const MailPreviewPage = () => {
   }
 
   const d = q.data;
+  const onReply = () => {
+    const back = window.location.pathname + window.location.search;
+    navigate({
+      to: "/telegram-app/compose",
+      search: {
+        accountId: search.accountId,
+        to: d.replyRecipients.join(", "),
+        subject: buildReplySubject(d.meta.subject),
+        replyEmailMessageId: emailMessageId,
+        token: search.t,
+        folder: d.folder,
+        back,
+      },
+    });
+  };
 
   return (
     <>
@@ -100,7 +115,6 @@ const MailPreviewPage = () => {
         starred={d.starred}
         inJunk={d.inJunk}
         inArchive={d.inArchive}
-        canArchive={d.canArchive}
         folder={search.folder}
         subject={d.meta.subject ?? null}
         webMailUrl={d.webMailUrl}
@@ -128,6 +142,7 @@ const MailPreviewPage = () => {
         }
         onToggleProxy={() => setUseProxy((v) => !v)}
         onSetReminder={onSetReminder}
+        onReply={d.canReply ? onReply : undefined}
         onChanged={() =>
           qc.invalidateQueries({ queryKey: queryOptions.queryKey })
         }
@@ -174,6 +189,11 @@ const Subject = ({
       </a>
     </h1>
   );
+};
+
+const buildReplySubject = (subject: string | null | undefined): string => {
+  const base = subject?.trim() || "(no subject)";
+  return /^\s*re\s*:/i.test(base) ? base : `Re: ${base}`;
 };
 // accountId + t 必填：缺失 → validateSearch 抛出，由父级 errorComponent 渲染。
 // folder / back 可选。

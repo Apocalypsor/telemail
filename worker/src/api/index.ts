@@ -1,5 +1,6 @@
 import { accountsController } from "@worker/api/modules/accounts";
 import { authController } from "@worker/api/modules/auth";
+import { composeController } from "@worker/api/modules/compose";
 import { mailController } from "@worker/api/modules/mail";
 import { miniAppController } from "@worker/api/modules/miniapp";
 import { oauthController } from "@worker/api/modules/oauth";
@@ -23,6 +24,7 @@ import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
  *  - `/api/preview`, `/api/junk-check` LLM tools
  *  - `/api/cors-proxy`                 mail body image proxy
  *  - `/api/mail/:id` + 6 mutations     mail preview + actions
+ *  - `/api/compose/send`              send / reply from Mini App
  *  - `/api/accounts/*`                 mini app account management
  *  - `/api/mini-app/*`                 mini app generic API
  *  - `/api/reminders/*`                reminders CRUD
@@ -70,6 +72,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter, name: "telemail" })
   .use(oauthController)
   .use(previewController)
   .use(mailController)
+  .use(composeController)
   .use(accountsController)
   .use(miniAppController)
   .use(remindersController)

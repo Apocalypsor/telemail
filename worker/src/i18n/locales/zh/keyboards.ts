@@ -4,6 +4,7 @@ export default {
     starred: "✅",
     junk: "🚫",
     archive: "📥",
+    reply: "↩️",
     refresh: "🔄",
     viewOriginal: "📧",
     remind: "⏰",
@@ -18,6 +19,6 @@ export default {
     reminders: "⏰ 我的提醒",
     search: "🔍 搜索邮件",
     userManagement: "👥 用户管理",
-    globalOps: "⚙️ 全局操作",
+    globalManagement: "🌐 全局管理",
   },
 };

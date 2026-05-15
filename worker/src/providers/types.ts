@@ -37,6 +37,14 @@ export interface PreviewContent {
   cidMap: Map<string, string>;
   meta: MailMeta;
   attachments: MailAttachmentMeta[];
+  replyRecipients: string[];
+}
+
+/** Text-only compose payload accepted by provider send implementations. */
+export interface ComposeMailInput {
+  to: string[];
+  subject: string;
+  body: string;
 }
 
 /** OAuth token 接口的响应体（Google / Microsoft 同构） */
@@ -107,6 +115,8 @@ export interface EmailProviderClass {
   oauth?: OAuthHandler;
   /** 当前 account 是否可执行归档 */
   canArchive(account: Account): boolean;
+  /** 当前 account 是否支持通过 Telemail 写邮件。 */
+  canSend(account: Account): boolean;
   /** 账号详情页是否显示"归档标签"入口（Gmail 需要，其他自动） */
   needsArchiveSetup: boolean;
 }

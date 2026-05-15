@@ -59,6 +59,7 @@ export const AccountResponse = t.Object({
   authorized: t.Boolean(),
   oauth: t.Boolean(),
   oauthProviderName: t.Union([t.String(), t.Null()]),
+  canSend: t.Boolean(),
   needsArchiveSetup: t.Boolean(),
   canArchive: t.Boolean(),
   archiveFolder: t.Union([t.String(), t.Null()]),

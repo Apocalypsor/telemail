@@ -101,6 +101,7 @@ export abstract class MailService {
       rawHtml: html,
       proxiedHtml: await proxyImages(html, env.ADMIN_SECRET),
       attachments: result.attachments,
+      replyRecipients: result.replyRecipients,
       fetchFolder,
       inJunk,
       starred,
