@@ -1,7 +1,5 @@
-import { cleanupAndDeleteAccount } from "@worker/bot/utils/account";
 import { userListKeyboard, userListText } from "@worker/bot/utils/admin";
 import { isAdmin } from "@worker/bot/utils/auth";
-import { formatUserName } from "@worker/bot/utils/user-format";
 import { getOwnAccounts } from "@worker/db/accounts";
 import {
   approveUser,
@@ -12,20 +10,10 @@ import {
 } from "@worker/db/users";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
+import { cleanupAndDeleteAccount } from "@worker/utils/accounts";
+import { formatUserName } from "@worker/utils/user-format";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-
-/** 删除用户及其绑定的所有邮箱账号 */
-const deleteUserWithAccounts = async (
-  env: Env,
-  telegramId: string,
-): Promise<void> => {
-  const accounts = await getOwnAccounts(env.DB, telegramId);
-  for (const acc of accounts) {
-    await cleanupAndDeleteAccount(env, acc);
-  }
-  await deleteUser(env.DB, telegramId);
-};
 
 /** 注册 user 管理回调：列表 / info / approve / reject / delete confirm + confirmed。 */
 export const registerUserCallbacks = (bot: Bot, env: Env) => {
@@ -150,4 +138,16 @@ export const registerUserCallbacks = (bot: Bot, env: Env) => {
     });
     await ctx.answerCallbackQuery({ text: t("admin:users.deleted") });
   });
+};
+
+/** 删除用户及其绑定的所有邮箱账号 */
+const deleteUserWithAccounts = async (
+  env: Env,
+  telegramId: string,
+): Promise<void> => {
+  const accounts = await getOwnAccounts(env.DB, telegramId);
+  for (const acc of accounts) {
+    await cleanupAndDeleteAccount(env, acc);
+  }
+  await deleteUser(env.DB, telegramId);
 };

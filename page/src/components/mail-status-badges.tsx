@@ -1,3 +1,7 @@
+interface MailStatusBadgesProps {
+  starred: boolean;
+}
+
 /** 邮件状态 badge：放在 subject 和 meta 之间，避免把状态混进邮件原始标题。 */
 export const MailStatusBadges = ({ starred }: MailStatusBadgesProps) => {
   if (!starred) return null;
@@ -11,7 +15,3 @@ export const MailStatusBadges = ({ starred }: MailStatusBadgesProps) => {
     </div>
   );
 };
-
-interface MailStatusBadgesProps {
-  starred: boolean;
-}

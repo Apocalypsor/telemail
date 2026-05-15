@@ -2,6 +2,7 @@ import { getAuthorizedAccount } from "@worker/db/accounts";
 import { getUserByTelegramId } from "@worker/db/users";
 import { accountCanArchive, PROVIDERS } from "@worker/providers";
 import type { Account, AccountType, Env, TelegramUser } from "@worker/types";
+import { formatUserName } from "@worker/utils/user-format";
 import type {
   AccountProviderOption,
   AccountResponse,
@@ -51,13 +52,6 @@ export const getAuthorizedAccountOrResult = async (
   if (!account)
     return { ok: false, status: 404, error: "账号不存在或无权访问" };
   return account;
-};
-
-const formatUserName = (user: {
-  first_name: string;
-  last_name?: string | null;
-}): string => {
-  return user.first_name + (user.last_name ? ` ${user.last_name}` : "");
 };
 
 export const buildOwnerName = async (

@@ -10,6 +10,24 @@ import {
 } from "@worker/utils/message-actions";
 import type { MailListType } from "./model";
 
+interface ListDef {
+  fetcher: (p: EmailProvider, maxResults: number) => Promise<EmailListItem[]>;
+  pageFetcher: (
+    p: EmailProvider,
+    maxResults: number,
+    cursor?: string,
+  ) => Promise<{ items: EmailListItem[]; nextCursor: string | null }>;
+  errorEvent: string;
+  /** junk/archive 列表：TG 消息可能已被删除，不返回 tgLink */
+  hideTgLinks?: boolean;
+  /** 列出后的副作用 —— starred: 同步键盘；junk: 清 mapping；其余无 */
+  afterMappings?: (
+    env: Env,
+    mappings: MessageMapping[],
+    account: Account,
+  ) => Promise<void>;
+}
+
 /** narrow URL param string → 4 种合法 list type。直接用 LIST_DEFS 的 key 集合，
  *  避免另写一份字面量数组维护双份真相。 */
 export const isMailListType = (s: string): s is MailListType => {
@@ -48,24 +66,6 @@ export const parseAccountCursor = (
 
   return cursorByAccount;
 };
-
-interface ListDef {
-  fetcher: (p: EmailProvider, maxResults: number) => Promise<EmailListItem[]>;
-  pageFetcher: (
-    p: EmailProvider,
-    maxResults: number,
-    cursor?: string,
-  ) => Promise<{ items: EmailListItem[]; nextCursor: string | null }>;
-  errorEvent: string;
-  /** junk/archive 列表：TG 消息可能已被删除，不返回 tgLink */
-  hideTgLinks?: boolean;
-  /** 列出后的副作用 —— starred: 同步键盘；junk: 清 mapping；其余无 */
-  afterMappings?: (
-    env: Env,
-    mappings: MessageMapping[],
-    account: Account,
-  ) => Promise<void>;
-}
 
 export const LIST_DEFS: Record<MailListType, ListDef> = {
   unread: {

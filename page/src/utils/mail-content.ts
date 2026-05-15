@@ -1,5 +1,14 @@
 import { api } from "@page/api/client";
 
+export type MailContentFolder = "inbox" | "junk" | "archive";
+
+export interface MailContentQueryInput {
+  emailMessageId: string;
+  accountId: number;
+  token: string;
+  folder?: MailContentFolder;
+}
+
 export const mailContentQueryOptions = ({
   emailMessageId,
   accountId,
@@ -37,11 +46,3 @@ export const buildMailAttachmentUrl = ({
   if (folder) params.set("folder", folder);
   return `/api/mail/${encodeURIComponent(emailMessageId)}/attachment?${params.toString()}`;
 };
-export type MailContentFolder = "inbox" | "junk" | "archive";
-
-export interface MailContentQueryInput {
-  emailMessageId: string;
-  accountId: number;
-  token: string;
-  folder?: MailContentFolder;
-}

@@ -1,13 +1,6 @@
 import ky from "ky";
 import { config } from "../config";
 
-const api = ky.create({
-  prefixUrl: config.workerUrl,
-  headers: { Authorization: `Bearer ${config.bridgeSecret}` },
-  retry: { limit: 3, methods: ["get", "post"], backoffLimit: 5_000 },
-  timeout: 60_000,
-});
-
 /** 与 Telemail Worker 中 accounts 表对应的 IMAP 账号信息 */
 export interface ImapAccount {
   id: number;
@@ -19,6 +12,13 @@ export interface ImapAccount {
   imap_user: string;
   imap_pass: string;
 }
+
+const api = ky.create({
+  prefixUrl: config.workerUrl,
+  headers: { Authorization: `Bearer ${config.bridgeSecret}` },
+  retry: { limit: 3, methods: ["get", "post"], backoffLimit: 5_000 },
+  timeout: 60_000,
+});
 
 /** 从 Telemail Worker 拉取所有 IMAP 账号 */
 export const fetchImapAccounts = (): Promise<ImapAccount[]> =>

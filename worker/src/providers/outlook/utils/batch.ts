@@ -1,6 +1,23 @@
 import { http } from "@worker/clients/http";
 import { MS_GRAPH_API } from "@worker/constants";
 
+/** Graph $batch 单个子请求的形状（详见 https://learn.microsoft.com/graph/json-batching） */
+export interface GraphBatchRequest {
+  id: string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  /** 注意：path 里不要加 `/v1.0` 前缀，Graph 已自动加上 */
+  url: string;
+  body?: Record<string, unknown>;
+  headers?: Record<string, string>;
+}
+
+export interface GraphBatchResponse<T = unknown> {
+  id: string;
+  status: number;
+  body?: T & { error?: { code?: string; message?: string } };
+  headers?: Record<string, string>;
+}
+
 /**
  * Graph `$batch` 端点：JSON 格式塞最多 20 个子请求，1 个 HTTP 调用拿全 20 条响应。
  * 内部自动按 20 切片串行批次（保留请求顺序）；request body 里如果有 JSON
@@ -40,19 +57,3 @@ export const graphBatch = async (
   }
   return all;
 };
-/** Graph $batch 单个子请求的形状（详见 https://learn.microsoft.com/graph/json-batching） */
-export interface GraphBatchRequest {
-  id: string;
-  method: "GET" | "POST" | "PATCH" | "DELETE";
-  /** 注意：path 里不要加 `/v1.0` 前缀，Graph 已自动加上 */
-  url: string;
-  body?: Record<string, unknown>;
-  headers?: Record<string, string>;
-}
-
-export interface GraphBatchResponse<T = unknown> {
-  id: string;
-  status: number;
-  body?: T & { error?: { code?: string; message?: string } };
-  headers?: Record<string, string>;
-}

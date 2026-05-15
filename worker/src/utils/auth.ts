@@ -1,37 +1,26 @@
 import { SESSION_TTL, TG_AUTH_MAX_AGE } from "@worker/constants";
 import { hmacSha256Hex, timingSafeEqual } from "@worker/utils/hash";
 
-const hmacSha256 = async (
-  keyBytes: Uint8Array | ArrayBuffer,
-  data: string,
-): Promise<Uint8Array> => {
-  const buf =
-    keyBytes instanceof ArrayBuffer
-      ? keyBytes
-      : (keyBytes.buffer.slice(
-          keyBytes.byteOffset,
-          keyBytes.byteOffset + keyBytes.byteLength,
-        ) as ArrayBuffer);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    buf,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(data),
-  );
-  return new Uint8Array(sig);
-};
+// ── Telegram Login Widget ───────────────────────────────────────────────────
 
-const bytesToHex = (b: Uint8Array): string => {
-  let s = "";
-  for (let i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, "0");
-  return s;
-};
+export interface TelegramLoginData {
+  id: string;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: string;
+  hash: string;
+}
+
+/** Telegram Mini App 用户信息（来自 initData 的 user 字段） */
+interface TgWebAppUser {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+}
 
 /** 验证 Telegram Login Widget 数据（https://core.telegram.org/widgets/login#checking-authorization） */
 export const verifyTelegramLogin = async (
@@ -101,17 +90,6 @@ export const verifySessionCookie = async (
   if (!timingSafeEqual(expected, hmac)) return null;
   return telegramId;
 };
-// ── Telegram Login Widget ───────────────────────────────────────────────────
-
-export interface TelegramLoginData {
-  id: string;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date: string;
-  hash: string;
-}
 
 /**
  * 校验 Telegram Mini App initData。规范见
@@ -158,11 +136,35 @@ export const verifyTgInitData = async (
     return null;
   }
 };
-/** Telegram Mini App 用户信息（来自 initData 的 user 字段） */
-interface TgWebAppUser {
-  id: number;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  language_code?: string;
-}
+
+const hmacSha256 = async (
+  keyBytes: Uint8Array | ArrayBuffer,
+  data: string,
+): Promise<Uint8Array> => {
+  const buf =
+    keyBytes instanceof ArrayBuffer
+      ? keyBytes
+      : (keyBytes.buffer.slice(
+          keyBytes.byteOffset,
+          keyBytes.byteOffset + keyBytes.byteLength,
+        ) as ArrayBuffer);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    buf,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(data),
+  );
+  return new Uint8Array(sig);
+};
+
+const bytesToHex = (b: Uint8Array): string => {
+  let s = "";
+  for (let i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, "0");
+  return s;
+};

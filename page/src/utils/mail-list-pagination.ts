@@ -3,8 +3,6 @@ import type {
   MailListItem,
 } from "@worker/api/modules/miniapp/model";
 
-export const MAIL_LIST_PAGE_SIZE = 20;
-
 export type MailListCursor = Record<string, string>;
 
 export interface MailListPageLike {
@@ -15,6 +13,8 @@ export interface FlatMailListItem extends MailListItem {
   accountId: number;
   accountEmail: string | null;
 }
+
+export const MAIL_LIST_PAGE_SIZE = 20;
 
 export const encodeMailListCursor = (
   cursor: MailListCursor | undefined,

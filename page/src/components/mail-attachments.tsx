@@ -1,14 +1,9 @@
-const formatBytes = (size: number | null): string | null => {
-  if (size == null || !Number.isFinite(size) || size < 0) return null;
-  if (size < 1024) return `${size} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = size / 1024;
-  for (const unit of units) {
-    if (value < 1024) return `${value.toFixed(value >= 10 ? 0 : 1)} ${unit}`;
-    value /= 1024;
-  }
-  return `${value.toFixed(1)} TB`;
-};
+interface MailAttachmentItem {
+  id: string;
+  filename: string | null;
+  mimeType: string | null;
+  size: number | null;
+}
 
 export const MailAttachments = ({
   attachments,
@@ -54,9 +49,15 @@ export const MailAttachments = ({
     </section>
   );
 };
-interface MailAttachmentItem {
-  id: string;
-  filename: string | null;
-  mimeType: string | null;
-  size: number | null;
-}
+
+const formatBytes = (size: number | null): string | null => {
+  if (size == null || !Number.isFinite(size) || size < 0) return null;
+  if (size < 1024) return `${size} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = size / 1024;
+  for (const unit of units) {
+    if (value < 1024) return `${value.toFixed(value >= 10 ? 0 : 1)} ${unit}`;
+    value /= 1024;
+  }
+  return `${value.toFixed(1)} TB`;
+};

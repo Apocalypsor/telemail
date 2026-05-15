@@ -6,7 +6,6 @@ import {
 } from "@page/paths";
 import { helpText } from "@worker/bot/commands";
 import { isAdmin } from "@worker/bot/utils/auth";
-import { formatUserName } from "@worker/bot/utils/user-format";
 import {
   approveUser,
   getUserByTelegramId,
@@ -16,36 +15,9 @@ import {
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { formatUserName } from "@worker/utils/user-format";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-
-/** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/全局管理。 */
-const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
-  const kb = new InlineKeyboard();
-  const base = env.WORKER_URL.replace(/\/$/, "");
-  const listUrl = (type: string) =>
-    `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
-  kb.row()
-    .webApp(t("keyboards:menu.unread"), listUrl("unread"))
-    .webApp(t("keyboards:menu.starred"), listUrl("starred"))
-    .row()
-    .webApp(t("keyboards:menu.junk"), listUrl("junk"))
-    .webApp(t("keyboards:menu.archived"), listUrl("archived"))
-    .row()
-    .webApp(t("keyboards:menu.reminders"), `${base}${ROUTE_MINI_APP_REMINDERS}`)
-    .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
-  kb.row()
-    .webApp(
-      t("keyboards:menu.accountManagement"),
-      `${base}${ROUTE_MINI_APP_ACCOUNTS}`,
-    )
-    .text(t("keyboards:menu.sync"), "sync")
-    .row();
-  if (admin) {
-    kb.text(t("keyboards:menu.globalOps"), "admin").row();
-  }
-  return kb;
-};
 
 export const registerStartHandlers = (bot: Bot, env: Env) => {
   // ─── /start: 主入口，自动注册用户（私聊由全局守卫保证） ──────────────────
@@ -152,4 +124,32 @@ export const registerStartHandlers = (bot: Bot, env: Env) => {
     }
     return ctx.answerCallbackQuery();
   });
+};
+
+/** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/全局管理。 */
+const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
+  const kb = new InlineKeyboard();
+  const base = env.WORKER_URL.replace(/\/$/, "");
+  const listUrl = (type: string) =>
+    `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
+  kb.row()
+    .webApp(t("keyboards:menu.unread"), listUrl("unread"))
+    .webApp(t("keyboards:menu.starred"), listUrl("starred"))
+    .row()
+    .webApp(t("keyboards:menu.junk"), listUrl("junk"))
+    .webApp(t("keyboards:menu.archived"), listUrl("archived"))
+    .row()
+    .webApp(t("keyboards:menu.reminders"), `${base}${ROUTE_MINI_APP_REMINDERS}`)
+    .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
+  kb.row()
+    .webApp(
+      t("keyboards:menu.accountManagement"),
+      `${base}${ROUTE_MINI_APP_ACCOUNTS}`,
+    )
+    .text(t("keyboards:menu.sync"), "sync")
+    .row();
+  if (admin) {
+    kb.text(t("keyboards:menu.globalOps"), "admin").row();
+  }
+  return kb;
 };

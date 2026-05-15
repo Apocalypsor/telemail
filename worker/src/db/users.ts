@@ -3,6 +3,13 @@ import { users } from "@worker/db/schema";
 import type { TelegramUser } from "@worker/types";
 import { desc, eq, ne } from "drizzle-orm";
 
+export interface UserThingsSettingsUpdate {
+  email: string;
+  password?: string | null;
+}
+
+type UserUpdate = Partial<typeof users.$inferInsert>;
+
 /** 登录时 upsert 用户信息（approved 仅在首次 INSERT 时设置，UPDATE 不覆盖） */
 export const upsertUser = async (
   d1: D1Database,
@@ -158,9 +165,3 @@ export const deleteUser = async (
   const db = getDb(d1);
   await db.delete(users).where(eq(users.telegram_id, telegramId));
 };
-type UserUpdate = Partial<typeof users.$inferInsert>;
-
-export interface UserThingsSettingsUpdate {
-  email: string;
-  password?: string | null;
-}

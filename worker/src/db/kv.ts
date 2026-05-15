@@ -1,8 +1,42 @@
-// ─── Access Token Cache ─────────────────────────────────────────────────────
+// ─── OAuth Bot Message (回写 Bot 消息位置) ──────────────────────────────────
 
-const kvAccessTokenKey = (accountId: number): string => {
-  return `access_token:${accountId}`;
-};
+interface OAuthBotMsg {
+  chatId: string;
+  messageId: number;
+}
+
+// ─── Outlook Well-known Folder IDs Cache ───────────────────────────────────
+// Graph API 的 well-known folder name (Inbox / JunkEmail / archive / DeletedItems)
+// 解析出来的 ID 在账号生命周期内稳定，存 KV 30 天，省掉 resolveMessageState/isJunk
+// 每次 4 个 GET 的开销。删账号时清掉。
+
+export interface OutlookFolderIds {
+  inbox: string;
+  junk: string;
+  archive: string;
+  deleted: string;
+}
+
+// ─── KV keys & prefixes ────────────────────────────────────────────────────
+
+const KV_OAUTH_STATE_PREFIX = "oauth_state:";
+const KV_OAUTH_BOT_MSG_PREFIX = "oauth_bot_msg:";
+const KV_MS_SUB_ACCOUNT_PREFIX = "ms_sub_account:";
+const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
+const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
+const KV_BOT_INFO_KEY = "telegram:bot_info";
+const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
+const KV_DAILY_MAIL_SUMMARY_PREFIX = "daily_mail_summary:";
+const KV_THINGS_APP_INSTANCE_ID_PREFIX = "things:app_instance_id:";
+
+// ─── TTLs ───────────────────────────────────────────────────────────────────
+
+const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
+const BOT_INFO_TTL = 86400 * 30; // 30 天
+const OUTLOOK_FOLDERS_TTL = 86400 * 30;
+const DAILY_MAIL_SUMMARY_TTL = 86400 * 3; // 3 天
+
+// ─── Access Token Cache ─────────────────────────────────────────────────────
 
 export const getCachedAccessToken = async (
   kv: KVNamespace,
@@ -253,40 +287,7 @@ export const deleteThingsAppInstanceId = async (
 ): Promise<void> => {
   await kv.delete(`${KV_THINGS_APP_INSTANCE_ID_PREFIX}${telegramUserId}`);
 };
-// ─── KV keys & prefixes ──────────────────────────────────────────────��─────
 
-const KV_OAUTH_STATE_PREFIX = "oauth_state:";
-const KV_OAUTH_BOT_MSG_PREFIX = "oauth_bot_msg:";
-const KV_MS_SUB_ACCOUNT_PREFIX = "ms_sub_account:";
-const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
-const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
-const KV_BOT_INFO_KEY = "telegram:bot_info";
-const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
-const KV_DAILY_MAIL_SUMMARY_PREFIX = "daily_mail_summary:";
-const KV_THINGS_APP_INSTANCE_ID_PREFIX = "things:app_instance_id:";
-
-// ─── TTLs ───────────────────────────────────────────────────────────────────
-
-const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
-const BOT_INFO_TTL = 86400 * 30; // 30 天
-const OUTLOOK_FOLDERS_TTL = 86400 * 30;
-const DAILY_MAIL_SUMMARY_TTL = 86400 * 3; // 3 天
-
-// ─── OAuth Bot Message (回写 Bot 消息位置) ──────────────────────────────────
-
-interface OAuthBotMsg {
-  chatId: string;
-  messageId: number;
-}
-
-// ─── Outlook Well-known Folder IDs Cache ───────────────────────────────────
-// Graph API 的 well-known folder name (Inbox / JunkEmail / archive / DeletedItems)
-// 解析出来的 ID 在账号生命周期内稳定，存 KV 30 天，省掉 resolveMessageState/isJunk
-// 每次 4 个 GET 的开销。删账号时清掉。
-
-export interface OutlookFolderIds {
-  inbox: string;
-  junk: string;
-  archive: string;
-  deleted: string;
-}
+const kvAccessTokenKey = (accountId: number): string => {
+  return `access_token:${accountId}`;
+};

@@ -2,6 +2,23 @@ import { getDb } from "@worker/db/client";
 import { reminders } from "@worker/db/schema";
 import { and, asc, count, eq, isNull, lte } from "drizzle-orm";
 
+/** D1 reminders 表记录 —— Drizzle `mode: "timestamp_ms"` 自动把 INTEGER ms epoch
+ *  读出来 wrap 成 Date、写入时调 `.getTime()`。 */
+export type Reminder = typeof reminders.$inferSelect;
+
+/** 创建提醒的输入：邮件上下文五个字段同时为 NULL = 通用提醒；同时 set = 邮件提醒 */
+export interface CreateReminderInput {
+  telegramUserId: string;
+  text: string;
+  remindAt: Date;
+  /** 以下五个字段绑定一封邮件；要么全 set，要么全 omit */
+  accountId?: number;
+  emailMessageId?: string;
+  emailSubject?: string;
+  tgChatId?: string;
+  tgMessageId?: number;
+}
+
 /** 创建提醒，返回新行 id */
 export const createReminder = async (
   d1: D1Database,
@@ -192,19 +209,3 @@ export const countPendingReminders = async (
     );
   return row?.n ?? 0;
 };
-/** D1 reminders 表记录 —— Drizzle `mode: "timestamp_ms"` 自动把 INTEGER ms epoch
- *  读出来 wrap 成 Date、写入时调 `.getTime()`。 */
-export type Reminder = typeof reminders.$inferSelect;
-
-/** 创建提醒的输入：邮件上下文五个字段同时为 NULL = 通用提醒；同时 set = 邮件提醒 */
-export interface CreateReminderInput {
-  telegramUserId: string;
-  text: string;
-  remindAt: Date;
-  /** 以下五个字段绑定一封邮件；要么全 set，要么全 omit */
-  accountId?: number;
-  emailMessageId?: string;
-  emailSubject?: string;
-  tgChatId?: string;
-  tgMessageId?: number;
-}

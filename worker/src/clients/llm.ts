@@ -4,41 +4,19 @@ import { http } from "@worker/clients/http";
 import { LLM_TIMEOUT_MS, MAX_LINKS } from "@worker/constants";
 import { extractLinks, prepareBody } from "@worker/utils/mail/llm-input";
 
-/** 从逗号分隔的 API Key 列表中随机选一个 */
-const pickRandomKey = (apiKeys: string): string => {
-  const keys = apiKeys
-    .split(",")
-    .map((k) => k.trim())
-    .filter(Boolean);
-  return keys[Math.floor(Math.random() * keys.length)];
-};
-
-/** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode */
-const callLLM = async (
-  baseUrl: string,
-  apiKeys: string,
-  model: string,
-  prompt: string,
-  json?: boolean,
-): Promise<string> => {
-  const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
-  const data = await http
-    .post(url, {
-      headers: { Authorization: `Bearer ${pickRandomKey(apiKeys)}` },
-      json: {
-        model,
-        messages: [{ role: "user", content: prompt }],
-        stream: false,
-        ...(json && { response_format: { type: "json_object" } }),
-      },
-      timeout: LLM_TIMEOUT_MS,
-    })
-    .json<{ choices?: Array<{ message: { content: string } }> }>();
-
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("LLM API returned no choices");
-  return content.trim();
-};
+/** LLM 一次调用返回结果 */
+export interface EmailAnalysis {
+  /** 摘要（bullet list） */
+  summary: string;
+  /** 一句话摘要（用于邮件列表显示） */
+  shortSummary: string;
+  /** 标签 */
+  tags: string[];
+  /** 是否为垃圾邮件 */
+  isJunk: boolean;
+  /** 垃圾邮件置信度 0-1 */
+  junkConfidence: number;
+}
 
 /** 一次 LLM 调用完成邮件分析：摘要 + 标签 */
 export const analyzeEmail = async (
@@ -126,16 +104,39 @@ export const analyzeEmail = async (
     throw new Error(`LLM returned invalid JSON: ${raw.slice(0, 200)}`);
   }
 };
-/** LLM 一次调用返回结果 */
-export interface EmailAnalysis {
-  /** 摘要（bullet list） */
-  summary: string;
-  /** 一句话摘要（用于邮件列表显示） */
-  shortSummary: string;
-  /** 标签 */
-  tags: string[];
-  /** 是否为垃圾邮件 */
-  isJunk: boolean;
-  /** 垃圾邮件置信度 0-1 */
-  junkConfidence: number;
-}
+
+/** 从逗号分隔的 API Key 列表中随机选一个 */
+const pickRandomKey = (apiKeys: string): string => {
+  const keys = apiKeys
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  return keys[Math.floor(Math.random() * keys.length)];
+};
+
+/** 调用 OpenAI compatible /v1/chat/completions 接口，支持 JSON mode */
+const callLLM = async (
+  baseUrl: string,
+  apiKeys: string,
+  model: string,
+  prompt: string,
+  json?: boolean,
+): Promise<string> => {
+  const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const data = await http
+    .post(url, {
+      headers: { Authorization: `Bearer ${pickRandomKey(apiKeys)}` },
+      json: {
+        model,
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+        ...(json && { response_format: { type: "json_object" } }),
+      },
+      timeout: LLM_TIMEOUT_MS,
+    })
+    .json<{ choices?: Array<{ message: { content: string } }> }>();
+
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("LLM API returned no choices");
+  return content.trim();
+};

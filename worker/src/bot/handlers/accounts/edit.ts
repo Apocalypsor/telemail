@@ -2,13 +2,11 @@ import {
   accountDetailKeyboard,
   accountDetailText,
   accountListKeyboard,
-  cleanupAndDeleteAccount,
   resolveAccount,
   resolveOwnerName,
 } from "@worker/bot/utils/account";
 import { isAdmin } from "@worker/bot/utils/auth";
 import { clearBotState, setBotState } from "@worker/bot/utils/input-state";
-import { formatUserName } from "@worker/bot/utils/user-format";
 import {
   getAuthorizedAccount,
   getOwnAccounts,
@@ -20,7 +18,9 @@ import { getAllUsers, getUserByTelegramId } from "@worker/db/users";
 import { t } from "@worker/i18n";
 import { getEmailProvider } from "@worker/providers";
 import type { Env } from "@worker/types";
+import { cleanupAndDeleteAccount } from "@worker/utils/accounts";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { formatUserName } from "@worker/utils/user-format";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 

@@ -18,6 +18,15 @@ import type { Account, Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { InlineKeyboard } from "grammy";
 
+type ToggleStarResult =
+  | { ok: true; keyboard: InlineKeyboard; emailMessageId: string }
+  | { ok: false; reason: string };
+
+interface MailMutationOptions {
+  folder?: "inbox" | "junk" | "archive";
+  waitUntil?: (p: Promise<unknown>) => void;
+}
+
 /** 删除 TG 消息 + mapping（邮件不再归属 INBOX 时统一清理）。
  *  调用方拿到了 mapping 时直接用；只有 (account, emailMessageId) 时用下面的
  *  `cleanupTgForEmail` 包一层。 */
@@ -323,17 +332,6 @@ export const markEmailAsRead = async (
   }
 };
 
-const scheduleOrAwait = async (
-  promise: Promise<unknown>,
-  waitUntil?: (p: Promise<unknown>) => void,
-): Promise<void> => {
-  if (waitUntil) {
-    waitUntil(promise);
-    return;
-  }
-  await promise;
-};
-
 export const markEmailAsJunkAndCleanup = async (
   env: Env,
   account: Account,
@@ -452,11 +450,14 @@ export const trashAllJunkEmails = async (
 
   return { success, failed };
 };
-type ToggleStarResult =
-  | { ok: true; keyboard: InlineKeyboard; emailMessageId: string }
-  | { ok: false; reason: string };
 
-interface MailMutationOptions {
-  folder?: "inbox" | "junk" | "archive";
-  waitUntil?: (p: Promise<unknown>) => void;
-}
+const scheduleOrAwait = async (
+  promise: Promise<unknown>,
+  waitUntil?: (p: Promise<unknown>) => void,
+): Promise<void> => {
+  if (waitUntil) {
+    waitUntil(promise);
+    return;
+  }
+  await promise;
+};

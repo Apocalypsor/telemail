@@ -1,13 +1,11 @@
-import { formatUserName } from "@worker/bot/utils/user-format";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
 import type { Env, TelegramUser } from "@worker/types";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
+import { formatUserName } from "@worker/utils/user-format";
 import { InlineKeyboard } from "grammy";
 
 export const SECRETS_AUTO_DELETE_SECONDS = 60;
-
-const codeEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
 
 export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
   const failedCount = await countFailedEmails(env.DB);
@@ -133,3 +131,5 @@ export const failedEmailListMessage = (
     keyboard: kb,
   };
 };
+
+const codeEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/`/g, "\\`");

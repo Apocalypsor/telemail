@@ -1,13 +1,11 @@
 import { isAdmin } from "@worker/bot/utils/auth";
-import { formatUserName } from "@worker/bot/utils/user-format";
 import { getAuthorizedAccount } from "@worker/db/accounts";
 import { getUserByTelegramId } from "@worker/db/users";
 import { t } from "@worker/i18n";
 import { PROVIDERS } from "@worker/providers";
 import type { Account, Env } from "@worker/types";
+import { formatUserName } from "@worker/utils/user-format";
 import { InlineKeyboard } from "grammy";
-
-export { cleanupAndDeleteAccount } from "@worker/utils/accounts";
 
 /**
  * 解析账号所有者名称用于详情页 owner 行：

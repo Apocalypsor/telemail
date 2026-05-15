@@ -14,6 +14,19 @@ import {
 } from "@telegram-apps/sdk-react";
 import { useEffect } from "react";
 
+export interface MainButtonConfig {
+  text: string | undefined;
+  onClick: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  color?: RGB;
+  textColor?: RGB;
+}
+
+export interface SecondaryButtonConfig extends MainButtonConfig {
+  position?: SecondaryButtonPosition;
+}
+
 // SDK 的 setParams 一次性提交所有变更，比之前 `setText` + `enable/disable` +
 // `show/hide` 多次调用更稳，老 Android 客户端在分段调用时的兼容坑
 // (vkruglikov/react-telegram-web-app #69) 也避开了。
@@ -107,15 +120,3 @@ export const useSettingsButton = (onClick: (() => void) | undefined): void => {
     };
   }, [onClick]);
 };
-export interface MainButtonConfig {
-  text: string | undefined;
-  onClick: () => void;
-  loading?: boolean;
-  disabled?: boolean;
-  color?: RGB;
-  textColor?: RGB;
-}
-
-export interface SecondaryButtonConfig extends MainButtonConfig {
-  position?: SecondaryButtonPosition;
-}
