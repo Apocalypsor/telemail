@@ -37,7 +37,7 @@ const callLLM = async (
 
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("LLM API returned no choices");
-  return content.trim();
+  return content;
 };
 
 /** 一次 LLM 调用完成邮件分析：摘要 + 标签 */
@@ -126,6 +126,71 @@ export const analyzeEmail = async (
     throw new Error(`LLM returned invalid JSON: ${raw.slice(0, 200)}`);
   }
 };
+
+export const optimizeEmailDraft = async (
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  subject: string,
+  body: string,
+  replyMode: boolean,
+  senderEmail?: string | null,
+  originalEmail?: OriginalEmailContext,
+): Promise<string> => {
+  const originalSection = originalEmail
+    ? `\n\nOriginal email context for this reply:\n` +
+      `From: ${originalEmail.from || "(unknown)"}\n` +
+      `To: ${originalEmail.to || "(unknown)"}\n` +
+      `Subject: ${originalEmail.subject || "(none)"}\n\n` +
+      `Original body:\n${originalEmail.body || "(empty)"}\n`
+    : "";
+  const senderSection = senderEmail ? `\nSending as: ${senderEmail}\n` : "";
+
+  const prompt =
+    `You are helping write a complete email draft in Markdown.\n` +
+    `Turn the user's input into a finished email that can be sent directly.\n` +
+    `Rules:\n` +
+    `- Keep the same language as the draft unless the draft is mixed; then prefer the dominant language.\n` +
+    `- Keep Markdown syntax valid and useful.\n` +
+    `- Preserve paragraph breaks and deliberate blank lines, especially before a signature or closing line.\n` +
+    `- Follow normal email structure: greeting, body paragraphs, and a short closing line.\n` +
+    `- If the draft is short, vague, or just a hint, expand it into a complete email instead of keeping it brief.\n` +
+    `- Never return a bare fragment like "hi" or a one-line note when the context requires a full email.\n` +
+    `- If the draft is a reply, answer the original email directly and naturally, in the order the recipient would expect.\n` +
+    `- If the draft is a new email, open with a concise greeting and close with a polite sign-off.\n` +
+    `- If the draft already has a greeting or sign-off, improve it rather than removing it.\n` +
+    `- Use bullets only when they make the email clearer, especially for multiple requests or action items.\n` +
+    `- Do not add explanations, labels, headings, or a preface.\n` +
+    `- Do not invent new facts.\n` +
+    `- If this is a reply, use the original email context to make the reply relevant, but do not quote or summarize the original email unless the draft asks for it.\n` +
+    `- If this is a reply, keep the tone concise, direct, and polite.\n` +
+    `- If the original email context makes a greeting or closing natural, use it sparingly and keep it human.\n` +
+    `- If the user only typed something like "hi", "thanks", or a one-line note, infer the rest of the email from the context and make it complete.\n` +
+    `- If sender or recipient names are available, use them naturally; otherwise fall back to email addresses or a neutral greeting.\n` +
+    `- If this is a reply and the sender email is known, address the original sender with that context when natural.\n` +
+    `- If the original sender looks like a person, use a personal greeting; if it looks like a service or support mailbox, use a neutral professional greeting.\n` +
+    `- If the body is already strong, you may make only light edits.\n` +
+    `- Output only the rewritten draft body.\n\n` +
+    `Context:\n` +
+    `Reply mode: ${replyMode ? "yes" : "no"}\n` +
+    `Subject: ${subject || "(none)"}\n` +
+    senderSection +
+    originalSection +
+    `\n\n` +
+    `Draft:\n${body}`;
+
+  const raw = await callLLM(baseUrl, apiKey, model, prompt, false);
+  return raw
+    .replace(/^\s*```(?:markdown|md)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "");
+};
+
+export interface OriginalEmailContext {
+  subject: string | null;
+  from: string | null;
+  to: string | null;
+  body: string;
+}
 /** LLM 一次调用返回结果 */
 export interface EmailAnalysis {
   /** 摘要（bullet list） */

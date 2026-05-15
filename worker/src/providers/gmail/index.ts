@@ -55,6 +55,7 @@ import {
 } from "@worker/utils/base64url";
 import { parseEmailDate, wrapPlainText } from "@worker/utils/mail/body";
 import {
+  buildMultipartMimeMessage,
   buildReplyReferences,
   buildTextMimeMessage,
   mimeToBase64Url,
@@ -367,16 +368,25 @@ export class GmailProvider extends EmailProvider {
       threadId?: string | null;
     },
   ): Promise<void> {
-    const raw = mimeToBase64Url(
-      buildTextMimeMessage({
-        from: this.account.email,
-        to: input.to,
-        subject: input.subject,
-        body: input.body,
-        inReplyTo: input.inReplyTo,
-        references: input.references,
-      }),
-    );
+    const mime = input.html
+      ? buildMultipartMimeMessage({
+          from: this.account.email,
+          to: input.to,
+          subject: input.subject,
+          text: input.body,
+          html: input.html,
+          inReplyTo: input.inReplyTo,
+          references: input.references,
+        })
+      : buildTextMimeMessage({
+          from: this.account.email,
+          to: input.to,
+          subject: input.subject,
+          body: input.body,
+          inReplyTo: input.inReplyTo,
+          references: input.references,
+        });
+    const raw = mimeToBase64Url(mime);
     const body: Record<string, unknown> = { raw };
     if (input.threadId) body.threadId = input.threadId;
     await gmailPost(await this.token(), "/users/me/messages/send", body);

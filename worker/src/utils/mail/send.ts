@@ -142,6 +142,51 @@ export const buildTextMimeMessage = ({
   return `${headers.join("\r\n")}\r\n\r\n${foldBase64(utf8Base64(body))}`;
 };
 
+export const buildMultipartMimeMessage = ({
+  from,
+  to,
+  subject,
+  text,
+  html,
+  inReplyTo,
+  references,
+}: MultipartMimeMessageInput): string => {
+  const boundary = `telemail-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const headers: string[] = [];
+  const sanitizedFrom = sanitizeHeaderValue(from ?? "");
+  if (sanitizedFrom) headers.push(`From: ${sanitizedFrom}`);
+  headers.push(`To: ${to.map(sanitizeHeaderValue).join(", ")}`);
+  headers.push(`Subject: ${encodeMimeHeader(subject)}`);
+  const normalizedInReplyTo = normalizeMessageId(inReplyTo);
+  if (normalizedInReplyTo) headers.push(`In-Reply-To: ${normalizedInReplyTo}`);
+  const normalizedReferences = references
+    ?.map(normalizeMessageId)
+    .filter((item): item is string => !!item);
+  if (normalizedReferences?.length) {
+    headers.push(`References: ${normalizedReferences.join(" ")}`);
+  }
+  headers.push(
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  );
+
+  const parts = [
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    foldBase64(utf8Base64(text)),
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    foldBase64(utf8Base64(html)),
+    `--${boundary}--`,
+    "",
+  ];
+  return `${headers.join("\r\n")}\r\n\r\n${parts.join("\r\n")}`;
+};
+
 export const mimeToBase64Url = (mime: string): string => {
   return utf8Base64(mime)
     .replace(/\+/g, "-")
@@ -156,4 +201,10 @@ export interface TextMimeMessageInput {
   body: string;
   inReplyTo?: string | null;
   references?: string[] | null;
+}
+
+export interface MultipartMimeMessageInput
+  extends Omit<TextMimeMessageInput, "body"> {
+  text: string;
+  html: string;
 }

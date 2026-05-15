@@ -40,11 +40,12 @@ export interface PreviewContent {
   replyRecipients: string[];
 }
 
-/** Text-only compose payload accepted by provider send implementations. */
+/** Compose payload accepted by provider send implementations. `html` is optional. */
 export interface ComposeMailInput {
   to: string[];
   subject: string;
   body: string;
+  html?: string;
 }
 
 /** OAuth token 接口的响应体（Google / Microsoft 同构） */

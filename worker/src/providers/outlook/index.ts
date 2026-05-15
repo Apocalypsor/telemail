@@ -311,7 +311,10 @@ export class OutlookProvider extends EmailProvider {
     await graphPost(await this.token(), "/me/sendMail", {
       message: {
         subject: input.subject,
-        body: { contentType: "Text", content: input.body },
+        body: {
+          contentType: input.html ? "HTML" : "Text",
+          content: input.html ?? input.body,
+        },
         toRecipients: this.graphRecipients(input.to),
       },
       saveToSentItems: true,
@@ -342,7 +345,10 @@ export class OutlookProvider extends EmailProvider {
     await graphPost(token, "/me/sendMail", {
       message: {
         subject: input.subject,
-        body: { contentType: "Text", content: input.body },
+        body: {
+          contentType: input.html ? "HTML" : "Text",
+          content: input.html ?? input.body,
+        },
         toRecipients: this.graphRecipients(input.to),
         ...(internetMessageHeaders.length > 0
           ? { internetMessageHeaders }

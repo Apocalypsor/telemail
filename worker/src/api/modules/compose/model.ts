@@ -20,3 +20,19 @@ export const ComposeSendBody = t.Object({
   replySource: t.Optional(ComposeReplySource),
 });
 export type ComposeSendBody = UnwrapSchema<typeof ComposeSendBody>;
+
+export const ComposeOptimizeBody = t.Object({
+  accountId: t.Optional(t.Number()),
+  subject: t.Optional(t.String({ maxLength: 998 })),
+  body: t.String({ minLength: 1, maxLength: 100_000 }),
+  replyMode: t.Optional(t.Boolean()),
+  replySource: t.Optional(ComposeReplySource),
+});
+export type ComposeOptimizeBody = UnwrapSchema<typeof ComposeOptimizeBody>;
+
+export const ComposeOptimizeResponse = t.Object({
+  body: t.String(),
+});
+export type ComposeOptimizeResponse = UnwrapSchema<
+  typeof ComposeOptimizeResponse
+>;

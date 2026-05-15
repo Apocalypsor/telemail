@@ -25,6 +25,7 @@
     "i18next": "^26.0.8",
     "ky": "^1.14.3",
     "linkedom": "^0.18.12",
+    "marked": "^16.0.0",
     "postal-mime": "^2.7.4",
     "turndown": "^7.2.4",
     "workers-observability-hub": "^1.0.3"

@@ -1,7 +1,7 @@
 import { authAny } from "@worker/api/plugins/auth-any";
 import { cf } from "@worker/api/plugins/cf";
 import { Elysia } from "elysia";
-import { ComposeSendBody } from "./model";
+import { ComposeOptimizeBody, ComposeSendBody } from "./model";
 import { ComposeService } from "./service";
 
 export const composeController = new Elysia({ name: "controller.compose" })
@@ -12,6 +12,17 @@ export const composeController = new Elysia({ name: "controller.compose" })
     if (!result.ok) return status(result.status, { error: result.error });
     return result.data;
   })
+
+  .post(
+    "/api/compose/optimize",
+    async ({ env, userId, isAdmin, body, status }) => {
+      const result = await ComposeService.optimize(env, userId, isAdmin, body);
+      if (!result.ok)
+        return status(result.status, { ok: false, error: result.error });
+      return result.data;
+    },
+    { body: ComposeOptimizeBody },
+  )
 
   .post(
     "/api/compose/send",

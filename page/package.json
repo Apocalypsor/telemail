@@ -19,6 +19,8 @@
     "@tanstack/react-query": "^5.100.5",
     "@tanstack/react-router": "^1.168.24",
     "@tanstack/react-virtual": "^3.13.24",
+    "marked": "^16.0.0",
+    "prismjs": "^1.30.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
@@ -27,6 +29,7 @@
     "@tanstack/router-cli": "^1.166.36",
     "@tanstack/router-plugin": "^1.167.27",
     "@telegram-apps/sdk-react": "^3.3.9",
+    "@types/prismjs": "^1.26.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
