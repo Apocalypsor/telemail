@@ -136,7 +136,7 @@ export const optimizeEmailDraft = async (
   replyMode: boolean,
   senderEmail?: string | null,
   originalEmail?: OriginalEmailContext,
-): Promise<string> => {
+): Promise<OptimizedEmailDraft> => {
   const originalSection = originalEmail
     ? `\n\nOriginal email context for this reply:\n` +
       `From: ${originalEmail.from || "(unknown)"}\n` +
@@ -145,10 +145,14 @@ export const optimizeEmailDraft = async (
       `Original body:\n${originalEmail.body || "(empty)"}\n`
     : "";
   const senderSection = senderEmail ? `\nSending as: ${senderEmail}\n` : "";
+  const needsSubject = !subject.trim();
 
   const prompt =
     `You are helping write a complete email draft in Markdown.\n` +
     `Turn the user's input into a finished email that can be sent directly.\n` +
+    `Return ONLY valid JSON with these fields:\n` +
+    `- "body": the rewritten draft body in Markdown.\n` +
+    `- "subject": ${needsSubject ? "a concise generated subject line" : "null. Do not generate or rewrite a subject because one already exists"}.\n\n` +
     `Rules:\n` +
     `- Keep the same language as the draft unless the draft is mixed; then prefer the dominant language.\n` +
     `- Make the email concise, but include every necessary detail, request, answer, date, name, and action item.\n` +
@@ -174,7 +178,13 @@ export const optimizeEmailDraft = async (
     `- If this is a reply and the sender email is known, address the original sender with that context when natural.\n` +
     `- If the original sender looks like a person, use a personal greeting; if it looks like a service or support mailbox, use a neutral professional greeting.\n` +
     `- If the body is already strong, you may make only light edits.\n` +
-    `- Output only the rewritten draft body.\n\n` +
+    `- If an existing subject was provided, return subject as null and do not generate, rewrite, translate, or improve it.\n` +
+    `- If "subject" is needed, keep it friendly, professional, specific, and under 80 characters when possible.\n` +
+    `- If this is a reply and the original subject is meaningful, keep a natural reply subject with the Re: prefix.\n` +
+    `- If this is a reply but the original subject is empty or generic, create a specific reply subject from the draft and context.\n` +
+    `- Do not put quotes, markdown, labels, or explanations in "subject".\n` +
+    `- Do not invent new facts in either field.\n` +
+    `- Output JSON only. Do not wrap it in a code fence.\n\n` +
     `Context:\n` +
     `Reply mode: ${replyMode ? "yes" : "no"}\n` +
     `Subject: ${subject || "(none)"}\n` +
@@ -183,10 +193,53 @@ export const optimizeEmailDraft = async (
     `\n\n` +
     `Draft:\n${body}`;
 
-  const raw = await callLLM(baseUrl, apiKey, model, prompt, false);
-  return raw
+  const raw = await callLLM(baseUrl, apiKey, model, prompt, true);
+  const parsed = parseOptimizedEmailDraft(raw);
+  return {
+    body: parsed.body,
+    subject: needsSubject ? parsed.subject : undefined,
+  };
+};
+
+const parseOptimizedEmailDraft = (raw: string): OptimizedEmailDraft => {
+  const jsonStr = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+  try {
+    const parsed = JSON.parse(jsonStr) as {
+      body?: unknown;
+      subject?: unknown;
+    };
+    const body =
+      typeof parsed.body === "string"
+        ? cleanGeneratedMarkdown(parsed.body)
+        : "";
+    const subject =
+      typeof parsed.subject === "string"
+        ? cleanGeneratedSubject(parsed.subject)
+        : undefined;
+    if (!body.trim()) throw new Error("LLM returned empty body");
+    return { body, subject };
+  } catch (err) {
+    throw new Error(
+      `LLM returned invalid optimized draft JSON: ${raw.slice(0, 200)}`,
+      { cause: err },
+    );
+  }
+};
+
+const cleanGeneratedMarkdown = (value: string): string => {
+  return value
     .replace(/^\s*```(?:markdown|md)?\s*\n?/i, "")
     .replace(/\n?```\s*$/i, "");
+};
+
+const cleanGeneratedSubject = (value: string): string => {
+  return value
+    .replace(/^\s*```(?:text|markdown|md)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .replace(/^subject\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "");
 };
 
 export interface OriginalEmailContext {
@@ -195,6 +248,12 @@ export interface OriginalEmailContext {
   to: string | null;
   body: string;
 }
+
+export interface OptimizedEmailDraft {
+  body: string;
+  subject?: string;
+}
+
 /** LLM 一次调用返回结果 */
 export interface EmailAnalysis {
   /** 摘要（bullet list） */

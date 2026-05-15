@@ -1,4 +1,7 @@
-import { optimizeEmailDraft } from "@worker/clients/llm";
+import {
+  type OriginalEmailContext,
+  optimizeEmailDraft,
+} from "@worker/clients/llm";
 import { MAX_BODY_CHARS } from "@worker/constants";
 import { getAuthorizedAccount } from "@worker/db/accounts";
 import { getEmailProvider, PROVIDERS } from "@worker/providers";
@@ -14,7 +17,7 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { AccountResponse } from "../accounts/model";
 import { AccountsService } from "../accounts/service";
 import { MailService } from "../mail/service";
-import type { Folder } from "../mail/types";
+import type { Folder, LoadForRenderingResult } from "../mail/types";
 import type { ComposeOptimizeBody, ComposeSendBody } from "./model";
 
 export abstract class ComposeService {
@@ -75,8 +78,12 @@ export abstract class ComposeService {
       : null;
     if (replyDefaults && !replyDefaults.ok) return replyDefaults;
 
-    const recipients = parseEmailAddressList(body.to);
     const draftBody = body.body;
+    if (!draftBody.trim()) {
+      return { ok: false, status: 400, error: "正文不能为空" };
+    }
+
+    const recipients = parseEmailAddressList(body.to);
     const draftHtml = markdownToHtml(draftBody);
     const input: ComposeMailInput = {
       to:
@@ -87,9 +94,6 @@ export abstract class ComposeService {
     };
     if (input.to.length === 0) {
       return { ok: false, status: 400, error: "请填写有效收件人" };
-    }
-    if (!input.body.trim()) {
-      return { ok: false, status: 400, error: "正文不能为空" };
     }
 
     try {
@@ -156,12 +160,15 @@ export abstract class ComposeService {
         senderAccount?.email ?? originalContext?.senderEmail ?? null,
         originalContext?.context,
       );
-      if (!optimized.trim()) {
+      if (!optimized.body.trim()) {
         return { ok: false, status: 500, error: "优化失败" };
       }
       return {
         ok: true,
-        data: { body: optimized.trim() },
+        data: {
+          body: optimized.body.trim(),
+          ...(optimized.subject ? { subject: optimized.subject } : {}),
+        },
       };
     } catch (err) {
       await reportErrorToObservability(env, "compose.optimize_failed", err, {
@@ -207,6 +214,16 @@ export abstract class ComposeService {
       return { ok: false, status: original.status, error: "原邮件不可用" };
     }
 
+    return {
+      ok: true,
+      context: ComposeService.buildOriginalContext(original),
+      senderEmail: ctx.account.email ?? null,
+    };
+  }
+
+  private static buildOriginalContext(
+    original: Extract<LoadForRenderingResult, { ok: true }>,
+  ): OriginalEmailContext {
     let bodyMarkdown = "";
     try {
       bodyMarkdown = htmlToMarkdown(original.rawHtml);
@@ -216,17 +233,13 @@ export abstract class ComposeService {
 
     const normalizedBody = bodyMarkdown.replace(/\s+\n/g, "\n").trim();
     return {
-      ok: true,
-      context: {
-        subject: original.meta.subject ?? null,
-        from: original.meta.from ?? null,
-        to: original.meta.to ?? null,
-        body:
-          normalizedBody.length > MAX_BODY_CHARS
-            ? `${normalizedBody.slice(0, MAX_BODY_CHARS)}...`
-            : normalizedBody,
-      },
-      senderEmail: ctx.account.email ?? null,
+      subject: original.meta.subject ?? null,
+      from: original.meta.from ?? null,
+      to: original.meta.to ?? null,
+      body:
+        normalizedBody.length > MAX_BODY_CHARS
+          ? `${normalizedBody.slice(0, MAX_BODY_CHARS)}...`
+          : normalizedBody,
     };
   }
 
@@ -266,6 +279,7 @@ export abstract class ComposeService {
       folder: original.fetchFolder,
       recipients: original.replyRecipients,
       subject: buildReplySubject(original.meta.subject),
+      originalContext: ComposeService.buildOriginalContext(original),
     };
   }
 }
@@ -286,7 +300,7 @@ type ComposeAccountsResult =
   | { ok: false; status: number; error: string };
 
 type ComposeOptimizeResult =
-  | { ok: true; data: { body: string } }
+  | { ok: true; data: { body: string; subject?: string } }
   | { ok: false; status: 400 | 403 | 404 | 500; error: string };
 
 type OriginalContextResult =
@@ -309,5 +323,6 @@ type ReplyDefaultsResult =
       folder: Folder;
       recipients: string[];
       subject: string;
+      originalContext: OriginalEmailContext;
     }
   | { ok: false; status: 400 | 403 | 404 | 500; error: string };

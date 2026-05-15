@@ -32,6 +32,7 @@ export type ComposeOptimizeBody = UnwrapSchema<typeof ComposeOptimizeBody>;
 
 export const ComposeOptimizeResponse = t.Object({
   body: t.String(),
+  subject: t.Optional(t.String()),
 });
 export type ComposeOptimizeResponse = UnwrapSchema<
   typeof ComposeOptimizeResponse

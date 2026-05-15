@@ -52,7 +52,7 @@ Queue Consumer 拉取原始 RFC 2822 邮件（Gmail REST / Outlook Graph / IMAP 
 
 每条邮件消息附带 inline keyboard：⭐ 星标 / 🚫 垃圾 / ↩️ 回复 / 🔄 刷新 / ⏰ 提醒 / 📧 查看原文。星标同时自动标记已读 + 置顶（取消星标 → 取消置顶）；标记垃圾移到垃圾邮件文件夹 + 删除 Telegram 消息；回复会打开写邮件 Mini App 并带入原邮件上下文，且只能从原收件账号发送；刷新先和远端对账（邮件被移到垃圾 / 归档 / 删除 → 清理 TG 消息），仍在收件箱才重新拉取 + LLM 分析。
 
-`WORKER_URL` 是必填，用来生成 ↩️ 回复 + ⏰ 提醒 + 📧 查看原文等 Mini App 入口。私聊里直接打开 Mini App；群聊走 `t.me/<bot>/<short>?startapp=...` deep link（需配 `TG_MINI_APP_SHORT_NAME`，未配时群聊只保留 web 查看原文）。Mini App 里能管理邮箱账号、写邮件 / 回复邮件（正文支持 Markdown，带预览和 LLM 优化）、看邮件预览（带星标 / 回复 / 标垃圾 / 删除等操作），设提醒，浏览未读 / 星标 / 垃圾 / 归档列表；列表和搜索会随滚动继续加载，并在每封邮件上用不同颜色显示发件人和收件人。每个用户可在 Mini App 里单独配置 Things Cloud；邮件提醒到期时会创建一条 Things Today 任务。Cron 会按每个用户记录的时区，在本地 19:00 私聊发送晚间邮件摘要；未读和垃圾都为 0 时跳过。
+`WORKER_URL` 是必填，用来生成 ↩️ 回复 + ⏰ 提醒 + 📧 查看原文等 Mini App 入口。私聊里直接打开 Mini App；群聊走 `t.me/<bot>/<short>?startapp=...` deep link（需配 `TG_MINI_APP_SHORT_NAME`，未配时群聊只保留 web 查看原文）。Mini App 里能管理邮箱账号、写邮件 / 回复邮件（正文支持 Markdown，带预览和 LLM 优化，空主题点 LLM 优化时会同时生成主题）、看邮件预览（带星标 / 回复 / 标垃圾 / 删除等操作），设提醒，浏览未读 / 星标 / 垃圾 / 归档列表；列表和搜索会随滚动继续加载，并在每封邮件上用不同颜色显示发件人和收件人。每个用户可在 Mini App 里单独配置 Things Cloud；邮件提醒到期时会创建一条 Things Today 任务。Cron 会按每个用户记录的时区，在本地 19:00 私聊发送晚间邮件摘要；未读和垃圾都为 0 时跳过。
 
 频道 / 群组里对邮件消息加 emoji reaction 会自动标记对应邮件为已读。
 
@@ -61,7 +61,7 @@ Queue Consumer 拉取原始 RFC 2822 邮件（Gmail REST / Outlook Graph / IMAP 
 <details>
 <summary><strong>AI 摘要 + 垃圾检测</strong>（点击展开）</summary>
 
-配好 `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` 后，新邮件发到 Telegram 后会异步调用 LLM 生成摘要和标签，编辑原消息替换正文；标签以 `#Tag` 形式附在末尾。验证码会先用规则提取并随正文首发，LLM 摘要完成后仍和验证码一起显示。Mini App 的写邮件 / 回复邮件页也会用同一组配置提供正文优化；回复邮件优化会带上原邮件内容作为上下文。垃圾检测高置信度（≥ 0.8）自动加 `#Junk` 标签（不会自动移动或删除）。
+配好 `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` 后，新邮件发到 Telegram 后会异步调用 LLM 生成摘要和标签，编辑原消息替换正文；标签以 `#Tag` 形式附在末尾。验证码会先用规则提取并随正文首发，LLM 摘要完成后仍和验证码一起显示。Mini App 的写邮件 / 回复邮件页也会用同一组配置提供正文优化；回复邮件优化会带上原邮件内容作为上下文；空主题点 LLM 优化时会在同一次调用里根据正文和回复上下文生成主题。垃圾检测高置信度（≥ 0.8）自动加 `#Junk` 标签（不会自动移动或删除）。
 
 </details>
 
