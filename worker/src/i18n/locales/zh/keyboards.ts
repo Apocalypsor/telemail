@@ -10,7 +10,7 @@ export default {
     remind: "⏰",
   },
   menu: {
-    compose: "✉️ 写邮件",
+    compose: "✉️ 写新邮件",
     accountManagement: "📧 账号管理",
     unread: "📬 未读邮件",
     sync: "🔄 同步邮件",

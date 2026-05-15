@@ -1,4 +1,3 @@
-import { ROUTE_MINI_APP_COMPOSE } from "@page/paths";
 import { formatUserName } from "@worker/bot/utils/user-format";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
@@ -18,8 +17,6 @@ export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
       : t("admin:failedEmails.title");
   const base = env.WORKER_URL.replace(/\/$/, "");
   const kb = new InlineKeyboard()
-    .webApp(t("admin:compose"), `${base}${ROUTE_MINI_APP_COMPOSE}`)
-    .row()
     .text(t("keyboards:menu.userManagement"), "users")
     .row()
     .text(failedLabel, "failed")

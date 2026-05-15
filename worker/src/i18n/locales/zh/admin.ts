@@ -32,7 +32,6 @@ export default {
     clearedShort: "已清空",
   },
   renewWatch: "🔄 续订所有 Watch",
-  compose: "✉️ 写邮件",
   htmlPreview: "🔍 HTML 预览工具",
   junkCheck: "🚫 垃圾邮件检测",
   secrets: {
