@@ -1,20 +1,9 @@
 import { validateSearch } from "@page/api/utils";
-import { Type as t } from "@sinclair/typebox";
 import { createFileRoute } from "@tanstack/react-router";
 import { ComposePage } from "./-components/compose-page";
+import { ComposeSearchSchema } from "./-types";
 
-const Search = t.Object({
-  accountId: t.Optional(t.Number()),
-  to: t.Optional(t.String()),
-  subject: t.Optional(t.String()),
-  replyEmailMessageId: t.Optional(t.String()),
-  token: t.Optional(t.String()),
-  folder: t.Optional(
-    t.Union([t.Literal("inbox"), t.Literal("junk"), t.Literal("archive")]),
-  ),
-  back: t.Optional(t.String()),
-});
-const validateComposeSearch = validateSearch(Search);
+const validateComposeSearch = validateSearch(ComposeSearchSchema);
 
 const ComposeRoute = () => {
   const search = Route.useSearch();

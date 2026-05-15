@@ -151,6 +151,9 @@ export const optimizeEmailDraft = async (
     `Turn the user's input into a finished email that can be sent directly.\n` +
     `Rules:\n` +
     `- Keep the same language as the draft unless the draft is mixed; then prefer the dominant language.\n` +
+    `- Make the email concise, but include every necessary detail, request, answer, date, name, and action item.\n` +
+    `- Keep the tone friendly and professional.\n` +
+    `- Prefer short paragraphs over long blocks.\n` +
     `- Keep Markdown syntax valid and useful.\n` +
     `- Preserve paragraph breaks and deliberate blank lines, especially before a signature or closing line.\n` +
     `- Follow normal email structure: greeting, body paragraphs, and a short closing line.\n` +
@@ -165,6 +168,7 @@ export const optimizeEmailDraft = async (
     `- If this is a reply, use the original email context to make the reply relevant, but do not quote or summarize the original email unless the draft asks for it.\n` +
     `- If this is a reply, keep the tone concise, direct, and polite.\n` +
     `- If the original email context makes a greeting or closing natural, use it sparingly and keep it human.\n` +
+    `- If the draft is only a short prompt, infer the implied message and complete the email naturally.\n` +
     `- If the user only typed something like "hi", "thanks", or a one-line note, infer the rest of the email from the context and make it complete.\n` +
     `- If sender or recipient names are available, use them naturally; otherwise fall back to email addresses or a neutral greeting.\n` +
     `- If this is a reply and the sender email is known, address the original sender with that context when natural.\n` +

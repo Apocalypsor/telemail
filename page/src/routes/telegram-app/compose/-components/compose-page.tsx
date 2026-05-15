@@ -15,13 +15,7 @@ import "prismjs/components/prism-markdown";
 import { marked } from "marked";
 import type { Token as PrismToken } from "prismjs";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { ComposeSearch } from "../-utils/types";
-
-type ComposeAccountsData = {
-  accounts: AccountResponse[];
-  currentUserId: string;
-  canViewAll: boolean;
-};
+import type { ComposeAccountsData, ComposeSearch } from "../-types";
 
 export const ComposePage = ({ search }: { search: ComposeSearch }) => {
   const inTelegramMiniApp = isTMA();
@@ -87,10 +81,6 @@ export const ComposePage = ({ search }: { search: ComposeSearch }) => {
   });
 
   const accounts = accountsQuery.data?.accounts ?? [];
-  const selectedAccount = useMemo(
-    () => accounts.find((account) => account.id === accountId) ?? null,
-    [accounts, accountId],
-  );
   const replyAccount = useMemo(
     () =>
       replyMode && search.accountId
@@ -249,19 +239,7 @@ export const ComposePage = ({ search }: { search: ComposeSearch }) => {
           <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
             {replyMode ? "回复邮件" : "写邮件"}
           </h1>
-          <div className="mt-1 text-xs text-zinc-500 truncate">
-            {selectedAccount
-              ? accountLabel(selectedAccount)
-              : accounts.length > 0
-                ? ""
-                : " "}
-          </div>
         </div>
-        {replyMode && (
-          <span className="shrink-0 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">
-            ↩️
-          </span>
-        )}
       </header>
 
       {status && (
