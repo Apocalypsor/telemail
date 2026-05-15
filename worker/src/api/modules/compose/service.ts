@@ -157,7 +157,7 @@ export abstract class ComposeService {
         body.subject?.trim() ?? "",
         draft,
         body.replyMode === true,
-        senderAccount?.email ?? originalContext?.senderEmail ?? null,
+        senderAccount?.email ?? null,
         originalContext?.context,
       );
       if (!optimized.body.trim()) {
@@ -217,7 +217,6 @@ export abstract class ComposeService {
     return {
       ok: true,
       context: ComposeService.buildOriginalContext(original),
-      senderEmail: ctx.account.email ?? null,
     };
   }
 
@@ -312,7 +311,6 @@ type OriginalContextResult =
         to: string | null;
         body: string;
       };
-      senderEmail: string | null;
     }
   | { ok: false; status: 400 | 403 | 404 | 500; error: string };
 

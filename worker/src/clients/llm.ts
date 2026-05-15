@@ -174,8 +174,10 @@ export const optimizeEmailDraft = async (
     `- If the original email context makes a greeting or closing natural, use it sparingly and keep it human.\n` +
     `- If the draft is only a short prompt, infer the implied message and complete the email naturally.\n` +
     `- If the user only typed something like "hi", "thanks", or a one-line note, infer the rest of the email from the context and make it complete.\n` +
-    `- If sender or recipient names are available, use them naturally; otherwise fall back to email addresses or a neutral greeting.\n` +
-    `- If this is a reply and the sender email is known, address the original sender with that context when natural.\n` +
+    `- If sender or recipient names are available, use them naturally; otherwise use a neutral greeting.\n` +
+    `- Email addresses are context only. Never use an email address directly as a greeting name, recipient name, sender name, signature name, or closing.\n` +
+    `- If a From/To value has a display name, you may use that display name. If it only has an email address, use a neutral greeting instead.\n` +
+    `- Do not sign off with the sender email address. If no sender name is available, use a short neutral sign-off without a name.\n` +
     `- If the original sender looks like a person, use a personal greeting; if it looks like a service or support mailbox, use a neutral professional greeting.\n` +
     `- If the body is already strong, you may make only light edits.\n` +
     `- If an existing subject was provided, return subject as null and do not generate, rewrite, translate, or improve it.\n` +
