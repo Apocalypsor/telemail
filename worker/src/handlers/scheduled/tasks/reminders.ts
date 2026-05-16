@@ -23,6 +23,7 @@ import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 
 export class DueRemindersTask extends ScheduledTask {
   constructor() {
@@ -127,7 +128,7 @@ export class DueRemindersTask extends ScheduledTask {
       accountId,
     );
     const url = buildMiniAppMailUrl(
-      env.WORKER_URL,
+      getWorkerBaseUrl(env),
       emailMessageId,
       accountId,
       token,

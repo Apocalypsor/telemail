@@ -9,6 +9,7 @@ import { t } from "@worker/i18n";
 import { PROVIDERS } from "@worker/providers";
 import type { AccountType, Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 
@@ -84,7 +85,7 @@ export const registerAddCallbacks = (bot: Bot, env: Env) => {
         const account = await createAccount(env.DB, state.chatId, userId, type);
         await clearBotState(env, userId);
 
-        const origin = env.WORKER_URL.replace(/\/$/, "");
+        const origin = getWorkerBaseUrl(env);
         const oauthUrl = await oauth.generateOAuthUrl(
           env,
           account.id,

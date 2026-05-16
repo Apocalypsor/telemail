@@ -1,7 +1,9 @@
+import { ROUTE_MINI_APP_USERS } from "@page/paths";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
 import type { Env, TelegramUser } from "@worker/types";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import { formatUserName } from "@worker/utils/user-format";
 import { InlineKeyboard } from "grammy";
 
@@ -9,12 +11,16 @@ export const SECRETS_AUTO_DELETE_SECONDS = 60;
 
 export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
   const failedCount = await countFailedEmails(env.DB);
+  const base = getWorkerBaseUrl(env);
   const failedLabel =
     failedCount > 0
       ? t("admin:failedEmails.titleWithCount", { count: failedCount })
       : t("admin:failedEmails.title");
   const kb = new InlineKeyboard()
-    .text(t("keyboards:menu.userManagement"), "users")
+    .webApp(
+      t("keyboards:menu.userManagement"),
+      `${base}${ROUTE_MINI_APP_USERS}`,
+    )
     .row()
     .text(failedLabel, "failed")
     .row()
@@ -22,7 +28,6 @@ export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
     .row()
     .text(t("admin:secrets.button"), "secrets")
     .row();
-  const base = env.WORKER_URL.replace(/\/$/, "");
   kb.url(t("admin:htmlPreview"), `${base}/preview`).row();
   kb.url(t("admin:junkCheck"), `${base}/junk-check`).row();
   kb.text(t("common:button.back"), "menu");
@@ -40,7 +45,7 @@ export const buildSecretsText = (env: Env): string => {
   for (const { label, value } of secrets) {
     lines.push(``, escapeMdV2(label), `\`${codeEsc(value)}\``);
   }
-  const url = `${env.WORKER_URL.replace(/\/$/, "")}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
+  const url = `${getWorkerBaseUrl(env)}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
   lines.push(
     ``,
     escapeMdV2(t("admin:secrets.webhookUrlLabel")),

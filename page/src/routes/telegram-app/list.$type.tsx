@@ -27,7 +27,7 @@ import {
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import type { MailListType } from "@worker/api/modules/miniapp/model";
 import { useCallback, useMemo, useState } from "react";
-import { BULK_ACTIONS, isMailListType } from "./-utils/list-actions";
+import { BULK_ACTIONS, isMailListType } from "./-utils";
 
 const MailListPage = () => {
   const { type: typeParam } = Route.useParams();

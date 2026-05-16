@@ -15,6 +15,7 @@ import {
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import { formatUserName } from "@worker/utils/user-format";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
@@ -129,7 +130,7 @@ export const registerStartHandlers = (bot: Bot, env: Env) => {
 /** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/全局管理。 */
 const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
   const kb = new InlineKeyboard();
-  const base = env.WORKER_URL.replace(/\/$/, "");
+  const base = getWorkerBaseUrl(env);
   const listUrl = (type: string) =>
     `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
   kb.row()

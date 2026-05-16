@@ -22,6 +22,7 @@ import {
 } from "@worker/utils/mail/token";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { resolveUserTimeZone } from "@worker/utils/time-zone";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import type { EnrichedReminder } from "./types";
 
 const getOrCreateThingsAppInstanceId = async (
@@ -127,7 +128,7 @@ export abstract class RemindersService {
         reminder.account_id,
       );
       const mailUrl = buildWebMailUrl(
-        env.WORKER_URL,
+        getWorkerBaseUrl(env),
         reminder.email_message_id,
         reminder.account_id,
         token,

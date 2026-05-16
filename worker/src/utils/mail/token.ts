@@ -1,4 +1,5 @@
 import { hmacSha256Hex, timingSafeEqual } from "@worker/utils/hash";
+import { normalizeBaseUrl } from "@worker/utils/url";
 
 /** 生成基于 accountId 的邮件查看链接 HMAC-SHA256 token（32 字符截断） */
 export const generateMailTokenById = async (
@@ -48,7 +49,7 @@ export const buildWebMailUrl = (
   token: string,
   folder?: "inbox" | "junk" | "archive",
 ): string => {
-  const base = `${workerUrl.replace(/\/$/, "")}/mail/${encodeURIComponent(emailMessageId)}?accountId=${accountId}&t=${encodeURIComponent(token)}`;
+  const base = `${normalizeBaseUrl(workerUrl)}/mail/${encodeURIComponent(emailMessageId)}?accountId=${accountId}&t=${encodeURIComponent(token)}`;
   return folder ? `${base}&folder=${folder}` : base;
 };
 
@@ -59,7 +60,7 @@ export const buildMiniAppMailUrl = (
   accountId: number,
   token: string,
 ): string => {
-  return `${workerUrl.replace(/\/$/, "")}/telegram-app/mail/${encodeURIComponent(emailMessageId)}?accountId=${accountId}&t=${encodeURIComponent(token)}`;
+  return `${normalizeBaseUrl(workerUrl)}/telegram-app/mail/${encodeURIComponent(emailMessageId)}?accountId=${accountId}&t=${encodeURIComponent(token)}`;
 };
 
 /** Mini App 版提醒页 URL（与 ROUTE_MINI_APP_REMINDERS 同步） */
@@ -69,5 +70,5 @@ export const buildMiniAppRemindersUrl = (
   accountId: number,
   token: string,
 ): string => {
-  return `${workerUrl.replace(/\/$/, "")}/telegram-app/reminders?accountId=${accountId}&emailMessageId=${encodeURIComponent(emailMessageId)}&token=${encodeURIComponent(token)}`;
+  return `${normalizeBaseUrl(workerUrl)}/telegram-app/reminders?accountId=${accountId}&emailMessageId=${encodeURIComponent(emailMessageId)}&token=${encodeURIComponent(token)}`;
 };

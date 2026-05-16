@@ -8,6 +8,7 @@ import { providersController } from "@worker/api/modules/providers";
 import { remindersController } from "@worker/api/modules/reminders";
 import { settingsController } from "@worker/api/modules/settings";
 import { telegramController } from "@worker/api/modules/telegram";
+import { usersController } from "@worker/api/modules/users";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { Elysia } from "elysia";
 import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
@@ -26,6 +27,7 @@ import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
  *  - `/api/accounts/*`                 mini app account management
  *  - `/api/mini-app/*`                 mini app generic API
  *  - `/api/reminders/*`                reminders CRUD
+ *  - `/api/users/*`                    mini app admin user management
  *
  * 通过 `worker/index.ts` 的 fetch wrapper 把 (env, executionCtx) 注入。
  */
@@ -74,6 +76,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter, name: "telemail" })
   .use(miniAppController)
   .use(remindersController)
   .use(settingsController)
+  .use(usersController)
   .compile();
 
 export type App = typeof app;

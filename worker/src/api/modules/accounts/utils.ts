@@ -2,6 +2,7 @@ import { getAuthorizedAccount } from "@worker/db/accounts";
 import { getUserByTelegramId } from "@worker/db/users";
 import { accountCanArchive, PROVIDERS } from "@worker/providers";
 import type { Account, AccountType, Env, TelegramUser } from "@worker/types";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import { formatUserName } from "@worker/utils/user-format";
 import type {
   AccountProviderOption,
@@ -33,7 +34,7 @@ export const normalizeChatId = (chatId: string): string | null => {
 };
 
 export const oauthCallbackUrl = (env: Env, type: AccountType): string => {
-  const origin = env.WORKER_URL.replace(/\/$/, "");
+  const origin = getWorkerBaseUrl(env);
   return `${origin}/oauth/${type}/callback`;
 };
 

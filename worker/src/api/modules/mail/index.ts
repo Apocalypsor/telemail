@@ -15,6 +15,7 @@ import {
   trashEmailAndCleanup,
 } from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import { Elysia } from "elysia";
 import {
   MailActionBody,
@@ -64,7 +65,7 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
     );
 
     const webMailUrl = buildWebMailUrl(
-      env.WORKER_URL,
+      getWorkerBaseUrl(env),
       emailMessageId,
       account.id,
       token,

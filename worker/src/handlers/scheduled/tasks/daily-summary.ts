@@ -17,6 +17,7 @@ import { type Account, AccountType, type Env } from "@worker/types";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { resolveUserTimeZone } from "@worker/utils/time-zone";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import { InlineKeyboard } from "grammy";
 
 interface LocalDateTime {
@@ -154,7 +155,7 @@ export class DailyMailSummaryTask extends ScheduledTask {
     counts: MailCounts,
   ): InlineKeyboard | undefined {
     const kb = new InlineKeyboard();
-    const base = env.WORKER_URL.replace(/\/$/, "");
+    const base = getWorkerBaseUrl(env);
     const listUrl = (type: "unread" | "junk"): string =>
       `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
     let hasButtons = false;

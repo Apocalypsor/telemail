@@ -9,8 +9,25 @@ interface BulkAction {
   danger?: boolean;
 }
 
+export interface UserActionInput {
+  telegramId: string;
+  name: string;
+}
+
+export const USERS_QUERY_KEY = ["users"];
+
 export const isMailListType = (s: string): s is MailListType => {
   return (MAIL_LIST_TYPES as readonly string[]).includes(s);
+};
+
+export const formatUserLastLogin = (value: string | null): string => {
+  if (!value) return "从未";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 };
 
 export const BULK_ACTIONS: Partial<Record<MailListType, BulkAction>> = {

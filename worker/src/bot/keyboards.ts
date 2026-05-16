@@ -8,6 +8,7 @@ import {
   buildWebMailUrl,
   generateMailTokenById,
 } from "@worker/utils/mail/token";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import { InlineKeyboard } from "grammy";
 
 // ── 邮件信息键盘（星标 / 查看原文）─────────────────────────────────────────
@@ -70,7 +71,7 @@ export const buildEmailKeyboard = async (
   tgMessageId: number,
 ): Promise<InlineKeyboard> => {
   const kb = addCoreButtons(new InlineKeyboard(), starred, canArchive);
-  const base = env.WORKER_URL;
+  const base = getWorkerBaseUrl(env);
   const [mailToken, reminderCount] = await Promise.all([
     generateMailTokenById(env.ADMIN_SECRET, emailMessageId, accountId),
     // ⏰ label 实时反映该邮件的 pending 提醒数（"⏰" 或 "⏰ (2)"）。

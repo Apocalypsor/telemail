@@ -11,6 +11,7 @@ import { getEmailProvider, PROVIDERS } from "@worker/providers";
 import type { GmailProvider } from "@worker/providers/gmail";
 import type { Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 
@@ -34,7 +35,7 @@ export const registerAuthCallbacks = (bot: Bot, env: Env) => {
       });
 
     try {
-      const origin = env.WORKER_URL.replace(/\/$/, "");
+      const origin = getWorkerBaseUrl(env);
       const callbackUrl = `${origin}/oauth/${account.type}/callback`;
       const oauthUrl = await oauth.generateOAuthUrl(
         env,

@@ -58,6 +58,7 @@ import {
   QueueMessageType,
 } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { getWorkerBaseUrl } from "@worker/utils/url";
 import { HTTPError } from "ky";
 
 export class OutlookProvider extends EmailProvider {
@@ -164,7 +165,7 @@ export class OutlookProvider extends EmailProvider {
       throw new Error("MS_WEBHOOK_SECRET not configured");
     }
     const token = await this.token();
-    const workerUrl = this.env.WORKER_URL.replace(/\/$/, "");
+    const workerUrl = getWorkerBaseUrl(this.env);
     const notificationUrl = `${workerUrl}${OutlookProvider.ROUTE_PUSH}?secret=${this.env.MS_WEBHOOK_SECRET}`;
 
     const expiration = new Date(

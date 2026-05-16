@@ -96,7 +96,7 @@ Bot 只保留主入口和帮助，其它常用功能通过 `/start` 面板进入
 
 命令菜单通过 `setMyCommands` API 自动注册到 Telegram（webhook 收到消息时异步触发，KV 版本号不变则跳过）。修改 `worker/src/bot/commands.ts` 的 `BOT_COMMANDS` 后递增 `BOT_COMMANDS_VERSION` 即可，部署后发任意消息给 Bot 生效。
 
-管理员功能通过 `/start` 面板里的管理入口访问；Secrets 藏在 **全局管理** 里，不作为 slash command 暴露。
+管理员功能通过 `/start` 面板里的管理入口访问；**用户管理** 打开 Mini App，Secrets 藏在 **全局管理** 里，不作为 slash command 暴露。
 
 ## 许可证
 
