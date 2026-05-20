@@ -44,11 +44,11 @@
 
 | Secret        | 说明                                              |
 | ------------- | ------------------------------------------------- |
-| `LLM_API_URL` | OpenAI-compatible API base URL（含 `/v1`）        |
+| `LLM_API_URL` | OpenAI Responses API base URL（含 `/v1`）         |
 | `LLM_API_KEY` | LLM API key                                       |
 | `LLM_MODEL`   | 模型名称（例如 `gpt-4o-mini`）                    |
 
-兼容 OpenAI、Groq、OpenRouter、vLLM、Ollama（`http://host:11434/v1`）等任何提供 `/chat/completions` 端点的服务。
+调用走 `/v1/responses`，并使用流式 SSE 读取 `response.output_text.delta`。
 
 ### Mini App / Web 预览（可选）
 

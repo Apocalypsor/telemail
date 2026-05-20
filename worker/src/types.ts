@@ -30,9 +30,9 @@ interface WorkerSecrets {
   ADMIN_SECRET: string;
   /** Telegram 管理员 user ID，用于 Telegram Login 鉴权 */
   ADMIN_TELEGRAM_ID: string;
-  /** OpenAI compatible API base URL，例如 https://api.openai.com（可选，不配置则跳过 AI 摘要） */
+  /** OpenAI Responses API base URL，例如 https://api.openai.com/v1（可选，不配置则跳过 AI 摘要） */
   LLM_API_URL?: string;
-  /** OpenAI compatible API key */
+  /** OpenAI API key */
   LLM_API_KEY?: string;
   /** LLM 模型名称 */
   LLM_MODEL?: string;
