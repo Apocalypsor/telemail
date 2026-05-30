@@ -14,7 +14,7 @@ export interface ImapAccount {
 }
 
 const api = ky.create({
-  prefixUrl: config.workerUrl,
+  prefix: config.workerUrl,
   headers: { Authorization: `Bearer ${config.bridgeSecret}` },
   retry: { limit: 3, methods: ["get", "post"], backoffLimit: 5_000 },
   timeout: 60_000,
