@@ -64,7 +64,7 @@ const WebMailPage = () => {
           </h1>
         )}
 
-        <MailStatusBadges starred={d.starred} />
+        <MailStatusBadges inArchive={d.inArchive} starred={d.starred} />
 
         <MailMeta meta={d.meta} accountEmail={d.accountEmail} />
 

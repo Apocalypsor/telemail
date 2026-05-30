@@ -67,7 +67,7 @@ const MailPreviewPage = () => {
           <Subject subject={d.meta.subject} webMailUrl={d.webMailUrl} />
         )}
 
-        <MailStatusBadges starred={d.starred} />
+        <MailStatusBadges inArchive={d.inArchive} starred={d.starred} />
 
         <MailMeta meta={d.meta} accountEmail={d.accountEmail} />
 

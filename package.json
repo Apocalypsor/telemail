@@ -27,7 +27,7 @@
     "check:wrangler": "bun --filter '*' check:wrangler",
     "typecheck": "bun --filter '*' typecheck",
     "prepare": "husky",
-    "skills:install": "bunx skills experimental_install && ln -sf ../.agents/skills .claude/",
+    "skills:install": "bunx skills experimental_install && mkdir -p .claude/ && ln -sf ../.agents/skills .claude/",
     "skills:update": "bunx skills update"
   },
   "devDependencies": {
