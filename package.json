@@ -31,7 +31,7 @@
     "skills:update": "bunx skills update"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.8",
+    "@biomejs/biome": "2.4.15",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.0",
     "typescript": "^5.9.3",
