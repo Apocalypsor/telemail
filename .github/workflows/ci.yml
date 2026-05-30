@@ -89,7 +89,7 @@ jobs:
           D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
           KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
         run: envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -118,7 +118,7 @@ jobs:
           D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
           KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
         run: envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         id: upload
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -152,7 +152,7 @@ jobs:
         with:
           name: page-dist
           path: page/dist
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -180,7 +180,7 @@ jobs:
         with:
           name: page-dist
           path: page/dist
-      - uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v4
         id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -249,7 +249,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/github-script@v8
+      - uses: actions/github-script@v9
         env:
           MODE: preview
           NEEDS: ${{ toJSON(needs) }}
@@ -277,7 +277,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/github-script@v8
+      - uses: actions/github-script@v9
         env:
           MODE: deploy
           NEEDS: ${{ toJSON(needs) }}
