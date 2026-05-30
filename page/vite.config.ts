@@ -2,7 +2,35 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
+
+const manualChunkGroups = [
+  { name: "react", packages: ["react", "react-dom"] },
+  {
+    name: "tanstack",
+    packages: ["@tanstack/react-router", "@tanstack/react-query"],
+  },
+  { name: "heroui", packages: ["@heroui/react", "@heroui/styles"] },
+  { name: "typebox", packages: ["@sinclair/typebox"] },
+  { name: "telegram", packages: ["@telegram-apps/sdk-react"] },
+] as const;
+
+const getManualChunk = (id: string) => {
+  const normalizedId = id.replaceAll("\\", "/");
+
+  if (!normalizedId.includes("/node_modules/")) {
+    return;
+  }
+
+  for (const group of manualChunkGroups) {
+    if (
+      group.packages.some((packageName) =>
+        normalizedId.includes(`/node_modules/${packageName}/`),
+      )
+    ) {
+      return group.name;
+    }
+  }
+};
 
 /**
  * 单 entry bundle —— web 页面和 Mini App 共用 `index.html` / `main.tsx`。
@@ -11,26 +39,21 @@ import tsconfigPaths from "vite-tsconfig-paths";
  */
 export default defineConfig({
   // router 插件必须排在 react 插件之前，才能把 routeTree 的生成和 Fast Refresh 串起来
-  // tsconfigPaths 把 tsconfig.json 的 paths 直接喂给 Vite，避免 alias 双份维护
   plugins: [
-    tsconfigPaths(),
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
     tailwindcss(),
   ],
+  resolve: {
+    tsconfigPaths: true,
+  },
   build: {
     outDir: "dist",
     sourcemap: true,
     target: "es2022",
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom"],
-          tanstack: ["@tanstack/react-router", "@tanstack/react-query"],
-          heroui: ["@heroui/react", "@heroui/styles"],
-          typebox: ["@sinclair/typebox"],
-          telegram: ["@telegram-apps/sdk-react"],
-        },
+        manualChunks: getManualChunk,
       },
     },
   },
