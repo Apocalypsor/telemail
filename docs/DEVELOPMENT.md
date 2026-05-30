@@ -12,6 +12,8 @@ cp worker/wrangler.example.jsonc worker/wrangler.jsonc
 bun typegen:worker            # 重新生成 worker-configuration.d.ts
 ```
 
+根目录 `bunfig.toml` 要求依赖版本至少发布满 14 天，`bun install` 会跳过更新发布太新的版本。
+
 CI 自己走 `envsubst` 用 repo secrets 生成 `wrangler.jsonc`，本地不需要装 envsubst。
 
 ## 目录结构

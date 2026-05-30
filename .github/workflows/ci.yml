@@ -40,26 +40,50 @@ jobs:
               - 'package.json'
               - '.dockerignore'
 
-  ci:
-    name: Lint
+  check:
+    name: Biome check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun
-      - name: Biome check
-        run: bun check
-      - name: Typecheck (worker + page + middleware)
-        run: bun typecheck
-      - name: Build page
-        run: bun build:page
-      - name: Build middleware (compile sanity)
-        run: bun build:middleware
+      - run: bun check
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun
+      - run: bun typecheck
+
+  build-page:
+    name: Build page
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun
+      - run: bun build:page
       - uses: actions/upload-artifact@v7
         with:
           name: page-dist
           path: page/dist
           retention-days: 1
           if-no-files-found: error
+
+  build-middleware:
+    name: Build middleware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun
+      - run: bun build:middleware
+
+  ci:
+    name: CI
+    needs: [check, typecheck, build-page, build-middleware]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "CI checks passed"
 
   # ─── Worker ────────────────────────────────────────────────────────────────
 

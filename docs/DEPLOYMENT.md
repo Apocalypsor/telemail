@@ -17,6 +17,8 @@
 bun install
 ```
 
+根目录 `bunfig.toml` 要求依赖版本至少发布满 14 天，CI 的 `bun install --frozen-lockfile` 也会沿用这条规则。
+
 ## 2. Google Cloud（Gmail）
 
 ### 2.1 启用 Gmail API
@@ -288,13 +290,13 @@ docker compose pull && docker compose up -d
 
 ## 8. CI/CD（GitHub Actions）
 
-`.github/workflows/ci.yml` 一个 workflow，8 个 job。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` / `middleware` 三个 boolean，后续 deploy / preview / docker job 按这三个 flag + 事件类型决定跑不跑。
+`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` / `middleware` 三个 boolean，后续 deploy / preview / docker job 按这三个 flag + 事件类型决定跑不跑。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
 
 ### 8.1 行为矩阵
 
 | 触发 | 跑什么 |
 | --- | --- |
-| `pull_request` | CI 总跑（biome + typecheck + build page + build middleware）<br/>`worker/**` 变 → `preview-worker`（`wrangler versions upload`，输出 preview URL，不接生产流量）<br/>`page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>`middleware/**` 变 → `docker-middleware` 仅 build 验证（不 push）<br/>**`preview-comment`** sticky comment 把上面三个的 URL / 状态贴到 PR |
+| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`worker/**` 变 → `preview-worker`（`wrangler versions upload`，输出 preview URL，不接生产流量）<br/>`page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>`middleware/**` 变 → `docker-middleware` 仅 build 验证（不 push）<br/>**`preview-comment`** sticky comment 把上面三个的 URL / 状态贴到 PR |
 | `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`、pages `wrangler pages deploy --branch=main`、docker 多 arch 镜像 push 到 GHCR `:latest` + `:sha-<short>`。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
 | `workflow_dispatch` on `main` | **强制**三个 deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 / 镜像重 push |
 | `workflow_dispatch` on 其他 branch | 仅 CI |
