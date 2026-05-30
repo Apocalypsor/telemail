@@ -15,6 +15,7 @@ const markdownV2ToPlainText = (text: string): string => {
 };
 
 const extractTelegramDescription = (payload: unknown): string => {
+  if (typeof payload === "string" && payload) return payload;
   if (!payload || typeof payload !== "object" || !("description" in payload))
     return "Unknown Telegram error";
   const desc = (payload as { description?: unknown }).description;
@@ -38,8 +39,7 @@ const tgPost = async <T = unknown>(
     if (!(err instanceof HTTPError)) throw err;
     const { response } = err;
 
-    const errBody = (await response.json()) as unknown;
-    const errDescription = extractTelegramDescription(errBody);
+    const errDescription = extractTelegramDescription(err.data);
 
     // parse_mode 错误 → 回退纯文本
     if (payload.parse_mode && isEntityParseError(errDescription)) {
@@ -148,17 +148,16 @@ export const sendWithAttachments = async (
         return data.result.message_id;
       } catch (err) {
         if (!(err instanceof HTTPError)) throw err;
-        const { response } = err;
 
-        const errBody = (await response.json()) as { description?: string };
+        const errDescription = extractTelegramDescription(err.data);
         console.error("TG sendDocument failed payload:", {
           chatId,
           captionLength: caption.length,
           filename: att.filename || "attachment",
-          description: errBody.description,
+          description: errDescription,
         });
 
-        if (isEntityParseError(errBody.description)) {
+        if (isEntityParseError(errDescription)) {
           console.warn(
             "TG sendDocument parse_mode failed, retrying as plain caption",
           );
@@ -177,7 +176,7 @@ export const sendWithAttachments = async (
         }
 
         throw new Error(
-          `TG sendDocument ${response.status}: ${errBody.description}`,
+          `TG sendDocument ${err.response.status}: ${errDescription}`,
         );
       }
     } else {
@@ -355,17 +354,16 @@ const sendMediaGroupChunk = async (
     return data.result[0].message_id;
   } catch (err) {
     if (!(err instanceof HTTPError)) throw err;
-    const { response } = err;
 
-    const errBody = (await response.json()) as { description?: string };
+    const errDescription = extractTelegramDescription(err.data);
     console.error("TG sendMediaGroup failed payload:", {
       chatId,
       captionLength: caption.length,
       attachments: attachments.length,
-      description: errBody.description,
+      description: errDescription,
     });
 
-    if (isEntityParseError(errBody.description) && caption) {
+    if (isEntityParseError(errDescription) && caption) {
       console.warn(
         "TG sendMediaGroup parse_mode failed, retrying as plain caption",
       );
@@ -398,7 +396,7 @@ const sendMediaGroupChunk = async (
     }
 
     throw new Error(
-      `TG sendMediaGroup ${response.status}: ${errBody.description}`,
+      `TG sendMediaGroup ${err.response.status}: ${errDescription}`,
     );
   }
 };

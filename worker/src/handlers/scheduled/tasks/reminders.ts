@@ -23,7 +23,11 @@ import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { sleep } from "@worker/utils/sleep";
 import { getWorkerBaseUrl } from "@worker/utils/url";
+import { DrizzleQueryError } from "drizzle-orm/errors";
+
+const DUE_REMINDERS_QUERY_RETRY_DELAYS_MS = [100, 300] as const;
 
 export class DueRemindersTask extends ScheduledTask {
   constructor() {
@@ -35,7 +39,8 @@ export class DueRemindersTask extends ScheduledTask {
     date,
     waitUntil,
   }: ScheduledTaskContext): Promise<void> {
-    const due = await listDueReminders(env.DB, date);
+    const due = await this.listDueRemindersForCron(env, date);
+    if (!due) return;
     if (due.length === 0) return;
 
     await Promise.allSettled(
@@ -64,6 +69,31 @@ export class DueRemindersTask extends ScheduledTask {
         }
       }),
     );
+  }
+
+  private async listDueRemindersForCron(
+    env: Env,
+    date: Date,
+  ): Promise<Reminder[] | null> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await listDueReminders(env.DB, date);
+      } catch (err) {
+        if (!(err instanceof DrizzleQueryError)) throw err;
+
+        const delayMs = DUE_REMINDERS_QUERY_RETRY_DELAYS_MS[attempt];
+        if (delayMs === undefined) {
+          console.warn("scheduled.reminders_due_query_skipped", {
+            attempts: attempt + 1,
+            scheduledAt: date.toISOString(),
+            message: err.message,
+          });
+          return null;
+        }
+
+        await sleep(delayMs);
+      }
+    }
   }
 
   private isPermanentSendError(err: unknown): boolean {

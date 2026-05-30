@@ -1,4 +1,4 @@
-import { http } from "@worker/clients/http";
+import { http, httpErrorDataToText } from "@worker/clients/http";
 import {
   MS_GRAPH_API,
   MS_GRAPH_API_BETA,
@@ -220,9 +220,8 @@ export class OutlookProvider extends EmailProvider {
         .json()) as { id: string };
     } catch (err) {
       if (err instanceof HTTPError) {
-        const text = await err.response.text();
         throw new Error(
-          `Failed to create Graph subscription for ${this.account.email}: ${err.response.status} ${text}`,
+          `Failed to create Graph subscription for ${this.account.email}: ${err.response.status} ${httpErrorDataToText(err.data)}`,
         );
       }
       throw err;

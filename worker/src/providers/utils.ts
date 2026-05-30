@@ -1,4 +1,4 @@
-import { http } from "@worker/clients/http";
+import { http, httpErrorDataToText } from "@worker/clients/http";
 import { getCachedAccessToken, putCachedAccessToken } from "@worker/db/kv";
 import type { OAuthTokenResponse } from "@worker/providers/types";
 import type { Account, Env, MailAttachmentDownload } from "@worker/types";
@@ -69,7 +69,7 @@ export const refreshAccessToken = async (
   } catch (err) {
     if (err instanceof HTTPError) {
       throw new Error(
-        `${label}Token exchange failed for ${account.email}: ${await err.response.text()}`,
+        `${label}Token exchange failed for ${account.email}: ${httpErrorDataToText(err.data)}`,
       );
     }
     throw err;
