@@ -19,20 +19,36 @@ class ImapConnectionManager {
   private connections = new Map<number, Connection>();
   private reconnectTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private refreshTimers = new Map<number, ReturnType<typeof setTimeout>>();
-  private connecting = new Set<number>();
+  private connecting = new Map<number, Promise<void>>();
 
-  getConnection(accountId: number): Connection | undefined {
-    return this.connections.get(accountId);
-  }
-
-  requireConnection(accountId: number, caller: string): ActiveConnection {
+  requireConnection = async (
+    accountId: number,
+    caller: string,
+  ): Promise<ActiveConnection> => {
     const conn = this.connections.get(accountId);
-    if (!conn?.client) {
+    if (!conn?.active) {
       throw new Error(`[Account ${accountId}] ${caller}: no active connection`);
     }
 
-    return conn as ActiveConnection;
-  }
+    const activeConnection = this.getActiveConnection(conn);
+    if (activeConnection) return activeConnection;
+
+    if (conn.client) {
+      const staleClient = conn.client;
+      conn.client = null;
+      staleClient.logout().catch(() => {});
+    }
+
+    this.clearTimer(this.reconnectTimers, accountId);
+    await this.connect(conn);
+
+    const reconnected = this.getActiveConnection(conn);
+    if (!reconnected) {
+      throw new Error(`[Account ${accountId}] ${caller}: no usable connection`);
+    }
+
+    return reconnected;
+  };
 
   sync = async (): Promise<void> => {
     console.log("[ImapManager] Syncing accounts from Telemail...");
@@ -121,6 +137,9 @@ class ImapConnectionManager {
     }
   };
 
+  private getActiveConnection = (conn: Connection): ActiveConnection | null =>
+    conn.client?.usable ? (conn as ActiveConnection) : null;
+
   private scheduleReconnect = (conn: Connection): void => {
     if (!conn.active) return;
     if (this.reconnectTimers.has(conn.account.id)) return;
@@ -151,22 +170,31 @@ class ImapConnectionManager {
     );
     // Clear any pending reconnect to prevent double-connect
     this.clearTimer(this.reconnectTimers, conn.account.id);
-    const oldClient = conn.client;
-    conn.client = null;
-    // Fire-and-forget: don't await logout — the connection may be stuck (the
-    // very reason we refresh). The old socket will close on its own timeout.
-    oldClient?.logout().catch(() => {});
     await this.connect(conn);
   };
 
   private connect = async (conn: Connection): Promise<void> => {
     if (!conn.active) return;
     const id = conn.account.id;
-    if (this.connecting.has(id)) return;
-    this.connecting.add(id);
+    const pending = this.connecting.get(id);
+    if (pending) return pending;
+
+    const nextConnection = this.establishConnection(conn);
+    this.connecting.set(id, nextConnection);
+    try {
+      await nextConnection;
+    } finally {
+      this.connecting.delete(id);
+    }
+  };
+
+  private establishConnection = async (conn: Connection): Promise<void> => {
+    if (!conn.active) return;
+    const id = conn.account.id;
+    let client: ImapFlow | null = null;
 
     try {
-      conn.client = new ImapFlow({
+      const nextClient = new ImapFlow({
         host: conn.account.imap_host,
         port: conn.account.imap_port,
         secure: conn.account.imap_secure,
@@ -177,40 +205,27 @@ class ImapConnectionManager {
         // EXISTS responses (not all do), and SELECT has a known loop issue.
         missingIdleCommand: "STATUS",
       });
+      client = nextClient;
 
-      await conn.client.connect();
-
-      // Capture reference so stale event handlers from old clients are ignored
-      const client = conn.client;
-
-      const lock = await client.getMailboxLock("INBOX");
-      try {
-        if (conn.lastUid === 0) {
-          const mailbox = client.mailbox || undefined;
-          conn.lastUid = (mailbox?.uidNext ?? 1) - 1;
-        } else {
-          conn.lastUid = await this.fetchNewMessages(conn, conn.lastUid);
-        }
-        await setLastUid(conn.account.id, conn.lastUid);
-      } finally {
-        lock.release();
+      await nextClient.connect();
+      if (!conn.active) {
+        await nextClient.logout().catch(() => {});
+        return;
       }
 
-      console.log(
-        `[Account ${id}] Connected to ${conn.account.imap_host} | watching from UID > ${conn.lastUid}`,
-      );
-
-      // Schedule periodic refresh to prevent IDLE stalls (e.g. iCloud)
-      this.scheduleRefresh(conn);
-
-      client.on("exists", async (data: ExistsEvent) => {
-        if (!conn.active || conn.client !== client) return;
+      // Capture reference so stale event handlers from old clients are ignored
+      nextClient.on("exists", async (data: ExistsEvent) => {
+        if (!conn.active || conn.client !== nextClient) return;
         if (data.count <= data.prevCount) return;
 
         try {
-          const lock = await client.getMailboxLock("INBOX");
+          const lock = await nextClient.getMailboxLock("INBOX");
           try {
-            conn.lastUid = await this.fetchNewMessages(conn, conn.lastUid);
+            conn.lastUid = await this.fetchNewMessages(
+              conn,
+              nextClient,
+              conn.lastUid,
+            );
             await setLastUid(id, conn.lastUid);
           } finally {
             lock.release();
@@ -224,13 +239,13 @@ class ImapConnectionManager {
         }
       });
 
-      client.on("error", (err: Error) => {
-        if (!conn.active || conn.client !== client) return;
+      nextClient.on("error", (err: Error) => {
+        if (!conn.active || conn.client !== nextClient) return;
         console.error(`[Account ${id}] IMAP error:`, err.message);
       });
 
-      client.on("close", () => {
-        if (!conn.active || conn.client !== client) return;
+      nextClient.on("close", () => {
+        if (!conn.active || conn.client !== nextClient) return;
         conn.client = null;
         this.clearTimer(this.refreshTimers, id);
         console.log(
@@ -238,66 +253,93 @@ class ImapConnectionManager {
         );
         this.scheduleReconnect(conn);
       });
+
+      const lock = await nextClient.getMailboxLock("INBOX");
+      try {
+        if (conn.lastUid === 0) {
+          const mailbox = nextClient.mailbox || undefined;
+          conn.lastUid = (mailbox?.uidNext ?? 1) - 1;
+        } else {
+          conn.lastUid = await this.fetchNewMessages(
+            conn,
+            nextClient,
+            conn.lastUid,
+          );
+        }
+        await setLastUid(conn.account.id, conn.lastUid);
+      } finally {
+        lock.release();
+      }
+
+      if (!nextClient.usable) {
+        throw new Error("Connection not available after setup");
+      }
+
+      const oldClient = conn.client;
+      conn.client = nextClient;
+      if (oldClient && oldClient !== nextClient) {
+        // Fire-and-forget: don't await logout — the old connection may be the
+        // one that was stuck. Stale event handlers are guarded by client ref.
+        oldClient.logout().catch(() => {});
+      }
+
+      console.log(
+        `[Account ${id}] Connected to ${conn.account.imap_host} | watching from UID > ${conn.lastUid}`,
+      );
+
+      // Schedule periodic refresh to prevent IDLE stalls (e.g. iCloud)
+      this.scheduleRefresh(conn);
     } catch (err: unknown) {
       if (!conn.active) return;
       console.error(
         `[Account ${id}] Connection error:`,
         err instanceof Error ? err.message : String(err),
       );
-      try {
-        await conn.client?.logout();
+      if (conn.client === client) {
         conn.client = null;
-      } catch {}
+      }
+      await client?.logout().catch(() => {});
       this.scheduleReconnect(conn);
-    } finally {
-      this.connecting.delete(id);
     }
   };
 
   private fetchNewMessages = async (
     conn: Connection,
+    client: ImapFlow,
     lastUid: number,
   ): Promise<number> => {
     let newLastUid = lastUid;
-    try {
-      if (!conn.client) return newLastUid;
+    if (!client.usable) throw new Error("Connection not available");
 
-      // 拉 envelope 取 Message-Id 作为通知 payload —— worker 以 RFC Message-Id 为
-      // 邮件全局唯一标识，per-folder 的 UID 移出 INBOX 后就失效了
-      for await (const msg of conn.client.fetch(
-        `${lastUid + 1}:*`,
-        { uid: true, envelope: true },
-        { uid: true },
-      )) {
-        if (msg.uid <= lastUid) continue;
-        newLastUid = Math.max(newLastUid, msg.uid);
+    // 拉 envelope 取 Message-Id 作为通知 payload —— worker 以 RFC Message-Id 为
+    // 邮件全局唯一标识，per-folder 的 UID 移出 INBOX 后就失效了
+    for await (const msg of client.fetch(
+      `${lastUid + 1}:*`,
+      { uid: true, envelope: true },
+      { uid: true },
+    )) {
+      if (msg.uid <= lastUid) continue;
+      newLastUid = Math.max(newLastUid, msg.uid);
 
-        const rfcMessageId = msg.envelope?.messageId;
-        if (!rfcMessageId) {
-          console.warn(
-            `[Account ${conn.account.id}] UID ${msg.uid} has no Message-Id, skipping notify`,
-          );
-          continue;
-        }
-
-        console.log(
-          `[Account ${conn.account.id}] New email UID ${msg.uid} (${rfcMessageId}), notifying Worker...`,
+      const rfcMessageId = msg.envelope?.messageId;
+      if (!rfcMessageId) {
+        console.warn(
+          `[Account ${conn.account.id}] UID ${msg.uid} has no Message-Id, skipping notify`,
         );
-        notifyNewEmail(conn.account.id, rfcMessageId).catch((err: unknown) => {
-          console.error(
-            `[Account ${conn.account.id}] Notify failed after retries (UID ${msg.uid}):`,
-            err,
-          );
-        });
+        continue;
       }
-      return newLastUid;
-    } catch (err: unknown) {
-      console.error(
-        `[Account ${conn.account.id}] fetchNewMessages error:`,
-        err instanceof Error ? err.message : err,
+
+      console.log(
+        `[Account ${conn.account.id}] New email UID ${msg.uid} (${rfcMessageId}), notifying Worker...`,
       );
-      return newLastUid;
+      notifyNewEmail(conn.account.id, rfcMessageId).catch((err: unknown) => {
+        console.error(
+          `[Account ${conn.account.id}] Notify failed after retries (UID ${msg.uid}):`,
+          err,
+        );
+      });
     }
+    return newLastUid;
   };
 }
 

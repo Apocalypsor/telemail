@@ -17,10 +17,16 @@ import { config } from "./config";
  * 都从这棵 `.use(...)` 链里推出来。
  */
 export const app = new Elysia({ prefix: "/api" })
-  .onError(({ error }) => {
+  .onError(({ code, error, status }) => {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(msg);
-    return { ok: false, error: msg };
+    if (code === "VALIDATION" || code === "PARSE" || code === "NOT_FOUND") {
+      return error;
+    }
+    if (typeof code === "number" && code >= 400 && code < 500) {
+      return error;
+    }
+    return status(500, { ok: false, error: msg });
   })
   .use(syncController)
   .use(mailController)

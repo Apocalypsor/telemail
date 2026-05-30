@@ -18,6 +18,7 @@ import {
   resolveArchiveFolder,
   resolveFolderForHint,
 } from "./utils/folders";
+import { assertImapMutationSucceeded } from "./utils/mutations";
 import {
   countSearchResults,
   findUidByMessageId,
@@ -43,12 +44,13 @@ const Imap = {
     folderHint?: FolderHint,
     archiveFolder?: string,
   ): Promise<boolean> {
-    const raw = connectionManager.getConnection(accountId);
-    if (!raw?.client) {
+    let conn: ActiveConnection;
+    try {
+      conn = await connectionManager.requireConnection(accountId, "setFlag");
+    } catch {
       console.warn(`[Account ${accountId}] setFlag: no active connection`);
       return false;
     }
-    const conn = raw as ActiveConnection;
 
     const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
     if (folder === null) {
@@ -93,7 +95,7 @@ const Imap = {
    * 单条 IMAP 命令搞定整 INBOX，不存在 N+1。
    */
   async markAllAsRead(accountId: number): Promise<{ count: number }> {
-    const conn = connectionManager.requireConnection(
+    const conn = await connectionManager.requireConnection(
       accountId,
       "markAllAsRead",
     );
@@ -119,7 +121,10 @@ const Imap = {
     folderHint?: FolderHint,
     archiveFolder?: string,
   ): Promise<string> {
-    const conn = connectionManager.requireConnection(accountId, "fetchEmail");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "fetchEmail",
+    );
 
     // 调用方 hint 是权威 —— 单 folder 操作，不做跨 folder fallback。
     const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
@@ -163,13 +168,10 @@ const Imap = {
     folderHint?: FolderHint,
     archiveFolder?: string,
   ) {
-    const raw = connectionManager.getConnection(accountId);
-    if (!raw?.client) {
-      throw new Error(
-        `[Account ${accountId}] downloadAttachment: no active connection`,
-      );
-    }
-    const conn = raw as ActiveConnection;
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "downloadAttachment",
+    );
 
     const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
     if (folder === null) {
@@ -252,12 +254,18 @@ const Imap = {
     maxResults: number = 20,
     offset: number = 0,
   ): Promise<MessageSummary[]> {
-    const conn = connectionManager.requireConnection(accountId, "listUnread");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "listUnread",
+    );
     return searchAndFetch(conn, "INBOX", { seen: false }, maxResults, offset);
   },
 
   async countUnread(accountId: number): Promise<number> {
-    const conn = connectionManager.requireConnection(accountId, "countUnread");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "countUnread",
+    );
     return countSearchResults(conn, "INBOX", { seen: false });
   },
 
@@ -266,7 +274,10 @@ const Imap = {
     maxResults: number = 20,
     offset: number = 0,
   ): Promise<MessageSummary[]> {
-    const conn = connectionManager.requireConnection(accountId, "listStarred");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "listStarred",
+    );
     return searchAndFetch(conn, "INBOX", { flagged: true }, maxResults, offset);
   },
 
@@ -275,14 +286,20 @@ const Imap = {
     maxResults: number = 20,
     offset: number = 0,
   ): Promise<MessageSummary[]> {
-    const conn = connectionManager.requireConnection(accountId, "listJunk");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "listJunk",
+    );
     const junkPath = await findJunkFolder(conn);
     if (!junkPath) return [];
     return searchAndFetch(conn, junkPath, { all: true }, maxResults, offset);
   },
 
   async countJunk(accountId: number): Promise<number> {
-    const conn = connectionManager.requireConnection(accountId, "countJunk");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "countJunk",
+    );
     const junkPath = await findJunkFolder(conn);
     if (!junkPath) return 0;
     return countSearchResults(conn, junkPath, { all: true });
@@ -300,7 +317,7 @@ const Imap = {
     maxResults: number = 20,
     offset: number = 0,
   ): Promise<SearchResultMessage[]> {
-    const conn = connectionManager.requireConnection(accountId, "search");
+    const conn = await connectionManager.requireConnection(accountId, "search");
     const trimmed = query.trim();
     if (!trimmed) return [];
 
@@ -371,7 +388,10 @@ const Imap = {
     maxResults: number = 20,
     offset: number = 0,
   ): Promise<MessageSummary[]> {
-    const conn = connectionManager.requireConnection(accountId, "listFolder");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "listFolder",
+    );
 
     // 没传 folder 时走自动探测（`findArchiveFolder` 返回非 null 即存在），跳过
     // 一次 IMAP `LIST` 验证；用户自定义路径才需要查存在性。
@@ -398,7 +418,7 @@ const Imap = {
     rfcMessageId: string,
     folder: string | undefined,
   ): Promise<void> {
-    const conn = connectionManager.requireConnection(
+    const conn = await connectionManager.requireConnection(
       accountId,
       "archiveMessage",
     );
@@ -441,7 +461,10 @@ const Imap = {
           `[Account ${accountId}] archiveMessage: Message-Id not in INBOX: ${rfcMessageId}`,
         );
       }
-      await conn.client.messageMove([uid], resolved, { uid: true });
+      const moved = await conn.client.messageMove([uid], resolved, {
+        uid: true,
+      });
+      assertImapMutationSucceeded(moved, accountId, "archiveMessage");
       console.log(
         `[Account ${accountId}] Archived UID ${uid} from INBOX to ${resolved}`,
       );
@@ -456,7 +479,7 @@ const Imap = {
    * 全局唯一的 Message-Id。
    */
   async isJunk(accountId: number, rfcMessageId: string): Promise<boolean> {
-    const conn = connectionManager.requireConnection(accountId, "isJunk");
+    const conn = await connectionManager.requireConnection(accountId, "isJunk");
 
     const junkPath = await findJunkFolder(conn);
     if (!junkPath) return false;
@@ -466,7 +489,10 @@ const Imap = {
   },
 
   async markAsJunk(accountId: number, rfcMessageId: string): Promise<void> {
-    const conn = connectionManager.requireConnection(accountId, "markAsJunk");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "markAsJunk",
+    );
 
     const junkPath = await findJunkFolder(conn);
     if (!junkPath)
@@ -482,7 +508,10 @@ const Imap = {
           `[Account ${accountId}] markAsJunk: Message-Id not in INBOX: ${rfcMessageId}`,
         );
       }
-      await conn.client.messageMove([uid], junkPath, { uid: true });
+      const moved = await conn.client.messageMove([uid], junkPath, {
+        uid: true,
+      });
+      assertImapMutationSucceeded(moved, accountId, "markAsJunk");
       console.log(
         `[Account ${accountId}] Moved UID ${uid} from INBOX to ${junkPath}`,
       );
@@ -492,7 +521,10 @@ const Imap = {
   },
 
   async moveToInbox(accountId: number, rfcMessageId: string): Promise<void> {
-    const conn = connectionManager.requireConnection(accountId, "moveToInbox");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "moveToInbox",
+    );
 
     const junkPath = await findJunkFolder(conn);
     if (!junkPath)
@@ -508,7 +540,10 @@ const Imap = {
           `[Account ${accountId}] moveToInbox: Message-Id not in ${junkPath}: ${rfcMessageId}`,
         );
       }
-      await conn.client.messageMove([uid], "INBOX", { uid: true });
+      const moved = await conn.client.messageMove([uid], "INBOX", {
+        uid: true,
+      });
+      assertImapMutationSucceeded(moved, accountId, "moveToInbox");
       console.log(
         `[Account ${accountId}] Moved UID ${uid} from ${junkPath} to INBOX`,
       );
@@ -522,7 +557,7 @@ const Imap = {
     rfcMessageId: string,
     archiveFolder?: string,
   ): Promise<void> {
-    const conn = connectionManager.requireConnection(
+    const conn = await connectionManager.requireConnection(
       accountId,
       "unarchiveMessage",
     );
@@ -536,7 +571,10 @@ const Imap = {
           `[Account ${accountId}] unarchiveMessage: Message-Id not in ${resolved}: ${rfcMessageId}`,
         );
       }
-      await conn.client.messageMove([uid], "INBOX", { uid: true });
+      const moved = await conn.client.messageMove([uid], "INBOX", {
+        uid: true,
+      });
+      assertImapMutationSucceeded(moved, accountId, "unarchiveMessage");
       console.log(
         `[Account ${accountId}] Moved UID ${uid} from ${resolved} to INBOX`,
       );
@@ -562,7 +600,7 @@ const Imap = {
     rfcMessageId: string,
     archiveFolder?: string,
   ): Promise<LocateResult> {
-    const conn = connectionManager.requireConnection(accountId, "locate");
+    const conn = await connectionManager.requireConnection(accountId, "locate");
 
     // INBOX —— 命中就顺带读星标状态
     {
@@ -622,7 +660,10 @@ const Imap = {
     folderHint?: FolderHint,
     archiveFolder?: string,
   ): Promise<boolean> {
-    const conn = connectionManager.requireConnection(accountId, "isStarred");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "isStarred",
+    );
 
     const folder = await resolveFolderForHint(conn, folderHint, archiveFolder);
     if (folder === null) return false;
@@ -649,7 +690,10 @@ const Imap = {
    * 从哪个预览点击都得能工作。
    */
   async trashMessage(accountId: number, rfcMessageId: string): Promise<void> {
-    const conn = connectionManager.requireConnection(accountId, "trashMessage");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "trashMessage",
+    );
 
     // 三个特殊 folder 走 Redis 缓存并发拉。findArchiveFolder 非 null 即存在，
     // 不需要额外 `client.list()` 验证。
@@ -687,7 +731,10 @@ const Imap = {
   },
 
   async trashAllJunk(accountId: number): Promise<number> {
-    const conn = connectionManager.requireConnection(accountId, "trashAllJunk");
+    const conn = await connectionManager.requireConnection(
+      accountId,
+      "trashAllJunk",
+    );
 
     const junkPath = await findJunkFolder(conn);
     if (!junkPath) return 0;
