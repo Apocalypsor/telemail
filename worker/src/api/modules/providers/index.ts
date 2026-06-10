@@ -1,22 +1,16 @@
 import { cf } from "@worker/api/plugins/cf";
-import {
-  requireGmailPushSecret,
-  requireImapBridgeBearer,
-} from "@worker/api/plugins/secrets";
-import { getImapAccounts } from "@worker/db/accounts";
+import { requireGmailPushSecret } from "@worker/api/plugins/secrets";
 import { GmailProvider } from "@worker/providers/gmail";
-import { ImapProvider } from "@worker/providers/imap";
 import { OutlookProvider } from "@worker/providers/outlook";
 import { timingSafeEqual } from "@worker/utils/hash";
 import { Elysia } from "elysia";
 import { OutlookPushQuery, PushBody } from "./model";
-import { toImapBridgeAccount } from "./utils";
 
 /**
  * Provider push webhooks。
  *  - Gmail: Pub/Sub push（query `?secret=GMAIL_PUSH_SECRET`）
  *  - Outlook: Graph subscription（先处理 `?validationToken=` 握手，再 secret）
- *  - IMAP: 中间件回调（Bearer + accounts list）
+ *  - IMAP: container outbound 直接在 `worker/src/containers/imap-container.ts` 里处理
  *
  * 走的都是各 provider class 的 `enqueue` 静态方法，把消息丢进 Queue 后立即 200。
  */
@@ -62,25 +56,6 @@ const outlookPush = new Elysia({ name: "outlook-push" }).use(cf).post(
   { body: PushBody, query: OutlookPushQuery },
 );
 
-const imapBridge = new Elysia({ name: "imap-bridge" })
-  .use(requireImapBridgeBearer)
-  .get("/api/imap/accounts", async ({ env }) => {
-    const accounts = await getImapAccounts(env.DB);
-    return accounts.map(toImapBridgeAccount);
-  })
-  .post(
-    "/api/imap/push",
-    async ({ env, body }) => {
-      await ImapProvider.enqueue(
-        body as { accountId: number; rfcMessageId: string },
-        env,
-      );
-      return "OK";
-    },
-    { body: PushBody },
-  );
-
 export const providersController = new Elysia({ name: "controller.providers" })
   .use(gmailPush)
-  .use(outlookPush)
-  .use(imapBridge);
+  .use(outlookPush);

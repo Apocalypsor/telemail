@@ -3,7 +3,7 @@ import {
   type FolderKind,
   getCachedFolderPath,
   setCachedFolderPath,
-} from "@middleware/utils/redis";
+} from "@middleware/utils/state";
 import type { FolderHint } from "../types";
 
 /**
@@ -49,9 +49,9 @@ export const findSpecialFolder = async (
 };
 
 /**
- * `findSpecialFolder` 的 Redis 缓存包装。每个 (account, kind) 单独缓存，命中后省
+ * `findSpecialFolder` 的 Worker KV 缓存包装。每个 (account, kind) 单独缓存，命中后省
  * 掉 IMAP `LIST` 调用。`null`（"找不到这种 folder"）也会被缓存，避免反复重试探测。
- * 缓存的失效在 `redis.ts` 用 TTL 兜底，账号 stop / config 变更时主动 clear。
+ * 缓存的失效在 `state.ts` 用 TTL 兜底，账号 stop / config 变更时主动 clear。
  */
 const findCachedSpecialFolder = async (
   conn: ActiveConnection,

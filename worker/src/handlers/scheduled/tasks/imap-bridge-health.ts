@@ -11,7 +11,7 @@ export class ImapBridgeHealthTask extends ScheduledTask {
   }
 
   protected shouldRun(ctx: ScheduledTaskContext): boolean {
-    return this.isHourly(ctx);
+    return ctx.date.getUTCMinutes() % 5 === 0;
   }
 
   protected async run({ env }: ScheduledTaskContext): Promise<void> {

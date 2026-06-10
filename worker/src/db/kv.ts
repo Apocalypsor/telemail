@@ -24,6 +24,8 @@ const KV_OAUTH_BOT_MSG_PREFIX = "oauth_bot_msg:";
 const KV_MS_SUB_ACCOUNT_PREFIX = "ms_sub_account:";
 const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
 const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
+const KV_IMAP_LAST_UID_PREFIX = "imap:last_uid:";
+const KV_IMAP_FOLDER_PREFIX = "imap:folder:";
 const KV_BOT_INFO_KEY = "telegram:bot_info";
 const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
 const KV_DAILY_MAIL_SUMMARY_PREFIX = "daily_mail_summary:";
@@ -35,6 +37,14 @@ const OAUTH_STATE_TTL_SECONDS = 10 * 60; // 10 分钟
 const BOT_INFO_TTL = 86400 * 30; // 30 天
 const OUTLOOK_FOLDERS_TTL = 86400 * 30;
 const DAILY_MAIL_SUMMARY_TTL = 86400 * 3; // 3 天
+const IMAP_FOLDER_TTL = 86400; // 1 天
+
+export type ImapBridgeFolderKind = "junk" | "trash" | "archive";
+
+export interface ImapBridgeFolderState {
+  hit: boolean;
+  path: string | null;
+}
 
 // ─── Access Token Cache ─────────────────────────────────────────────────────
 
@@ -204,6 +214,61 @@ export const deleteCachedOutlookFolderIds = async (
 ): Promise<void> => {
   await kv.delete(`${KV_OUTLOOK_FOLDERS_PREFIX}${accountId}`);
 };
+
+// ─── IMAP Bridge State ─────────────────────────────────────────────────────
+
+export const getImapBridgeLastUid = async (
+  kv: KVNamespace,
+  accountId: number,
+): Promise<number | null> => {
+  const raw = await kv.get(`${KV_IMAP_LAST_UID_PREFIX}${accountId}`);
+  return raw ? Number.parseInt(raw, 10) : null;
+};
+
+export const putImapBridgeLastUid = async (
+  kv: KVNamespace,
+  accountId: number,
+  uid: number,
+): Promise<void> => {
+  await kv.put(`${KV_IMAP_LAST_UID_PREFIX}${accountId}`, String(uid));
+};
+
+export const getImapBridgeFolderPath = async (
+  kv: KVNamespace,
+  accountId: number,
+  kind: ImapBridgeFolderKind,
+): Promise<ImapBridgeFolderState> => {
+  const raw = await kv.get(imapBridgeFolderKey(accountId, kind));
+  if (raw === null) return { hit: false, path: null };
+  return { hit: true, path: raw === "" ? null : raw };
+};
+
+export const putImapBridgeFolderPath = async (
+  kv: KVNamespace,
+  accountId: number,
+  kind: ImapBridgeFolderKind,
+  path: string | null,
+): Promise<void> => {
+  await kv.put(imapBridgeFolderKey(accountId, kind), path ?? "", {
+    expirationTtl: IMAP_FOLDER_TTL,
+  });
+};
+
+export const deleteImapBridgeFolderPaths = async (
+  kv: KVNamespace,
+  accountId: number,
+): Promise<void> => {
+  await Promise.all(
+    (["junk", "trash", "archive"] as const).map((kind) =>
+      kv.delete(imapBridgeFolderKey(accountId, kind)),
+    ),
+  );
+};
+
+const imapBridgeFolderKey = (
+  accountId: number,
+  kind: ImapBridgeFolderKind,
+): string => `${KV_IMAP_FOLDER_PREFIX}${accountId}:${kind}`;
 
 // ─── Bot Info Cache ─────────────────────────────────────────────────────────
 

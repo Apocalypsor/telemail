@@ -6,7 +6,7 @@ import {
   clearCachedFolders,
   getLastUid,
   setLastUid,
-} from "@middleware/utils/redis";
+} from "@middleware/utils/state";
 import {
   fetchImapAccounts,
   type ImapAccount,
@@ -119,7 +119,7 @@ class ImapConnectionManager {
     };
     if (cachedUid !== null) {
       console.log(
-        `[Account ${account.id}] Restored lastUid from Redis: ${cachedUid}`,
+        `[Account ${account.id}] Restored lastUid from Worker KV: ${cachedUid}`,
       );
     }
     this.connections.set(account.id, conn);

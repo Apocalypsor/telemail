@@ -13,6 +13,17 @@ export interface ImapAccount {
   imap_pass: string;
 }
 
+export type ImapFolderKind = "junk" | "trash" | "archive";
+
+interface ImapLastUidState {
+  value: number | null;
+}
+
+interface ImapFolderState {
+  hit: boolean;
+  path: string | null;
+}
+
 const api = ky.create({
   prefix: config.workerUrl,
   headers: { Authorization: `Bearer ${config.bridgeSecret}` },
@@ -32,3 +43,31 @@ export const notifyNewEmail = (
   api
     .post("api/imap/push", { json: { accountId, rfcMessageId } })
     .then(() => {});
+
+export const fetchImapLastUid = (
+  accountId: number,
+): Promise<ImapLastUidState> =>
+  api.get(`api/imap/state/last-uid/${accountId}`).json<ImapLastUidState>();
+
+export const putImapLastUid = (accountId: number, uid: number): Promise<void> =>
+  api
+    .put(`api/imap/state/last-uid/${accountId}`, { json: { uid } })
+    .then(() => {});
+
+export const fetchImapFolderState = (
+  accountId: number,
+  kind: ImapFolderKind,
+): Promise<ImapFolderState> =>
+  api.get(`api/imap/state/folder/${accountId}/${kind}`).json<ImapFolderState>();
+
+export const putImapFolderState = (
+  accountId: number,
+  kind: ImapFolderKind,
+  path: string | null,
+): Promise<void> =>
+  api
+    .put(`api/imap/state/folder/${accountId}/${kind}`, { json: { path } })
+    .then(() => {});
+
+export const clearImapFolderState = (accountId: number): Promise<void> =>
+  api.delete(`api/imap/state/folders/${accountId}`).then(() => {});

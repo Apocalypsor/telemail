@@ -42,12 +42,8 @@ interface WorkerSecrets {
   TELEGRAM_WEBHOOK_SECRET: string;
   /** Worker 对外访问 URL，例如 https://gmail-tg-bridge.xxx.workers.dev（用于生成邮件查看链接） */
   WORKER_URL: string;
-  /** IMAP 中间件 URL，例如 https://middleware.example.com */
-  IMAP_BRIDGE_URL?: string;
   /** IMAP 中间件共享密钥（Bearer token） */
   IMAP_BRIDGE_SECRET?: string;
-  /** Cloudflare Container 模式下传给 middleware 的 Redis URL（可选） */
-  IMAP_BRIDGE_REDIS_URL?: string;
   /** Microsoft OAuth2 Client ID（Outlook 支持） */
   MS_CLIENT_ID?: string;
   /** Microsoft OAuth2 Client Secret */
@@ -69,7 +65,7 @@ type RefinedBindings = Omit<
 > & {
   /** Queue 绑定 —— wrangler 生成 binding，项目侧细化 message body 类型 */
   EMAIL_QUEUE: Queue<QueueMessage>;
-  /** IMAP bridge Cloudflare Container binding；没有启用容器时可回退到 IMAP_BRIDGE_URL */
+  /** IMAP bridge Cloudflare Container binding */
   IMAP_BRIDGE_CONTAINER?: DurableObjectNamespace;
 };
 

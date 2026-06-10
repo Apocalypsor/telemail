@@ -14,7 +14,7 @@ Cloudflare API knowledge may be stale — fetch <https://developers.cloudflare.c
 
 - **`worker/`** Cloudflare Worker (Elysia + grammY) — bot webhook, queue, cron, providers, D1. Owns `wrangler.example.jsonc` + `migrations/`. CI generates real `wrangler.jsonc` via `envsubst` from `CF_D1_DATABASE_ID` + `CF_KV_NAMESPACE_ID`.
 - **`page/`** Cloudflare Pages SPA (Vite + React + TanStack Router/Query + HeroUI + Eden treaty) — single bundle serves both web pages and Mini App routes (`/telegram-app/*`).
-- **`middleware/`** IMAP bridge (Bun + Elysia + ImapFlow) — **not on Cloudflare**. Built to single binary, packaged as multi-arch docker image. User runs it on their server; Worker calls it via `IMAP_BRIDGE_URL` + `IMAP_BRIDGE_SECRET`.
+- **`middleware/`** IMAP bridge (Bun + Elysia + ImapFlow) — built into the Cloudflare Container hosted by `worker/`. It keeps IMAP IDLE connections open; Worker calls it through the `IMAP_BRIDGE_CONTAINER` binding, and middleware calls Worker-internal `http://telemail.worker/api/imap/*` endpoints for accounts, push events, and KV-backed state.
 
 Single custom domain. `*.com/api/*` + `/oauth/*` → Worker; everything else → Pages. Same origin, zero CORS.
 

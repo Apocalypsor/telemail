@@ -17,18 +17,3 @@ export const requireGmailPushSecret = new Elysia({
     }
     return {};
   });
-
-/** IMAP bridge: Authorization: Bearer <secret> 校验。 */
-export const requireImapBridgeBearer = new Elysia({
-  name: "require-imap-bridge-bearer",
-})
-  .use(cf)
-  .derive({ as: "scoped" }, ({ env, headers, status }) => {
-    const header = headers.authorization ?? "";
-    const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
-    const expected = env.IMAP_BRIDGE_SECRET;
-    if (!provided || !expected || !timingSafeEqual(provided, expected)) {
-      return status(401, "Unauthorized");
-    }
-    return {};
-  });

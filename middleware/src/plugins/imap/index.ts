@@ -321,7 +321,7 @@ const Imap = {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    // 并发查 Redis 缓存。`findArchiveFolder` 返回非 null 即说明该 folder 在
+    // 并发查 Worker KV 缓存。`findArchiveFolder` 返回非 null 即说明该 folder 在
     // server 上存在（不会返回 fallback 字面量），省掉额外一次 IMAP `LIST` 验证。
     const [junkPath, archivePath] = await Promise.all([
       findJunkFolder(conn),
@@ -423,7 +423,7 @@ const Imap = {
       "archiveMessage",
     );
 
-    // 用户没传 folder 且 `findArchiveFolder` 命中（Redis 或 server LIST 返回非
+    // 用户没传 folder 且 `findArchiveFolder` 命中（Worker KV 或 server LIST 返回非
     // null）即说明该 folder 在 server 上存在；直接跳过 `list()` + `mailboxCreate`
     // 这条慢路径。只有用户自定义 / 兜底字面量 "Archive" 才需要查存在性 + 建。
     let resolved: string;
@@ -695,7 +695,7 @@ const Imap = {
       "trashMessage",
     );
 
-    // 三个特殊 folder 走 Redis 缓存并发拉。findArchiveFolder 非 null 即存在，
+    // 三个特殊 folder 走 Worker KV 缓存并发拉。findArchiveFolder 非 null 即存在，
     // 不需要额外 `client.list()` 验证。
     const [junkPath, archivePath, trashPath] = await Promise.all([
       findJunkFolder(conn),

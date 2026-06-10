@@ -5,6 +5,14 @@ import {
   toImapBridgeAccount,
 } from "@worker/api/modules/providers/utils";
 import { getImapAccounts } from "@worker/db/accounts";
+import {
+  deleteImapBridgeFolderPaths,
+  getImapBridgeFolderPath,
+  getImapBridgeLastUid,
+  type ImapBridgeFolderKind,
+  putImapBridgeFolderPath,
+  putImapBridgeLastUid,
+} from "@worker/db/kv";
 import { ImapProvider } from "@worker/providers/imap";
 import type { Env } from "@worker/types";
 import { timingSafeEqual } from "@worker/utils/hash";
@@ -64,22 +72,75 @@ const handleInternalWorkerRequest = async (
     return new Response("OK");
   }
 
+  const stateResponse = await handleBridgeStateRequest(request, url, env);
+  if (stateResponse) return stateResponse;
+
+  return new Response("Not Found", { status: 404 });
+};
+
+const handleBridgeStateRequest = async (
+  request: Request,
+  url: URL,
+  env: Env,
+): Promise<Response | null> => {
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts[0] !== "api" || parts[1] !== "imap" || parts[2] !== "state") {
+    return null;
+  }
+
+  const accountId = parseAccountId(parts[4]);
+  if (parts[3] === "last-uid" && accountId) {
+    if (request.method === "GET") {
+      const value = await getImapBridgeLastUid(env.EMAIL_KV, accountId);
+      return Response.json({ value });
+    }
+
+    if (request.method === "PUT") {
+      const body = await readJson(request);
+      if (!isLastUidStateBody(body)) {
+        return Response.json({ error: "Bad Request" }, { status: 400 });
+      }
+      await putImapBridgeLastUid(env.EMAIL_KV, accountId, body.uid);
+      return new Response("OK");
+    }
+  }
+
+  if (parts[3] === "folder" && accountId && isFolderKind(parts[5])) {
+    const kind = parts[5];
+    if (request.method === "GET") {
+      const state = await getImapBridgeFolderPath(
+        env.EMAIL_KV,
+        accountId,
+        kind,
+      );
+      return Response.json(state);
+    }
+
+    if (request.method === "PUT") {
+      const body = await readJson(request);
+      if (!isFolderStateBody(body)) {
+        return Response.json({ error: "Bad Request" }, { status: 400 });
+      }
+      await putImapBridgeFolderPath(env.EMAIL_KV, accountId, kind, body.path);
+      return new Response("OK");
+    }
+  }
+
+  if (parts[3] === "folders" && accountId && request.method === "DELETE") {
+    await deleteImapBridgeFolderPaths(env.EMAIL_KV, accountId);
+    return new Response("OK");
+  }
+
   return new Response("Not Found", { status: 404 });
 };
 
 const getContainerEnvVars = (): Record<string, string> => {
-  const vars: Record<string, string> = {
+  return {
     NODE_ENV: "production",
     PORT: "3000",
     BRIDGE_SECRET: workerEnv.IMAP_BRIDGE_SECRET ?? "",
     TELEMAIL_URL: TELEMAIL_WORKER_INTERNAL_ORIGIN,
   };
-
-  if (workerEnv.IMAP_BRIDGE_REDIS_URL) {
-    vars.REDIS_URL = workerEnv.IMAP_BRIDGE_REDIS_URL;
-  }
-
-  return vars;
 };
 
 const isAuthorizedBridgeRequest = (request: Request, env: Env): boolean => {
@@ -97,4 +158,39 @@ const readJson = async (request: Request): Promise<unknown> => {
   } catch {
     return null;
   }
+};
+
+const parseAccountId = (value: string | undefined): number | null => {
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const isFolderKind = (
+  value: string | undefined,
+): value is ImapBridgeFolderKind =>
+  value === "junk" || value === "trash" || value === "archive";
+
+interface LastUidStateBody {
+  uid: number;
+}
+
+const isLastUidStateBody = (body: unknown): body is LastUidStateBody => {
+  if (!body || typeof body !== "object") return false;
+  const candidate = body as Partial<LastUidStateBody>;
+  return (
+    typeof candidate.uid === "number" &&
+    Number.isInteger(candidate.uid) &&
+    candidate.uid >= 0
+  );
+};
+
+interface FolderStateBody {
+  path: string | null;
+}
+
+const isFolderStateBody = (body: unknown): body is FolderStateBody => {
+  if (!body || typeof body !== "object") return false;
+  const candidate = body as Partial<FolderStateBody>;
+  return candidate.path === null || typeof candidate.path === "string";
 };

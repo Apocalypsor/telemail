@@ -227,13 +227,7 @@ IMAP Bridge 默认作为 Cloudflare Container 由主 Worker 托管。`worker/wra
 bun wrangler secret put IMAP_BRIDGE_SECRET
 ```
 
-可选：如果希望 `lastUid` / folder cache 在容器重启后保留，配置一个外部 Redis：
-
-```sh
-bun wrangler secret put IMAP_BRIDGE_REDIS_URL
-```
-
-不配置 Redis 时 middleware 会退回内存状态；容器重启后可能需要依赖 IMAP 服务器当前 `uidNext` 重新定位起点。
+`lastUid` / folder cache 会通过 Worker 内部接口写入 `EMAIL_KV`，不需要 Redis。
 
 ### 部署与更新
 
@@ -248,19 +242,8 @@ bun deploy:worker
 ### 通信模型
 
 - Worker → middleware：通过 `IMAP_BRIDGE_CONTAINER` binding 直接 `fetch()` 到 singleton container，不需要 `middleware.example.com`。
-- middleware → Worker：middleware 访问虚拟 `http://telemail.worker/api/imap/*`，由 Container `outboundByHost` handler 在 Worker runtime 中处理，并直接使用 D1 / Queue binding。
+- middleware → Worker：middleware 访问虚拟 `http://telemail.worker/api/imap/*`，由 Container `outboundByHost` handler 在 Worker runtime 中处理，并直接使用 D1 / Queue / KV binding。
 - middleware → IMAP server：容器保持公网出站能力，直接连接外部 IMAP `993/143`。
-
-### 自托管 fallback（可选）
-
-如果暂时不用 Cloudflare Container，仍可用旧 Docker Compose 模式：把 `middleware/docker-compose.yml` 和 `.env.example` 放到服务器，配置 `BRIDGE_SECRET`、`TELEMAIL_URL=https://example.com`，用反向代理暴露 `middleware.example.com`，并在 Worker 配置：
-
-```sh
-bun wrangler secret put IMAP_BRIDGE_URL          # https://middleware.example.com
-bun wrangler secret put IMAP_BRIDGE_SECRET       # 和 middleware/.env 里 BRIDGE_SECRET 一致
-```
-
-Worker 会优先使用 `IMAP_BRIDGE_CONTAINER`，Container 不可用且配置了 `IMAP_BRIDGE_URL` 时回退到自托管 bridge。
 
 ## 7. 添加邮箱账号
 
@@ -273,7 +256,7 @@ Worker 会优先使用 `IMAP_BRIDGE_CONTAINER`，Container 不可用且配置了
 
 管理员可从 `/start` → **全局管理** → **用户管理** 打开 Mini App 审批、撤回或删除用户。
 
-后续 Cron Trigger 会自动维护：每分钟分发到期提醒，并按用户本地时区在 19:00 发送未读 / 垃圾邮件摘要（非零列表会附 Mini App 入口）；每小时检查 IMAP 中间件健康并重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
+后续 Cron Trigger 会自动维护：每分钟分发到期提醒，并按用户本地时区在 19:00 发送未读 / 垃圾邮件摘要（非零列表会附 Mini App 入口）；每 5 分钟检查 IMAP 中间件健康；每小时重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
 
 ## 8. CI/CD（GitHub Actions）
 

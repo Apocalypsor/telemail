@@ -36,8 +36,6 @@
 | Secret                  | 说明                                                                 |
 | ----------------------- | -------------------------------------------------------------------- |
 | `IMAP_BRIDGE_SECRET`    | IMAP Bridge 共享密钥（Bearer），Worker 调 Container、Container 回调 Worker 都用它校验 |
-| `IMAP_BRIDGE_REDIS_URL` | Cloudflare Container 模式下传给 middleware 的 Redis URL（可选；不配则 lastUid/folder cache 仅内存） |
-| `IMAP_BRIDGE_URL`       | 自托管 middleware fallback URL（可选；配置后 Container 不可用时 Worker 会回退到该 URL） |
 
 ### LLM / AI 摘要（可选）
 
@@ -76,7 +74,7 @@
 | Binding       | 类型    | 用途                                                                 |
 | ------------- | ------- | -------------------------------------------------------------------- |
 | `DB`          | D1      | 账号 / 消息映射 / 提醒 / 用户 / 失败邮件                             |
-| `EMAIL_KV`    | KV      | access_token 缓存、消息去重、OAuth state、预览 HTML（7 天 TTL）      |
+| `EMAIL_KV`    | KV      | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
 | `EMAIL_QUEUE` | Queue   | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
 | `OBS_SERVICE` | Service | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
 | `IMAP_BRIDGE_CONTAINER` | Durable Object / Container | 托管 `middleware/` IMAP Bridge 镜像，Worker 通过 binding 直接访问 |
@@ -87,7 +85,8 @@
 
 - **每分钟**：分发到期的 Mini App 提醒
 - **每 15 分钟**：按用户本地时区检查是否到 19:00，发送未读 / 垃圾邮件摘要（都为 0 时跳过；非零列表会附 Mini App 入口）
-- **每小时**（`minute === 0`）：检查 IMAP Bridge 健康、重试失败的 LLM 摘要
+- **每 5 分钟**（`minute % 5 === 0`）：检查 IMAP Bridge 健康
+- **每小时**（`minute === 0`）：重试失败的 LLM 摘要
 - **每天 UTC 0 点**（额外）：为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）
 
 ## D1 Schema
