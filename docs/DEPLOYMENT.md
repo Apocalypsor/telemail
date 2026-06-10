@@ -255,18 +255,18 @@ bun deploy:worker
 
 ## 8. CI/CD（GitHub Actions）
 
-`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` 两个 boolean，后续 deploy / preview job 按这两个 flag + 事件类型决定跑不跑。`apps/middleware/**` 归入 worker filter，因为 IMAP Container 随 Worker deploy 一起构建发布。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
+`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` 两个 boolean，后续 deploy / preview job 按这两个 flag + 事件类型决定跑不跑。`apps/middleware/**` 归入 worker filter，因为 IMAP Container 随 Worker deploy 一起构建发布；Markdown 变更会跑 CI，但不会触发 Worker / Pages deploy。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
 
 ### 8.1 行为矩阵
 
 | 触发 | 跑什么 |
 | --- | --- |
-| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`apps/worker/**` 或 `apps/middleware/**` 变 → `preview-worker`（`wrangler versions upload`，包含 Container 镜像，输出 preview URL，不接生产流量）<br/>`apps/page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>**`preview-comment`** sticky comment 把上面两个的 URL / 状态贴到 PR |
+| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`apps/worker/**` 或 `apps/middleware/**` 非 Markdown 变更 → `preview-worker`（`wrangler versions upload`，包含 Container 镜像，输出 preview URL，不接生产流量）<br/>`apps/page/**` 非 Markdown 变更 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>**`preview-comment`** sticky comment 把上面两个的 URL / 状态贴到 PR |
 | `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`（含 IMAP Container 镜像）、pages `wrangler pages deploy --branch=main`。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
 | `workflow_dispatch` on `main` | **强制**Worker / Pages deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 |
 | `workflow_dispatch` on 其他 branch | 仅 CI |
 
-Path filter 故意**不含** `bun.lock`：免得改个 lockfile 牵连所有 workspace 重部署。子包 `package.json` 已被各自 `**` 范围 cover；根 `package.json` 同时影响 worker / page / middleware（共享 devDeps）。
+Path filter 故意**不含** `bun.lock`：免得改个 lockfile 牵连所有 workspace 重部署。Markdown 只影响 CI，不触发 deploy。根 `package.json` 同时影响 worker / page / middleware（共享 devDeps）。
 
 ### 8.2 配置 Repo Secrets
 
@@ -312,6 +312,6 @@ Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Di
 
 ### 8.6 跳过 deploy
 
-- 改 docs / 根配置 / `.github/`：path filter 自然过滤，不触发 deploy
+- 改 docs / Markdown / 根配置 / `.github/`：path filter 自然过滤，不触发 deploy
 - 整个 workflow 都不想跑：commit message 带 `[skip ci]`
 - 改 worker 和 page 都改了：两个 deploy 并行跑，互不依赖
