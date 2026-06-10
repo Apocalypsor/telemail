@@ -1,14 +1,16 @@
 # Middleware — Agent Guide
 
-IMAP bridge (Bun + Elysia + ImapFlow). Production runs as a Cloudflare Container hosted by `apps/worker/` via the `ImapBridgeContainer` Durable Object binding. This service holds IMAP connections on the user's behalf and pushes "new email arrived" events to the worker. Cross-workspace rules in [root AGENTS.md](../../AGENTS.md).
+IMAP bridge (Bun + Elysia + ImapFlow). Cross-workspace rules in [root AGENTS.md](../../AGENTS.md).
+
+Before changing middleware behavior, inspect the current `package.json`, Dockerfile, `src/index.ts`, `src/config.ts`, connection manager, state helpers, and worker-side container host. Do not rely on this file for runtime topology, interval defaults, or bridge route inventory.
 
 ## Conventions
 
-- **Bridge state lives in Worker KV**: per-account `lastUid` and special folder cache go through `@middleware/utils/state`, which calls Worker-internal `/api/imap/state/*` endpoints. Do not add Redis or local persistence here.
-- **Periodic refresh** (`REFRESH_INTERVAL_MS`, default 5 min): close + reconnect every client to prevent IDLE from going silently stale (servers like iCloud do this often).
-- **Reconnect is manual**: ImapFlow doesn't auto-reconnect. `close` event → `scheduleReconnect` → wait `RECONNECT_DELAY_MS` (3s) → fresh `ImapFlow` instance. One timer guard per account prevents stacking.
+- **Bridge state**: inspect `@middleware/utils/state` and the worker-side bridge endpoints before adding state reads/writes. Do not add a second persistence backend unless you are deliberately replacing the current pattern end to end.
+- **Periodic refresh**: cadence comes from current config. The purpose is to close + reconnect clients so IDLE does not silently stale on providers that behave poorly.
+- **Reconnect is manual**: ImapFlow doesn't auto-reconnect. Preserve the close → scheduled reconnect → fresh `ImapFlow` instance pattern, including one timer guard per account to prevent stacking.
 - **Stale client guard**: when registering an event handler, **capture the current `ImapFlow` ref** and ignore events from old clients — preserve this pattern when adding new handlers.
-- **Container-only HTTP surface**: middleware routes are intended to be reached only through the Worker `IMAP_BRIDGE_CONTAINER` binding. Don't add a public deployment path or expose email addresses/passwords in responses.
+- **Container-only HTTP surface**: middleware routes are intended to be reached only through the current Worker/container transport. Inspect Worker config for the binding name before touching it. Don't add a public deployment path or expose email addresses/passwords in responses.
 - **`src/index.ts` exports `app` and `App` type**: the worker imports `import type { App } from "@middleware/index"` and drives the bridge through Eden treaty. Treat the route surface (`/api/*` paths, body schemas, return shapes) as a public contract — renaming a route or changing a body schema breaks worker compile-time.
 - **Aliases**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in root `tsconfig.base.json`. Internal imports here use `@middleware/connections`, `@middleware/constants`, `@middleware/utils/state`, etc. —— same prefix worker would use for cross-package access, so files don't change meaning when read from another tsconfig.
 

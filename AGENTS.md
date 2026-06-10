@@ -2,23 +2,27 @@
 
 > **Commit only when explicitly asked.** Don't auto-commit after finishing a task — wait for the user to say so.
 > **Before commit**: `bun check` (Biome) + `bun typecheck` (tsc) from repo root. Don't use `biome-ignore`. Update `README.md` / `docs/*` when you change behavior they describe.
-> **Commit message convention**: use Conventional Commits (`<type>(optional-scope): <summary>`). Feature work must start with `feat:` (for example, `feat: add Cloudflare Container IMAP bridge`); use `fix:`, `docs:`, `chore:`, etc. only when that type accurately describes the change.
+> **Commit message convention**: use Conventional Commits (`<type>(optional-scope): <summary>`). Feature work must start with `feat:` (for example, `feat: add account sync`); use `fix:`, `docs:`, `chore:`, etc. only when that type accurately describes the change.
 
 User-facing docs: `README.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
 
 Per-workspace guides: [`apps/worker/AGENTS.md`](./apps/worker/AGENTS.md) · [`apps/page/AGENTS.md`](./apps/page/AGENTS.md) · [`apps/middleware/AGENTS.md`](./apps/middleware/AGENTS.md).
 
+## Explore first
+
+Treat AGENTS.md as stable guardrails, not a live architecture inventory. Before changing a workspace, inspect the current source and config: root + workspace `package.json`, relevant `src/` entry points, `wrangler.example.jsonc`, migrations, `.github/workflows/ci.yml`, and the user-facing docs listed above. Use `rg` to find existing patterns and call sites before adding new ones.
+
+If this guide conflicts with the checked-in code or docs, trust the checked-in code after verifying the behavior, then update the guide only for durable conventions. Do not encode short-lived implementation details here when a future agent can discover them directly from source.
+
 Cloudflare API knowledge may be stale — fetch <https://developers.cloudflare.com/workers/> before any Workers/KV/D1/Queues task.
 
 ## Workspaces (bun monorepo)
 
-- **`apps/worker/`** Cloudflare Worker (Elysia + grammY) — bot webhook, queue, cron, providers, D1. Owns `wrangler.example.jsonc` + `migrations/`. CI generates real `wrangler.jsonc` via `envsubst` from `CF_D1_DATABASE_ID` + `CF_KV_NAMESPACE_ID`.
-- **`apps/page/`** Cloudflare Pages SPA (Vite + React + TanStack Router/Query + HeroUI + Eden treaty) — single bundle serves both web pages and Mini App routes (`/telegram-app/*`).
-- **`apps/middleware/`** IMAP bridge (Bun + Elysia + ImapFlow) — built into the Cloudflare Container hosted by `apps/worker/`. It keeps IMAP IDLE connections open; Worker calls it through the `IMAP_BRIDGE_CONTAINER` binding, and middleware calls Worker-internal `http://telemail.worker/api/imap/*` endpoints for accounts, push events, and KV-backed state.
+- **`apps/worker/`** Cloudflare Worker runtime. Inspect its `package.json`, `wrangler.example.jsonc`, `src/` entry points, and `migrations/` before changing runtime bindings, API routes, queues, cron, providers, or database behavior.
+- **`apps/page/`** Cloudflare Pages SPA. Inspect its `package.json`, routing tree, Vite/TanStack config, and API client before changing routes, dependencies, build behavior, or Mini App flows.
+- **`apps/middleware/`** IMAP bridge Container app. Inspect its `package.json`, Dockerfile, `src/index.ts`, `src/config.ts`, and the worker-side container host before changing runtime topology or Worker/middleware communication.
 
-Single custom domain. `*.com/api/*` + `/oauth/*` → Worker; everything else → Pages. Same origin, zero CORS.
-
-CI/CD via `.github/workflows/ci.yml` — `dorny/paths-filter` decides which deploy jobs run. Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+Routing, domains, deploy conditions, and required secrets belong to `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`, `.github/workflows/ci.yml`, and Cloudflare config. Verify those files instead of assuming the topology from this guide.
 
 All scripts run from repo root. Read root + per-workspace `package.json` for the actual command list.
 
@@ -31,7 +35,7 @@ All scripts run from repo root. Read root + per-workspace `package.json` for the
 - **Type placement**: in regular `.ts` / `.tsx` implementation files, keep module-level `interface` and `type` declarations immediately after imports, before runtime constants/functions/classes/components/hooks. Schema-derived aliases such as `UnwrapSchema<typeof Foo>` or `typeof app` may stay next to the value they derive from. Do not park local interfaces at the bottom of a file.
 - **Error reporting** (worker): `reportErrorToObservability(env, "tag", err)`, never `console.error`. Page side: surface via `extractErrorMessage()`, no silent swallowing.
 - **Cross-package imports**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in `tsconfig.base.json`. Page imports `@worker/*` are **type-only** (no runtime — keeps the page bundle slim). Worker imports `@page/paths` (Mini App URL constants), `@middleware/index` (Eden `App` type for the IMAP bridge client), and pure bridge constants from `@middleware/constants`.
-- **Auth + API contract**: page calls worker through Eden treaty (`apps/page/src/api/client.ts` exports `treaty<App>(...)` where `App` comes from `import type { App } from "@worker/api"`). Eden auto-injects `X-Telegram-Init-Data` in TG context; worker plugin `authMiniApp` verifies. Web pages use a session cookie (`authSession`). Mail preview GET also accepts an HMAC token. Worker calls middleware through the `IMAP_BRIDGE_CONTAINER` binding with Eden (`treaty<App>` against `@middleware/index`, `throwHttpError: true`); middleware calls Worker-internal `http://telemail.worker/api/imap/*` via Container outbound host routing.
+- **Auth + API contract**: do not hand-write HTTP contracts. Start from the current Eden clients, Elysia apps, and auth plugins in source, then let exported `App` types drive route/method/body/query/response shapes. Verify the current headers, cookies, tokens, and Worker/middleware transport before changing auth or bridge routes.
 
 ## Elysia layout
 

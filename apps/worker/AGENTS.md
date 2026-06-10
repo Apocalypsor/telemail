@@ -2,9 +2,11 @@
 
 Cloudflare Worker (Elysia + grammY). Cross-workspace rules in [root AGENTS.md](../../AGENTS.md).
 
+Before changing worker behavior, inspect the current entry points and config instead of relying on this file as an inventory: `package.json`, `wrangler.example.jsonc`, `src/index.ts`, `src/api/index.ts`, `src/handlers/`, `src/containers/`, and the relevant provider/module files.
+
 ## Layout (`src/`)
 
-- **`api/`** — HTTP layer (Elysia). Module / plugin file rules in root [AGENTS.md](../../AGENTS.md) "Elysia layout". `api/index.ts` composes the tree with `CloudflareAdapter` + `.compile()` and exports `type App` for Eden.
+- **`api/`** — HTTP layer (Elysia). Module / plugin file rules in root [AGENTS.md](../../AGENTS.md) "Elysia layout". Start at `api/index.ts` to see the current app composition and exported `App` type.
 - **`bot/`** — Telegram bot (grammY). Self-contained tree, **no** sub-`services/`. Handler folders should stay focused on callback/command registration; shared or extracted bot helper code lives in `bot/utils/` with purpose-named files.
 - **`handlers/`** — non-HTTP entry points (queue consumer + cron).
 - **`clients/`** — outbound HTTP: shared `ky` instance + hand-written external API wrappers.
@@ -20,13 +22,13 @@ Decision tree for a new file: public HTTP route → `api/modules/<feature>/`; Wo
 
 - **Aliases**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in root `tsconfig.base.json`. Worker-internal imports use `@worker/db/...` `@worker/bot/...` `@worker/utils/...` etc.; cross-package middleware access goes through `@middleware/index` (Eden treaty `App` type), `@middleware/constants` (pure bridge constants), and `@page/paths` (Mini App URL constants).
 - **HTTP**: every generic outbound request goes through `@worker/clients/http` (a `ky` instance). Centralized retry / parse-fallback lives there. **IMAP middleware** is the exception — talk to it through the Eden treaty client at `@worker/providers/imap/utils/client`.
-- **IMAP bridge client**: Worker → middleware goes through `bridgeClient` / `bridgeCall` in `providers/imap/utils/client.ts`, typed against `import type { App } from "@middleware/index"` and backed by the `IMAP_BRIDGE_CONTAINER` binding. Treaty config sets `throwHttpError: true` so non-2xx auto-throws `EdenFetchError`. For raw streaming routes that Eden cannot model cleanly, use `bridgeFetch` + `bridgeRequestUrl`. Middleware → Worker uses `ImapBridgeContainer.outboundByHost` in `containers/imap-container.ts`; keep those container-only endpoints out of `api/modules/`.
+- **IMAP bridge client**: discover the current Worker ↔ middleware transport from `providers/imap/utils/client.ts`, `containers/imap-container.ts`, and middleware `src/index.ts`. Keep typed calls on Eden where possible. For raw streaming routes that Eden cannot model cleanly, use the existing bridge fetch helpers. Keep container-only Worker endpoints out of public `api/modules/`.
 - **Env / waitUntil**: in Elysia handlers, destructure `{ env, executionCtx, waitUntil }` from context (provided by `cf` plugin). Queue, cron, and Container code receive `env` from the Worker runtime entry point and pass it explicitly to services/providers. Use `waitUntil` for side effects that should survive the response or current batch item.
-- **Bot commands**: private chat only by default — `bot/index.ts` registers `registerPrivateOnlyCommandGuard` as a global guard (also covers `channel_post`). New commands don't need to re-check; `callback_query` is unaffected.
+- **Bot commands**: before adding command auth or chat-scope checks, inspect `bot/index.ts` for global guards and the relevant handler folder for local exceptions.
 - **State reconciliation**: all "remote → TG" syncs go through `reconcileMessageState`; star pin goes through `syncStarPinState`. **Don't** patch state in multiple places.
-- **Disable/enable**: `accounts.disabled` pauses an account without deleting data. Enforcement points include the queue consumer, push renewal, Mini App mail lists, manual sync callback, and `getImapAccounts`.
+- **Disable/enable**: `accounts.disabled` pauses an account without deleting data. Before adding a new account workflow, `rg "disabled" apps/worker/src` and preserve the existing enforcement pattern.
 - **IMAP message id = RFC 822 Message-Id** (not the per-folder UID). The bridge takes `rfcMessageId` everywhere; UIDs aren't stable across folders. Emails without Message-Id are dropped. Gmail / Outlook keep their native ids.
 - **Archive**: `provider.archiveMessage(id)` + `accountCanArchive(account)`. Gmail needs the user to pick a label (`accounts.archive_folder`); without one `canArchive()` returns false.
-- **Cron**: single `* * * * *` trigger. Reminders dispatch every minute; daily summary checks every 15 minutes; IMAP bridge health runs every 5 minutes; `minute === 0` gates hourly retry work; UTC midnight renews all push subscriptions.
+- **Cron**: inspect the scheduled handler and `wrangler.example.jsonc` for current triggers and time gates before changing cadence. Keep scheduling decisions centralized in the cron path instead of scattering timers across providers.
 - **Email keyboard**: `buildEmailKeyboard` requires `tgMessageId`, so the delivery flow is send naked → insert message_map → build keyboard → `setReplyMarkup`. **One code path** covers both private chat and groups.
-- **Reminders**: the only entry is the ⏰ button on email messages. Auth: `X-Telegram-Init-Data` + `users.approved`; group deep-link also verifies `account.telegram_user_id === current user`. Cron sends with `reply_parameters` so reminders thread under the original email.
+- **Reminders**: start from the reminder module, auth plugin, and cron handler before changing entry points or delivery behavior. Preserve threading under the original email unless the product flow changes deliberately.
