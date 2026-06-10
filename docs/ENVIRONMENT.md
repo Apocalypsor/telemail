@@ -33,10 +33,11 @@
 
 ### IMAP（用 IMAP 时必填）
 
-| Secret               | 说明                                                                |
-| -------------------- | ------------------------------------------------------------------- |
-| `IMAP_BRIDGE_URL`    | IMAP Bridge 中间件 URL（middleware 部署见 [DEPLOYMENT.md §6.4](./DEPLOYMENT.md)） |
-| `IMAP_BRIDGE_SECRET` | IMAP Bridge 共享密钥（Bearer），跟 middleware `.env` 的 `BRIDGE_SECRET` 一致 |
+| Secret                  | 说明                                                                 |
+| ----------------------- | -------------------------------------------------------------------- |
+| `IMAP_BRIDGE_SECRET`    | IMAP Bridge 共享密钥（Bearer），Worker 调 Container、Container 回调 Worker 都用它校验 |
+| `IMAP_BRIDGE_REDIS_URL` | Cloudflare Container 模式下传给 middleware 的 Redis URL（可选；不配则 lastUid/folder cache 仅内存） |
+| `IMAP_BRIDGE_URL`       | 自托管 middleware fallback URL（可选；配置后 Container 不可用时 Worker 会回退到该 URL） |
 
 ### LLM / AI 摘要（可选）
 
@@ -78,6 +79,7 @@
 | `EMAIL_KV`    | KV      | access_token 缓存、消息去重、OAuth state、预览 HTML（7 天 TTL）      |
 | `EMAIL_QUEUE` | Queue   | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
 | `OBS_SERVICE` | Service | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
+| `IMAP_BRIDGE_CONTAINER` | Durable Object / Container | 托管 `middleware/` IMAP Bridge 镜像，Worker 通过 binding 直接访问 |
 
 ## Cron Triggers
 

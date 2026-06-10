@@ -15,7 +15,7 @@
 //
 // 用法（workflow 里）：
 //   - uses: actions/checkout@v6        # 需要 checkout 才能 require 这个文件
-//   - uses: actions/github-script@v8
+//   - uses: actions/github-script@v9
 //     env:
 //       MODE: preview
 //       NEEDS: ${{ toJSON(needs) }}
@@ -45,14 +45,6 @@ async function postPreview({ github, context, needs }) {
   const MARKER = "<!-- preview-deploys -->";
   const sha = context.payload.pull_request.head.sha.slice(0, 7);
 
-  const dockerStatus = (() => {
-    const j = needs["docker-middleware"];
-    if (!j || j.result === "skipped") return "_(unchanged)_";
-    if (j.result === "failure") return "❌ build failed";
-    if (j.result === "success") return "✅ build OK (no push on PR)";
-    return j.result;
-  })();
-
   const body = [
     MARKER,
     "## 🚀 Preview deploys",
@@ -62,7 +54,6 @@ async function postPreview({ github, context, needs }) {
     `| 🔧 Worker version | ${fmt(needs["preview-worker"], needs["preview-worker"]?.outputs?.url)} |`,
     `| 📄 Pages preview  | ${fmt(needs["preview-page"], needs["preview-page"]?.outputs?.url)} |`,
     `| 📄 Pages alias    | ${fmt(needs["preview-page"], needs["preview-page"]?.outputs?.alias_url)} |`,
-    `| 🐳 Middleware     | ${dockerStatus} |`,
     "",
     `_Last updated: \`${sha}\` · [Workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId})_`,
   ].join("\n");
@@ -91,26 +82,15 @@ async function postPreview({ github, context, needs }) {
 async function postDeploy({ github, context, needs }) {
   const MARKER = "<!-- deploy-results -->";
 
-  const dockerStatus = (() => {
-    const j = needs["docker-middleware"];
-    if (!j || j.result === "skipped") return "_(unchanged)_";
-    if (j.result === "failure") return "❌ build/push failed";
-    if (j.result !== "success") return j.result;
-    const owner = context.repo.owner.toLowerCase();
-    const sha = context.sha.slice(0, 7);
-    return `\`ghcr.io/${owner}/telemail-middleware:latest\` + \`:sha-${sha}\``;
-  })();
-
   const body = [
     MARKER,
     "## ✅ Deployed to production",
     "",
-    "| Resource | URL / Image |",
+    "| Resource | URL / Status |",
     "| --- | --- |",
     `| 🔧 Worker | ${fmt(needs["deploy-worker"], needs["deploy-worker"]?.outputs?.url)} |`,
     `| 📄 Pages  | ${fmt(needs["deploy-page"], needs["deploy-page"]?.outputs?.url)} |`,
     `| 📄 Pages alias | ${fmt(needs["deploy-page"], needs["deploy-page"]?.outputs?.alias_url)} |`,
-    `| 🐳 Middleware | ${dockerStatus} |`,
     "",
     `_[Workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId})_`,
   ].join("\n");

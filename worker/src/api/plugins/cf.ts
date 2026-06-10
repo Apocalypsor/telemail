@@ -14,7 +14,7 @@ import { Elysia } from "elysia";
  */
 export type RequestWithCtx = Request & { _ctx?: ExecutionContext };
 
-const env = cfEnv as Env;
+const env = cfEnv as unknown as Env;
 
 export const cf = new Elysia({ name: "cf" })
   .decorate("env", env)

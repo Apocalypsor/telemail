@@ -46,6 +46,8 @@ interface WorkerSecrets {
   IMAP_BRIDGE_URL?: string;
   /** IMAP 中间件共享密钥（Bearer token） */
   IMAP_BRIDGE_SECRET?: string;
+  /** Cloudflare Container 模式下传给 middleware 的 Redis URL（可选） */
+  IMAP_BRIDGE_REDIS_URL?: string;
   /** Microsoft OAuth2 Client ID（Outlook 支持） */
   MS_CLIENT_ID?: string;
   /** Microsoft OAuth2 Client Secret */
@@ -61,9 +63,14 @@ interface WorkerSecrets {
   TG_MINI_APP_SHORT_NAME?: string;
 }
 
-type RefinedBindings = Omit<Cloudflare.Env, "EMAIL_QUEUE"> & {
+type RefinedBindings = Omit<
+  Cloudflare.Env,
+  "EMAIL_QUEUE" | "IMAP_BRIDGE_CONTAINER"
+> & {
   /** Queue 绑定 —— wrangler 生成 binding，项目侧细化 message body 类型 */
   EMAIL_QUEUE: Queue<QueueMessage>;
+  /** IMAP bridge Cloudflare Container binding；没有启用容器时可回退到 IMAP_BRIDGE_URL */
+  IMAP_BRIDGE_CONTAINER?: DurableObjectNamespace;
 };
 
 /** Worker runtime env：binding 来源于 `wrangler types` 生成的 `Cloudflare.Env`；

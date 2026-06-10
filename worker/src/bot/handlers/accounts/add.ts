@@ -7,6 +7,7 @@ import { createAccount } from "@worker/db/accounts";
 import { putOAuthBotMsg } from "@worker/db/kv";
 import { t } from "@worker/i18n";
 import { PROVIDERS } from "@worker/providers";
+import { isImapBridgeConfigured } from "@worker/providers/imap/utils/client";
 import type { AccountType, Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { getWorkerBaseUrl } from "@worker/utils/url";
@@ -135,7 +136,7 @@ export const registerAddCallbacks = (bot: Bot, env: Env) => {
       });
     }
 
-    if (!env.IMAP_BRIDGE_URL || !env.IMAP_BRIDGE_SECRET) {
+    if (!isImapBridgeConfigured(env)) {
       return ctx.answerCallbackQuery({
         text: t("accounts:add.imapNotConfigured"),
       });

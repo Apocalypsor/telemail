@@ -9,7 +9,7 @@
 - 接收消息的 Telegram Chat ID（每个邮箱账号可配置不同的 Chat）
 - **Gmail**：启用了 Gmail API 的 [Google Cloud](https://console.cloud.google.com) 项目
 - **Outlook**：[Microsoft Entra ID](https://entra.microsoft.com) 应用注册
-- **IMAP**：内置 IMAP Bridge（`middleware/`，docker 部署，可选，见 §6.4）
+- **IMAP**：内置 IMAP Bridge（`middleware/`，默认随 Worker 作为 Cloudflare Container 部署，见 §6.4）
 
 安装依赖：
 
@@ -216,64 +216,51 @@ bun wrangler secret put TG_MINI_APP_SHORT_NAME
 
 ## 6.4 部署 IMAP Middleware（可选，仅当要接 IMAP 账号时）
 
-IMAP 账号走自己服务器上的桥接服务（Cloudflare Workers 不能保持 IMAP IDLE 长连接）。Middleware 在 `middleware/` 子包，docker 部署，**镜像由 CI 推到 `ghcr.io/apocalypsor/telemail-middleware`**（main 上 push 自动构建 + push `:latest` 和 `:sha-<short>` 两个 tag），服务器只 pull 不 build。
+IMAP Bridge 默认作为 Cloudflare Container 由主 Worker 托管。`worker/wrangler.example.jsonc` 中的 `containers` 配置会让 `wrangler deploy` 使用 `middleware/Dockerfile` 构建镜像、推送到 Cloudflare Registry，并通过 `IMAP_BRIDGE_CONTAINER` Durable Object binding 启动一个 singleton bridge 实例。
 
 ### 准备
 
-- 一台 Linux 服务器 + Docker & Docker Compose
-- 反向代理（Caddy / nginx）+ TLS，把 `middleware.example.com` 转到 `127.0.0.1:3000`
-- GitHub repo 是 public 的话 GHCR 镜像默认也是 public，server 直接 pull 就行；private repo 要先在服务器 `docker login ghcr.io -u <user>` 用 PAT 登录
-
-### 首次部署
-
-只把 `middleware/docker-compose.yml` + `middleware/.env.example` 拷到服务器（不需要整个 repo，docker-compose 只 pull GHCR 镜像不 build）：
+- 本地或 CI runner 需要 Docker daemon；`wrangler deploy` 构建 Container 镜像时会用到。
+- Worker secret 里配置 bridge 共享密钥：
 
 ```sh
-mkdir telemail-middleware && cd telemail-middleware
-curl -O https://raw.githubusercontent.com/Apocalypsor/telemail/main/middleware/docker-compose.yml
-curl -O https://raw.githubusercontent.com/Apocalypsor/telemail/main/middleware/.env.example
-mv .env.example .env
-# 编辑 .env：BRIDGE_SECRET=$(openssl rand -hex 32)，TELEMAIL_URL=https://example.com
-docker compose up -d
+bun wrangler secret put IMAP_BRIDGE_SECRET
 ```
 
-`docker-compose.yml` 同时有 `image:` 和 `build:` 段：服务器无源码 → 走 `image: ghcr.io/...`（`pull_policy: always`）；本地开发有源码 → `docker compose build` 强制本地编。
+可选：如果希望 `lastUid` / folder cache 在容器重启后保留，配置一个外部 Redis：
 
-### 反向代理（Caddy 例）
-
-```text
-middleware.example.com {
-    reverse_proxy localhost:3000
-}
+```sh
+bun wrangler secret put IMAP_BRIDGE_REDIS_URL
 ```
 
-### 配置 Worker
+不配置 Redis 时 middleware 会退回内存状态；容器重启后可能需要依赖 IMAP 服务器当前 `uidNext` 重新定位起点。
 
-把 middleware 的 URL + 密钥告诉 Worker：
+### 部署与更新
+
+IMAP Container 跟 Worker 一起部署：
+
+```sh
+bun deploy:worker
+```
+
+每次 `worker/**` 或 `middleware/**` 变更，CI 都会触发 Worker deploy；middleware 代码变更会随 Worker deploy 重新构建并发布 Cloudflare Container 镜像。
+
+### 通信模型
+
+- Worker → middleware：通过 `IMAP_BRIDGE_CONTAINER` binding 直接 `fetch()` 到 singleton container，不需要 `middleware.example.com`。
+- middleware → Worker：middleware 访问虚拟 `http://telemail.worker/api/imap/*`，由 Container `outboundByHost` handler 在 Worker runtime 中处理，并直接使用 D1 / Queue binding。
+- middleware → IMAP server：容器保持公网出站能力，直接连接外部 IMAP `993/143`。
+
+### 自托管 fallback（可选）
+
+如果暂时不用 Cloudflare Container，仍可用旧 Docker Compose 模式：把 `middleware/docker-compose.yml` 和 `.env.example` 放到服务器，配置 `BRIDGE_SECRET`、`TELEMAIL_URL=https://example.com`，用反向代理暴露 `middleware.example.com`，并在 Worker 配置：
 
 ```sh
 bun wrangler secret put IMAP_BRIDGE_URL          # https://middleware.example.com
 bun wrangler secret put IMAP_BRIDGE_SECRET       # 和 middleware/.env 里 BRIDGE_SECRET 一致
 ```
 
-### 健康检查
-
-```sh
-curl https://middleware.example.com/api/health
-# {"ok":true,"total":2,"usable":2}
-```
-
-故意不带鉴权，只暴露 `{ ok, total, usable }` 三个数字（不返回邮箱地址等）。
-
-### 更新
-
-每次 main 更新 `middleware/**`，CI 会自动重 build 镜像 push 到 GHCR。服务器拉新版：
-
-```sh
-docker compose pull && docker compose up -d
-```
-
-固定到某个 commit（不想跟 latest 滚动）就把 `image:` 改成 `ghcr.io/apocalypsor/telemail-middleware:sha-<short>`。
+Worker 会优先使用 `IMAP_BRIDGE_CONTAINER`，Container 不可用且配置了 `IMAP_BRIDGE_URL` 时回退到自托管 bridge。
 
 ## 7. 添加邮箱账号
 
@@ -290,15 +277,15 @@ docker compose pull && docker compose up -d
 
 ## 8. CI/CD（GitHub Actions）
 
-`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` / `middleware` 三个 boolean，后续 deploy / preview / docker job 按这三个 flag + 事件类型决定跑不跑。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
+`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` 两个 boolean，后续 deploy / preview job 按这两个 flag + 事件类型决定跑不跑。`middleware/**` 归入 worker filter，因为 IMAP Container 随 Worker deploy 一起构建发布。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
 
 ### 8.1 行为矩阵
 
 | 触发 | 跑什么 |
 | --- | --- |
-| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`worker/**` 变 → `preview-worker`（`wrangler versions upload`，输出 preview URL，不接生产流量）<br/>`page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>`middleware/**` 变 → `docker-middleware` 仅 build 验证（不 push）<br/>**`preview-comment`** sticky comment 把上面三个的 URL / 状态贴到 PR |
-| `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`、pages `wrangler pages deploy --branch=main`、docker 多 arch 镜像 push 到 GHCR `:latest` + `:sha-<short>`。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
-| `workflow_dispatch` on `main` | **强制**三个 deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 / 镜像重 push |
+| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`worker/**` 或 `middleware/**` 变 → `preview-worker`（`wrangler versions upload`，包含 Container 镜像，输出 preview URL，不接生产流量）<br/>`page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>**`preview-comment`** sticky comment 把上面两个的 URL / 状态贴到 PR |
+| `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`（含 IMAP Container 镜像）、pages `wrangler pages deploy --branch=main`。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
+| `workflow_dispatch` on `main` | **强制**Worker / Pages deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 |
 | `workflow_dispatch` on 其他 branch | 仅 CI |
 
 Path filter 故意**不含** `bun.lock`：免得改个 lockfile 牵连所有 workspace 重部署。子包 `package.json` 已被各自 `**` 范围 cover；根 `package.json` 同时影响 worker / page / middleware（共享 devDeps）。
@@ -316,15 +303,15 @@ GitHub repo → **Settings → Secrets and variables → Actions** 加：
 
 `worker/wrangler.jsonc` 是 gitignored 的 templated 文件 —— `deploy-worker` / `preview-worker` job 在跑 wrangler 之前会先 `envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc`，把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成上面两个 secrets。
 
-GHCR push 用内置 `GITHUB_TOKEN`（workflow 顶部 `permissions: packages: write` 已配），不需要额外 secret。Public repo → 镜像默认 public。
+不再单独发布 GHCR middleware 镜像；Cloudflare Container 镜像由 `wrangler deploy` 根据 `worker/wrangler.jsonc` 的 `containers` 配置构建并上传到 Cloudflare Registry。
 
 ### 8.3 资源命名
 
 | 资源 | 名字 | 改名要动哪 |
 | --- | --- | --- |
 | Worker | `telemail` | `worker/wrangler.jsonc` 的 `name` |
+| IMAP Container | `telemail-imap-bridge` | `worker/wrangler.jsonc` 的 `containers[0].name` |
 | Pages 项目 | `telemail-web` | `.github/workflows/ci.yml` 里的 `--project-name`（出现 2 次）|
-| GHCR 镜像 | `ghcr.io/<owner>/telemail-middleware` | workflow `metadata-action` 的 `images:`（owner 自动跟 GitHub repo） |
 
 ### 8.4 关掉 Pages 的 Git Integration（如果之前接过）
 
@@ -332,14 +319,13 @@ Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Di
 
 ### 8.5 PR Preview URL 在哪看
 
-`preview-comment` job 会在 PR 上发 / 更新一条 sticky comment，列出三个资源的 URL 或状态：
+`preview-comment` job 会在 PR 上发 / 更新一条 sticky comment，列出 Worker / Pages 的 URL 或状态：
 
 ```
 | Resource           | URL / Status |
 | 🔧 Worker version  | https://<id>-telemail.<account>.workers.dev |
 | 📄 Pages preview   | https://<id>.telemail-web.pages.dev |
 | 📄 Pages alias     | https://<sanitized-branch>.telemail-web.pages.dev |
-| 🐳 Middleware      | ✅ build OK (no push on PR) |
 ```
 
 跳过 / 失败的资源会显示 `_(unchanged)_` / `❌ failed`。同一个 PR 反复 push 评论会**原地更新**，不刷屏。

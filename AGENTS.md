@@ -2,6 +2,7 @@
 
 > **Commit only when explicitly asked.** Don't auto-commit after finishing a task — wait for the user to say so.
 > **Before commit**: `bun check` (Biome) + `bun typecheck` (tsc) from repo root. Don't use `biome-ignore`. Update `README.md` / `docs/*` when you change behavior they describe.
+> **Commit message convention**: use Conventional Commits (`<type>(optional-scope): <summary>`). Feature work must start with `feat:` (for example, `feat: add Cloudflare Container IMAP bridge`); use `fix:`, `docs:`, `chore:`, etc. only when that type accurately describes the change.
 
 User-facing docs: `README.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
 

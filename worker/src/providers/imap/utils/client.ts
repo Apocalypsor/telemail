@@ -1,5 +1,9 @@
 import { treaty } from "@elysiajs/eden";
 import type { App as MiddlewareApp } from "@middleware/index";
+import {
+  IMAP_BRIDGE_CONTAINER_NAME,
+  IMAP_BRIDGE_CONTAINER_ORIGIN,
+} from "@worker/containers/imap-container";
 import type { Env } from "@worker/types";
 
 /**
@@ -11,15 +15,59 @@ import type { Env } from "@worker/types";
  * 把 message 拼成可读形式；这里就用原版 treaty，不再单独包一层。
  */
 export const bridgeClient = (env: Env) => {
-  if (!env.IMAP_BRIDGE_URL || !env.IMAP_BRIDGE_SECRET) {
-    throw new Error(
-      "IMAP bridge not configured (missing IMAP_BRIDGE_URL or IMAP_BRIDGE_SECRET)",
-    );
-  }
-  return treaty<MiddlewareApp>(env.IMAP_BRIDGE_URL.replace(/\/$/, ""), {
+  assertImapBridgeConfigured(env);
+  return treaty<MiddlewareApp>(getBridgeOrigin(env), {
+    fetcher: bridgeFetch(env),
     headers: { Authorization: `Bearer ${env.IMAP_BRIDGE_SECRET}` },
     throwHttpError: true,
   });
+};
+
+export const isImapBridgeConfigured = (env: Env): boolean =>
+  Boolean(
+    env.IMAP_BRIDGE_SECRET &&
+      (env.IMAP_BRIDGE_CONTAINER || env.IMAP_BRIDGE_URL),
+  );
+
+type BridgeFetcher = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
+interface RequestInitSource {
+  body: Request["body"];
+  headers: Request["headers"];
+  method: Request["method"];
+  redirect: Request["redirect"];
+}
+
+interface RequestSource extends RequestInitSource {
+  url: string;
+}
+
+export const bridgeFetch = (env: Env): typeof fetch => {
+  const fetcher: BridgeFetcher = async (input, init) => {
+    assertImapBridgeConfigured(env);
+    const request = toRequest(input, init);
+    const fallbackRequest = env.IMAP_BRIDGE_URL ? request.clone() : null;
+
+    if (env.IMAP_BRIDGE_CONTAINER) {
+      try {
+        return await env.IMAP_BRIDGE_CONTAINER.getByName(
+          IMAP_BRIDGE_CONTAINER_NAME,
+        ).fetch(request.url, toRequestInit(request));
+      } catch (err: unknown) {
+        if (!fallbackRequest) throw err;
+      }
+    }
+
+    if (fallbackRequest) {
+      const externalRequest = toExternalBridgeRequest(env, fallbackRequest);
+      return fetch(externalRequest.url, toRequestInit(externalRequest));
+    }
+    throw new Error("IMAP bridge not configured");
+  };
+  return fetcher as typeof fetch;
 };
 
 /**
@@ -41,7 +89,7 @@ export const bridgeCall = async <T>(
 export const checkImapBridgeHealth = async (
   env: Env,
 ): Promise<{ ok: boolean; total: number; usable: number } | null> => {
-  if (!env.IMAP_BRIDGE_URL) return null;
+  if (!isImapBridgeConfigured(env)) return null;
   try {
     return await bridgeCall(bridgeClient(env).api.health.get());
   } catch {
@@ -53,3 +101,40 @@ export const checkImapBridgeHealth = async (
 export const syncAccounts = async (env: Env): Promise<void> => {
   await bridgeClient(env).api.sync.post();
 };
+
+const getBridgeOrigin = (env: Env): string => {
+  if (env.IMAP_BRIDGE_CONTAINER) return IMAP_BRIDGE_CONTAINER_ORIGIN;
+  return env.IMAP_BRIDGE_URL?.replace(/\/$/, "") ?? "";
+};
+
+const assertImapBridgeConfigured = (env: Env): void => {
+  if (!isImapBridgeConfigured(env)) {
+    throw new Error(
+      "IMAP bridge not configured (missing container binding/IMAP_BRIDGE_URL or IMAP_BRIDGE_SECRET)",
+    );
+  }
+};
+
+const toExternalBridgeRequest = (env: Env, request: RequestSource): Request => {
+  if (!env.IMAP_BRIDGE_URL) {
+    return new Request(request.url, toRequestInit(request));
+  }
+
+  const bridgeUrl = new URL(env.IMAP_BRIDGE_URL.replace(/\/$/, ""));
+  const url = new URL(request.url);
+  url.protocol = bridgeUrl.protocol;
+  url.host = bridgeUrl.host;
+  return new Request(url.toString(), toRequestInit(request));
+};
+
+const toRequest = (input: RequestInfo | URL, init?: RequestInit): Request => {
+  if (input instanceof Request) return new Request(input, init);
+  return new Request(input.toString(), init);
+};
+
+const toRequestInit = (request: RequestInitSource): RequestInit => ({
+  body: request.body,
+  headers: request.headers,
+  method: request.method,
+  redirect: request.redirect,
+});

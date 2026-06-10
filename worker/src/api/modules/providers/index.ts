@@ -10,6 +10,7 @@ import { OutlookProvider } from "@worker/providers/outlook";
 import { timingSafeEqual } from "@worker/utils/hash";
 import { Elysia } from "elysia";
 import { OutlookPushQuery, PushBody } from "./model";
+import { toImapBridgeAccount } from "./utils";
 
 /**
  * Provider push webhooks。
@@ -65,16 +66,7 @@ const imapBridge = new Elysia({ name: "imap-bridge" })
   .use(requireImapBridgeBearer)
   .get("/api/imap/accounts", async ({ env }) => {
     const accounts = await getImapAccounts(env.DB);
-    return accounts.map((acc) => ({
-      id: acc.id,
-      email: acc.email,
-      chat_id: acc.chat_id,
-      imap_host: acc.imap_host,
-      imap_port: acc.imap_port,
-      imap_secure: !!acc.imap_secure,
-      imap_user: acc.imap_user,
-      imap_pass: acc.imap_pass,
-    }));
+    return accounts.map(toImapBridgeAccount);
   })
   .post(
     "/api/imap/push",

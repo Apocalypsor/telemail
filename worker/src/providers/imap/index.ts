@@ -1,9 +1,12 @@
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@worker/constants";
+import { IMAP_BRIDGE_CONTAINER_ORIGIN } from "@worker/containers/imap-container";
 import { getAccountById } from "@worker/db/accounts";
 import { EmailProvider } from "@worker/providers/base";
 import {
   bridgeCall,
   bridgeClient,
+  bridgeFetch,
+  isImapBridgeConfigured,
   syncAccounts,
 } from "@worker/providers/imap/utils/client";
 import { listImapBridgePage } from "@worker/providers/imap/utils/list";
@@ -35,7 +38,7 @@ export class ImapProvider extends EmailProvider {
 
   /** 账号状态变化后立即通知 bridge reconcile（不等下次 sync） */
   async onPersistedChange() {
-    if (!this.env.IMAP_BRIDGE_URL || !this.env.IMAP_BRIDGE_SECRET) return;
+    if (!isImapBridgeConfigured(this.env)) return;
     await syncAccounts(this.env);
   }
 
@@ -370,14 +373,8 @@ export class ImapProvider extends EmailProvider {
     attachmentId: string,
     folder: "inbox" | "junk" | "archive",
   ): Promise<MailAttachmentDownload | null> {
-    if (!this.env.IMAP_BRIDGE_URL || !this.env.IMAP_BRIDGE_SECRET) {
-      throw new Error(
-        "IMAP bridge not configured (missing IMAP_BRIDGE_URL or IMAP_BRIDGE_SECRET)",
-      );
-    }
-
-    const resp = await fetch(
-      `${this.env.IMAP_BRIDGE_URL.replace(/\/$/, "")}/api/attachment`,
+    const resp = await bridgeFetch(this.env)(
+      `${IMAP_BRIDGE_CONTAINER_ORIGIN}/api/attachment`,
       {
         method: "POST",
         headers: {

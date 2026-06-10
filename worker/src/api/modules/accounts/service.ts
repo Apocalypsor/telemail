@@ -10,7 +10,10 @@ import {
 import { getAllUsers, getUserByTelegramId } from "@worker/db/users";
 import { getEmailProvider, PROVIDERS } from "@worker/providers";
 import type { GmailProvider } from "@worker/providers/gmail";
-import { syncAccounts } from "@worker/providers/imap/utils/client";
+import {
+  isImapBridgeConfigured,
+  syncAccounts,
+} from "@worker/providers/imap/utils/client";
 import type { Env } from "@worker/types";
 import { cleanupAndDeleteAccount } from "@worker/utils/accounts";
 import { reportErrorToObservability } from "@worker/utils/observability";
@@ -134,7 +137,7 @@ export abstract class AccountsService {
     userId: string,
     body: CreateImapAccountBody,
   ): Promise<AccountMutationResult> {
-    if (!env.IMAP_BRIDGE_URL || !env.IMAP_BRIDGE_SECRET) {
+    if (!isImapBridgeConfigured(env)) {
       return {
         ok: false,
         status: 400,

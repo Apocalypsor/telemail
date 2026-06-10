@@ -1,6 +1,6 @@
 # Middleware — Agent Guide
 
-IMAP bridge (Bun + Elysia + ImapFlow + optional Redis). **Doesn't run on Cloudflare** — Workers don't have native TCP / persistent sockets, so IDLE can't run there. This service holds IMAP connections on the user's behalf and pushes "new email arrived" events to the worker. Cross-workspace rules in [root AGENTS.md](../AGENTS.md).
+IMAP bridge (Bun + Elysia + ImapFlow + optional Redis). Production default is Cloudflare Containers hosted by `worker/` via the `ImapBridgeContainer` Durable Object binding; Docker Compose remains available as a self-hosted fallback. This service holds IMAP connections on the user's behalf and pushes "new email arrived" events to the worker. Cross-workspace rules in [root AGENTS.md](../AGENTS.md).
 
 ## Conventions
 

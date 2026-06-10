@@ -1,6 +1,7 @@
 import { getAuthorizedAccount } from "@worker/db/accounts";
 import { getUserByTelegramId } from "@worker/db/users";
 import { accountCanArchive, PROVIDERS } from "@worker/providers";
+import { isImapBridgeConfigured } from "@worker/providers/imap/utils/client";
 import type { Account, AccountType, Env, TelegramUser } from "@worker/types";
 import { getWorkerBaseUrl } from "@worker/utils/url";
 import { formatUserName } from "@worker/utils/user-format";
@@ -107,7 +108,7 @@ export const toProviderOptions = (env: Env): AccountProviderOption[] => {
     oauthProviderName: klass.oauth?.name ?? null,
     configured: klass.oauth
       ? klass.oauth.isConfigured(env)
-      : Boolean(env.IMAP_BRIDGE_URL && env.IMAP_BRIDGE_SECRET),
+      : isImapBridgeConfigured(env),
     needsArchiveSetup: klass.needsArchiveSetup,
   }));
 };
