@@ -1,4 +1,4 @@
-import { TELEMAIL_WORKER_INTERNAL_ORIGIN } from "@middleware/constants";
+import { config } from "@middleware/config";
 import ky from "ky";
 
 /** 与 Telemail Worker 中 accounts 表对应的 IMAP 账号信息 */
@@ -25,7 +25,8 @@ interface ImapFolderState {
 }
 
 const api = ky.create({
-  prefix: TELEMAIL_WORKER_INTERNAL_ORIGIN,
+  prefix: config.workerUrl,
+  headers: { Authorization: `Bearer ${config.bridgeSecret}` },
   retry: { limit: 3, methods: ["get", "post"], backoffLimit: 5_000 },
   timeout: 60_000,
 });

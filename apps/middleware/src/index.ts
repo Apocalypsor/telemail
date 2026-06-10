@@ -8,6 +8,7 @@ import { connectionManager } from "@middleware/connections";
 import { junkController } from "@middleware/modules/junk/index";
 import { mailController } from "@middleware/modules/mail/index";
 import { syncController } from "@middleware/modules/sync/index";
+import { auth } from "@middleware/plugins/auth";
 import { Elysia } from "elysia";
 import { config } from "./config";
 
@@ -28,6 +29,7 @@ export const app = new Elysia({ prefix: "/api" })
     }
     return status(500, { ok: false, error: msg });
   })
+  .use(auth)
   .use(syncController)
   .use(mailController)
   .use(junkController);

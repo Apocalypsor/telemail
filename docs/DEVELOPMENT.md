@@ -20,9 +20,9 @@ CI 通过 `envsubst` 和 repo secrets 生成 `wrangler.jsonc`。
 
 仓库根是 bun workspace 容器，三个子包：
 
-- **`apps/worker/`** —— Cloudflare Worker（Elysia + grammY）。Bot webhook、queue consumer、cron、email providers、D1 / KV、`/api/*` + `/oauth/*`，并托管 IMAP Bridge Cloudflare Container。`wrangler.jsonc` / `migrations/` 在这里。
+- **`apps/worker/`** —— Cloudflare Worker（Elysia + grammY）。Bot webhook、queue consumer、cron、email providers、D1 / KV、`/api/*` + `/oauth/*`。`wrangler.jsonc` / `migrations/` 在这里。
 - **`apps/page/`** —— Cloudflare Pages SPA（Vite + React 19 + TanStack Router/Query + HeroUI + Eden treaty）。web 页面（`/`、`/mail/:id`、`/preview`、`/junk-check`、`/login`）和 Mini App 路由（`/telegram-app/*`）共用同一个 `index.html` + `main.tsx`。
-- **`apps/middleware/`** —— IMAP bridge（Bun + Elysia + ImapFlow）。生产由 `apps/worker/` 的 Cloudflare Container binding 运行；`lastUid` / folder cache 通过 Worker 内部接口写入 `EMAIL_KV`。`bun build --compile` 出单文件 binary，distroless 镜像。详见 [`DEPLOYMENT.md` §6.4](./DEPLOYMENT.md)。
+- **`apps/middleware/`** —— IMAP bridge（Bun + Elysia + ImapFlow）。生产用 Docker 跑在 VPS；Worker 通过 `IMAP_BRIDGE_URL` 调它，它通过 `TELEMAIL_URL` 回调 Worker，双方共享 Bearer secret。`lastUid` / folder cache 通过 Worker API 写入 `EMAIL_KV`。`bun build --compile` 出单文件 binary，distroless 镜像。详见 [`DEPLOYMENT.md` §6.4](./DEPLOYMENT.md)。
 
 ## 命令（在仓库根跑）
 
@@ -50,7 +50,7 @@ bun check                 # Biome（pre-commit 自动触发）
 bun typecheck             # tsc on worker + page + middleware
 ```
 
-也可以进子包跑（`apps/worker/` 里 `bun dev` / `bun deploy` 等是无前缀短名）。`apps/middleware/` 生产运行在 Cloudflare Container 中；它访问的 `http://telemail.worker` 是 Container outbound 虚拟 host。本地用 `bun build:middleware` 做编译验证。Zed 用户：`.zed/tasks.json` 已配好常用任务，cmd-shift-p → "task: spawn"。
+也可以进子包跑（`apps/worker/` 里 `bun dev` / `bun deploy` 等是无前缀短名）。`apps/middleware/` 生产用 Docker 跑在 VPS；本地用 `bun build:middleware` 做编译验证，也可以在 `apps/middleware/` 下用 `docker compose up -d` 跑完整镜像。Zed 用户：`.zed/tasks.json` 已配好常用任务，cmd-shift-p → "task: spawn"。
 
 ## 代码风格
 
@@ -100,7 +100,7 @@ cookie 7 天有效。改 `ADMIN_SECRET` 或 `ADMIN_TELEGRAM_ID` 后要重签。
 跨包只走 **类型 + 字符串常量**，从不跨包拖运行时代码：
 
 - `apps/page/` 用 `import type { App } from "@worker/api"` 配 Eden treaty 拿端到端类型（Mini App 路径常量从 `@page/paths` 自己出）
-- `apps/worker/` 用 `import type { App } from "@middleware/index"` 配 Eden treaty 调 IMAP bridge；用 `@middleware/constants` 共享 bridge 内部虚拟 host / Container origin 常量；用 `import { ROUTE_MINI_APP_* } from "@page/paths"` 拼 `web_app` 按钮 URL
+- `apps/worker/` 用 `import type { App } from "@middleware/index"` 配 Eden treaty 调 IMAP bridge；用 `import { ROUTE_MINI_APP_* } from "@page/paths"` 拼 `web_app` 按钮 URL
 
 任何从 page 拉 worker 运行时代码（非 type-only import）都会被 Vite 打进前端 bundle —— 反向同理。
 

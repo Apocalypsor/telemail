@@ -1,14 +1,14 @@
 # Telemail
 
-运行在 Cloudflare Workers + Pages + Containers 上的邮件转发系统，监控 **Gmail / Outlook / IMAP** 收件箱，把新邮件转发到 Telegram 聊天——支持**多账号**、附件、AI 摘要、Mini App 稍后提醒。
+运行在 Cloudflare Workers + Pages 上的邮件转发系统，监控 **Gmail / Outlook / IMAP** 收件箱，把新邮件转发到 Telegram 聊天——支持**多账号**、附件、AI 摘要、Mini App 稍后提醒。
 
 - **Gmail**：Google Cloud Pub/Sub 推送通知实时接收
 - **Outlook**：Microsoft Graph webhook 订阅实时接收
-- **IMAP**：内置 IMAP Bridge，以 Cloudflare Container 运行，通过 IMAP IDLE 实时推送
+- **IMAP**（可选）：独立 IMAP Bridge Docker 服务，通过 IMAP IDLE 实时推送
 
 ## 技术栈
 
-- **Runtime**：Cloudflare Workers（后端 + IMAP Container 宿主）+ Cloudflare Pages（Mini App 前端 + web 工具页）
+- **Runtime**：Cloudflare Workers（后端）+ Cloudflare Pages（Mini App 前端 + web 工具页）+ VPS Docker（IMAP Bridge）
 - **后端**：[Elysia](https://elysiajs.com)（CloudflareAdapter）+ [grammY](https://grammy.dev) + Cloudflare D1 / KV / Queue / Cron
 - **前端**：[Vite](https://vite.dev) + React 19 + [TanStack Router](https://tanstack.com/router) + [TanStack Query](https://tanstack.com/query) + [HeroUI](https://heroui.com) + [Eden treaty](https://elysiajs.com/eden/treaty/overview)（端到端类型安全 RPC）+ [TypeBox](https://github.com/sinclairzx81/typebox)
 - **邮件解析**：[postal-mime](https://github.com/postalsys/postal-mime)；HTML → Markdown：[turndown](https://github.com/mixmark-io/turndown) → Telegram MarkdownV2

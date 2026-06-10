@@ -374,7 +374,7 @@ export class ImapProvider extends EmailProvider {
     folder: "inbox" | "junk" | "archive",
   ): Promise<MailAttachmentDownload | null> {
     const resp = await bridgeFetch(this.env)(
-      bridgeRequestUrl("/api/attachment"),
+      bridgeRequestUrl(this.env, "/api/attachment"),
       {
         method: "POST",
         headers: {

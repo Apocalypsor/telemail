@@ -4,9 +4,6 @@ import queueHandler from "@worker/handlers/queue";
 import scheduledHandler from "@worker/handlers/scheduled";
 import type { Env, QueueMessage } from "@worker/types";
 
-export { ContainerProxy } from "@cloudflare/containers";
-export { ImapBridgeContainer } from "@worker/containers/imap-container";
-
 export default {
   /**
    * 把 ExecutionContext 挂到 request 上，让 Elysia 的 `cf` plugin derive

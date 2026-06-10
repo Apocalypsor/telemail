@@ -10,19 +10,19 @@ Per-workspace guides: [`apps/worker/AGENTS.md`](./apps/worker/AGENTS.md) · [`ap
 
 ## Explore first
 
-Treat AGENTS.md as stable guardrails, not a live architecture inventory. Before changing a workspace, inspect the current source and config: root + workspace `package.json`, relevant `src/` entry points, `wrangler.example.jsonc`, migrations, `.github/workflows/ci.yml`, and the user-facing docs listed above. Use `rg` to find existing patterns and call sites before adding new ones.
+Treat AGENTS.md as stable guardrails, not a live architecture inventory. Before changing a workspace, inspect the current source, package scripts, runtime config, deploy config, migrations if relevant, and the user-facing docs listed above. Use `rg` to find existing patterns and call sites before adding new ones.
 
-If this guide conflicts with the checked-in code or docs, trust the checked-in code after verifying the behavior, then update the guide only for durable conventions. Do not encode short-lived implementation details here when a future agent can discover them directly from source.
+If this guide conflicts with the checked-in code or docs, trust the checked-in code after verifying the behavior, then update the guide only for durable conventions. Do not encode deployment topology, secret names, route inventories, cadence values, or one-off file locations here when a future agent can discover them directly from source.
 
 Cloudflare API knowledge may be stale — fetch <https://developers.cloudflare.com/workers/> before any Workers/KV/D1/Queues task.
 
 ## Workspaces (bun monorepo)
 
-- **`apps/worker/`** Cloudflare Worker runtime. Inspect its `package.json`, `wrangler.example.jsonc`, `src/` entry points, and `migrations/` before changing runtime bindings, API routes, queues, cron, providers, or database behavior.
-- **`apps/page/`** Cloudflare Pages SPA. Inspect its `package.json`, routing tree, Vite/TanStack config, and API client before changing routes, dependencies, build behavior, or Mini App flows.
-- **`apps/middleware/`** IMAP bridge Container app. Inspect its `package.json`, Dockerfile, `src/index.ts`, `src/config.ts`, and the worker-side container host before changing runtime topology or Worker/middleware communication.
+- **`apps/worker/`** Worker-side backend runtime.
+- **`apps/page/`** Browser / Mini App frontend.
+- **`apps/middleware/`** IMAP bridge service.
 
-Routing, domains, deploy conditions, and required secrets belong to `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`, `.github/workflows/ci.yml`, and Cloudflare config. Verify those files instead of assuming the topology from this guide.
+Routing, domains, deploy conditions, runtime topology, and required secrets belong to source/config/docs. Verify those files instead of assuming the topology from this guide.
 
 All scripts run from repo root. Read root + per-workspace `package.json` for the actual command list.
 
@@ -34,12 +34,12 @@ All scripts run from repo root. Read root + per-workspace `package.json` for the
 - **Shared types**: `apps/worker/src/types.ts` for cross-cutting; module-scoped `types.ts` (e.g. `providers/types.ts`) otherwise. Never inline reusable types into handlers / services / route components.
 - **Type placement**: in regular `.ts` / `.tsx` implementation files, keep module-level `interface` and `type` declarations immediately after imports, before runtime constants/functions/classes/components/hooks. Schema-derived aliases such as `UnwrapSchema<typeof Foo>` or `typeof app` may stay next to the value they derive from. Do not park local interfaces at the bottom of a file.
 - **Error reporting** (worker): `reportErrorToObservability(env, "tag", err)`, never `console.error`. Page side: surface via `extractErrorMessage()`, no silent swallowing.
-- **Cross-package imports**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in `tsconfig.base.json`. Page imports `@worker/*` are **type-only** (no runtime — keeps the page bundle slim). Worker imports `@page/paths` (Mini App URL constants), `@middleware/index` (Eden `App` type for the IMAP bridge client), and pure bridge constants from `@middleware/constants`.
-- **Auth + API contract**: do not hand-write HTTP contracts. Start from the current Eden clients, Elysia apps, and auth plugins in source, then let exported `App` types drive route/method/body/query/response shapes. Verify the current headers, cookies, tokens, and Worker/middleware transport before changing auth or bridge routes.
+- **Cross-package imports**: only the TS path aliases declared in `tsconfig.base.json` are allowed. Page-side imports from backend packages must stay type-only unless the current bundler config explicitly supports the runtime import. Do not add short aliases that hide package ownership.
+- **Auth + API contract**: do not hand-write HTTP contracts. Start from the current clients, Elysia apps, and auth plugins in source, then let exported types drive route/method/body/query/response shapes. Verify current headers, cookies, tokens, and transports before changing auth or bridge routes.
 
 ## Elysia layout
 
-Applies everywhere Elysia is used: worker `apps/worker/src/api/{modules,plugins}/` and middleware `apps/middleware/src/{modules,plugins}/`.
+Applies everywhere Elysia is used. Start from the current module / plugin directories in the workspace you are editing.
 
 [Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) means two different patterns here:
 

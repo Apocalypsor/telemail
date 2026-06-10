@@ -1,8 +1,4 @@
 import { treaty } from "@elysiajs/eden";
-import {
-  IMAP_BRIDGE_CONTAINER_NAME,
-  IMAP_BRIDGE_CONTAINER_ORIGIN,
-} from "@middleware/constants";
 import type { App as MiddlewareApp } from "@middleware/index";
 import type { Env } from "@worker/types";
 
@@ -16,42 +12,35 @@ import type { Env } from "@worker/types";
  */
 export const bridgeClient = (env: Env) => {
   assertImapBridgeConfigured(env);
-  return treaty<MiddlewareApp>(IMAP_BRIDGE_CONTAINER_ORIGIN, {
-    fetcher: bridgeFetch(env),
+  return treaty<MiddlewareApp>(bridgeOrigin(env), {
+    headers: bridgeHeaders(env),
     throwHttpError: true,
   });
 };
 
 export const isImapBridgeConfigured = (env: Env): boolean =>
-  Boolean(env.IMAP_BRIDGE_CONTAINER);
+  Boolean(env.IMAP_BRIDGE_URL && env.IMAP_BRIDGE_SECRET);
 
 type BridgeFetcher = (
   input: RequestInfo | URL,
   init?: RequestInit,
 ) => Promise<Response>;
 
-interface RequestInitSource {
-  body: Request["body"];
-  headers: Request["headers"];
-  method: Request["method"];
-  redirect: Request["redirect"];
-}
-
 export const bridgeFetch = (env: Env): typeof fetch => {
   const fetcher: BridgeFetcher = async (input, init) => {
     assertImapBridgeConfigured(env);
-    const request = toRequest(input, init);
-    const container = env.IMAP_BRIDGE_CONTAINER;
-    if (!container) throw new Error("IMAP bridge container not configured");
-    return container
-      .getByName(IMAP_BRIDGE_CONTAINER_NAME)
-      .fetch(request.url, toRequestInit(request));
+    const request =
+      input instanceof Request
+        ? new Request(input, init)
+        : new Request(input.toString(), init);
+    request.headers.set("Authorization", `Bearer ${env.IMAP_BRIDGE_SECRET}`);
+    return fetch(request);
   };
   return fetcher as typeof fetch;
 };
 
-export const bridgeRequestUrl = (path: `/${string}`): string =>
-  `${IMAP_BRIDGE_CONTAINER_ORIGIN}${path}`;
+export const bridgeRequestUrl = (env: Env, path: `/${string}`): string =>
+  `${bridgeOrigin(env)}${path}`;
 
 /**
  * 拆 treaty 的 success branch。`throwHttpError: true` 已保证非 2xx 抛错，
@@ -88,19 +77,16 @@ export const syncAccounts = async (env: Env): Promise<void> => {
 const assertImapBridgeConfigured = (env: Env): void => {
   if (!isImapBridgeConfigured(env)) {
     throw new Error(
-      "IMAP bridge not configured (missing IMAP_BRIDGE_CONTAINER binding)",
+      "IMAP bridge not configured (missing IMAP_BRIDGE_URL or IMAP_BRIDGE_SECRET)",
     );
   }
 };
 
-const toRequest = (input: RequestInfo | URL, init?: RequestInit): Request => {
-  if (input instanceof Request) return new Request(input, init);
-  return new Request(input.toString(), init);
+const bridgeOrigin = (env: Env): string => {
+  assertImapBridgeConfigured(env);
+  return env.IMAP_BRIDGE_URL?.replace(/\/$/, "") ?? "";
 };
 
-const toRequestInit = (request: RequestInitSource): RequestInit => ({
-  body: request.body,
-  headers: request.headers,
-  method: request.method,
-  redirect: request.redirect,
+const bridgeHeaders = (env: Env): Record<string, string> => ({
+  Authorization: `Bearer ${env.IMAP_BRIDGE_SECRET}`,
 });

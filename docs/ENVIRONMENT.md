@@ -31,6 +31,23 @@
 | `MS_CLIENT_SECRET`  | Microsoft Entra ID Client Secret                  |
 | `MS_WEBHOOK_SECRET` | 自定义密钥，验证 Microsoft Graph webhook 签名     |
 
+### IMAP Bridge（用 IMAP 时必填）
+
+Worker secrets：
+
+| Secret               | 说明                                                  |
+| -------------------- | ----------------------------------------------------- |
+| `IMAP_BRIDGE_URL`    | VPS 上 IMAP Bridge 的 HTTPS URL，例如 `https://imap.example.com` |
+| `IMAP_BRIDGE_SECRET` | Worker 调 middleware、middleware 回调 Worker 共用的 Bearer secret |
+
+middleware `apps/middleware/.env`：
+
+| Env             | 说明                                                  |
+| --------------- | ----------------------------------------------------- |
+| `BRIDGE_SECRET` | 与 Worker `IMAP_BRIDGE_SECRET` 相同的 Bearer secret   |
+| `TELEMAIL_URL`  | Worker 对外 URL，例如 `https://telemail.example.com`  |
+| `PORT`          | middleware 本地监听端口，默认 `3000`                  |
+
 ### LLM / AI 摘要（可选）
 
 三个都配置后启用 AI 摘要 + 垃圾检测：
@@ -71,7 +88,6 @@
 | `EMAIL_KV`    | KV      | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
 | `EMAIL_QUEUE` | Queue   | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
 | `OBS_SERVICE` | Service | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
-| `IMAP_BRIDGE_CONTAINER` | Durable Object / Container | 托管 `apps/middleware/` IMAP Bridge 镜像，提供 Worker ↔ Container 内部通信 |
 
 ## Cron Triggers
 

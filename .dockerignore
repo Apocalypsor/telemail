@@ -1,6 +1,3 @@
-# Build context = repo root（apps/worker/wrangler.jsonc 的 image_build_context: "../.."）。
-# Dockerfile 用 explicit COPY，所以这里主要是为了减小发往 daemon 的 context 体积。
-
 **/node_modules
 .git
 .github

@@ -37,34 +37,6 @@
   "workers_dev": true,
   "preview_urls": true,
   /**
-   * Cloudflare Container — IMAP bridge（apps/middleware/ Docker 镜像）。
-   * Container 必须由 Durable Object class 托管；Worker 通过 binding 直接请求容器。
-   */
-  "containers": [
-    {
-      "name": "telemail-imap-bridge",
-      "class_name": "ImapBridgeContainer",
-      "image": "../middleware/Dockerfile",
-      "image_build_context": "../..",
-      "max_instances": 1,
-      "instance_type": "basic"
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "IMAP_BRIDGE_CONTAINER",
-        "class_name": "ImapBridgeContainer"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["ImapBridgeContainer"]
-    }
-  ],
-  /**
    * D1 Database — 多账号信息（email / chat_id / refresh_token / history_id）
    * 先运行: bun wrangler d1 create gmail-tg-bridge
    * 然后把返回的 database_id 填入 ${D1_DATABASE_ID}（local: 直接替换；CI: 走 secrets）

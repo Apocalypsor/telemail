@@ -48,6 +48,10 @@ interface WorkerSecrets {
   MS_CLIENT_SECRET?: string;
   /** Microsoft Graph webhook 共享密钥，校验通知来源 */
   MS_WEBHOOK_SECRET?: string;
+  /** IMAP bridge public URL, e.g. https://imap.example.com */
+  IMAP_BRIDGE_URL?: string;
+  /** Shared Bearer secret for Worker ↔ IMAP bridge calls */
+  IMAP_BRIDGE_SECRET?: string;
   /**
    * BotFather `/newapp` 注册的 Mini App short_name（如 `dovmailui`）。
    * 用于群聊里 ⏰ 按钮的 deep link `t.me/<bot>/<short_name>?startapp=...`。
@@ -57,14 +61,9 @@ interface WorkerSecrets {
   TG_MINI_APP_SHORT_NAME?: string;
 }
 
-type RefinedBindings = Omit<
-  Cloudflare.Env,
-  "EMAIL_QUEUE" | "IMAP_BRIDGE_CONTAINER"
-> & {
+type RefinedBindings = Omit<Cloudflare.Env, "EMAIL_QUEUE"> & {
   /** Queue 绑定 —— wrangler 生成 binding，项目侧细化 message body 类型 */
   EMAIL_QUEUE: Queue<QueueMessage>;
-  /** IMAP bridge Cloudflare Container binding */
-  IMAP_BRIDGE_CONTAINER?: DurableObjectNamespace;
 };
 
 /** Worker runtime env：binding 来源于 `wrangler types` 生成的 `Cloudflare.Env`；
