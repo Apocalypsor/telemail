@@ -22,7 +22,9 @@ export const setLastUid = async (
 ): Promise<void> => {
   try {
     await putImapLastUid(accountId, uid);
-  } catch {}
+  } catch (err) {
+    warnStateWriteFailed("set lastUid", accountId, err);
+  }
 };
 
 /**
@@ -51,12 +53,27 @@ export const setCachedFolderPath = async (
 ): Promise<void> => {
   try {
     await putImapFolderState(accountId, kind, path);
-  } catch {}
+  } catch (err) {
+    warnStateWriteFailed(`set ${kind} folder cache`, accountId, err);
+  }
 };
 
 /** 账号 stop / 配置变更 / 删除时调，强制下次重新探测 folder 结构。 */
 export const clearCachedFolders = async (accountId: number): Promise<void> => {
   try {
     await clearImapFolderState(accountId);
-  } catch {}
+  } catch (err) {
+    warnStateWriteFailed("clear folder cache", accountId, err);
+  }
+};
+
+const warnStateWriteFailed = (
+  operation: string,
+  accountId: number,
+  err: unknown,
+): void => {
+  console.warn(
+    `[Account ${accountId}] Worker KV state write failed (${operation}):`,
+    err instanceof Error ? err.message : String(err),
+  );
 };

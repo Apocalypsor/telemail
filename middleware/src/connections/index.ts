@@ -221,12 +221,7 @@ class ImapConnectionManager {
         try {
           const lock = await nextClient.getMailboxLock("INBOX");
           try {
-            conn.lastUid = await this.fetchNewMessages(
-              conn,
-              nextClient,
-              conn.lastUid,
-            );
-            await setLastUid(id, conn.lastUid);
+            await this.fetchNewMessages(conn, nextClient);
           } finally {
             lock.release();
           }
@@ -259,14 +254,10 @@ class ImapConnectionManager {
         if (conn.lastUid === 0) {
           const mailbox = nextClient.mailbox || undefined;
           conn.lastUid = (mailbox?.uidNext ?? 1) - 1;
+          await setLastUid(conn.account.id, conn.lastUid);
         } else {
-          conn.lastUid = await this.fetchNewMessages(
-            conn,
-            nextClient,
-            conn.lastUid,
-          );
+          await this.fetchNewMessages(conn, nextClient);
         }
-        await setLastUid(conn.account.id, conn.lastUid);
       } finally {
         lock.release();
       }
@@ -306,40 +297,42 @@ class ImapConnectionManager {
   private fetchNewMessages = async (
     conn: Connection,
     client: ImapFlow,
-    lastUid: number,
-  ): Promise<number> => {
-    let newLastUid = lastUid;
+  ): Promise<void> => {
+    const startUid = conn.lastUid;
     if (!client.usable) throw new Error("Connection not available");
 
     // 拉 envelope 取 Message-Id 作为通知 payload —— worker 以 RFC Message-Id 为
     // 邮件全局唯一标识，per-folder 的 UID 移出 INBOX 后就失效了
     for await (const msg of client.fetch(
-      `${lastUid + 1}:*`,
+      `${startUid + 1}:*`,
       { uid: true, envelope: true },
       { uid: true },
     )) {
-      if (msg.uid <= lastUid) continue;
-      newLastUid = Math.max(newLastUid, msg.uid);
+      if (msg.uid <= conn.lastUid) continue;
 
       const rfcMessageId = msg.envelope?.messageId;
       if (!rfcMessageId) {
         console.warn(
           `[Account ${conn.account.id}] UID ${msg.uid} has no Message-Id, skipping notify`,
         );
+        await this.persistLastUid(conn, msg.uid);
         continue;
       }
 
       console.log(
         `[Account ${conn.account.id}] New email UID ${msg.uid} (${rfcMessageId}), notifying Worker...`,
       );
-      notifyNewEmail(conn.account.id, rfcMessageId).catch((err: unknown) => {
-        console.error(
-          `[Account ${conn.account.id}] Notify failed after retries (UID ${msg.uid}):`,
-          err,
-        );
-      });
+      await notifyNewEmail(conn.account.id, rfcMessageId);
+      await this.persistLastUid(conn, msg.uid);
     }
-    return newLastUid;
+  };
+
+  private persistLastUid = async (
+    conn: Connection,
+    uid: number,
+  ): Promise<void> => {
+    conn.lastUid = Math.max(conn.lastUid, uid);
+    await setLastUid(conn.account.id, conn.lastUid);
   };
 }
 
