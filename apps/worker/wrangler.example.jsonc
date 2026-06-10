@@ -3,21 +3,21 @@
  * gitignored and generated locally / in CI from this file.
  *
  * Local dev:
- *   1. `cp worker/wrangler.example.jsonc worker/wrangler.jsonc`
+ *   1. `cp apps/worker/wrangler.example.jsonc apps/worker/wrangler.jsonc`
  *   2. Replace `${D1_DATABASE_ID}` and `${KV_NAMESPACE_ID}` with the IDs
  *      `bun wrangler d1 create gmail-tg-bridge` /
  *      `bun wrangler kv namespace create EMAIL_KV` returned.
- *   3. Run `bun typegen:worker` to regenerate `worker-configuration.d.ts`.
+ *   3. Run `bun typegen:worker` to regenerate `apps/worker/worker-configuration.d.ts`.
  *
  * CI (`.github/workflows/ci.yml`):
- *   `envsubst < wrangler.example.jsonc > wrangler.jsonc` runs before any
+ *   `envsubst < apps/worker/wrangler.example.jsonc > apps/worker/wrangler.jsonc` runs before any
  *   wrangler invocation, fed by `CF_D1_DATABASE_ID` + `CF_KV_NAMESPACE_ID`
  *   repo secrets.
  *
  * Wrangler reference: https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-  "$schema": "../node_modules/wrangler/config-schema.json",
+  "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "telemail",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-21",
@@ -37,7 +37,7 @@
   "workers_dev": true,
   "preview_urls": true,
   /**
-   * Cloudflare Container — IMAP bridge（middleware/ Docker 镜像）。
+   * Cloudflare Container — IMAP bridge（apps/middleware/ Docker 镜像）。
    * Container 必须由 Durable Object class 托管；Worker 通过 binding 直接请求容器。
    */
   "containers": [
@@ -45,7 +45,7 @@
       "name": "telemail-imap-bridge",
       "class_name": "ImapBridgeContainer",
       "image": "../middleware/Dockerfile",
-      "image_build_context": "..",
+      "image_build_context": "../..",
       "max_instances": 1,
       "instance_type": "basic"
     }

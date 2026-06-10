@@ -63,7 +63,7 @@
 
 ## Cloudflare Bindings
 
-`worker/wrangler.jsonc` 里声明，`bun typegen:worker` 把类型同步到 `worker/worker-configuration.d.ts`。
+`apps/worker/wrangler.jsonc` 里声明，`bun typegen:worker` 把类型同步到 `apps/worker/worker-configuration.d.ts`。
 
 | Binding       | 类型    | 用途                                                                 |
 | ------------- | ------- | -------------------------------------------------------------------- |
@@ -71,7 +71,7 @@
 | `EMAIL_KV`    | KV      | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
 | `EMAIL_QUEUE` | Queue   | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
 | `OBS_SERVICE` | Service | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
-| `IMAP_BRIDGE_CONTAINER` | Durable Object / Container | 托管 `middleware/` IMAP Bridge 镜像；内部通信不需要公网 URL 或共享密钥 |
+| `IMAP_BRIDGE_CONTAINER` | Durable Object / Container | 托管 `apps/middleware/` IMAP Bridge 镜像；内部通信不需要公网 URL 或共享密钥 |
 
 ## Cron Triggers
 

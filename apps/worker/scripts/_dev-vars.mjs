@@ -10,7 +10,7 @@ const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const devVarsPath = resolve(scriptsDir, "..", ".dev.vars");
 
 /**
- * 读取 worker/.dev.vars，按行解析成对象（剥外层引号、跳过 # 注释空行）。
+ * 读取 apps/worker/.dev.vars，按行解析成对象（剥外层引号、跳过 # 注释空行）。
  * 缺文件 / 缺指定 key 时打印 hint 并 process.exit(1)。
  */
 export function loadDevVars(requiredKeys = []) {
@@ -19,7 +19,7 @@ export function loadDevVars(requiredKeys = []) {
     raw = readFileSync(devVarsPath, "utf8");
   } catch {
     console.error(
-      `找不到 ${devVarsPath}\n请先创建 worker/.dev.vars，至少包含 ${requiredKeys.join(" / ") || "需要的 key"}。`,
+      `找不到 ${devVarsPath}\n请先创建 apps/worker/.dev.vars，至少包含 ${requiredKeys.join(" / ") || "需要的 key"}。`,
     );
     process.exit(1);
   }
@@ -46,7 +46,7 @@ export function loadDevVars(requiredKeys = []) {
 
   const missing = requiredKeys.filter((k) => !env[k]);
   if (missing.length > 0) {
-    console.error(`worker/.dev.vars 缺少: ${missing.join(", ")}`);
+    console.error(`apps/worker/.dev.vars 缺少: ${missing.join(", ")}`);
     process.exit(1);
   }
 

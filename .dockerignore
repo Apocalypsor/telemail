@@ -1,4 +1,4 @@
-# Build context = repo root（worker/wrangler.jsonc 的 image_build_context: ".."）。
+# Build context = repo root（apps/worker/wrangler.jsonc 的 image_build_context: "../.."）。
 # Dockerfile 用 explicit COPY，所以这里主要是为了减小发往 daemon 的 context 体积。
 
 **/node_modules
@@ -21,13 +21,13 @@
 **/.wrangler
 **/server
 **/*.tsbuildinfo
-page/src/routeTree.gen.ts
+apps/page/src/routeTree.gen.ts
 
 # 跟 middleware build 无关的子包（Dockerfile 只 COPY package.json 用来解析 workspace）
-worker/**
-!worker/package.json
-page/**
-!page/package.json
+apps/worker/**
+!apps/worker/package.json
+apps/page/**
+!apps/page/package.json
 
 # docs
 docs

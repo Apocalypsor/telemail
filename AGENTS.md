@@ -6,15 +6,15 @@
 
 User-facing docs: `README.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
 
-Per-workspace guides: [`worker/AGENTS.md`](./worker/AGENTS.md) · [`page/AGENTS.md`](./page/AGENTS.md) · [`middleware/AGENTS.md`](./middleware/AGENTS.md).
+Per-workspace guides: [`apps/worker/AGENTS.md`](./apps/worker/AGENTS.md) · [`apps/page/AGENTS.md`](./apps/page/AGENTS.md) · [`apps/middleware/AGENTS.md`](./apps/middleware/AGENTS.md).
 
 Cloudflare API knowledge may be stale — fetch <https://developers.cloudflare.com/workers/> before any Workers/KV/D1/Queues task.
 
 ## Workspaces (bun monorepo)
 
-- **`worker/`** Cloudflare Worker (Elysia + grammY) — bot webhook, queue, cron, providers, D1. Owns `wrangler.example.jsonc` + `migrations/`. CI generates real `wrangler.jsonc` via `envsubst` from `CF_D1_DATABASE_ID` + `CF_KV_NAMESPACE_ID`.
-- **`page/`** Cloudflare Pages SPA (Vite + React + TanStack Router/Query + HeroUI + Eden treaty) — single bundle serves both web pages and Mini App routes (`/telegram-app/*`).
-- **`middleware/`** IMAP bridge (Bun + Elysia + ImapFlow) — built into the Cloudflare Container hosted by `worker/`. It keeps IMAP IDLE connections open; Worker calls it through the `IMAP_BRIDGE_CONTAINER` binding, and middleware calls Worker-internal `http://telemail.worker/api/imap/*` endpoints for accounts, push events, and KV-backed state.
+- **`apps/worker/`** Cloudflare Worker (Elysia + grammY) — bot webhook, queue, cron, providers, D1. Owns `wrangler.example.jsonc` + `migrations/`. CI generates real `wrangler.jsonc` via `envsubst` from `CF_D1_DATABASE_ID` + `CF_KV_NAMESPACE_ID`.
+- **`apps/page/`** Cloudflare Pages SPA (Vite + React + TanStack Router/Query + HeroUI + Eden treaty) — single bundle serves both web pages and Mini App routes (`/telegram-app/*`).
+- **`apps/middleware/`** IMAP bridge (Bun + Elysia + ImapFlow) — built into the Cloudflare Container hosted by `apps/worker/`. It keeps IMAP IDLE connections open; Worker calls it through the `IMAP_BRIDGE_CONTAINER` binding, and middleware calls Worker-internal `http://telemail.worker/api/imap/*` endpoints for accounts, push events, and KV-backed state.
 
 Single custom domain. `*.com/api/*` + `/oauth/*` → Worker; everything else → Pages. Same origin, zero CORS.
 
@@ -27,15 +27,15 @@ All scripts run from repo root. Read root + per-workspace `package.json` for the
 - **Helpers**: file-private if used in ONE file; place those file-private helpers at the bottom of the file, after the main exported component/function, when execution order allows. Keep setup constants and framework-required declarations in their natural positions. Lift to nearest `utils/` (or `components/` / `hooks/` on page side) when used in multiple. Same applies to dedup — extract instead of copy-pasting.
 - **No barrel imports**: don't write `index.ts` files that just `export ... from "./foo"`. Consumers `import { x } from "@worker/.../<file>"` directly. Saves one redirection when reading code, removes a class of "where does this actually live" confusion. Module / plugin `index.ts` that contain real logic (Elysia controller, Worker entry) are fine — only re-export-only barrels are banned.
 - **Function style**: use arrow function expressions for standalone functions (`const foo = (...) => {}` / `export const foo = (...) => {}`), including helpers, React components, hooks, route-local handlers, and nested functions. Keep class methods, object literal methods, Elysia route chaining, and type / interface method signatures in their idiomatic syntax.
-- **Shared types**: `worker/types.ts` for cross-cutting; module-scoped `types.ts` (e.g. `providers/types.ts`) otherwise. Never inline reusable types into handlers / services / route components.
+- **Shared types**: `apps/worker/src/types.ts` for cross-cutting; module-scoped `types.ts` (e.g. `providers/types.ts`) otherwise. Never inline reusable types into handlers / services / route components.
 - **Type placement**: in regular `.ts` / `.tsx` implementation files, keep module-level `interface` and `type` declarations immediately after imports, before runtime constants/functions/classes/components/hooks. Schema-derived aliases such as `UnwrapSchema<typeof Foo>` or `typeof app` may stay next to the value they derive from. Do not park local interfaces at the bottom of a file.
 - **Error reporting** (worker): `reportErrorToObservability(env, "tag", err)`, never `console.error`. Page side: surface via `extractErrorMessage()`, no silent swallowing.
 - **Cross-package imports**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in `tsconfig.base.json`. Page imports `@worker/*` are **type-only** (no runtime — keeps the page bundle slim). Worker imports `@page/paths` (Mini App URL constants), `@middleware/index` (Eden `App` type for the IMAP bridge client), and pure bridge constants from `@middleware/constants`.
-- **Auth + API contract**: page calls worker through Eden treaty (`page/src/api/client.ts` exports `treaty<App>(...)` where `App` comes from `import type { App } from "@worker/api"`). Eden auto-injects `X-Telegram-Init-Data` in TG context; worker plugin `authMiniApp` verifies. Web pages use a session cookie (`authSession`). Mail preview GET also accepts an HMAC token. Worker calls middleware through the `IMAP_BRIDGE_CONTAINER` binding with Eden (`treaty<App>` against `@middleware/index`, `throwHttpError: true`); middleware calls Worker-internal `http://telemail.worker/api/imap/*` via Container outbound host routing.
+- **Auth + API contract**: page calls worker through Eden treaty (`apps/page/src/api/client.ts` exports `treaty<App>(...)` where `App` comes from `import type { App } from "@worker/api"`). Eden auto-injects `X-Telegram-Init-Data` in TG context; worker plugin `authMiniApp` verifies. Web pages use a session cookie (`authSession`). Mail preview GET also accepts an HMAC token. Worker calls middleware through the `IMAP_BRIDGE_CONTAINER` binding with Eden (`treaty<App>` against `@middleware/index`, `throwHttpError: true`); middleware calls Worker-internal `http://telemail.worker/api/imap/*` via Container outbound host routing.
 
 ## Elysia layout
 
-Applies everywhere Elysia is used: worker `worker/src/api/{modules,plugins}/` and middleware `middleware/src/{modules,plugins}/`.
+Applies everywhere Elysia is used: worker `apps/worker/src/api/{modules,plugins}/` and middleware `apps/middleware/src/{modules,plugins}/`.
 
 [Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) means two different patterns here:
 

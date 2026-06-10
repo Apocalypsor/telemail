@@ -29,7 +29,7 @@ import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
  *  - `/api/reminders/*`                reminders CRUD
  *  - `/api/users/*`                    mini app admin user management
  *
- * 通过 `worker/index.ts` 的 fetch wrapper 把 (env, executionCtx) 注入。
+ * 通过 `apps/worker/src/index.ts` 的 fetch wrapper 把 (env, executionCtx) 注入。
  */
 export const app = new Elysia({ adapter: CloudflareAdapter, name: "telemail" })
   .onError(async ({ code, error, request, status }) => {

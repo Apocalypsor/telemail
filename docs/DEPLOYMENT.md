@@ -9,7 +9,7 @@
 - 接收消息的 Telegram Chat ID（每个邮箱账号可配置不同的 Chat）
 - **Gmail**：启用了 Gmail API 的 [Google Cloud](https://console.cloud.google.com) 项目
 - **Outlook**：[Microsoft Entra ID](https://entra.microsoft.com) 应用注册
-- **IMAP**：内置 IMAP Bridge（`middleware/`，默认随 Worker 作为 Cloudflare Container 部署，见 §6.4）
+- **IMAP**：内置 IMAP Bridge（`apps/middleware/`，默认随 Worker 作为 Cloudflare Container 部署，见 §6.4）
 
 安装依赖：
 
@@ -63,9 +63,9 @@ gcloud pubsub subscriptions create gmail-push-sub \
 
 ## 4. Cloudflare 资源
 
-> wrangler 装在仓库根 devDeps，所以 `bun wrangler …` 在仓库任何地方都能跑。`wrangler.jsonc` 在 `worker/` 下，wrangler 默认从 cwd 找它，所以下面的 `wrangler d1` / `wrangler kv` / `wrangler queues` / `wrangler secret` 命令都建议在 `worker/` 目录跑。或者从根加 `--config worker/wrangler.jsonc`。
+> wrangler 装在仓库根 devDeps，所以 `bun wrangler …` 在仓库任何地方都能跑。`wrangler.jsonc` 在 `apps/worker/` 下，wrangler 默认从 cwd 找它，所以下面的 `wrangler d1` / `wrangler kv` / `wrangler queues` / `wrangler secret` 命令都建议在 `apps/worker/` 目录跑。或者从根加 `--config apps/worker/wrangler.jsonc`。
 >
-> ⚠️ **`worker/wrangler.jsonc` 是 gitignored 的**，由 `worker/wrangler.example.jsonc` 经 `envsubst` 生成（CF 账号专属 ID 不入库）。**首次本地 setup**：`cp worker/wrangler.example.jsonc worker/wrangler.jsonc` 然后把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成下面 §4.1 / §4.2 拿到的真实 ID。CI 自动走 envsubst（详见 §8.2）。
+> ⚠️ **`apps/worker/wrangler.jsonc` 是 gitignored 的**，由 `apps/worker/wrangler.example.jsonc` 经 `envsubst` 生成（CF 账号专属 ID 不入库）。**首次本地 setup**：`cp apps/worker/wrangler.example.jsonc apps/worker/wrangler.jsonc` 然后把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成下面 §4.1 / §4.2 拿到的真实 ID。CI 自动走 envsubst（详见 §8.2）。
 
 ### 4.1 D1 数据库
 
@@ -73,13 +73,13 @@ gcloud pubsub subscriptions create gmail-push-sub \
 bun wrangler d1 create gmail-tg-bridge
 ```
 
-把返回的 `database_id` 填入 `worker/wrangler.jsonc` 中 `d1_databases[0].database_id`（替换占位符 `${D1_DATABASE_ID}`），同时把这个 UUID 加到 GitHub repo secrets 里叫 `CF_D1_DATABASE_ID`（CI 用）。首次建库后从仓库根跑：
+把返回的 `database_id` 填入 `apps/worker/wrangler.jsonc` 中 `d1_databases[0].database_id`（替换占位符 `${D1_DATABASE_ID}`），同时把这个 UUID 加到 GitHub repo secrets 里叫 `CF_D1_DATABASE_ID`（CI 用）。首次建库后从仓库根跑：
 
 ```sh
 bun migrate:worker:remote
 ```
 
-后续只要代码改动包含 `worker/migrations/` 或 D1 schema 变化，也要在部署对应 Worker 版本前跑一次 `bun migrate:worker:remote`。`wrangler deploy` 不会自动执行 D1 migrations。
+后续只要代码改动包含 `apps/worker/migrations/` 或 D1 schema 变化，也要在部署对应 Worker 版本前跑一次 `bun migrate:worker:remote`。`wrangler deploy` 不会自动执行 D1 migrations。
 
 ### 4.2 KV 命名空间
 
@@ -87,7 +87,7 @@ bun migrate:worker:remote
 bun wrangler kv namespace create EMAIL_KV
 ```
 
-返回的 `id` 填入 `worker/wrangler.jsonc` 中 `kv_namespaces[0].id`（替换 `${KV_NAMESPACE_ID}`），同时加到 GitHub repo secrets 里叫 `CF_KV_NAMESPACE_ID`。用途：access_token 缓存、消息去重、OAuth state。
+返回的 `id` 填入 `apps/worker/wrangler.jsonc` 中 `kv_namespaces[0].id`（替换 `${KV_NAMESPACE_ID}`），同时加到 GitHub repo secrets 里叫 `CF_KV_NAMESPACE_ID`。用途：access_token 缓存、消息去重、OAuth state。
 
 ### 4.3 Queue
 
@@ -176,14 +176,14 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 ```sh
 bun build:page
 bun wrangler pages project create telemail-web --production-branch=main
-bun wrangler pages deploy page/dist --project-name=telemail-web --branch=main
+bun wrangler pages deploy apps/page/dist --project-name=telemail-web --branch=main
 ```
 
 或者在 Cloudflare 控制台手动创建。**项目名约定**：
 
 | 资源 | CF 项目名 | 来源 |
 | --- | --- | --- |
-| Worker | `telemail` | `worker/wrangler.jsonc` 里的 `name` 字段 |
+| Worker | `telemail` | `apps/worker/wrangler.jsonc` 里的 `name` 字段 |
 | Pages | `telemail-web` | `.github/workflows/ci.yml` 里 `--project-name` |
 
 要改 Pages 项目名的话，workflow 文件里 `deploy-page` / `preview-page` 两处 `--project-name` 都要同步改。
@@ -216,7 +216,7 @@ bun wrangler secret put TG_MINI_APP_SHORT_NAME
 
 ## 6.4 部署 IMAP Middleware（可选，仅当要接 IMAP 账号时）
 
-IMAP Bridge 默认作为 Cloudflare Container 由主 Worker 托管。`worker/wrangler.example.jsonc` 中的 `containers` 配置会让 `wrangler deploy` 使用 `middleware/Dockerfile` 构建镜像、推送到 Cloudflare Registry，并通过 `IMAP_BRIDGE_CONTAINER` Durable Object binding 启动一个 singleton bridge 实例。
+IMAP Bridge 默认作为 Cloudflare Container 由主 Worker 托管。`apps/worker/wrangler.example.jsonc` 中的 `containers` 配置会让 `wrangler deploy` 使用 `apps/middleware/Dockerfile` 构建镜像、推送到 Cloudflare Registry，并通过 `IMAP_BRIDGE_CONTAINER` Durable Object binding 启动一个 singleton bridge 实例。
 
 ### 准备
 
@@ -232,7 +232,7 @@ IMAP Container 跟 Worker 一起部署：
 bun deploy:worker
 ```
 
-每次 `worker/**` 或 `middleware/**` 变更，CI 都会触发 Worker deploy；middleware 代码变更会随 Worker deploy 重新构建并发布 Cloudflare Container 镜像。
+每次 `apps/worker/**` 或 `apps/middleware/**` 变更，CI 都会触发 Worker deploy；middleware 代码变更会随 Worker deploy 重新构建并发布 Cloudflare Container 镜像。
 
 ### 通信模型
 
@@ -255,13 +255,13 @@ bun deploy:worker
 
 ## 8. CI/CD（GitHub Actions）
 
-`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` 两个 boolean，后续 deploy / preview job 按这两个 flag + 事件类型决定跑不跑。`middleware/**` 归入 worker filter，因为 IMAP Container 随 Worker deploy 一起构建发布。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
+`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` 两个 boolean，后续 deploy / preview job 按这两个 flag + 事件类型决定跑不跑。`apps/middleware/**` 归入 worker filter，因为 IMAP Container 随 Worker deploy 一起构建发布。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
 
 ### 8.1 行为矩阵
 
 | 触发 | 跑什么 |
 | --- | --- |
-| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`worker/**` 或 `middleware/**` 变 → `preview-worker`（`wrangler versions upload`，包含 Container 镜像，输出 preview URL，不接生产流量）<br/>`page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>**`preview-comment`** sticky comment 把上面两个的 URL / 状态贴到 PR |
+| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`apps/worker/**` 或 `apps/middleware/**` 变 → `preview-worker`（`wrangler versions upload`，包含 Container 镜像，输出 preview URL，不接生产流量）<br/>`apps/page/**` 变 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>**`preview-comment`** sticky comment 把上面两个的 URL / 状态贴到 PR |
 | `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`（含 IMAP Container 镜像）、pages `wrangler pages deploy --branch=main`。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
 | `workflow_dispatch` on `main` | **强制**Worker / Pages deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 |
 | `workflow_dispatch` on 其他 branch | 仅 CI |
@@ -276,19 +276,19 @@ GitHub repo → **Settings → Secrets and variables → Actions** 加：
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | CF dashboard → My Profile → API Tokens → Create。权限至少：Account → Workers Scripts:Edit + Pages:Edit + Workers KV:Edit + D1:Edit + Queues:Edit |
 | `CLOUDFLARE_ACCOUNT_ID` | CF dashboard 任意 Worker 详情页右下角 |
-| `CF_D1_DATABASE_ID` | `bun wrangler d1 create gmail-tg-bridge` 返回的 UUID（也填入本地 `worker/wrangler.jsonc`） |
+| `CF_D1_DATABASE_ID` | `bun wrangler d1 create gmail-tg-bridge` 返回的 UUID（也填入本地 `apps/worker/wrangler.jsonc`） |
 | `CF_KV_NAMESPACE_ID` | `bun wrangler kv namespace create EMAIL_KV` 返回的 hex（同上） |
 
-`worker/wrangler.jsonc` 是 gitignored 的 templated 文件 —— `deploy-worker` / `preview-worker` job 在跑 wrangler 之前会先 `envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc`，把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成上面两个 secrets。
+`apps/worker/wrangler.jsonc` 是 gitignored 的 templated 文件 —— `deploy-worker` / `preview-worker` job 在跑 wrangler 之前会先 `envsubst < apps/worker/wrangler.example.jsonc > apps/worker/wrangler.jsonc`，把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成上面两个 secrets。
 
-Cloudflare Container 镜像由 `wrangler deploy` 根据 `worker/wrangler.jsonc` 的 `containers` 配置构建并上传到 Cloudflare Registry。
+Cloudflare Container 镜像由 `wrangler deploy` 根据 `apps/worker/wrangler.jsonc` 的 `containers` 配置构建并上传到 Cloudflare Registry。
 
 ### 8.3 资源命名
 
 | 资源 | 名字 | 改名要动哪 |
 | --- | --- | --- |
-| Worker | `telemail` | `worker/wrangler.jsonc` 的 `name` |
-| IMAP Container | `telemail-imap-bridge` | `worker/wrangler.jsonc` 的 `containers[0].name` |
+| Worker | `telemail` | `apps/worker/wrangler.jsonc` 的 `name` |
+| IMAP Container | `telemail-imap-bridge` | `apps/worker/wrangler.jsonc` 的 `containers[0].name` |
 | Pages 项目 | `telemail-web` | `.github/workflows/ci.yml` 里的 `--project-name`（出现 2 次）|
 
 ### 8.4 关掉 Pages 的 Git Integration（如果之前接过）

@@ -1,10 +1,10 @@
 # Worker — Agent Guide
 
-Cloudflare Worker (Elysia + grammY). Cross-workspace rules in [root AGENTS.md](../AGENTS.md).
+Cloudflare Worker (Elysia + grammY). Cross-workspace rules in [root AGENTS.md](../../AGENTS.md).
 
 ## Layout (`src/`)
 
-- **`api/`** — HTTP layer (Elysia). Module / plugin file rules in root [AGENTS.md](../AGENTS.md) "Elysia layout". `api/index.ts` composes the tree with `CloudflareAdapter` + `.compile()` and exports `type App` for Eden.
+- **`api/`** — HTTP layer (Elysia). Module / plugin file rules in root [AGENTS.md](../../AGENTS.md) "Elysia layout". `api/index.ts` composes the tree with `CloudflareAdapter` + `.compile()` and exports `type App` for Eden.
 - **`bot/`** — Telegram bot (grammY). Self-contained tree, **no** sub-`services/`. Handler folders should stay focused on callback/command registration; shared or extracted bot helper code lives in `bot/utils/` with purpose-named files.
 - **`handlers/`** — non-HTTP entry points (queue consumer + cron).
 - **`clients/`** — outbound HTTP: shared `ky` instance + hand-written external API wrappers.

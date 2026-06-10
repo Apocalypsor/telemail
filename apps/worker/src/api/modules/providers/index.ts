@@ -10,7 +10,7 @@ import { OutlookPushQuery, PushBody } from "./model";
  * Provider push webhooks。
  *  - Gmail: Pub/Sub push（query `?secret=GMAIL_PUSH_SECRET`）
  *  - Outlook: Graph subscription（先处理 `?validationToken=` 握手，再 secret）
- *  - IMAP: container outbound 直接在 `worker/src/containers/imap-container.ts` 里处理
+ *  - IMAP: container outbound 直接在 `apps/worker/src/containers/imap-container.ts` 里处理
  *
  * 走的都是各 provider class 的 `enqueue` 静态方法，把消息丢进 Queue 后立即 200。
  */

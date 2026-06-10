@@ -14,9 +14,9 @@
     "verbatimModuleSyntax": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@page/*": ["./page/src/*"],
-      "@worker/*": ["./worker/src/*"],
-      "@middleware/*": ["./middleware/src/*"]
+      "@page/*": ["./apps/page/src/*"],
+      "@worker/*": ["./apps/worker/src/*"],
+      "@middleware/*": ["./apps/middleware/src/*"]
     }
   }
 }

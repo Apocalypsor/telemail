@@ -1,8 +1,8 @@
-// Pre-commit guard：worker/wrangler.jsonc（gitignored，含真实 ID）和
-// worker/wrangler.example.jsonc（committed template）必须只差占位符替换。
+// Pre-commit guard：apps/worker/wrangler.jsonc（gitignored，含真实 ID）和
+// apps/worker/wrangler.example.jsonc（committed template）必须只差占位符替换。
 //
 // 用法：
-//   bun worker/scripts/check-wrangler-template.mjs
+//   bun apps/worker/scripts/check-wrangler-template.mjs
 //
 // 行为：
 //   - 没有 local wrangler.jsonc → 跳过（exit 0），打提示
@@ -31,7 +31,7 @@ const examplePath = path.join(workerDir, "wrangler.example.jsonc");
 
 if (!fs.existsSync(localPath)) {
   console.log(
-    "⚠️  worker/wrangler.jsonc 不存在 —— 跳过 template check（首次 setup 可能还没 cp）",
+    "⚠️  apps/worker/wrangler.jsonc 不存在 —— 跳过 template check（首次 setup 可能还没 cp）",
   );
   process.exit(0);
 }
@@ -62,13 +62,13 @@ const exampleStr = JSON.stringify(example, null, 2);
 
 if (localStr === exampleStr) {
   console.log(
-    "✅ worker/wrangler.jsonc 与 wrangler.example.jsonc 一致（除占位符外）",
+    "✅ apps/worker/wrangler.jsonc 与 wrangler.example.jsonc 一致（除占位符外）",
   );
   process.exit(0);
 }
 
 console.error(
-  "❌ worker/wrangler.jsonc 跟 wrangler.example.jsonc 出现 drift。",
+  "❌ apps/worker/wrangler.jsonc 跟 wrangler.example.jsonc 出现 drift。",
 );
 console.error("   要么把 example 同步成 local 的新字段（推荐），");
 console.error("   要么把 local 改回跟 example 一致。\n");

@@ -28,12 +28,12 @@ jobs:
         with:
           filters: |
             worker:
-              - 'worker/**'
-              - 'middleware/**'
+              - 'apps/worker/**'
+              - 'apps/middleware/**'
               - '.dockerignore'
               - 'package.json'
             page:
-              - 'page/**'
+              - 'apps/page/**'
               - 'package.json'
 
   check:
@@ -62,7 +62,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: page-dist
-          path: page/dist
+          path: apps/page/dist
           retention-days: 1
           if-no-files-found: error
 
@@ -108,14 +108,14 @@ jobs:
         env:
           D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
           KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
-        run: envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc
+        run: envsubst < apps/worker/wrangler.example.jsonc > apps/worker/wrangler.jsonc
       - uses: cloudflare/wrangler-action@v4
         id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: bun
-          workingDirectory: worker
+          workingDirectory: apps/worker
           command: deploy
 
   preview-worker:
@@ -137,14 +137,14 @@ jobs:
         env:
           D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
           KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
-        run: envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc
+        run: envsubst < apps/worker/wrangler.example.jsonc > apps/worker/wrangler.jsonc
       - uses: cloudflare/wrangler-action@v4
         id: upload
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: bun
-          workingDirectory: worker
+          workingDirectory: apps/worker
           command: versions upload --message=PR-${{ github.event.number }}-${{ github.event.pull_request.head.sha }}
 
   # ─── Pages ─────────────────────────────────────────────────────────────────
@@ -171,14 +171,14 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: page-dist
-          path: page/dist
+          path: apps/page/dist
       - uses: cloudflare/wrangler-action@v4
         id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: bun
-          command: pages deploy page/dist --project-name=telemail-web --branch=main --commit-hash=${{ github.sha }}
+          command: pages deploy apps/page/dist --project-name=telemail-web --branch=main --commit-hash=${{ github.sha }}
 
   preview-page:
     name: Preview Pages (PR)
@@ -199,14 +199,14 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: page-dist
-          path: page/dist
+          path: apps/page/dist
       - uses: cloudflare/wrangler-action@v4
         id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: bun
-          command: pages deploy page/dist --project-name=telemail-web --branch=${{ github.head_ref }} --commit-hash=${{ github.event.pull_request.head.sha }}
+          command: pages deploy apps/page/dist --project-name=telemail-web --branch=${{ github.head_ref }} --commit-hash=${{ github.event.pull_request.head.sha }}
 
   # ─── PR preview comment ────────────────────────────────────────────────────
 

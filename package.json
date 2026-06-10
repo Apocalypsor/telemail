@@ -5,9 +5,9 @@
   "license": "AGPL-3.0-or-later",
   "author": "Apocalypsor <chthon605@gmail.com>",
   "workspaces": [
-    "worker",
-    "page",
-    "middleware"
+    "apps/worker",
+    "apps/page",
+    "apps/middleware"
   ],
   "scripts": {
     "dev:worker": "bun --filter telemail-worker dev",

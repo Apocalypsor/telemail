@@ -1,6 +1,6 @@
 # Middleware — Agent Guide
 
-IMAP bridge (Bun + Elysia + ImapFlow). Production runs as a Cloudflare Container hosted by `worker/` via the `ImapBridgeContainer` Durable Object binding. This service holds IMAP connections on the user's behalf and pushes "new email arrived" events to the worker. Cross-workspace rules in [root AGENTS.md](../AGENTS.md).
+IMAP bridge (Bun + Elysia + ImapFlow). Production runs as a Cloudflare Container hosted by `apps/worker/` via the `ImapBridgeContainer` Durable Object binding. This service holds IMAP connections on the user's behalf and pushes "new email arrived" events to the worker. Cross-workspace rules in [root AGENTS.md](../../AGENTS.md).
 
 ## Conventions
 

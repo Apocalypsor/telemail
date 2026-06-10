@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 把 worker/.dev.vars 里的 ADMIN_TELEGRAM_ID 写入本地 D1 的 users 表。
+ * 把 apps/worker/.dev.vars 里的 ADMIN_TELEGRAM_ID 写入本地 D1 的 users 表。
  * 用 INSERT OR IGNORE，重复跑无副作用。requireTelegramLogin middleware 要
  * 在 users 表里有 row（即使是 admin 也躲不过这个检查），所以这一步是
  * /preview 等需要登录的本地页面能跑起来的前提。

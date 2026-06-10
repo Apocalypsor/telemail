@@ -1,4 +1,4 @@
-// 手动镜像 worker/src/api/modules/miniapp/model.ts 的 list type schema ——
+// 手动镜像 apps/worker/src/api/modules/miniapp/model.ts 的 list type schema ——
 // 不 import 是为了不把 worker 运行时依赖（D1 等）拖进前端 bundle。
 export const MAIL_LIST_TYPES = [
   "unread",

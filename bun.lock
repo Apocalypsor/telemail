@@ -12,7 +12,7 @@
         "wrangler": "^4.85.0",
       },
     },
-    "middleware": {
+    "apps/middleware": {
       "name": "telemail-middleware",
       "version": "0.0.0",
       "dependencies": {
@@ -24,7 +24,7 @@
         "@types/bun": "latest",
       },
     },
-    "page": {
+    "apps/page": {
       "name": "telemail-page",
       "version": "0.0.0",
       "dependencies": {
@@ -50,7 +50,7 @@
         "vite": "^8.0.0",
       },
     },
-    "worker": {
+    "apps/worker": {
       "name": "telemail-worker",
       "version": "0.0.0",
       "dependencies": {
@@ -869,11 +869,11 @@
 
     "tapable": ["tapable@2.3.3", "", {}, "sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A=="],
 
-    "telemail-middleware": ["telemail-middleware@workspace:middleware"],
+    "telemail-middleware": ["telemail-middleware@workspace:apps/middleware"],
 
-    "telemail-page": ["telemail-page@workspace:page"],
+    "telemail-page": ["telemail-page@workspace:apps/page"],
 
-    "telemail-worker": ["telemail-worker@workspace:worker"],
+    "telemail-worker": ["telemail-worker@workspace:apps/worker"],
 
     "thread-stream": ["thread-stream@4.2.0", "", { "dependencies": { "real-require": "^1.0.0" } }, "sha512-e2zZ96wSChazBsbENf/Pcm/4swHt2cEKQ92rhUjkL9GCKiTDJIaTBenjE/m9DXi0QBmTMDkFDdOomUy20A1tDQ=="],
 

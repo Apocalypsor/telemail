@@ -172,13 +172,13 @@ dist
 .wrangler/
 
 # TanStack Router auto-generated manifest (regenerated on every page build)
-page/src/routeTree.gen.ts
+apps/page/src/routeTree.gen.ts
 
 # Build artifacts
-page/dist/
+apps/page/dist/
 *.tsbuildinfo
-middleware/server
+apps/middleware/server
 
 # wrangler.jsonc 是 templated（containing CF account IDs）—— 由 wrangler.example.jsonc
 # 走 envsubst 生成（local: 手动 cp + 替换；CI: 走 CF_D1_DATABASE_ID / CF_KV_NAMESPACE_ID secrets）
-worker/wrangler.jsonc
+apps/worker/wrangler.jsonc
