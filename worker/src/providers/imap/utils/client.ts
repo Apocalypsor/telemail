@@ -1,9 +1,9 @@
 import { treaty } from "@elysiajs/eden";
-import type { App as MiddlewareApp } from "@middleware/index";
 import {
   IMAP_BRIDGE_CONTAINER_NAME,
   IMAP_BRIDGE_CONTAINER_ORIGIN,
-} from "@worker/containers/imap-container";
+} from "@middleware/constants";
+import type { App as MiddlewareApp } from "@middleware/index";
 import type { Env } from "@worker/types";
 
 /**
@@ -16,15 +16,14 @@ import type { Env } from "@worker/types";
  */
 export const bridgeClient = (env: Env) => {
   assertImapBridgeConfigured(env);
-  return treaty<MiddlewareApp>(getBridgeOrigin(env), {
+  return treaty<MiddlewareApp>(IMAP_BRIDGE_CONTAINER_ORIGIN, {
     fetcher: bridgeFetch(env),
-    headers: { Authorization: `Bearer ${env.IMAP_BRIDGE_SECRET}` },
     throwHttpError: true,
   });
 };
 
 export const isImapBridgeConfigured = (env: Env): boolean =>
-  Boolean(env.IMAP_BRIDGE_SECRET && env.IMAP_BRIDGE_CONTAINER);
+  Boolean(env.IMAP_BRIDGE_CONTAINER);
 
 type BridgeFetcher = (
   input: RequestInfo | URL,
@@ -50,6 +49,9 @@ export const bridgeFetch = (env: Env): typeof fetch => {
   };
   return fetcher as typeof fetch;
 };
+
+export const bridgeRequestUrl = (path: `/${string}`): string =>
+  `${IMAP_BRIDGE_CONTAINER_ORIGIN}${path}`;
 
 /**
  * 拆 treaty 的 success branch。`throwHttpError: true` 已保证非 2xx 抛错，
@@ -83,12 +85,10 @@ export const syncAccounts = async (env: Env): Promise<void> => {
   await bridgeClient(env).api.sync.post();
 };
 
-const getBridgeOrigin = (_env: Env): string => IMAP_BRIDGE_CONTAINER_ORIGIN;
-
 const assertImapBridgeConfigured = (env: Env): void => {
   if (!isImapBridgeConfigured(env)) {
     throw new Error(
-      "IMAP bridge not configured (missing IMAP_BRIDGE_CONTAINER binding or IMAP_BRIDGE_SECRET)",
+      "IMAP bridge not configured (missing IMAP_BRIDGE_CONTAINER binding)",
     );
   }
 };

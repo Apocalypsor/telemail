@@ -1,5 +1,4 @@
 import { Readable } from "node:stream";
-import { auth } from "@middleware/plugins/auth";
 import { imap } from "@middleware/plugins/imap";
 import { Elysia } from "elysia";
 import {
@@ -17,7 +16,6 @@ import {
 } from "./model";
 
 export const mailController = new Elysia({ name: "controller.mail" })
-  .use(auth)
   .use(imap)
 
   .post(

@@ -1,10 +1,8 @@
-import { auth } from "@middleware/plugins/auth";
 import { imap } from "@middleware/plugins/imap";
 import { Elysia } from "elysia";
 import { AccountBody, AccountMessageBody, ListBody } from "./model";
 
 export const junkController = new Elysia({ name: "controller.junk" })
-  .use(auth)
   .use(imap)
 
   .post(

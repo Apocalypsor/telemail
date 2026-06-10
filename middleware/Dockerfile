@@ -1,4 +1,4 @@
-# Build context = monorepo root（docker-compose.yml 指定 context: ..）。
+# Build context = monorepo root（worker/wrangler.jsonc 的 image_build_context: ".."）。
 # Middleware 是 bun workspace 的子包，install 时需要 root package.json + bun.lock
 # 才能解析依赖；产物是 `bun build --compile` 产生的单文件 binary，runtime stage
 # 只 copy binary，不带 node_modules。

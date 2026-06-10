@@ -1,11 +1,11 @@
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@worker/constants";
-import { IMAP_BRIDGE_CONTAINER_ORIGIN } from "@worker/containers/imap-container";
 import { getAccountById } from "@worker/db/accounts";
 import { EmailProvider } from "@worker/providers/base";
 import {
   bridgeCall,
   bridgeClient,
   bridgeFetch,
+  bridgeRequestUrl,
   isImapBridgeConfigured,
   syncAccounts,
 } from "@worker/providers/imap/utils/client";
@@ -374,11 +374,10 @@ export class ImapProvider extends EmailProvider {
     folder: "inbox" | "junk" | "archive",
   ): Promise<MailAttachmentDownload | null> {
     const resp = await bridgeFetch(this.env)(
-      `${IMAP_BRIDGE_CONTAINER_ORIGIN}/api/attachment`,
+      bridgeRequestUrl("/api/attachment"),
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.env.IMAP_BRIDGE_SECRET}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

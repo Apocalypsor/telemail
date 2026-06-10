@@ -1,5 +1,4 @@
 import { connectionManager } from "@middleware/connections";
-import { auth } from "@middleware/plugins/auth";
 import { Elysia } from "elysia";
 
 export const syncController = new Elysia({ name: "controller.sync" })
@@ -8,8 +7,6 @@ export const syncController = new Elysia({ name: "controller.sync" })
     if (!status.ok) set.status = 503;
     return status;
   })
-
-  .use(auth)
 
   .post("/sync", async () => {
     await connectionManager.sync();

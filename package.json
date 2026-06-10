@@ -20,8 +20,6 @@
     "dev:page": "bun --filter telemail-page dev",
     "build:page": "bun --filter telemail-page build",
     "deploy:page": "bun --filter telemail-page deploy",
-    "dev:middleware": "bun --filter telemail-middleware dev",
-    "start:middleware": "bun --filter telemail-middleware start",
     "build:middleware": "bun --filter telemail-middleware build",
     "check": "biome check --no-errors-on-unmatched --files-ignore-unknown=true",
     "check:wrangler": "bun --filter '*' check:wrangler",

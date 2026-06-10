@@ -31,12 +31,6 @@
 | `MS_CLIENT_SECRET`  | Microsoft Entra ID Client Secret                  |
 | `MS_WEBHOOK_SECRET` | 自定义密钥，验证 Microsoft Graph webhook 签名     |
 
-### IMAP（用 IMAP 时必填）
-
-| Secret                  | 说明                                                                 |
-| ----------------------- | -------------------------------------------------------------------- |
-| `IMAP_BRIDGE_SECRET`    | IMAP Bridge 共享密钥（Bearer），Worker 调 Container、Container 回调 Worker 都用它校验 |
-
 ### LLM / AI 摘要（可选）
 
 三个都配置后启用 AI 摘要 + 垃圾检测：
@@ -77,7 +71,7 @@
 | `EMAIL_KV`    | KV      | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
 | `EMAIL_QUEUE` | Queue   | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
 | `OBS_SERVICE` | Service | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
-| `IMAP_BRIDGE_CONTAINER` | Durable Object / Container | 托管 `middleware/` IMAP Bridge 镜像，Worker 通过 binding 直接访问 |
+| `IMAP_BRIDGE_CONTAINER` | Durable Object / Container | 托管 `middleware/` IMAP Bridge 镜像；内部通信不需要公网 URL 或共享密钥 |
 
 ## Cron Triggers
 

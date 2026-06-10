@@ -1,9 +1,5 @@
-import { env as cfEnv } from "cloudflare:workers";
 import { Container } from "@cloudflare/containers";
-import {
-  isImapBridgePushBody,
-  toImapBridgeAccount,
-} from "@worker/api/modules/providers/utils";
+import { TELEMAIL_WORKER_INTERNAL_HOST } from "@middleware/constants";
 import { getImapAccounts } from "@worker/db/accounts";
 import {
   deleteImapBridgeFolderPaths,
@@ -14,17 +10,21 @@ import {
   putImapBridgeLastUid,
 } from "@worker/db/kv";
 import { ImapProvider } from "@worker/providers/imap";
-import type { Env } from "@worker/types";
-import { timingSafeEqual } from "@worker/utils/hash";
+import type { Account, Env } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 
-export const IMAP_BRIDGE_CONTAINER_NAME = "imap-bridge";
-export const IMAP_BRIDGE_CONTAINER_ORIGIN = "http://imap-bridge.container";
+interface ImapBridgePushBody {
+  accountId: number;
+  rfcMessageId: string;
+}
 
-const TELEMAIL_WORKER_INTERNAL_HOST = "telemail.worker";
-const TELEMAIL_WORKER_INTERNAL_ORIGIN = `http://${TELEMAIL_WORKER_INTERNAL_HOST}`;
+interface LastUidStateBody {
+  uid: number;
+}
 
-const workerEnv = cfEnv as unknown as Env;
+interface FolderStateBody {
+  path: string | null;
+}
 
 export class ImapBridgeContainer extends Container<Env> {
   defaultPort = 3000;
@@ -52,10 +52,6 @@ const handleInternalWorkerRequest = async (
   request: Request,
   env: Env,
 ): Promise<Response> => {
-  if (!isAuthorizedBridgeRequest(request, env)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/api/imap/accounts") {
     const accounts = await getImapAccounts(env.DB);
@@ -138,18 +134,7 @@ const getContainerEnvVars = (): Record<string, string> => {
   return {
     NODE_ENV: "production",
     PORT: "3000",
-    BRIDGE_SECRET: workerEnv.IMAP_BRIDGE_SECRET ?? "",
-    TELEMAIL_URL: TELEMAIL_WORKER_INTERNAL_ORIGIN,
   };
-};
-
-const isAuthorizedBridgeRequest = (request: Request, env: Env): boolean => {
-  const expected = env.IMAP_BRIDGE_SECRET;
-  if (!expected) return false;
-
-  const header = request.headers.get("authorization") ?? "";
-  const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
-  return !!provided && timingSafeEqual(provided, expected);
 };
 
 const readJson = async (request: Request): Promise<unknown> => {
@@ -171,9 +156,28 @@ const isFolderKind = (
 ): value is ImapBridgeFolderKind =>
   value === "junk" || value === "trash" || value === "archive";
 
-interface LastUidStateBody {
-  uid: number;
-}
+const toImapBridgeAccount = (acc: Account) => ({
+  id: acc.id,
+  email: acc.email,
+  chat_id: acc.chat_id,
+  imap_host: acc.imap_host,
+  imap_port: acc.imap_port,
+  imap_secure: !!acc.imap_secure,
+  imap_user: acc.imap_user,
+  imap_pass: acc.imap_pass,
+});
+
+const isImapBridgePushBody = (body: unknown): body is ImapBridgePushBody => {
+  if (!body || typeof body !== "object") return false;
+  const candidate = body as Partial<ImapBridgePushBody>;
+  return (
+    typeof candidate.accountId === "number" &&
+    Number.isInteger(candidate.accountId) &&
+    candidate.accountId > 0 &&
+    typeof candidate.rfcMessageId === "string" &&
+    candidate.rfcMessageId.length > 0
+  );
+};
 
 const isLastUidStateBody = (body: unknown): body is LastUidStateBody => {
   if (!body || typeof body !== "object") return false;
@@ -184,10 +188,6 @@ const isLastUidStateBody = (body: unknown): body is LastUidStateBody => {
     candidate.uid >= 0
   );
 };
-
-interface FolderStateBody {
-  path: string | null;
-}
 
 const isFolderStateBody = (body: unknown): body is FolderStateBody => {
   if (!body || typeof body !== "object") return false;

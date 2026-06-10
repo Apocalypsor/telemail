@@ -8,9 +8,9 @@ IMAP bridge (Bun + Elysia + ImapFlow). Production runs as a Cloudflare Container
 - **Periodic refresh** (`REFRESH_INTERVAL_MS`, default 5 min): close + reconnect every client to prevent IDLE from going silently stale (servers like iCloud do this often).
 - **Reconnect is manual**: ImapFlow doesn't auto-reconnect. `close` event → `scheduleReconnect` → wait `RECONNECT_DELAY_MS` (3s) → fresh `ImapFlow` instance. One timer guard per account prevents stacking.
 - **Stale client guard**: when registering an event handler, **capture the current `ImapFlow` ref** and ignore events from old clients — preserve this pattern when adding new handlers.
-- **Health endpoint isn't authenticated**: returns only `{ ok, total, usable }` counts. **Never** expose email addresses or passwords.
+- **Container-only HTTP surface**: middleware routes are intended to be reached only through the Worker `IMAP_BRIDGE_CONTAINER` binding. Don't add a public deployment path or expose email addresses/passwords in responses.
 - **`src/index.ts` exports `app` and `App` type**: the worker imports `import type { App } from "@middleware/index"` and drives the bridge through Eden treaty. Treat the route surface (`/api/*` paths, body schemas, return shapes) as a public contract — renaming a route or changing a body schema breaks worker compile-time.
-- **Aliases**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in root `tsconfig.base.json`. Internal imports here use `@middleware/connections` `@middleware/plugins/auth` `@middleware/utils/state` etc. —— same prefix worker would use for cross-package access, so files don't change meaning when read from another tsconfig.
+- **Aliases**: only three TS path aliases exist repo-wide — `@page/*` `@worker/*` `@middleware/*`, declared in root `tsconfig.base.json`. Internal imports here use `@middleware/connections`, `@middleware/constants`, `@middleware/utils/state`, etc. —— same prefix worker would use for cross-package access, so files don't change meaning when read from another tsconfig.
 
 ## ImapFlow specifics ([docs](https://imapflow.com/docs/guides/basic-usage/))
 

@@ -42,8 +42,6 @@ interface WorkerSecrets {
   TELEGRAM_WEBHOOK_SECRET: string;
   /** Worker 对外访问 URL，例如 https://gmail-tg-bridge.xxx.workers.dev（用于生成邮件查看链接） */
   WORKER_URL: string;
-  /** IMAP 中间件共享密钥（Bearer token） */
-  IMAP_BRIDGE_SECRET?: string;
   /** Microsoft OAuth2 Client ID（Outlook 支持） */
   MS_CLIENT_ID?: string;
   /** Microsoft OAuth2 Client Secret */

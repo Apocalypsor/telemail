@@ -221,13 +221,8 @@ IMAP Bridge 默认作为 Cloudflare Container 由主 Worker 托管。`worker/wra
 ### 准备
 
 - 本地或 CI runner 需要 Docker daemon；`wrangler deploy` 构建 Container 镜像时会用到。
-- Worker secret 里配置 bridge 共享密钥：
-
-```sh
-bun wrangler secret put IMAP_BRIDGE_SECRET
-```
-
-`lastUid` / folder cache 会通过 Worker 内部接口写入 `EMAIL_KV`，不需要 Redis。
+- `lastUid` / folder cache 会通过 Worker 内部接口写入 `EMAIL_KV`。
+- IMAP Bridge 不需要额外的公网 URL 或共享密钥；Worker 和 Container 之间只走 `IMAP_BRIDGE_CONTAINER` binding / Container outbound 虚拟 host。
 
 ### 部署与更新
 
@@ -241,7 +236,7 @@ bun deploy:worker
 
 ### 通信模型
 
-- Worker → middleware：通过 `IMAP_BRIDGE_CONTAINER` binding 直接 `fetch()` 到 singleton container，不需要 `middleware.example.com`。
+- Worker → middleware：通过 `IMAP_BRIDGE_CONTAINER` binding 直接 `fetch()` 到 singleton container。
 - middleware → Worker：middleware 访问虚拟 `http://telemail.worker/api/imap/*`，由 Container `outboundByHost` handler 在 Worker runtime 中处理，并直接使用 D1 / Queue / KV binding。
 - middleware → IMAP server：容器保持公网出站能力，直接连接外部 IMAP `993/143`。
 
@@ -286,7 +281,7 @@ GitHub repo → **Settings → Secrets and variables → Actions** 加：
 
 `worker/wrangler.jsonc` 是 gitignored 的 templated 文件 —— `deploy-worker` / `preview-worker` job 在跑 wrangler 之前会先 `envsubst < worker/wrangler.example.jsonc > worker/wrangler.jsonc`，把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成上面两个 secrets。
 
-不再单独发布 GHCR middleware 镜像；Cloudflare Container 镜像由 `wrangler deploy` 根据 `worker/wrangler.jsonc` 的 `containers` 配置构建并上传到 Cloudflare Registry。
+Cloudflare Container 镜像由 `wrangler deploy` 根据 `worker/wrangler.jsonc` 的 `containers` 配置构建并上传到 Cloudflare Registry。
 
 ### 8.3 资源命名
 
