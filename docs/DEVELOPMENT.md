@@ -14,7 +14,7 @@ bun typegen:worker            # 重新生成 apps/worker/worker-configuration.d.
 
 根目录 `bunfig.toml` 要求依赖版本至少发布满 14 天，`bun install` 会跳过更新发布太新的版本。
 
-CI 自己走 `envsubst` 用 repo secrets 生成 `wrangler.jsonc`，本地不需要装 envsubst。
+CI 通过 `envsubst` 和 repo secrets 生成 `wrangler.jsonc`。
 
 ## 目录结构
 
@@ -50,7 +50,7 @@ bun check                 # Biome（pre-commit 自动触发）
 bun typecheck             # tsc on worker + page + middleware
 ```
 
-也可以进子包跑（`apps/worker/` 里 `bun dev` / `bun deploy` 等是无前缀短名）。`apps/middleware/` 不再作为 standalone 服务开发；它访问的 `http://telemail.worker` 是 Cloudflare Container outbound 虚拟 host，本地只把 `bun build:middleware` 作为编译验证。Zed 用户：`.zed/tasks.json` 已配好常用任务，cmd-shift-p → "task: spawn"。
+也可以进子包跑（`apps/worker/` 里 `bun dev` / `bun deploy` 等是无前缀短名）。`apps/middleware/` 生产运行在 Cloudflare Container 中；它访问的 `http://telemail.worker` 是 Container outbound 虚拟 host。本地用 `bun build:middleware` 做编译验证。Zed 用户：`.zed/tasks.json` 已配好常用任务，cmd-shift-p → "task: spawn"。
 
 ## 代码风格
 

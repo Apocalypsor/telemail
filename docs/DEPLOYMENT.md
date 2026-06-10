@@ -119,7 +119,7 @@ bun wrangler secret put GMAIL_PUSH_SECRET
 可选：如果要覆盖 Things Cloud API endpoint，再配置：
 
 ```sh
-bun wrangler secret put THINGS_CLOUD_ENDPOINT     # 调试用，通常不需要
+bun wrangler secret put THINGS_CLOUD_ENDPOINT     # 调试用
 ```
 
 Things Cloud 账号不是全局 Worker secret；每个用户在 Mini App 的 Things 设置页保存自己的邮箱 / 密码。用户设备时区会随 Mini App 请求自动记录，缺省固定 fallback 到 UTC。
@@ -169,7 +169,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 
 ### 6.1 创建 Pages 项目
 
-> 推荐用 Direct Upload + GitHub Actions 推（见下文 §8 CI/CD），不要再走 Pages 的 Git integration —— 否则 Actions 推 + CF 自动 build 会双跑撞车。如果之前接过 Git，去 Pages 项目 Settings → Builds & deployments 里把 "Build with Git" 关掉。
+> 推荐用 Direct Upload + GitHub Actions 推（见下文 §8 CI/CD）。Pages 项目 Settings → Builds & deployments 里的 "Build with Git" 保持关闭，避免 Actions 推送和 Cloudflare 自动 build 双跑撞车。
 
 首次创建 Pages 项目（用 wrangler 一行就行）：
 
@@ -222,7 +222,7 @@ IMAP Bridge 默认作为 Cloudflare Container 由主 Worker 托管。`apps/worke
 
 - 本地或 CI runner 需要 Docker daemon；`wrangler deploy` 构建 Container 镜像时会用到。
 - `lastUid` / folder cache 会通过 Worker 内部接口写入 `EMAIL_KV`。
-- IMAP Bridge 不需要额外的公网 URL 或共享密钥；Worker 和 Container 之间只走 `IMAP_BRIDGE_CONTAINER` binding / Container outbound 虚拟 host。
+- IMAP Bridge 的内部通信走 `IMAP_BRIDGE_CONTAINER` binding / Container outbound 虚拟 host。
 
 ### 部署与更新
 
@@ -291,9 +291,9 @@ Cloudflare Container 镜像由 `wrangler deploy` 根据 `apps/worker/wrangler.js
 | IMAP Container | `telemail-imap-bridge` | `apps/worker/wrangler.jsonc` 的 `containers[0].name` |
 | Pages 项目 | `telemail-web` | `.github/workflows/ci.yml` 里的 `--project-name`（出现 2 次）|
 
-### 8.4 关掉 Pages 的 Git Integration（如果之前接过）
+### 8.4 Pages Build 设置
 
-Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Disable。否则 push 到 main 时 CF Pages 会自己再 build 一次，跟 Actions 撞车。
+Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Disable。这样 push 到 main 时只有 GitHub Actions 执行 Pages deploy。
 
 ### 8.5 PR Preview URL 在哪看
 
