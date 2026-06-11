@@ -11,7 +11,11 @@ import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { registerFailedEmailCallbacks } from "./failed";
 
-export const registerAdminHandlers = (bot: Bot, env: Env) => {
+export const registerAdminHandlers = (
+  bot: Bot,
+  env: Env,
+  botUsername: string,
+) => {
   // Secrets panel (admin only, hidden behind /start -> global management)
   bot.callbackQuery("secrets", async (ctx) => {
     const userId = String(ctx.from.id);
@@ -42,7 +46,11 @@ export const registerAdminHandlers = (bot: Bot, env: Env) => {
       return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
     }
     await ctx.editMessageText(t("admin:menu.title"), {
-      reply_markup: await adminMenuKeyboard(env),
+      reply_markup: await adminMenuKeyboard(
+        env,
+        ctx.callbackQuery.message?.chat.type,
+        botUsername,
+      ),
     });
     await ctx.answerCallbackQuery();
   });
@@ -58,12 +66,20 @@ export const registerAdminHandlers = (bot: Bot, env: Env) => {
     try {
       await renewAllPush(env);
       await ctx.editMessageText(t("admin:watch.renewed"), {
-        reply_markup: await adminMenuKeyboard(env),
+        reply_markup: await adminMenuKeyboard(
+          env,
+          ctx.callbackQuery.message?.chat.type,
+          botUsername,
+        ),
       });
     } catch (err) {
       await reportErrorToObservability(env, "bot.watch_all_failed", err);
       await ctx.editMessageText(t("admin:watch.failed"), {
-        reply_markup: await adminMenuKeyboard(env),
+        reply_markup: await adminMenuKeyboard(
+          env,
+          ctx.callbackQuery.message?.chat.type,
+          botUsername,
+        ),
       });
     }
   });

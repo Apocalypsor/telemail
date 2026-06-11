@@ -1,4 +1,5 @@
 import { ROUTE_MINI_APP_USERS } from "@page/paths";
+import { groupMiniAppUrl } from "@worker/bot/utils/miniapp-menu";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
@@ -8,19 +9,30 @@ import { InlineKeyboard } from "grammy";
 
 export const SECRETS_AUTO_DELETE_SECONDS = 60;
 
-export const adminMenuKeyboard = async (env: Env): Promise<InlineKeyboard> => {
+type ChatType = "private" | "group" | "supergroup" | "channel" | undefined;
+
+export const adminMenuKeyboard = async (
+  env: Env,
+  chatType: ChatType,
+  botUsername: string,
+): Promise<InlineKeyboard> => {
   const failedCount = await countFailedEmails(env.DB);
   const base = getWorkerBaseUrl(env);
+  const userManagementUrl = `${base}${ROUTE_MINI_APP_USERS}`;
   const failedLabel =
     failedCount > 0
       ? t("admin:failedEmails.titleWithCount", { count: failedCount })
       : t("admin:failedEmails.title");
-  const kb = new InlineKeyboard()
-    .webApp(
+  const kb = new InlineKeyboard();
+  if (chatType === "private") {
+    kb.webApp(t("keyboards:menu.userManagement"), userManagementUrl);
+  } else {
+    kb.url(
       t("keyboards:menu.userManagement"),
-      `${base}${ROUTE_MINI_APP_USERS}`,
-    )
-    .row()
+      groupMiniAppUrl(env, botUsername)("p_users", userManagementUrl),
+    );
+  }
+  kb.row()
     .text(failedLabel, "failed")
     .row()
     .text(t("admin:renewWatch"), "walla")

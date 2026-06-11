@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
  * 唯一会落到这里。读 `start_param` 前缀决定跳哪去：
  *   r_<chatId>_<tgMsgId>  → /telegram-app/reminders?accountId=&emailMessageId=&token=
  *   m_<chatId>_<tgMsgId>  → /telegram-app/mail/$id?accountId=&t=
- *   p_<page>              → 群聊菜单入口，如 p_accounts / p_list_unread
+ *   p_<page>              → 群聊菜单入口，如 p_accounts / p_users / p_list_unread
  *   <chatId>_<tgMsgId>    → /telegram-app/reminders（兼容旧按钮，无前缀 = reminder）
  *   无 start_param         → /telegram-app/reminders（列表模式，主菜单"我的提醒"）
  */
@@ -103,6 +103,9 @@ const navigateMenuStartParam = (
   switch (startParam) {
     case "p_accounts":
       navigate({ to: "/telegram-app/accounts", replace: true });
+      return true;
+    case "p_users":
+      navigate({ to: "/telegram-app/users", replace: true });
       return true;
     case "p_reminders":
       navigate({ to: "/telegram-app/reminders", search: {}, replace: true });

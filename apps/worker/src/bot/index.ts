@@ -40,7 +40,7 @@ export const createBot = (env: Env, botInfo: UserFromGetMe) => {
   // 必须在 register*Handlers 之前注册，否则 use() 顺序错过。
   registerPrivateOnlyCommandGuard(bot);
   registerStartHandlers(bot, env, botInfo.username);
-  registerAdminHandlers(bot, env);
+  registerAdminHandlers(bot, env, botInfo.username);
   registerReactionHandler(bot, env);
   registerStarHandler(bot, env);
   registerJunkHandler(bot, env);
