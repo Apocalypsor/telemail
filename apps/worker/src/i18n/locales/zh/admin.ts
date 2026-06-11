@@ -2,16 +2,6 @@ export default {
   menu: {
     title: "⚙️ 全局管理",
   },
-  users: {
-    noUsers: "👥 暂无用户",
-    title: "👥 用户列表 ({{count}})",
-    revoke: "撤回",
-    approve: "批准",
-    confirmDelete:
-      "确定要删除用户 {{name}} 吗？\n\n该用户关联的账号绑定将被解除。",
-    deleted: "🗑 已删除",
-    processed: "已处理",
-  },
   watch: {
     renewing: "⏳ 正在续订...",
     renewed: "⚙️ 全局管理\n\n✅ 所有 Watch 已续订",

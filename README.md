@@ -24,7 +24,8 @@
 ## 多账号
 
 - Gmail / Outlook / IMAP 三种混用
-- 每个账号可以配**不同的 Telegram Chat ID**（不同邮箱转不同聊天 / 频道）
+- 每个账号可以配**不同的 Telegram Chat ID / Topic ID**（不同邮箱转不同聊天 / 频道 / forum topic）
+- Forum supergroup 可在 General 里 `/start` 自动创建 `Inbox` topic，用 General 做操作区、Inbox 放邮件
 - 所有 Gmail 账号共享同一个 GCP 项目；所有 Outlook 账号共享同一个 Entra ID 应用；所有账号共享同一个 Telegram Bot
 - 账号信息存 D1，通过 Mini App 管理（`/start` → 账号管理）
 - 支持**临时禁用**：推送 / cron / 列表跳过该账号，IMAP 额外通知 bridge 断开连接；配置保留随时可恢复

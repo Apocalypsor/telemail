@@ -9,6 +9,7 @@ import type {
 } from "@worker/api/modules/accounts/model";
 import { useEffect, useState } from "react";
 import { unwrapArchiveLabels } from "../-utils/api";
+import { parseOptionalTopicId, topicIdInputValue } from "../-utils/topic";
 
 interface AccountCardProps {
   account: AccountResponse;
@@ -16,7 +17,11 @@ interface AccountCardProps {
   busy?: boolean;
   onAuthorize: (accountId: number) => void;
   onRenewPush: (accountId: number) => void;
-  onUpdateChatId: (accountId: number, chatId: string) => void;
+  onUpdateChatId: (
+    accountId: number,
+    chatId: string,
+    topicId: number | null,
+  ) => void;
   onToggleDisabled: (accountId: number, disabled: boolean) => void;
   onAssignOwner: (accountId: number, telegramUserId: string) => void;
   onDelete: (account: AccountResponse) => void;
@@ -46,6 +51,7 @@ export const AccountCard = ({
   onSetArchiveLabel,
 }: AccountCardProps) => {
   const [chatId, setChatId] = useState(account.chatId);
+  const [topicId, setTopicId] = useState(topicIdInputValue(account.topicId));
   const [ownerId, setOwnerId] = useState(account.ownerTelegramId ?? "");
   const [archiveLabelId, setArchiveLabelId] = useState(
     account.archiveFolder ?? "",
@@ -53,6 +59,7 @@ export const AccountCard = ({
 
   useEffect(() => {
     setChatId(account.chatId);
+    setTopicId(topicIdInputValue(account.topicId));
     setOwnerId(account.ownerTelegramId ?? "");
     setArchiveLabelId(account.archiveFolder ?? "");
   }, [account]);
@@ -71,6 +78,13 @@ export const AccountCard = ({
 
   const archiveLabel =
     account.archiveFolderName || account.archiveFolder || "未设置";
+  const parsedTopicId = parseOptionalTopicId(topicId);
+  const topicChanged = parsedTopicId !== account.topicId;
+  const destinationChanged = chatId.trim() !== account.chatId || topicChanged;
+  const canSaveDestination =
+    chatId.trim().length > 0 &&
+    parsedTopicId !== undefined &&
+    destinationChanged;
 
   return (
     <article className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-5">
@@ -89,6 +103,9 @@ export const AccountCard = ({
         </dd>
         <Meta label="Email" value={account.email || `#${account.id}`} />
         <Meta label="Type" value={account.typeName} />
+        {account.topicId != null && (
+          <Meta label="Topic" value={String(account.topicId)} />
+        )}
         {account.imapHost && (
           <Meta
             label="Server"
@@ -112,23 +129,38 @@ export const AccountCard = ({
       <div className="border-t border-zinc-800 pt-4 space-y-4">
         <section className="space-y-2">
           <span className="block text-sm font-semibold text-zinc-300">
-            Chat ID
+            投递位置
           </span>
-          <div className="grid grid-cols-[1fr_auto] gap-2">
+          <div className="grid gap-2">
             <input
               value={chatId}
               inputMode="numeric"
+              aria-label="Chat ID"
+              placeholder="Chat ID"
               onChange={(event) => setChatId(event.target.value)}
               className={`min-w-0 text-[15px] ${INPUT_CLASS}`}
             />
-            <button
-              type="button"
-              disabled={busy || chatId.trim() === account.chatId}
-              onClick={() => onUpdateChatId(account.id, chatId)}
-              className="min-w-[64px] rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-emerald-950 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              保存
-            </button>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <input
+                value={topicId}
+                inputMode="numeric"
+                aria-label="Topic ID"
+                placeholder="Topic ID（可选）"
+                onChange={(event) => setTopicId(event.target.value)}
+                className={`min-w-0 text-[15px] ${INPUT_CLASS}`}
+              />
+              <button
+                type="button"
+                disabled={busy || !canSaveDestination}
+                onClick={() => {
+                  if (parsedTopicId === undefined) return;
+                  onUpdateChatId(account.id, chatId, parsedTopicId);
+                }}
+                className="min-w-[64px] rounded-lg bg-emerald-500 px-3 text-sm font-semibold text-emerald-950 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                保存
+              </button>
+            </div>
           </div>
         </section>
 

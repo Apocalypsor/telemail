@@ -7,6 +7,7 @@ import type {
 } from "@worker/api/modules/accounts/model";
 import { useEffect, useMemo, useState } from "react";
 import { isOAuthAccountType } from "../-utils/state";
+import { parseOptionalTopicId } from "../-utils/topic";
 
 interface AddAccountPanelProps {
   providers: AccountProviderOption[];
@@ -25,6 +26,7 @@ export const AddAccountPanel = ({
 }: AddAccountPanelProps) => {
   const [type, setType] = useState<AccountProviderOption["type"]>("gmail");
   const [chatId, setChatId] = useState(currentUserId);
+  const [topicId, setTopicId] = useState("");
   const [imapHost, setImapHost] = useState("");
   const [imapPort, setImapPort] = useState("993");
   const [imapSecure, setImapSecure] = useState(true);
@@ -40,9 +42,11 @@ export const AddAccountPanel = ({
     [providers, type],
   );
   const isImap = selected?.type === "imap";
+  const parsedTopicId = parseOptionalTopicId(topicId);
   const canSubmit =
     !!selected?.configured &&
     chatId.trim().length > 0 &&
+    parsedTopicId !== undefined &&
     (!isImap ||
       (imapHost.trim() &&
         imapPort.trim() &&
@@ -53,11 +57,16 @@ export const AddAccountPanel = ({
     event.preventDefault();
     if (!selected || !canSubmit || busy) return;
     if (selected.oauth && isOAuthAccountType(selected.type)) {
-      onCreateOAuth({ type: selected.type, chatId: chatId.trim() });
+      onCreateOAuth({
+        type: selected.type,
+        chatId: chatId.trim(),
+        topicId: parsedTopicId,
+      });
       return;
     }
     onCreateImap({
       chatId: chatId.trim(),
+      topicId: parsedTopicId,
       imapHost: imapHost.trim(),
       imapPort: Number(imapPort),
       imapSecure,
@@ -103,6 +112,19 @@ export const AddAccountPanel = ({
           value={chatId}
           inputMode="numeric"
           onChange={(event) => setChatId(event.target.value)}
+          className={`w-full text-[15px] ${INPUT_CLASS}`}
+        />
+      </label>
+
+      <label className="block">
+        <span className="block text-xs font-medium tracking-wide text-zinc-400 uppercase mb-2">
+          Topic ID
+        </span>
+        <input
+          value={topicId}
+          inputMode="numeric"
+          placeholder="可选"
+          onChange={(event) => setTopicId(event.target.value)}
           className={`w-full text-[15px] ${INPUT_CLASS}`}
         />
       </label>

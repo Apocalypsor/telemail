@@ -1,4 +1,3 @@
-import accounts from "./accounts";
 import admin from "./admin";
 import archive from "./archive";
 import bridge from "./bridge";
@@ -11,9 +10,9 @@ import reminders from "./reminders";
 import star from "./star";
 import start from "./start";
 import sync from "./sync";
+import topics from "./topics";
 
 export default {
-  accounts,
   admin,
   archive,
   bridge,
@@ -26,4 +25,5 @@ export default {
   star,
   start,
   sync,
+  topics,
 };

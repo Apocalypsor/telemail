@@ -6,9 +6,9 @@ export const isAdmin = (userId: string, env: Env): boolean => {
   return userId === env.ADMIN_TELEGRAM_ID;
 };
 
-/** 全局命令中间件：把 `/cmd` 形式的消息限制为仅私聊。
- *  群 / 频道里发命令可能泄漏用户私人数据；/start 在那里跑还会触发
- *  upsertUser 用频道/群成员的 ctx.from 引入未授权注册路径。
+/** 全局命令中间件：默认把 `/cmd` 形式的消息限制为仅私聊。
+ *  例外：forum supergroup 里的 `/start` 用于把一个“只有用户 + bot”的群
+ *  onboard 成 General 操作区 + Inbox 邮件 topic。
  *
  *  用 `ctx.msg`（grammY 的统一 getter）拿当前更新里的消息体，覆盖 message /
  *  editedMessage / channelPost / editedChannelPost 四种来源 —— 频道里发的
@@ -23,7 +23,11 @@ export const registerPrivateOnlyCommandGuard = (bot: Bot) => {
     const isTopLevelCommand = ctx.msg?.entities?.some(
       (e) => e.type === "bot_command" && e.offset === 0,
     );
-    if (isTopLevelCommand && ctx.chat?.type !== "private") {
+    if (
+      isTopLevelCommand &&
+      ctx.chat?.type !== "private" &&
+      !isForumGroupStart(ctx)
+    ) {
       // 频道 channel_post 没有 from，ctx.reply 仍然在该 chat 里发；私聊不可达就
       // 静默吃掉（不抛），比如机器人被踢、限流等
       await ctx.reply(t("common:privateOnly")).catch(() => {});
@@ -31,4 +35,10 @@ export const registerPrivateOnlyCommandGuard = (bot: Bot) => {
     }
     await next();
   });
+};
+
+const isForumGroupStart = (ctx: Context): boolean => {
+  const text = ctx.msg && "text" in ctx.msg ? ctx.msg.text : undefined;
+  if (!text || !/^\/start(?:@\w+)?(?:\s|$)/.test(text)) return false;
+  return ctx.chat?.type === "supergroup" && ctx.chat.is_forum === true;
 };

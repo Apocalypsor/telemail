@@ -80,13 +80,15 @@ const AccountDetailPage = () => {
     mutationFn: async ({
       accountId,
       chatId,
+      topicId,
     }: {
       accountId: number;
       chatId: string;
+      topicId: number | null;
     }) => {
       const { error } = await api.api
         .accounts({ id: String(accountId) })
-        ["chat-id"].patch({ chatId });
+        ["chat-id"].patch({ chatId, topicId });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -247,8 +249,8 @@ const AccountDetailPage = () => {
           busy={accountBusyId === data.account.id}
           onAuthorize={(accountId) => authUrlMut.mutate(accountId)}
           onRenewPush={(accountId) => renewMut.mutate(accountId)}
-          onUpdateChatId={(accountId, chatId) =>
-            chatMut.mutate({ accountId, chatId })
+          onUpdateChatId={(accountId, chatId, topicId) =>
+            chatMut.mutate({ accountId, chatId, topicId })
           }
           onToggleDisabled={(accountId, disabled) =>
             disabledMut.mutate({ accountId, disabled })

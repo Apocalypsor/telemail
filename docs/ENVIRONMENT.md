@@ -103,8 +103,8 @@ middleware `apps/middleware/.env`：
 
 用户可见的表：
 
-- `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、`refresh_token` 加密等）
-- `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id)`，幂等去重用
+- `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、可选 `topic_id`、`refresh_token` 加密等）
+- `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id, tg_thread_id)`，幂等去重用
 - `reminders` —— Mini App 设的提醒，可选记录推送到 Things Cloud 的 task UUID
 - `users` —— Telegram 用户记录（`approved` 状态控制访问 Mini App 与 web 工具页 `/preview` / `/junk-check`），以及可选的 per-user Things Cloud 设置
 - `failed_emails` —— LLM / queue 处理失败的邮件，cron 批量重试

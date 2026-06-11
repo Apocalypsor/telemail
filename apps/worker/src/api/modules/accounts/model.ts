@@ -8,10 +8,12 @@ export const AccountListQuery = t.Object({
 export type AccountListQuery = UnwrapSchema<typeof AccountListQuery>;
 
 const ChatId = t.String({ minLength: 1, maxLength: 64 });
+const TopicId = t.Optional(t.Union([t.Number(), t.Null()]));
 
 export const CreateOAuthAccountBody = t.Object({
   type: t.Union([t.Literal("gmail"), t.Literal("outlook")]),
   chatId: ChatId,
+  topicId: TopicId,
 });
 export type CreateOAuthAccountBody = UnwrapSchema<
   typeof CreateOAuthAccountBody
@@ -19,6 +21,7 @@ export type CreateOAuthAccountBody = UnwrapSchema<
 
 export const CreateImapAccountBody = t.Object({
   chatId: ChatId,
+  topicId: TopicId,
   imapHost: t.String({ minLength: 1, maxLength: 255 }),
   imapPort: t.Number(),
   imapSecure: t.Boolean(),
@@ -27,7 +30,7 @@ export const CreateImapAccountBody = t.Object({
 });
 export type CreateImapAccountBody = UnwrapSchema<typeof CreateImapAccountBody>;
 
-export const UpdateChatIdBody = t.Object({ chatId: ChatId });
+export const UpdateChatIdBody = t.Object({ chatId: ChatId, topicId: TopicId });
 export type UpdateChatIdBody = UnwrapSchema<typeof UpdateChatIdBody>;
 
 export const ToggleDisabledBody = t.Object({ disabled: t.Boolean() });
@@ -55,6 +58,7 @@ export const AccountResponse = t.Object({
   typeName: t.String(),
   email: t.Union([t.String(), t.Null()]),
   chatId: t.String(),
+  topicId: t.Union([t.Number(), t.Null()]),
   disabled: t.Boolean(),
   authorized: t.Boolean(),
   oauth: t.Boolean(),

@@ -76,7 +76,11 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
     ]);
     const mapping = mailMappings[0];
     const tgMessageLink = mapping
-      ? buildTgMessageLink(mapping.tg_chat_id, mapping.tg_message_id)
+      ? buildTgMessageLink(
+          mapping.tg_chat_id,
+          mapping.tg_message_id,
+          mapping.tg_thread_id,
+        )
       : null;
 
     return {

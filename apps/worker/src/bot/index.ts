@@ -1,7 +1,5 @@
-import { registerAccountHandlers } from "@worker/bot/handlers/accounts";
 import { registerAdminHandlers } from "@worker/bot/handlers/admin";
 import { registerArchiveHandler } from "@worker/bot/handlers/archive";
-import { registerInputHandler } from "@worker/bot/handlers/input";
 import { registerJunkHandler } from "@worker/bot/handlers/junk";
 import { registerPinCleanupHandler } from "@worker/bot/handlers/pin-cleanup";
 import { registerReactionHandler } from "@worker/bot/handlers/reaction";
@@ -41,8 +39,7 @@ export const createBot = (env: Env, botInfo: UserFromGetMe) => {
   // 全局守卫：所有 / 命令一律只允许私聊（防群里注册 / 信息泄漏）。
   // 必须在 register*Handlers 之前注册，否则 use() 顺序错过。
   registerPrivateOnlyCommandGuard(bot);
-  registerStartHandlers(bot, env);
-  registerAccountHandlers(bot, env);
+  registerStartHandlers(bot, env, botInfo.username);
   registerAdminHandlers(bot, env);
   registerReactionHandler(bot, env);
   registerStarHandler(bot, env);
@@ -51,8 +48,6 @@ export const createBot = (env: Env, botInfo: UserFromGetMe) => {
   registerRefreshHandler(bot, env);
   registerSyncHandler(bot, env);
   registerPinCleanupHandler(bot, env);
-  // 输入处理必须最后注册（catch-all text handler）
-  registerInputHandler(bot, env);
 
   return bot;
 };

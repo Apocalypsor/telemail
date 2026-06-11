@@ -128,6 +128,7 @@ export const sendWithAttachments = async (
   caption: string,
   attachments: Attachment[],
   replyMarkup?: unknown,
+  messageThreadId?: number | null,
 ): Promise<number> => {
   try {
     if (attachments.length === 1) {
@@ -135,6 +136,9 @@ export const sendWithAttachments = async (
       const blob = attToBlob(att);
       const form = new FormData();
       form.append("chat_id", chatId);
+      if (messageThreadId != null) {
+        form.append("message_thread_id", String(messageThreadId));
+      }
       form.append("document", blob, att.filename || "attachment");
       form.append("caption", caption);
       form.append("parse_mode", "MarkdownV2");
@@ -163,6 +167,9 @@ export const sendWithAttachments = async (
           );
           const fallbackForm = new FormData();
           fallbackForm.append("chat_id", chatId);
+          if (messageThreadId != null) {
+            fallbackForm.append("message_thread_id", String(messageThreadId));
+          }
           fallbackForm.append("document", blob, att.filename || "attachment");
           fallbackForm.append("caption", markdownV2ToPlainText(caption));
           if (replyMarkup)
@@ -185,6 +192,9 @@ export const sendWithAttachments = async (
         chatId,
         caption,
         replyMarkup,
+        messageThreadId != null
+          ? { message_thread_id: messageThreadId }
+          : undefined,
       );
 
       const chunks: Attachment[][] = [];
@@ -192,7 +202,14 @@ export const sendWithAttachments = async (
         chunks.push(attachments.slice(i, i + TG_MEDIA_GROUP_LIMIT));
       }
       for (const chunk of chunks) {
-        await sendMediaGroupChunk(token, chatId, "", chunk, textMsgId);
+        await sendMediaGroupChunk(
+          token,
+          chatId,
+          "",
+          chunk,
+          textMsgId,
+          messageThreadId,
+        );
       }
       return textMsgId;
     }
@@ -298,8 +315,12 @@ export const setReplyMarkup = async (
 export const buildTgMessageLink = (
   chatId: string,
   messageId: number,
+  messageThreadId?: number | null,
 ): string => {
   const numericId = chatId.replace(/^-100/, "");
+  if (messageThreadId != null) {
+    return `https://t.me/c/${numericId}/${messageThreadId}/${messageId}`;
+  }
   return `https://t.me/c/${numericId}/${messageId}`;
 };
 
@@ -322,9 +343,13 @@ const sendMediaGroupChunk = async (
   caption: string,
   attachments: Attachment[],
   replyToMessageId?: number,
+  messageThreadId?: number | null,
 ): Promise<number> => {
   const form = new FormData();
   form.append("chat_id", chatId);
+  if (messageThreadId != null) {
+    form.append("message_thread_id", String(messageThreadId));
+  }
   if (replyToMessageId)
     form.append("reply_to_message_id", String(replyToMessageId));
 
@@ -369,6 +394,9 @@ const sendMediaGroupChunk = async (
       );
       const fallbackForm = new FormData();
       fallbackForm.append("chat_id", chatId);
+      if (messageThreadId != null) {
+        fallbackForm.append("message_thread_id", String(messageThreadId));
+      }
       const fallbackMedia = attachments.map((att, i) => {
         const fieldName = `file${i}`;
         const blob = attToBlob(att);

@@ -1,8 +1,6 @@
-// ─── OAuth Bot Message (回写 Bot 消息位置) ──────────────────────────────────
-
-interface OAuthBotMsg {
-  chatId: string;
-  messageId: number;
+export interface TelegramForumTopics {
+  inboxTopicId: number;
+  onboardedAt: number;
 }
 
 // ─── Outlook Well-known Folder IDs Cache ───────────────────────────────────
@@ -20,7 +18,6 @@ export interface OutlookFolderIds {
 // ─── KV keys & prefixes ────────────────────────────────────────────────────
 
 const KV_OAUTH_STATE_PREFIX = "oauth_state:";
-const KV_OAUTH_BOT_MSG_PREFIX = "oauth_bot_msg:";
 const KV_MS_SUB_ACCOUNT_PREFIX = "ms_sub_account:";
 const KV_MS_SUBSCRIPTION_PREFIX = "ms_subscription:";
 const KV_OUTLOOK_FOLDERS_PREFIX = "outlook_folders:";
@@ -28,6 +25,7 @@ const KV_IMAP_LAST_UID_PREFIX = "imap:last_uid:";
 const KV_IMAP_FOLDER_PREFIX = "imap:folder:";
 const KV_BOT_INFO_KEY = "telegram:bot_info";
 const KV_BOT_COMMANDS_VERSION_KEY = "telegram:bot_commands_version";
+const KV_TELEGRAM_FORUM_TOPICS_PREFIX = "telegram:forum_topics:";
 const KV_DAILY_MAIL_SUMMARY_PREFIX = "daily_mail_summary:";
 const KV_THINGS_APP_INSTANCE_ID_PREFIX = "things:app_instance_id:";
 
@@ -102,32 +100,6 @@ export const deleteOAuthState = async (
   state: string,
 ): Promise<void> => {
   await kv.delete(`${KV_OAUTH_STATE_PREFIX}${statePrefix}${state}`);
-};
-
-export const putOAuthBotMsg = async (
-  kv: KVNamespace,
-  accountId: number,
-  msg: OAuthBotMsg,
-): Promise<void> => {
-  await kv.put(`${KV_OAUTH_BOT_MSG_PREFIX}${accountId}`, JSON.stringify(msg), {
-    expirationTtl: OAUTH_STATE_TTL_SECONDS,
-  });
-};
-
-export const getOAuthBotMsg = async (
-  kv: KVNamespace,
-  accountId: number,
-): Promise<OAuthBotMsg | null> => {
-  const raw = await kv.get(`${KV_OAUTH_BOT_MSG_PREFIX}${accountId}`);
-  if (!raw) return null;
-  return JSON.parse(raw) as OAuthBotMsg;
-};
-
-export const deleteOAuthBotMsg = async (
-  kv: KVNamespace,
-  accountId: number,
-): Promise<void> => {
-  await kv.delete(`${KV_OAUTH_BOT_MSG_PREFIX}${accountId}`);
 };
 
 // ─── Outlook Subscription ─────────────────────────────────────────────��─────
@@ -300,6 +272,29 @@ export const putBotCommandsVersion = async (
   version: string,
 ): Promise<void> => {
   await kv.put(KV_BOT_COMMANDS_VERSION_KEY, version);
+};
+
+// ─── Telegram Forum Topic Onboarding ───────────────────────────────────────
+
+export const getTelegramForumTopics = async (
+  kv: KVNamespace,
+  chatId: string,
+): Promise<TelegramForumTopics | null> => {
+  return kv.get<TelegramForumTopics>(
+    `${KV_TELEGRAM_FORUM_TOPICS_PREFIX}${chatId}`,
+    "json",
+  );
+};
+
+export const putTelegramForumTopics = async (
+  kv: KVNamespace,
+  chatId: string,
+  topics: TelegramForumTopics,
+): Promise<void> => {
+  await kv.put(
+    `${KV_TELEGRAM_FORUM_TOPICS_PREFIX}${chatId}`,
+    JSON.stringify(topics),
+  );
 };
 
 // ─── Daily Mail Summary ────────────────────────────────────────────────────

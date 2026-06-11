@@ -7,6 +7,11 @@ import {
 import { helpText } from "@worker/bot/commands";
 import { isAdmin } from "@worker/bot/utils/auth";
 import {
+  onboardForumGroupIfNeeded,
+  threadReplyOptions,
+} from "@worker/bot/utils/forum-onboarding";
+import { groupMiniAppUrl } from "@worker/bot/utils/miniapp-menu";
+import {
   approveUser,
   getUserByTelegramId,
   rejectUser,
@@ -20,7 +25,11 @@ import { formatUserName } from "@worker/utils/user-format";
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 
-export const registerStartHandlers = (bot: Bot, env: Env) => {
+export const registerStartHandlers = (
+  bot: Bot,
+  env: Env,
+  botUsername: string,
+) => {
   // ─── /start: 主入口，自动注册用户（私聊由全局守卫保证） ──────────────────
   bot.command("start", async (ctx) => {
     const telegramId = String(ctx.from?.id);
@@ -69,8 +78,13 @@ export const registerStartHandlers = (bot: Bot, env: Env) => {
       return ctx.reply(t("common:admin.awaitingApprovalFull"));
     }
 
-    return ctx.reply(t("start:panel"), {
-      reply_markup: mainMenuKeyboard(admin, env),
+    const groupOnboarding = await onboardForumGroupIfNeeded(ctx, env);
+    const text = groupOnboarding
+      ? `${groupOnboarding}\n\n${t("start:panel")}`
+      : t("start:panel");
+    return ctx.reply(text, {
+      ...threadReplyOptions(ctx.message?.message_thread_id),
+      reply_markup: mainMenuKeyboard(admin, env, ctx.chat?.type, botUsername),
     });
   });
 
@@ -84,7 +98,7 @@ export const registerStartHandlers = (bot: Bot, env: Env) => {
     const userId = String(ctx.from.id);
     const admin = isAdmin(userId, env);
     await ctx.editMessageText(t("start:panel"), {
-      reply_markup: mainMenuKeyboard(admin, env),
+      reply_markup: mainMenuKeyboard(admin, env, ctx.chat?.type, botUsername),
     });
     await ctx.answerCallbackQuery();
   });
@@ -128,27 +142,51 @@ export const registerStartHandlers = (bot: Bot, env: Env) => {
 };
 
 /** 主菜单键盘：邮件列表 + 提醒 Mini App 入口 + 账号/全局管理。 */
-const mainMenuKeyboard = (admin: boolean, env: Env): InlineKeyboard => {
+const mainMenuKeyboard = (
+  admin: boolean,
+  env: Env,
+  chatType: "private" | "group" | "supergroup" | "channel" | undefined,
+  botUsername: string,
+): InlineKeyboard => {
   const kb = new InlineKeyboard();
   const base = getWorkerBaseUrl(env);
   const listUrl = (type: string) =>
     `${base}${ROUTE_MINI_APP_LIST.replace(":type", type)}`;
-  kb.row()
-    .webApp(t("keyboards:menu.unread"), listUrl("unread"))
-    .webApp(t("keyboards:menu.starred"), listUrl("starred"))
-    .row()
-    .webApp(t("keyboards:menu.junk"), listUrl("junk"))
-    .webApp(t("keyboards:menu.archived"), listUrl("archived"))
-    .row()
-    .webApp(t("keyboards:menu.reminders"), `${base}${ROUTE_MINI_APP_REMINDERS}`)
-    .webApp(t("keyboards:menu.search"), `${base}${ROUTE_MINI_APP_SEARCH}`);
-  kb.row()
-    .webApp(
-      t("keyboards:menu.accountManagement"),
-      `${base}${ROUTE_MINI_APP_ACCOUNTS}`,
-    )
-    .text(t("keyboards:menu.sync"), "sync")
-    .row();
+  const miniAppUrl = groupMiniAppUrl(env, botUsername);
+  const appButton = (label: string, url: string, startParam: string): void => {
+    if (chatType === "private") {
+      kb.webApp(label, url);
+      return;
+    }
+    kb.url(label, miniAppUrl(startParam, url));
+  };
+  appButton(t("keyboards:menu.unread"), listUrl("unread"), "p_list_unread");
+  appButton(t("keyboards:menu.starred"), listUrl("starred"), "p_list_starred");
+  kb.row();
+  appButton(t("keyboards:menu.junk"), listUrl("junk"), "p_list_junk");
+  appButton(
+    t("keyboards:menu.archived"),
+    listUrl("archived"),
+    "p_list_archived",
+  );
+  kb.row();
+  appButton(
+    t("keyboards:menu.reminders"),
+    `${base}${ROUTE_MINI_APP_REMINDERS}`,
+    "p_reminders",
+  );
+  appButton(
+    t("keyboards:menu.search"),
+    `${base}${ROUTE_MINI_APP_SEARCH}`,
+    "p_search",
+  );
+  kb.row();
+  appButton(
+    t("keyboards:menu.accountManagement"),
+    `${base}${ROUTE_MINI_APP_ACCOUNTS}`,
+    "p_accounts",
+  );
+  kb.text(t("keyboards:menu.sync"), "sync").row();
   if (admin) {
     kb.text(t("keyboards:menu.globalOps"), "admin").row();
   }

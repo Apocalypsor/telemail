@@ -40,6 +40,7 @@ export const deliverEmailToTelegram = async (
 ): Promise<void> => {
   const tgToken = env.TELEGRAM_BOT_TOKEN;
   const chatId = account.chat_id;
+  const topicId = account.topic_id;
 
   const parser = new PostalMime();
   const email = await parser.parse(rawEmail);
@@ -83,6 +84,7 @@ export const deliverEmailToTelegram = async (
       text,
       email.attachments || [],
       initialKeyboard,
+      topicId,
     );
   } else {
     sentMessageId = await sendTextMessage(
@@ -90,12 +92,14 @@ export const deliverEmailToTelegram = async (
       chatId,
       text,
       initialKeyboard,
+      topicId != null ? { message_thread_id: topicId } : undefined,
     );
   }
 
   const inserted = await putMessageMapping(env.DB, {
     tg_message_id: sentMessageId,
     tg_chat_id: chatId,
+    tg_thread_id: topicId,
     email_message_id: emailMessageId,
     account_id: account.id,
   });

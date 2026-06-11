@@ -1,13 +1,7 @@
 import { html } from "@elysiajs/html";
 import { cf } from "@worker/api/plugins/cf";
-import {
-  accountDetailKeyboard,
-  accountDetailText,
-} from "@worker/bot/utils/account";
 import { getAccountById } from "@worker/db/accounts";
-import { deleteOAuthBotMsg, getOAuthBotMsg } from "@worker/db/kv";
 import { Elysia } from "elysia";
-import { Api } from "grammy";
 import {
   OAuthCallbackPage,
   OAuthErrorPage,
@@ -20,7 +14,7 @@ import { resolveOAuth } from "./utils";
  * OAuth flow 三个 HTML 页：
  *  - GET /oauth/:provider          说明 + redirect URI 提示页
  *  - GET /oauth/:provider/start    302 到 Google/MS authorize 页
- *  - GET /oauth/:provider/callback OAuth 回调，写 refresh_token，编辑 bot 消息，渲染成功页
+ * - GET /oauth/:provider/callback OAuth 回调，写 refresh_token，渲染成功页
  *
  * `./components` 里渲染函数已经直接调 `Html.createElement` 输出 HTML 字符串，
  * 不走 JSX 语法 —— page 那边 tsconfig 的 jsx 设置和 worker 这里的 jsxFactory
@@ -83,26 +77,6 @@ export const oauthController = new Elysia({ name: "controller.oauth" })
       if (!result.ok) {
         set.status = result.status;
         return OAuthErrorPage({ title: result.title, detail: result.detail });
-      }
-
-      // 尝试更新 bot 中的授权消息（best-effort）
-      const botMsg = await getOAuthBotMsg(env.EMAIL_KV, result.accountId);
-      if (botMsg) {
-        try {
-          const account = await getAccountById(env.DB, result.accountId);
-          if (account) {
-            const api = new Api(env.TELEGRAM_BOT_TOKEN);
-            await api.editMessageText(
-              botMsg.chatId,
-              botMsg.messageId,
-              accountDetailText(account),
-              { reply_markup: accountDetailKeyboard(account) },
-            );
-          }
-        } catch {
-          /* ignore: don't break OAuth success page */
-        }
-        await deleteOAuthBotMsg(env.EMAIL_KV, result.accountId);
       }
 
       return OAuthCallbackPage({

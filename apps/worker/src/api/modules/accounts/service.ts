@@ -34,6 +34,7 @@ import type {
 import {
   getAuthorizedAccountOrResult,
   normalizeChatId,
+  normalizeTopicId,
   oauthCallbackUrl,
   toAccountResponse,
   toProviderOptions,
@@ -104,6 +105,10 @@ export abstract class AccountsService {
   ): Promise<CreateOAuthAccountResult> {
     const chatId = normalizeChatId(body.chatId);
     if (!chatId) return { ok: false, status: 400, error: "Chat ID 必须为数字" };
+    const topicId = normalizeTopicId(body.topicId);
+    if (topicId === false) {
+      return { ok: false, status: 400, error: "Topic ID 必须为正整数" };
+    }
 
     const klass = PROVIDERS[body.type];
     const oauth = klass.oauth;
@@ -117,7 +122,13 @@ export abstract class AccountsService {
       };
     }
 
-    const account = await createAccount(env.DB, chatId, userId, body.type);
+    const account = await createAccount(
+      env.DB,
+      chatId,
+      userId,
+      body.type,
+      topicId ?? null,
+    );
     const oauthUrl = await oauth.generateOAuthUrl(
       env,
       account.id,
@@ -147,6 +158,10 @@ export abstract class AccountsService {
 
     const chatId = normalizeChatId(body.chatId);
     if (!chatId) return { ok: false, status: 400, error: "Chat ID 必须为数字" };
+    const topicId = normalizeTopicId(body.topicId);
+    if (topicId === false) {
+      return { ok: false, status: 400, error: "Topic ID 必须为正整数" };
+    }
 
     const imapHost = body.imapHost.trim();
     const imapUser = body.imapUser.trim();
@@ -162,6 +177,7 @@ export abstract class AccountsService {
 
     const account = await createImapAccount(env.DB, {
       chatId,
+      topicId: topicId ?? null,
       telegramUserId: userId,
       email: imapUser,
       imapHost,
@@ -260,9 +276,17 @@ export abstract class AccountsService {
 
     const chatId = normalizeChatId(body.chatId);
     if (!chatId) return { ok: false, status: 400, error: "Chat ID 必须为数字" };
+    const topicId = normalizeTopicId(body.topicId);
+    if (topicId === false) {
+      return { ok: false, status: 400, error: "Topic ID 必须为正整数" };
+    }
 
-    await updateAccount(env.DB, account.id, chatId);
-    const updated = { ...account, chat_id: chatId };
+    await updateAccount(env.DB, account.id, chatId, undefined, topicId);
+    const updated = {
+      ...account,
+      chat_id: chatId,
+      ...(topicId !== undefined ? { topic_id: topicId } : {}),
+    };
     return {
       ok: true,
       data: { account: await toAccountResponse(env, updated) },

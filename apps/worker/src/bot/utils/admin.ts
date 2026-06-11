@@ -1,10 +1,9 @@
 import { ROUTE_MINI_APP_USERS } from "@page/paths";
 import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
-import type { Env, TelegramUser } from "@worker/types";
+import type { Env } from "@worker/types";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
 import { getWorkerBaseUrl } from "@worker/utils/url";
-import { formatUserName } from "@worker/utils/user-format";
 import { InlineKeyboard } from "grammy";
 
 export const SECRETS_AUTO_DELETE_SECONDS = 60;
@@ -59,42 +58,6 @@ export const buildSecretsText = (env: Env): string => {
     }),
   );
   return lines.join("\n");
-};
-
-export const userListText = (users: TelegramUser[]): string => {
-  if (users.length === 0) return t("admin:users.noUsers");
-
-  let text = `${t("admin:users.title", { count: users.length })}\n\n`;
-  for (const u of users) {
-    const status = u.approved === 1 ? "✅" : "⏳";
-    const name = formatUserName(u);
-    const username = u.username ? ` @${u.username}` : "";
-    text += `${status} ${name}${username}\n   ID: ${u.telegram_id}\n`;
-  }
-  return text;
-};
-
-export const userListKeyboard = (
-  users: TelegramUser[],
-  opts?: { backTarget?: "admin" | "menu"; showBack?: boolean },
-): InlineKeyboard => {
-  const kb = new InlineKeyboard();
-  for (const u of users) {
-    const name = formatUserName(u);
-    if (u.approved === 1) {
-      kb.text(`✅ ${name}`, `u:${u.telegram_id}:info`)
-        .text(t("admin:users.revoke"), `u:${u.telegram_id}:r`)
-        .text("🗑", `u:${u.telegram_id}:del`);
-    } else {
-      kb.text(`⏳ ${name}`, `u:${u.telegram_id}:info`)
-        .text(t("admin:users.approve"), `u:${u.telegram_id}:a`)
-        .text("🗑", `u:${u.telegram_id}:del`);
-    }
-    kb.row();
-  }
-  if (opts?.showBack)
-    kb.text(t("common:button.back"), opts.backTarget ?? "menu");
-  return kb;
 };
 
 export const failedEmailListMessage = (

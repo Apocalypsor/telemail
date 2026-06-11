@@ -163,6 +163,8 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 - `callback_query`：星标按钮点击
 - `message_reaction` / `message_reaction_count`：emoji reaction（群组/频道）
 
+Forum supergroup 可用作“General 操作区 + Inbox 邮件区”：把 bot 设为管理员并授予“管理话题”权限后，在 General topic 里发送 `/start`，bot 会创建 `Inbox` topic，并返回 Chat ID / Inbox Topic ID。群聊里打开 Mini App 菜单需要配置 `TG_MINI_APP_SHORT_NAME`。
+
 > **注意**：邮件转发到**频道**时，Bot 需被设为频道管理员才能接收 reaction 事件。
 
 ## 6. Pages 部署（Mini App 前端 + web 工具页）

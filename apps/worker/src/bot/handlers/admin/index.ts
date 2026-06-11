@@ -4,14 +4,12 @@ import {
   SECRETS_AUTO_DELETE_SECONDS,
 } from "@worker/bot/utils/admin";
 import { isAdmin } from "@worker/bot/utils/auth";
-import { clearBotState } from "@worker/bot/utils/input-state";
 import { t } from "@worker/i18n";
 import { renewAllPush } from "@worker/providers";
 import { type Env, QueueMessageType } from "@worker/types";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { Bot } from "grammy";
 import { registerFailedEmailCallbacks } from "./failed";
-import { registerUserCallbacks } from "./users";
 
 export const registerAdminHandlers = (bot: Bot, env: Env) => {
   // Secrets panel (admin only, hidden behind /start -> global management)
@@ -43,7 +41,6 @@ export const registerAdminHandlers = (bot: Bot, env: Env) => {
     if (!isAdmin(userId, env)) {
       return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
     }
-    await clearBotState(env, userId);
     await ctx.editMessageText(t("admin:menu.title"), {
       reply_markup: await adminMenuKeyboard(env),
     });
@@ -71,6 +68,5 @@ export const registerAdminHandlers = (bot: Bot, env: Env) => {
     }
   });
 
-  registerUserCallbacks(bot, env);
   registerFailedEmailCallbacks(bot, env);
 };

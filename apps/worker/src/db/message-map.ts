@@ -9,7 +9,8 @@ export const putMessageMapping = async (
   mapping: Pick<
     MessageMapping,
     "tg_message_id" | "tg_chat_id" | "email_message_id" | "account_id"
-  >,
+  > &
+    Partial<Pick<MessageMapping, "tg_thread_id">>,
 ): Promise<boolean> => {
   const db = getDb(d1);
   const result = await db
@@ -17,6 +18,7 @@ export const putMessageMapping = async (
     .values({
       tg_message_id: mapping.tg_message_id,
       tg_chat_id: mapping.tg_chat_id,
+      tg_thread_id: mapping.tg_thread_id ?? null,
       email_message_id: mapping.email_message_id,
       account_id: mapping.account_id,
     })

@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
  * 唯一会落到这里。读 `start_param` 前缀决定跳哪去：
  *   r_<chatId>_<tgMsgId>  → /telegram-app/reminders?accountId=&emailMessageId=&token=
  *   m_<chatId>_<tgMsgId>  → /telegram-app/mail/$id?accountId=&t=
+ *   p_<page>              → 群聊菜单入口，如 p_accounts / p_list_unread
  *   <chatId>_<tgMsgId>    → /telegram-app/reminders（兼容旧按钮，无前缀 = reminder）
  *   无 start_param         → /telegram-app/reminders（列表模式，主菜单"我的提醒"）
  */
@@ -36,6 +37,8 @@ const RouterPage = () => {
         navigate({ to: "/telegram-app/reminders", search: {}, replace: true });
         return;
       }
+
+      if (navigateMenuStartParam(startParam, navigate)) return;
 
       const m = startParam.match(/^(?:([a-z])_)?(-?\d+)_(\d+)$/);
       if (!m) {
@@ -92,6 +95,54 @@ const RouterPage = () => {
   }
   return <AppPendingSkeleton surface="miniapp" />;
 };
+
+const navigateMenuStartParam = (
+  startParam: string,
+  navigate: ReturnType<typeof useNavigate>,
+): boolean => {
+  switch (startParam) {
+    case "p_accounts":
+      navigate({ to: "/telegram-app/accounts", replace: true });
+      return true;
+    case "p_reminders":
+      navigate({ to: "/telegram-app/reminders", search: {}, replace: true });
+      return true;
+    case "p_search":
+      navigate({ to: "/telegram-app/search", search: {}, replace: true });
+      return true;
+    case "p_list_unread":
+      navigate({
+        to: "/telegram-app/list/$type",
+        params: { type: "unread" },
+        replace: true,
+      });
+      return true;
+    case "p_list_starred":
+      navigate({
+        to: "/telegram-app/list/$type",
+        params: { type: "starred" },
+        replace: true,
+      });
+      return true;
+    case "p_list_junk":
+      navigate({
+        to: "/telegram-app/list/$type",
+        params: { type: "junk" },
+        replace: true,
+      });
+      return true;
+    case "p_list_archived":
+      navigate({
+        to: "/telegram-app/list/$type",
+        params: { type: "archived" },
+        replace: true,
+      });
+      return true;
+    default:
+      return false;
+  }
+};
+
 export const Route = createFileRoute("/telegram-app/")({
   component: RouterPage,
 });

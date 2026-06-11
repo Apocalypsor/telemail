@@ -34,6 +34,14 @@ export const normalizeChatId = (chatId: string): string | null => {
   return isValidChatId(trimmed) ? trimmed : null;
 };
 
+export const normalizeTopicId = (
+  topicId: number | null | undefined,
+): number | null | undefined | false => {
+  if (topicId == null) return topicId;
+  if (!Number.isInteger(topicId) || topicId <= 0) return false;
+  return topicId;
+};
+
 export const oauthCallbackUrl = (env: Env, type: AccountType): string => {
   const origin = getWorkerBaseUrl(env);
   return `${origin}/oauth/${type}/callback`;
@@ -78,6 +86,7 @@ export const toAccountResponse = async (
     typeName: klass.displayName,
     email: account.email,
     chatId: account.chat_id,
+    topicId: account.topic_id,
     disabled: !!account.disabled,
     authorized: oauth ? !!account.refresh_token : true,
     oauth: !!oauth,

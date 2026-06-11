@@ -1,6 +1,5 @@
 import { failedEmailListMessage } from "@worker/bot/utils/admin";
 import { isAdmin } from "@worker/bot/utils/auth";
-import { clearBotState } from "@worker/bot/utils/input-state";
 import {
   deleteAllFailedEmails,
   deleteFailedEmail,
@@ -25,7 +24,6 @@ export const registerFailedEmailCallbacks = (bot: Bot, env: Env) => {
     if (!isAdmin(userId, env)) {
       return ctx.answerCallbackQuery({ text: t("common:error.unauthorized") });
     }
-    await clearBotState(env, userId);
     const items = await getAllFailedEmails(env.DB);
     const { text, keyboard } = failedEmailListMessage(items);
     await ctx.editMessageText(text, { reply_markup: keyboard });
@@ -109,7 +107,7 @@ export const registerFailedEmailCallbacks = (bot: Bot, env: Env) => {
 
     const id = parseInt(ctx.match?.[1], 10);
     await deleteFailedEmail(env.DB, id);
-    await ctx.answerCallbackQuery({ text: t("admin:users.deleted") });
+    await ctx.answerCallbackQuery({ text: t("common:deleted") });
 
     // Refresh list
     const items = await getAllFailedEmails(env.DB);

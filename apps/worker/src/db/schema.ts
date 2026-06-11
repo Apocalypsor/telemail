@@ -26,6 +26,8 @@ export const accounts = sqliteTable("accounts", {
     .default("gmail"),
   email: text("email"),
   chat_id: text("chat_id").notNull(),
+  /** Telegram forum topic id for mail delivery. NULL = send to the chat's default destination. */
+  topic_id: integer("topic_id"),
   refresh_token: text("refresh_token"),
   telegram_user_id: text("telegram_user_id"),
   /** IMAP only */
@@ -71,6 +73,8 @@ export const messageMap = sqliteTable(
   {
     tg_message_id: integer("tg_message_id").notNull(),
     tg_chat_id: text("tg_chat_id").notNull(),
+    /** Telegram forum topic id where this message was posted. NULL for non-topic chats. */
+    tg_thread_id: integer("tg_thread_id"),
     email_message_id: text("email_message_id").notNull(),
     account_id: integer("account_id").notNull(),
     created_at: tsMs("created_at").notNull().default(nowDefault),

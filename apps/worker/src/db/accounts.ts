@@ -72,6 +72,7 @@ export const createAccount = async (
   chatId: string,
   telegramUserId: string | undefined,
   type: AccountType,
+  topicId?: number | null,
 ): Promise<Account> => {
   const db = getDb(d1);
   const [row] = await db
@@ -79,6 +80,7 @@ export const createAccount = async (
     .values({
       type,
       chat_id: chatId,
+      topic_id: topicId ?? null,
       telegram_user_id: telegramUserId ?? null,
     })
     .returning();
@@ -123,16 +125,21 @@ export const updateAccount = async (
   id: number,
   chatId: string,
   telegramUserId?: string | null,
+  topicId?: number | null,
 ): Promise<void> => {
   const db = getDb(d1);
-  const patch =
-    telegramUserId !== undefined
-      ? {
-          chat_id: chatId,
-          telegram_user_id: telegramUserId,
-          updated_at: new Date(),
-        }
-      : { chat_id: chatId, updated_at: new Date() };
+  const patch: {
+    chat_id: string;
+    telegram_user_id?: string | null;
+    topic_id?: number | null;
+    updated_at: Date;
+  } = { chat_id: chatId, updated_at: new Date() };
+  if (telegramUserId !== undefined) {
+    patch.telegram_user_id = telegramUserId;
+  }
+  if (topicId !== undefined) {
+    patch.topic_id = topicId;
+  }
   await db.update(accounts).set(patch).where(eq(accounts.id, id));
 };
 
@@ -209,6 +216,7 @@ export const createImapAccount = async (
   d1: D1Database,
   params: {
     chatId: string;
+    topicId?: number | null;
     telegramUserId?: string;
     email: string;
     imapHost: string;
@@ -224,6 +232,7 @@ export const createImapAccount = async (
     .values({
       type: "imap",
       chat_id: params.chatId,
+      topic_id: params.topicId ?? null,
       telegram_user_id: params.telegramUserId ?? null,
       email: params.email,
       imap_host: params.imapHost,
