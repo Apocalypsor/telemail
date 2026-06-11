@@ -1,6 +1,5 @@
 import { api } from "@page/api/client";
 import { extractErrorMessage } from "@page/api/utils";
-import { AppPendingSkeleton } from "@page/components/app-pending-skeleton";
 import { useBackButton } from "@page/hooks/use-back-button";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
@@ -93,7 +92,7 @@ const RouterPage = () => {
       </div>
     );
   }
-  return <AppPendingSkeleton surface="miniapp" />;
+  return <div className="min-h-screen bg-black" aria-hidden="true" />;
 };
 
 const navigateMenuStartParam = (
