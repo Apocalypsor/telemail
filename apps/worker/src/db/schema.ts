@@ -52,21 +52,29 @@ export const accounts = sqliteTable("accounts", {
 });
 
 /** D1 users 表（登录过的 Telegram 用户） */
-export const users = sqliteTable("users", {
-  telegram_id: text("telegram_id").primaryKey(),
-  first_name: text("first_name").notNull(),
-  last_name: text("last_name"),
-  username: text("username"),
-  photo_url: text("photo_url"),
-  last_login_at: tsMs("last_login_at").notNull().default(nowDefault),
-  created_at: tsMs("created_at").notNull().default(nowDefault),
-  approved: integer("approved").notNull().default(0),
-  /** Things Cloud per-user settings. Password is never returned by public APIs. */
-  things_cloud_email: text("things_cloud_email"),
-  things_cloud_password: text("things_cloud_password"),
-  /** Last IANA time zone reported by the user's Mini App device. */
-  user_timezone: text("user_timezone"),
-});
+export const users = sqliteTable(
+  "users",
+  {
+    telegram_id: text("telegram_id").primaryKey(),
+    first_name: text("first_name").notNull(),
+    last_name: text("last_name"),
+    username: text("username"),
+    photo_url: text("photo_url"),
+    last_login_at: tsMs("last_login_at").notNull().default(nowDefault),
+    created_at: tsMs("created_at").notNull().default(nowDefault),
+    approved: integer("approved").notNull().default(0),
+    /** Things Cloud per-user settings. Password is never returned by public APIs. */
+    things_cloud_email: text("things_cloud_email"),
+    things_cloud_password: text("things_cloud_password"),
+    /** Last IANA time zone reported by the user's Mini App device. */
+    user_timezone: text("user_timezone"),
+    /** HMAC hash of the user's current MCP API key. Plain key is shown once by bot. */
+    mcp_api_key_hash: text("mcp_api_key_hash"),
+    /** Last MCP API key generation time. */
+    mcp_api_key_created_at: tsMs("mcp_api_key_created_at"),
+  },
+  (t) => [uniqueIndex("idx_users_mcp_api_key_hash").on(t.mcp_api_key_hash)],
+);
 
 export const messageMap = sqliteTable(
   "message_map",

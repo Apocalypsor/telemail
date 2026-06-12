@@ -5,6 +5,7 @@
 - **Gmail**：Google Cloud Pub/Sub 推送通知实时接收
 - **Outlook**：Microsoft Graph webhook 订阅实时接收
 - **IMAP**（可选）：独立 IMAP Bridge Docker 服务，通过 IMAP IDLE 实时推送
+- **MCP**：用户可在 bot 里生成 API key，让 agent 通过 `/api/mcp` 搜索和读取自己的邮件
 
 ## 技术栈
 

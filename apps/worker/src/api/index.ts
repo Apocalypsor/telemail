@@ -1,6 +1,7 @@
 import { accountsController } from "@worker/api/modules/accounts";
 import { authController } from "@worker/api/modules/auth";
 import { mailController } from "@worker/api/modules/mail";
+import { mcpController } from "@worker/api/modules/mcp";
 import { miniAppController } from "@worker/api/modules/miniapp";
 import { oauthController } from "@worker/api/modules/oauth";
 import { previewController } from "@worker/api/modules/preview";
@@ -28,6 +29,7 @@ import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
  *  - `/api/mini-app/*`                 mini app generic API
  *  - `/api/reminders/*`                reminders CRUD
  *  - `/api/users/*`                    mini app admin user management
+ *  - `/api/mcp`                        user API-key authenticated MCP server
  *
  * 通过 `apps/worker/src/index.ts` 的 fetch wrapper 把 (env, executionCtx) 注入。
  */
@@ -72,6 +74,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter, name: "telemail" })
   .use(oauthController)
   .use(previewController)
   .use(mailController)
+  .use(mcpController)
   .use(accountsController)
   .use(miniAppController)
   .use(remindersController)

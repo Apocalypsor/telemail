@@ -1,6 +1,7 @@
 import { registerAdminHandlers } from "@worker/bot/handlers/admin";
 import { registerArchiveHandler } from "@worker/bot/handlers/archive";
 import { registerJunkHandler } from "@worker/bot/handlers/junk";
+import { registerMcpApiKeyHandler } from "@worker/bot/handlers/mcp-api-key";
 import { registerPinCleanupHandler } from "@worker/bot/handlers/pin-cleanup";
 import { registerReactionHandler } from "@worker/bot/handlers/reaction";
 import { registerRefreshHandler } from "@worker/bot/handlers/refresh";
@@ -47,6 +48,7 @@ export const createBot = (env: Env, botInfo: UserFromGetMe) => {
   registerArchiveHandler(bot, env);
   registerRefreshHandler(bot, env);
   registerSyncHandler(bot, env);
+  registerMcpApiKeyHandler(bot, env);
   registerPinCleanupHandler(bot, env);
 
   return bot;

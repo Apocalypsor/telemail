@@ -6,6 +6,7 @@ import common from "./common";
 import dailySummary from "./dailySummary";
 import junk from "./junk";
 import keyboards from "./keyboards";
+import mcp from "./mcp";
 import reminders from "./reminders";
 import star from "./star";
 import start from "./start";
@@ -21,6 +22,7 @@ export default {
   dailySummary,
   junk,
   keyboards,
+  mcp,
   reminders,
   star,
   start,

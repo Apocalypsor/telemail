@@ -10,7 +10,7 @@
 | ------------------------- | ------------------------------------------------------ |
 | `TELEGRAM_BOT_TOKEN`      | Telegram Bot Token                                     |
 | `ADMIN_TELEGRAM_ID`       | 管理员 Telegram user ID，用于鉴权                      |
-| `ADMIN_SECRET`            | 自定义密钥，HMAC 签名用（session cookie、邮件链接 token） |
+| `ADMIN_SECRET`            | 自定义密钥，HMAC 签名用（session cookie、邮件链接 token、MCP API key hash） |
 | `TELEGRAM_WEBHOOK_SECRET` | 自定义密钥，验证 Telegram webhook                      |
 | `WORKER_URL`              | Worker + Pages 对外 URL，例如 `https://telemail.dov.moe`；OAuth callback、Outlook webhook、邮件查看 / 提醒按钮都会用 |
 
@@ -106,5 +106,5 @@ middleware `apps/middleware/.env`：
 - `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、可选 `topic_id`、`refresh_token` 加密等）
 - `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id, tg_thread_id)`，幂等去重用
 - `reminders` —— Mini App 设的提醒，可选记录推送到 Things Cloud 的 task UUID
-- `users` —— Telegram 用户记录（`approved` 状态控制访问 Mini App 与 web 工具页 `/preview` / `/junk-check`），以及可选的 per-user Things Cloud 设置
+- `users` —— Telegram 用户记录（`approved` 状态控制访问 Mini App、web 工具页 `/preview` / `/junk-check` 与 `/api/mcp`），以及可选的 per-user Things Cloud 设置和 MCP API key hash
 - `failed_emails` —— LLM / queue 处理失败的邮件，cron 批量重试

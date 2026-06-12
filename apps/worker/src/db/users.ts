@@ -58,6 +58,19 @@ export const getUserByTelegramId = async (
   return row ?? null;
 };
 
+/** 根据 MCP API key hash 查询用户。 */
+export const getUserByMcpApiKeyHash = async (
+  d1: D1Database,
+  apiKeyHash: string,
+): Promise<TelegramUser | null> => {
+  const db = getDb(d1);
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(eq(users.mcp_api_key_hash, apiKeyHash));
+  return row ?? null;
+};
+
 /** 获取所有已登录过的用户 */
 export const getAllUsers = async (d1: D1Database): Promise<TelegramUser[]> => {
   const db = getDb(d1);
@@ -139,6 +152,22 @@ export const updateUserTimezone = async (
   await db
     .update(users)
     .set({ user_timezone: userTimezone })
+    .where(eq(users.telegram_id, telegramId));
+};
+
+/** 生成 / 轮换单个用户的 MCP API key hash。 */
+export const updateUserMcpApiKeyHash = async (
+  d1: D1Database,
+  telegramId: string,
+  apiKeyHash: string,
+): Promise<void> => {
+  const db = getDb(d1);
+  await db
+    .update(users)
+    .set({
+      mcp_api_key_hash: apiKeyHash,
+      mcp_api_key_created_at: new Date(),
+    })
     .where(eq(users.telegram_id, telegramId));
 };
 

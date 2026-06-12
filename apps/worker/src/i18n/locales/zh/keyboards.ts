@@ -17,6 +17,7 @@ export default {
     archived: "📥 归档邮件",
     reminders: "⏰ 我的提醒",
     search: "🔍 搜索邮件",
+    apiKey: "🔑 API Key",
     userManagement: "👥 用户管理",
     globalOps: "⚙️ 全局管理",
   },

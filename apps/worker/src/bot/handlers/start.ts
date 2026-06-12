@@ -5,6 +5,7 @@ import {
   ROUTE_MINI_APP_SEARCH,
 } from "@page/paths";
 import { helpText } from "@worker/bot/commands";
+import { MCP_API_KEY_CALLBACK } from "@worker/bot/handlers/mcp-api-key";
 import { isAdmin } from "@worker/bot/utils/auth";
 import {
   onboardForumGroupIfNeeded,
@@ -186,9 +187,15 @@ const mainMenuKeyboard = (
     `${base}${ROUTE_MINI_APP_ACCOUNTS}`,
     "p_accounts",
   );
-  kb.text(t("keyboards:menu.sync"), "sync").row();
+  kb.text(t("keyboards:menu.sync"), "sync");
+  kb.row();
+  if (chatType === "private") {
+    kb.text(t("keyboards:menu.apiKey"), MCP_API_KEY_CALLBACK);
+  }
   if (admin) {
     kb.text(t("keyboards:menu.globalOps"), "admin").row();
+  } else if (chatType === "private") {
+    kb.row();
   }
   return kb;
 };
