@@ -25,7 +25,7 @@ import {
   MailToggleStarBody,
 } from "./model";
 import { MailService } from "./service";
-import { contentDisposition } from "./utils";
+import { contentDisposition, schedulePreviewTelegramCleanup } from "./utils";
 
 /**
  * Mail preview API + 6 mutations:
@@ -58,7 +58,17 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
       emailMessageId,
       query.folder,
     );
-    if (!result.ok) return status(result.status, { error: result.reason });
+    if (!result.ok) {
+      if (result.location && result.location !== "inbox") {
+        schedulePreviewTelegramCleanup(
+          executionCtx,
+          env,
+          account.id,
+          emailMessageId,
+        );
+      }
+      return status(result.status, { error: result.reason });
+    }
 
     executionCtx.waitUntil(
       markEmailAsRead(env, account, emailMessageId, result.fetchFolder),
@@ -75,13 +85,22 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
       emailMessageId,
     ]);
     const mapping = mailMappings[0];
-    const tgMessageLink = mapping
-      ? buildTgMessageLink(
-          mapping.tg_chat_id,
-          mapping.tg_message_id,
-          mapping.tg_thread_id,
-        )
-      : null;
+    if (result.location !== "inbox") {
+      schedulePreviewTelegramCleanup(
+        executionCtx,
+        env,
+        account.id,
+        emailMessageId,
+      );
+    }
+    const tgMessageLink =
+      mapping && result.location === "inbox"
+        ? buildTgMessageLink(
+            mapping.tg_chat_id,
+            mapping.tg_message_id,
+            mapping.tg_thread_id,
+          )
+        : null;
 
     return {
       meta: result.meta,
@@ -91,7 +110,7 @@ const mailGet = new Elysia({ name: "controller.mail.get" }).use(cf).get(
       attachments: result.attachments,
       folder: result.fetchFolder,
       inJunk: result.inJunk,
-      inArchive: result.fetchFolder === "archive",
+      inArchive: result.location === "archive",
       starred: result.starred,
       canArchive: accountCanArchive(account),
       webMailUrl,

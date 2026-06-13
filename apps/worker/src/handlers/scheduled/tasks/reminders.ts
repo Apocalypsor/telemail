@@ -21,7 +21,10 @@ import {
 } from "@worker/utils/mail/token";
 import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
-import { refreshEmailKeyboardAfterReminderChange } from "@worker/utils/message-actions";
+import {
+  cleanupTgForEmail,
+  refreshEmailKeyboardAfterReminderChange,
+} from "@worker/utils/message-actions";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { sleep } from "@worker/utils/sleep";
 import { getWorkerBaseUrl } from "@worker/utils/url";
@@ -205,8 +208,9 @@ export class DueRemindersTask extends ScheduledTask {
     }
     if (location !== "inbox") {
       console.log(
-        `Reminder ${r.id}: email is in ${location}, skipping star/pin/redeliver`,
+        `Reminder ${r.id}: email is in ${location}, cleaning Telegram message`,
       );
+      await cleanupTgForEmail(env, accountId, emailMessageId);
       return;
     }
 

@@ -4,7 +4,7 @@ import type { MessageMapping } from "@worker/db/message-map";
 import type { EmailProvider } from "@worker/providers/base";
 import type { EmailListItem } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
-import { deleteJunkMappings } from "@worker/utils/message-actions";
+import { deleteOutOfInboxMappings } from "@worker/utils/message-actions";
 import type { MailListType } from "./model";
 
 interface ListDef {
@@ -17,7 +17,7 @@ interface ListDef {
   errorEvent: string;
   /** junk/archive 列表：TG 消息可能已被删除，不返回 tgLink */
   hideTgLinks?: boolean;
-  /** 列出后的副作用 —— starred: 同步键盘；junk: 清 mapping；其余无 */
+  /** 列出后的副作用 —— junk/archive: 清 TG 残留；其余无 */
   afterMappings?: (
     env: Env,
     mappings: MessageMapping[],
@@ -82,7 +82,7 @@ export const LIST_DEFS: Record<MailListType, ListDef> = {
     pageFetcher: (p, maxResults, cursor) => p.listJunkPage(maxResults, cursor),
     errorEvent: "bot.junk_query_failed",
     hideTgLinks: true,
-    afterMappings: (env, mappings) => deleteJunkMappings(env, mappings),
+    afterMappings: (env, mappings) => deleteOutOfInboxMappings(env, mappings),
   },
   archived: {
     fetcher: (p, maxResults) => p.listArchived(maxResults),
@@ -90,5 +90,6 @@ export const LIST_DEFS: Record<MailListType, ListDef> = {
       p.listArchivedPage(maxResults, cursor),
     errorEvent: "bot.archived_query_failed",
     hideTgLinks: true,
+    afterMappings: (env, mappings) => deleteOutOfInboxMappings(env, mappings),
   },
 };

@@ -1,6 +1,8 @@
 import { buildEmailKeyboard } from "@worker/bot/keyboards";
 import {
-  deleteMessage,
+  deleteMessageIfPresent,
+  editMessageCaption,
+  editTextMessage,
   pinChatMessage,
   setReplyMarkup,
   unpinChatMessage,
@@ -34,16 +36,40 @@ export const removeFromTelegram = async (
   env: Env,
   mapping: MessageMapping,
 ): Promise<void> => {
-  await deleteMessage(
-    env.TELEGRAM_BOT_TOKEN,
-    mapping.tg_chat_id,
-    mapping.tg_message_id,
-  ).catch(() => {});
+  let removed = false;
+  try {
+    const result = await deleteMessageIfPresent(
+      env.TELEGRAM_BOT_TOKEN,
+      mapping.tg_chat_id,
+      mapping.tg_message_id,
+    );
+    removed = result === "deleted" || result === "not_found";
+    if (result === "unavailable") {
+      removed = await markTelegramMessageAsRemoved(env, mapping);
+    }
+  } catch (err) {
+    await reportErrorToObservability(env, "tg.delete_failed", err, {
+      accountId: mapping.account_id,
+      emailMessageId: mapping.email_message_id,
+      chatId: mapping.tg_chat_id,
+      tgMessageId: mapping.tg_message_id,
+    });
+  }
+
+  if (!removed) return;
+
   await deleteMappingByEmailId(
     env.DB,
     mapping.email_message_id,
     mapping.account_id,
-  ).catch(() => {});
+  ).catch((err) =>
+    reportErrorToObservability(env, "tg.delete_mapping_failed", err, {
+      accountId: mapping.account_id,
+      emailMessageId: mapping.email_message_id,
+      chatId: mapping.tg_chat_id,
+      tgMessageId: mapping.tg_message_id,
+    }),
+  );
 };
 
 /** 邮件被 markAsJunk / archive / trash 之后清理 TG 侧的残留：
@@ -60,22 +86,13 @@ export const cleanupTgForEmail = async (
   await removeFromTelegram(env, mappings[0]);
 };
 
-/** 删除垃圾邮件对应的 Telegram 消息和映射（junk 列表刷新时调用） */
-export const deleteJunkMappings = async (
+/** 删除非 INBOX 邮件对应的 Telegram 消息和映射（junk/archive 列表刷新时调用） */
+export const deleteOutOfInboxMappings = async (
   env: Env,
   mappings: MessageMapping[],
 ): Promise<void> => {
   for (const m of mappings) {
-    await deleteMessage(
-      env.TELEGRAM_BOT_TOKEN,
-      m.tg_chat_id,
-      m.tg_message_id,
-    ).catch(() => {});
-    await deleteMappingByEmailId(
-      env.DB,
-      m.email_message_id,
-      m.account_id,
-    ).catch(() => {});
+    await removeFromTelegram(env, m);
   }
 };
 
@@ -200,7 +217,25 @@ export const refreshEmailKeyboardAfterReminderChange = async (
   if (!m) return;
 
   const provider = getEmailProvider(account, env);
-  const starred = await provider.isStarred(emailMessageId).catch(() => false);
+  const state = await provider
+    .resolveMessageState(emailMessageId)
+    .catch(async (err) => {
+      await reportErrorToObservability(
+        env,
+        "reminder.resolve_state_failed",
+        err,
+        { accountId: account.id, emailMessageId },
+      );
+      return null;
+    });
+  if (state && state.location !== "inbox") {
+    await removeFromTelegram(env, m);
+    return;
+  }
+  const starred =
+    state?.location === "inbox"
+      ? state.starred
+      : await provider.isStarred(emailMessageId).catch(() => false);
   const keyboard = await buildEmailKeyboard(
     env,
     emailMessageId,
@@ -413,4 +448,68 @@ const scheduleOrAwait = async (
     return;
   }
   await promise;
+};
+
+const REMOVED_FROM_INBOX_TEXT = "邮件已移出收件箱，Telegram 消息已失效。";
+const EMPTY_INLINE_KEYBOARD = { inline_keyboard: [] };
+
+const markTelegramMessageAsRemoved = async (
+  env: Env,
+  mapping: MessageMapping,
+): Promise<boolean> => {
+  try {
+    await editTextMessage(
+      env.TELEGRAM_BOT_TOKEN,
+      mapping.tg_chat_id,
+      mapping.tg_message_id,
+      REMOVED_FROM_INBOX_TEXT,
+      EMPTY_INLINE_KEYBOARD,
+    );
+    return true;
+  } catch (textErr) {
+    if (isMessageNotModified(textErr)) return true;
+    if (!shouldTryCaptionRemoval(textErr)) {
+      await reportRemovedFallbackFailure(env, mapping, textErr);
+      return false;
+    }
+  }
+
+  try {
+    await editMessageCaption(
+      env.TELEGRAM_BOT_TOKEN,
+      mapping.tg_chat_id,
+      mapping.tg_message_id,
+      REMOVED_FROM_INBOX_TEXT,
+      EMPTY_INLINE_KEYBOARD,
+    );
+    return true;
+  } catch (captionErr) {
+    if (isMessageNotModified(captionErr)) return true;
+    await reportRemovedFallbackFailure(env, mapping, captionErr);
+    return false;
+  }
+};
+
+const shouldTryCaptionRemoval = (err: unknown): boolean => {
+  if (!(err instanceof Error)) return false;
+  return /message is not a text|there is no text|no text in the message/i.test(
+    err.message,
+  );
+};
+
+const isMessageNotModified = (err: unknown): boolean => {
+  return err instanceof Error && /message is not modified/i.test(err.message);
+};
+
+const reportRemovedFallbackFailure = async (
+  env: Env,
+  mapping: MessageMapping,
+  err: unknown,
+): Promise<void> => {
+  await reportErrorToObservability(env, "tg.mark_removed_failed", err, {
+    accountId: mapping.account_id,
+    emailMessageId: mapping.email_message_id,
+    chatId: mapping.tg_chat_id,
+    tgMessageId: mapping.tg_message_id,
+  });
 };

@@ -72,23 +72,43 @@ export abstract class MailService {
     folderHint?: string,
   ): Promise<LoadForRenderingResult> {
     const provider = getEmailProvider(account, env);
-    // hint 给定就直接信，省一次 isJunk —— hint 没传才回退用 isJunk 自动判断
-    const inJunk =
-      folderHint === "junk"
-        ? true
-        : folderHint === "archive" || folderHint === "inbox"
-          ? false
-          : await provider.isJunk(emailMessageId).catch(() => false);
-    const fetchFolder: Folder =
-      folderHint === "archive" ? "archive" : inJunk ? "junk" : "inbox";
-    // isStarred 需要 fetchFolder（IMAP 各 folder UID 不通用），所以排在 fetchFolder
-    // 算出之后；OAuth provider 忽略 folder 参数
-    const starred = await provider
-      .isStarred(emailMessageId, fetchFolder)
-      .catch(() => false);
-
     if (PROVIDERS[account.type].oauth && !account.refresh_token)
       return { ok: false, status: 403, reason: "Account not authorized" };
+
+    const state = await provider
+      .resolveMessageState(emailMessageId)
+      .catch(() => null);
+    if (state?.location === "deleted") {
+      return {
+        ok: false,
+        status: 404,
+        reason: "Email no longer exists",
+        location: "deleted",
+      };
+    }
+
+    const location =
+      state?.location ??
+      (folderHint === "junk"
+        ? "junk"
+        : folderHint === "archive"
+          ? "archive"
+          : "inbox");
+    const fetchFolder: Folder =
+      folderHint === "archive" || location === "archive"
+        ? "archive"
+        : folderHint === "junk" || location === "junk"
+          ? "junk"
+          : "inbox";
+    const inJunk = fetchFolder === "junk";
+    // isStarred 需要 fetchFolder（IMAP 各 folder UID 不通用），所以排在 fetchFolder
+    // 算出之后；OAuth provider 忽略 folder 参数
+    const starred =
+      state?.location === "inbox"
+        ? state.starred
+        : await provider
+            .isStarred(emailMessageId, fetchFolder)
+            .catch(() => false);
 
     const result = await provider.fetchForPreview(emailMessageId, fetchFolder);
     if (!result)
@@ -103,6 +123,7 @@ export abstract class MailService {
       attachments: result.attachments,
       fetchFolder,
       inJunk,
+      location,
       starred,
     };
   }

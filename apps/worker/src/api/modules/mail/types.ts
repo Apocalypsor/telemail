@@ -1,5 +1,6 @@
 /** Mail module 内部 TS 类型声明 —— 装不进 TypeBox model 的 discriminated union /
  *  helper alias 都集中在这里。route schema / wire 形态请看 model.ts。 */
+import type { MessageLocation } from "@worker/providers/types";
 import type { Account, MailAttachmentMeta, MailMeta } from "@worker/types";
 
 /** mail preview 拉取时的 folder 来源 —— IMAP UID per-folder 不通用，所以
@@ -30,9 +31,15 @@ export type LoadForRenderingResult =
       attachments: MailAttachmentMeta[];
       fetchFolder: Folder;
       inJunk: boolean;
+      location: MessageLocation;
       starred: boolean;
     }
-  | { ok: false; status: 403 | 404; reason: string };
+  | {
+      ok: false;
+      status: 403 | 404;
+      reason: string;
+      location?: MessageLocation;
+    };
 
 /** `MailService.lookupContext` 的返回 —— 一封邮件在 Telegram 里的位置 + 展示用 subject。 */
 export interface LookupContextResult {

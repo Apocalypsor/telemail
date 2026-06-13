@@ -3,6 +3,12 @@ import { TG_API_BASE, TG_MEDIA_GROUP_LIMIT } from "@worker/constants";
 import type { Attachment } from "@worker/types";
 import { HTTPError } from "ky";
 
+export type DeleteMessageResult =
+  | "deleted"
+  | "not_found"
+  | "rate_limited"
+  | "unavailable";
+
 const isEntityParseError = (description: string | undefined): boolean => {
   return !!description && /can't parse entities/i.test(description);
 };
@@ -310,7 +316,6 @@ export const setReplyMarkup = async (
   );
 };
 
-/** 删除消息（用于去重时撤回重复消息） */
 /** 生成指向 Telegram 群组消息的深链接 */
 export const buildTgMessageLink = (
   chatId: string,
@@ -335,6 +340,39 @@ export const deleteMessage = async (
     { chat_id: chatId, message_id: messageId },
     "deleteMessage",
   );
+};
+
+/** 删除消息并把可重试 / 幂等结果交给调用方判断是否可以清 mapping。 */
+export const deleteMessageIfPresent = async (
+  token: string,
+  chatId: string,
+  messageId: number,
+): Promise<DeleteMessageResult> => {
+  try {
+    await deleteMessage(token, chatId, messageId);
+    return "deleted";
+  } catch (err) {
+    if (err instanceof Error) {
+      if (
+        /message to delete not found|not found|MESSAGE_ID_INVALID/i.test(
+          err.message,
+        )
+      ) {
+        return "not_found";
+      }
+      if (/too many requests|429/i.test(err.message)) {
+        return "rate_limited";
+      }
+      if (
+        /can't be deleted|cannot be deleted|not enough rights/i.test(
+          err.message,
+        )
+      ) {
+        return "unavailable";
+      }
+    }
+    throw err;
+  }
 };
 
 const sendMediaGroupChunk = async (
