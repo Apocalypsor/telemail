@@ -50,7 +50,7 @@ export const authMiniApp = new Elysia({ name: "auth-miniapp" })
     }
 
     const dbUser = await getUserByTelegramId(env.DB, telegramId);
-    if (!dbUser || dbUser.approved !== 1) {
+    if (dbUser?.approved !== 1) {
       return status(401, { error: "Unauthorized" });
     }
     await updateUserTimezoneIfChanged(env, dbUser, userTimezone);

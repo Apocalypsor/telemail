@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
  *   r_<chatId>_<tgMsgId>  → /telegram-app/reminders?accountId=&emailMessageId=&token=
  *   m_<chatId>_<tgMsgId>  → /telegram-app/mail/$id?accountId=&t=
  *   p_<page>              → 群聊菜单入口，如 p_accounts / p_users / p_list_unread
- *   <chatId>_<tgMsgId>    → /telegram-app/reminders（兼容旧按钮，无前缀 = reminder）
  *   无 start_param         → /telegram-app/reminders（列表模式，主菜单"我的提醒"）
  */
 const RouterPage = () => {
@@ -39,12 +38,12 @@ const RouterPage = () => {
 
       if (navigateMenuStartParam(startParam, navigate)) return;
 
-      const m = startParam.match(/^(?:([a-z])_)?(-?\d+)_(\d+)$/);
+      const m = startParam.match(/^([rm])_(-?\d+)_(\d+)$/);
       if (!m) {
         setError("无效的入口参数");
         return;
       }
-      const feature = m[1] || "r";
+      const feature = m[1];
       const chatId = m[2];
       const tgMsgId = m[3];
 

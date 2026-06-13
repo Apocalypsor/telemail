@@ -105,7 +105,7 @@ export const useSecondaryButton = ({
 
 /** TG SettingsButton（右上角 ⋮ 里的 "Settings" 入口）。`onClick` 缺失 → 隐藏；
  *  Bot API < 7.0 / 浏览器 / @BotFather 未配 menu button = settings → SDK
- *  isAvailable 返回 false，全部 no-op，由 caller 自行 fallback。 */
+ *  isAvailable 返回 false，全部 no-op。 */
 export const useSettingsButton = (onClick: (() => void) | undefined): void => {
   useEffect(() => {
     if (!onClick) {

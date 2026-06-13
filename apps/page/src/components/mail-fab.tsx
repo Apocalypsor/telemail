@@ -15,7 +15,6 @@ import {
 import {
   type ShowPopupOptionsButton,
   showPopup,
-  showSettingsButton,
 } from "@telegram-apps/sdk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -35,11 +34,11 @@ export interface MailFabProps {
   webMailUrl?: string | null;
   /** 跳到 TG 原消息的 deep link。缺失 → 不显示跳转入口 */
   tgMessageLink?: string | null;
-  /** 当前 CORS 图片代理是否开启 —— 决定 SettingsButton/extras 里 toggle 文案 */
+  /** 当前 CORS 图片代理是否开启 —— 决定 SettingsButton 里的 toggle 文案 */
   useProxy: boolean;
-  /** 重新拉取当前邮件预览；点 TG SettingsButton（或老版本退化的 extras 项）调用 */
+  /** 重新拉取当前邮件预览；点 TG SettingsButton 调用 */
   onRefresh?: () => Promise<void>;
-  /** 切换 CORS 图片代理；点 TG SettingsButton（或老版本退化的 extras 项）调用 */
+  /** 切换 CORS 图片代理；点 TG SettingsButton 调用 */
   onToggleProxy: () => void;
   /** 跳到提醒页（带 back URL）；undefined → 隐藏 ⏰ 入口 */
   onSetReminder?: () => void;
@@ -59,7 +58,7 @@ interface ActionDef {
   doneLabel?: string;
 }
 
-type ExtraId = "reminder" | "share" | "tg-link" | "refresh" | "toggle-proxy";
+type ExtraId = "reminder" | "share" | "tg-link";
 
 interface ExtraDef {
   id: ExtraId;
@@ -85,8 +84,7 @@ const TERMINAL_STATUS_DURATION_MS = 3600;
  *     多项 → "🔗 更多" popup
  *     单项 → 按钮直接做
  *     无   → 隐藏
- *   SettingsButton (右上角 ⋮) → 刷新邮件 / 切 CORS 图片代理；老客户端无此
- *                              按钮 → 退化到 SecondaryButton extras 末位
+ *   SettingsButton (右上角 ⋮) → 刷新邮件 / 切 CORS 图片代理
  *
  * popup 有 3 按钮硬上限，所以邮件状态动作和工具操作拆到两个原生按钮里。
  *
@@ -124,10 +122,8 @@ export const MailFab = ({
     return () => window.clearTimeout(timeout);
   }, [status]);
 
-  // 设置菜单走 TG SettingsButton（右上角 ⋮）。Bot API 7.0+；不可用 → 回落到
-  // SecondaryButton extras 末位。注：还需 @BotFather 把 bot menu button 配为
-  // "settings" 才会显示 —— 部署时检查。
-  const hasSettingsButton = showSettingsButton.isAvailable();
+  // 设置菜单走 TG SettingsButton（右上角 ⋮）。需 @BotFather 把 bot menu button
+  // 配为 "settings" 才会显示。
   const refreshMail = useCallback(async () => {
     if (!onRefresh) return;
     try {
@@ -140,17 +136,9 @@ export const MailFab = ({
       );
     }
   }, [onRefresh]);
-  // 点 SettingsButton 弹设置 popup。popup 不可用 → 退化到刷新邮件（没有刷新
-  // 回调时再退回到图片代理 toggle）。
+  // 点 SettingsButton 弹设置 popup。
   const onSettingsClick = useCallback(async () => {
-    if (!showPopup.isAvailable()) {
-      if (onRefresh) {
-        await refreshMail();
-      } else {
-        onToggleProxy();
-      }
-      return;
-    }
+    if (!showPopup.isAvailable()) return;
     const id = await showPopup({
       title: "设置",
       message: useProxy
@@ -176,7 +164,7 @@ export const MailFab = ({
     if (id === "refresh") await refreshMail();
     if (id === "toggle-proxy") onToggleProxy();
   }, [useProxy, onRefresh, refreshMail, onToggleProxy]);
-  useSettingsButton(hasSettingsButton ? onSettingsClick : undefined);
+  useSettingsButton(onSettingsClick);
   const { starred, done, pending, run } = useMailActions({
     emailMessageId,
     accountId,
@@ -299,11 +287,7 @@ export const MailFab = ({
       runWithFeedback(actions[0].id);
       return;
     }
-    if (!showPopup.isAvailable()) {
-      // 兜底（极老的 TG 客户端没 showPopup）：直接跑第一个动作
-      runWithFeedback(actions[0].id);
-      return;
-    }
+    if (!showPopup.isAvailable()) return;
     // title + message 都不能为空：TG 客户端对 message 校验严格，
     // 空串会让 popup 静默不弹
     const id = await showPopup({
@@ -361,7 +345,7 @@ export const MailFab = ({
   const extras = useMemo<ExtraDef[]>(() => {
     const list: ExtraDef[] = [];
     // 提醒在最前 —— 用户最常用；刷新/图片代理走 SettingsButton（右上角 ⋮），
-    // 不挤 popup 三槽位。老 TG 客户端无 SettingsButton → 回落到 extras 末位。
+    // 不挤 popup 三槽位。
     // label 尽量短（≤ 6 字符）—— TG Desktop popup 按总文本宽度决定排列，
     // 长 label 会让 3 项强制换成竖排 + 右对齐，跟 Main 的横排不一致。
     if (onSetReminder)
@@ -369,33 +353,8 @@ export const MailFab = ({
     if (webMailUrl) list.push({ id: "share", label: "📤 分享", run: doShare });
     if (tgMessageLink)
       list.push({ id: "tg-link", label: "💬 原消息", run: doOpenTg });
-    if (!hasSettingsButton && onRefresh) {
-      list.push({
-        id: "refresh",
-        label: "🔄 刷新",
-        run: refreshMail,
-      });
-    }
-    if (!hasSettingsButton) {
-      list.push({
-        id: "toggle-proxy",
-        label: useProxy ? "🖼 关图片代理" : "🖼 开图片代理",
-        run: onToggleProxy,
-      });
-    }
     return list;
-  }, [
-    onSetReminder,
-    webMailUrl,
-    tgMessageLink,
-    hasSettingsButton,
-    onRefresh,
-    refreshMail,
-    useProxy,
-    doShare,
-    doOpenTg,
-    onToggleProxy,
-  ]);
+  }, [onSetReminder, webMailUrl, tgMessageLink, doShare, doOpenTg]);
 
   const handleSecondaryButtonClick = useCallback(async () => {
     if (extras.length === 0) return;
@@ -403,10 +362,7 @@ export const MailFab = ({
       extras[0].run();
       return;
     }
-    if (!showPopup.isAvailable()) {
-      extras[0].run();
-      return;
-    }
+    if (!showPopup.isAvailable()) return;
     const id = await showPopup({
       title: "更多",
       message: "选择要执行的操作",

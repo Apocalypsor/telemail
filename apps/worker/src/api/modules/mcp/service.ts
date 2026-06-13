@@ -7,20 +7,17 @@ import type { Env } from "@worker/types";
 import { buildWebMailUrl } from "@worker/utils/mail/token";
 import { getWorkerBaseUrl } from "@worker/utils/url";
 import {
+  type ListMailToolInput,
   ListMailToolInputSchema,
+  type ReadMailToolInput,
   ReadMailToolInputSchema,
+  type SearchMailToolInput,
   SearchMailToolInputSchema,
 } from "./model";
-import type {
-  ListMailToolInput,
-  ReadMailToolInput,
-  SearchMailToolInput,
-} from "./types";
 import {
   getOwnActiveAccount,
   mcpErrorResult,
   mcpJsonResult,
-  registerMcpTool,
   safeHtmlToMarkdown,
   toMcpMailListResult,
   toMcpMailSearchResult,
@@ -53,8 +50,7 @@ export abstract class McpService {
       },
     );
 
-    registerMcpTool<ListMailToolInput>(
-      server,
+    server.registerTool(
       "list_mail",
       {
         title: "List mail",
@@ -62,7 +58,7 @@ export abstract class McpService {
           "List unread, starred, junk, or archived mail across the current user's enabled accounts.",
         inputSchema: ListMailToolInputSchema,
       },
-      async ({ type, limit }) => {
+      async ({ type, limit }: ListMailToolInput) => {
         const result = await MiniappService.getMailList(env, userId, type, {
           limit,
         });
@@ -70,8 +66,7 @@ export abstract class McpService {
       },
     );
 
-    registerMcpTool<SearchMailToolInput>(
-      server,
+    server.registerTool(
       "search_mail",
       {
         title: "Search mail",
@@ -79,7 +74,7 @@ export abstract class McpService {
           "Search mail across the current user's enabled accounts. Use provider-native search syntax where supported.",
         inputSchema: SearchMailToolInputSchema,
       },
-      async ({ query, limit }) => {
+      async ({ query, limit }: SearchMailToolInput) => {
         const result = await MiniappService.searchMail(env, userId, query, {
           limit,
         });
@@ -87,8 +82,7 @@ export abstract class McpService {
       },
     );
 
-    registerMcpTool<ReadMailToolInput>(
-      server,
+    server.registerTool(
       "read_mail",
       {
         title: "Read mail",
@@ -96,7 +90,7 @@ export abstract class McpService {
           "Read one message from one of the current user's enabled accounts. Get accountId and messageId from list_mail or search_mail.",
         inputSchema: ReadMailToolInputSchema,
       },
-      async ({ accountId, messageId, folder }) => {
+      async ({ accountId, messageId, folder }: ReadMailToolInput) => {
         const account = await getOwnActiveAccount(env, userId, accountId);
         if (!account) return mcpErrorResult("Account not found");
 
