@@ -267,7 +267,7 @@ const tgPost = async <T = unknown>(
   }
 };
 
-/** 发送纯文字消息，返回 message_id。`extras` 用于透传 reply_to_message_id /
+/** 发送纯文字消息，返回 message_id。`extras` 用于透传 reply_parameters /
  *  link_preview_options 等可选字段（与 chat_id/text/parse_mode 同层）。 */
 export const sendTextMessage = async (
   env: Env,
@@ -608,8 +608,12 @@ const sendMediaGroupChunk = async (
   if (messageThreadId != null) {
     form.append("message_thread_id", String(messageThreadId));
   }
-  if (replyToMessageId)
-    form.append("reply_to_message_id", String(replyToMessageId));
+  if (replyToMessageId) {
+    form.append(
+      "reply_parameters",
+      JSON.stringify({ message_id: replyToMessageId }),
+    );
+  }
 
   const media = attachments.map((att, i) => {
     const fieldName = `file${i}`;
