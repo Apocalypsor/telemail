@@ -84,7 +84,7 @@
   },
   "migrations": [
     {
-      "tag": "v1",
+      "tag": "telegram-rate-limiter-20260613",
       "new_sqlite_classes": ["TelegramRateLimiter"]
     }
   ],
