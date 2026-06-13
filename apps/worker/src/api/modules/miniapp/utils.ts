@@ -4,10 +4,7 @@ import type { MessageMapping } from "@worker/db/message-map";
 import type { EmailProvider } from "@worker/providers/base";
 import type { EmailListItem } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
-import {
-  deleteJunkMappings,
-  syncStarButtonsForMappings,
-} from "@worker/utils/message-actions";
+import { deleteJunkMappings } from "@worker/utils/message-actions";
 import type { MailListType } from "./model";
 
 interface ListDef {
@@ -79,8 +76,6 @@ export const LIST_DEFS: Record<MailListType, ListDef> = {
     pageFetcher: (p, maxResults, cursor) =>
       p.listStarredPage(maxResults, cursor),
     errorEvent: "bot.starred_query_failed",
-    afterMappings: (env, mappings, account) =>
-      syncStarButtonsForMappings(env, mappings, account),
   },
   junk: {
     fetcher: (p, maxResults) => p.listJunk(maxResults),

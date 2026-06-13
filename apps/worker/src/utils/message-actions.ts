@@ -229,53 +229,6 @@ export const refreshEmailKeyboardAfterReminderChange = async (
   }
 };
 
-/** 批量同步 Telegram 消息的星标按钮状态（starred 列表刷新时调用） */
-export const syncStarButtonsForMappings = async (
-  env: Env,
-  mappings: MessageMapping[],
-  account: Account,
-): Promise<void> => {
-  const canArchive = accountCanArchive(account);
-  for (const m of mappings) {
-    try {
-      const keyboard = await buildEmailKeyboard(
-        env,
-        m.email_message_id,
-        account.id,
-        true,
-        canArchive,
-        m.tg_chat_id,
-        m.tg_message_id,
-      );
-      await setReplyMarkup(
-        env.TELEGRAM_BOT_TOKEN,
-        m.tg_chat_id,
-        m.tg_message_id,
-        keyboard,
-      );
-    } catch (err) {
-      if (
-        err instanceof Error &&
-        err.message.includes("message is not modified")
-      ) {
-        // keyboard 已是最新，但 pin 状态仍可能漂移（用户刚在 web 端加星），继续同步
-      } else {
-        await reportErrorToObservability(
-          env,
-          "bot.sync_star_button_failed",
-          err,
-          {
-            chatId: m.tg_chat_id,
-            messageId: m.tg_message_id,
-          },
-        );
-        continue;
-      }
-    }
-    await syncStarPinState(env, m.tg_chat_id, m.tg_message_id, true);
-  }
-};
-
 /** 切换星标并返回新的 keyboard */
 export const toggleStar = async (
   env: Env,
