@@ -82,12 +82,13 @@ middleware `apps/middleware/.env`：
 
 `apps/worker/wrangler.jsonc` 里声明，`bun typegen:worker` 把类型同步到 `apps/worker/worker-configuration.d.ts`。
 
-| Binding       | 类型    | 用途                                                                 |
-| ------------- | ------- | -------------------------------------------------------------------- |
-| `DB`          | D1      | 账号 / 消息映射 / 提醒 / 用户 / 失败邮件                             |
-| `EMAIL_KV`    | KV      | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
-| `EMAIL_QUEUE` | Queue   | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
-| `OBS_SERVICE` | Service | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
+| Binding                 | 类型           | 用途                                                                 |
+| ----------------------- | -------------- | -------------------------------------------------------------------- |
+| `DB`                    | D1             | 账号 / 消息映射 / 提醒 / 用户 / 失败邮件                             |
+| `EMAIL_KV`              | KV             | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
+| `EMAIL_QUEUE`           | Queue          | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
+| `TELEGRAM_RATE_LIMITER` | Durable Object | Telegram API 写请求限流闸门；Queue 遇到 TG 429 时按 retry_after 延迟重试 |
+| `OBS_SERVICE`           | Service        | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
 
 ## Cron Triggers
 

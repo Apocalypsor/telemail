@@ -38,7 +38,6 @@ export const deliverEmailToTelegram = async (
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
 ): Promise<void> => {
-  const tgToken = env.TELEGRAM_BOT_TOKEN;
   const chatId = account.chat_id;
   const topicId = account.topic_id;
 
@@ -79,7 +78,7 @@ export const deliverEmailToTelegram = async (
   let sentMessageId: number;
   if (hasAttachments) {
     sentMessageId = await sendWithAttachments(
-      tgToken,
+      env,
       chatId,
       text,
       email.attachments || [],
@@ -88,7 +87,7 @@ export const deliverEmailToTelegram = async (
     );
   } else {
     sentMessageId = await sendTextMessage(
-      tgToken,
+      env,
       chatId,
       text,
       initialKeyboard,
@@ -109,7 +108,7 @@ export const deliverEmailToTelegram = async (
     console.log(
       `Duplicate delivery detected for ${emailMessageId}, deleting duplicate Telegram message`,
     );
-    await deleteMessage(tgToken, chatId, sentMessageId).catch(() => {});
+    await deleteMessage(env, chatId, sentMessageId).catch(() => {});
     return;
   }
 
@@ -122,9 +121,7 @@ export const deliverEmailToTelegram = async (
     chatId,
     sentMessageId,
   );
-  await setReplyMarkup(tgToken, chatId, sentMessageId, keyboard).catch(
-    () => {},
-  );
+  await setReplyMarkup(env, chatId, sentMessageId, keyboard).catch(() => {});
 
   if (initialStarred) {
     // 新消息投递完 + 初始就是 star → 同步置顶
@@ -152,7 +149,6 @@ export const deliverEmailToTelegram = async (
         );
         const analysis = await editMessageWithAnalysis(
           env,
-          tgToken,
           chatId,
           sentMessageId,
           hasSingleAttachment,

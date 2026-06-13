@@ -1,4 +1,7 @@
-import { deleteMessage } from "@worker/clients/telegram";
+import {
+  deleteMessage,
+  isTelegramRateLimitError,
+} from "@worker/clients/telegram";
 import { getAccountById } from "@worker/db/accounts";
 import { getEmailProvider } from "@worker/providers";
 import {
@@ -24,15 +27,15 @@ const queueHandler = async (
           await processEmailMessage(msg.body, env, waitUntil);
           break;
         case QueueMessageType.DeleteTgMessage:
-          await deleteMessage(
-            env.TELEGRAM_BOT_TOKEN,
-            msg.body.chatId,
-            msg.body.messageId,
-          );
+          await deleteMessage(env, msg.body.chatId, msg.body.messageId);
           break;
       }
       msg.ack();
     } catch (error: unknown) {
+      if (isTelegramRateLimitError(error)) {
+        msg.retry({ delaySeconds: error.delaySeconds });
+        continue;
+      }
       await reportErrorToObservability(env, "queue.message_failed", error, {
         attempt: msg.attempts,
         body: msg.body,

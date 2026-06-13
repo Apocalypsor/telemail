@@ -243,7 +243,7 @@ export class DailyMailSummaryTask extends ScheduledTask {
     }
 
     await sendTextMessage(
-      env.TELEGRAM_BOT_TOKEN,
+      env,
       telegramUserId,
       this.buildDailySummaryText(counts),
       this.buildDailySummaryKeyboard(env, counts),

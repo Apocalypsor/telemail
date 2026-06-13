@@ -392,7 +392,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
             m.tg_message_id,
           );
           await setReplyMarkup(
-            env.TELEGRAM_BOT_TOKEN,
+            env,
             m.tg_chat_id,
             m.tg_message_id,
             keyboard,

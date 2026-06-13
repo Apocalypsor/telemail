@@ -60,7 +60,6 @@ const reanalyzeEmail = async (
 
   const analysis = await editMessageWithAnalysis(
     env,
-    env.TELEGRAM_BOT_TOKEN,
     tg_chat_id,
     tg_message_id,
     isCaption,

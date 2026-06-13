@@ -1,4 +1,5 @@
 import type { accounts, users } from "@worker/db/schema";
+import type { TelegramRateLimiter } from "@worker/durable-objects/telegram-rate-limiter";
 
 /** 用 const + 类型别名替代 enum —— 这样字面量值就是 string literal type，跟 Drizzle
  *  schema 的 `text({ enum: [...] })` 推出来的 union 类型完全对齐，免掉强转。
@@ -61,9 +62,14 @@ interface WorkerSecrets {
   TG_MINI_APP_SHORT_NAME?: string;
 }
 
-type RefinedBindings = Omit<Cloudflare.Env, "EMAIL_QUEUE"> & {
+type RefinedBindings = Omit<
+  Cloudflare.Env,
+  "EMAIL_QUEUE" | "TELEGRAM_RATE_LIMITER"
+> & {
   /** Queue 绑定 —— wrangler 生成 binding，项目侧细化 message body 类型 */
   EMAIL_QUEUE: Queue<QueueMessage>;
+  /** Durable Object：统一协调 Telegram API 限流窗口 */
+  TELEGRAM_RATE_LIMITER: DurableObjectNamespace<TelegramRateLimiter>;
 };
 
 /** Worker runtime env：binding 来源于 `wrangler types` 生成的 `Cloudflare.Env`；

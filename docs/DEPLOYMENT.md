@@ -95,9 +95,13 @@ bun wrangler kv namespace create EMAIL_KV
 bun wrangler queues create gmail-tg-queue
 ```
 
-`wrangler.jsonc` 中已经配好 producer / consumer 绑定。Queue 用于串行处理邮件，内置重试。
+`wrangler.jsonc` 中已经配好 producer / consumer 绑定。Queue 用于并发处理邮件，Telegram 429 会按 `retry_after` 延迟重试。
 
-### 4.4 Secrets
+### 4.4 Durable Object
+
+Telegram API 写请求的限流闸门由 `TELEGRAM_RATE_LIMITER` Durable Object 提供。`wrangler.jsonc` 已经声明 binding 和 migration；不需要手动 create，部署 Worker 时 Wrangler 会应用 Durable Object migration。
+
+### 4.5 Secrets
 
 所有 secret 的用途和"哪些必填 / 哪些可选"见 [ENVIRONMENT.md](./ENVIRONMENT.md)。最小集：
 
@@ -217,7 +221,7 @@ BotFather：
 - `/setdomain` 设为 `example.com`
 - `/newapp` 注册 Mini App，Web App URL 填 `https://example.com/telegram-app`，short name 记下来
 
-确认 §4.4 的 `WORKER_URL` 已经是最终同源域名；`TG_MINI_APP_SHORT_NAME` 填刚才的 short name：
+确认 §4.5 的 `WORKER_URL` 已经是最终同源域名；`TG_MINI_APP_SHORT_NAME` 填刚才的 short name：
 
 ```sh
 bun wrangler secret put TG_MINI_APP_SHORT_NAME

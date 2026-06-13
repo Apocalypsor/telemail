@@ -237,7 +237,6 @@ export const prepareEmailContent = (
 /** 调用 LLM 分析邮件并编辑 Telegram 消息（验证码 / 摘要 + 标签），返回分析结果 */
 export const editMessageWithAnalysis = async (
   env: Env,
-  tgToken: string,
   chatId: string,
   tgMessageId: number,
   isCaption: boolean,
@@ -249,8 +248,8 @@ export const editMessageWithAnalysis = async (
 ): Promise<EmailAnalysis> => {
   const editMsg = (newText: string) =>
     isCaption
-      ? editMessageCaption(tgToken, chatId, tgMessageId, newText, keyboard)
-      : editTextMessage(tgToken, chatId, tgMessageId, newText, keyboard);
+      ? editMessageCaption(env, chatId, tgMessageId, newText, keyboard)
+      : editTextMessage(env, chatId, tgMessageId, newText, keyboard);
 
   const result = await analyzeEmail(
     env.LLM_API_URL as string,

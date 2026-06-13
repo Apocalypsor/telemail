@@ -71,7 +71,25 @@
     }
   ],
   /**
-   * Queue — 邮件处理队列（sync + message），串行消费，内置重试
+   * Durable Object — Telegram API 全局限流闸门。Queue 并发可以保持，
+   * 但所有项目自有 Telegram client 请求会先经过这里预约发送窗口。
+   */
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TELEGRAM_RATE_LIMITER",
+        "class_name": "TelegramRateLimiter"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TelegramRateLimiter"]
+    }
+  ],
+  /**
+   * Queue — 邮件处理队列（sync + message），并发消费，内置重试
    * 先运行: bun wrangler queues create gmail-tg-queue
    */
   "queues": {

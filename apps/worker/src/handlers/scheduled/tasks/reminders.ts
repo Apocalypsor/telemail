@@ -170,13 +170,9 @@ export class DueRemindersTask extends ScheduledTask {
       inline_keyboard: [[{ text: t("reminders:viewMail"), web_app: { url } }]],
     };
 
-    await sendTextMessage(
-      env.TELEGRAM_BOT_TOKEN,
-      r.telegram_user_id,
-      text,
-      replyMarkup,
-      { link_preview_options: { is_disabled: true } },
-    );
+    await sendTextMessage(env, r.telegram_user_id, text, replyMarkup, {
+      link_preview_options: { is_disabled: true },
+    });
 
     waitUntil(this.applyReminderSideEffects(env, r, waitUntil));
   }
@@ -226,11 +222,7 @@ export class DueRemindersTask extends ScheduledTask {
       if (r.tg_chat_id == null || r.tg_message_id == null) return;
       let status: Awaited<ReturnType<typeof pinChatMessage>>;
       try {
-        status = await pinChatMessage(
-          env.TELEGRAM_BOT_TOKEN,
-          r.tg_chat_id,
-          r.tg_message_id,
-        );
+        status = await pinChatMessage(env, r.tg_chat_id, r.tg_message_id);
       } catch (err) {
         await reportErrorToObservability(env, "reminders.pin_failed", err, {
           reminderId: r.id,
@@ -295,6 +287,6 @@ export class DueRemindersTask extends ScheduledTask {
       "",
       escapeMdV2(r.text || "(无备注)"),
     ].join("\n");
-    await sendTextMessage(env.TELEGRAM_BOT_TOKEN, r.telegram_user_id, text);
+    await sendTextMessage(env, r.telegram_user_id, text);
   }
 }

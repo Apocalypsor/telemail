@@ -118,7 +118,7 @@ export abstract class UsersService {
     message: string,
   ): Promise<void> {
     try {
-      await sendTextMessage(env.TELEGRAM_BOT_TOKEN, telegramId, message);
+      await sendTextMessage(env, telegramId, message);
     } catch (err) {
       await reportErrorToObservability(env, "users.notify_user_failed", err, {
         telegramUserId: telegramId,

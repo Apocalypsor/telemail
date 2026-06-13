@@ -39,7 +39,7 @@ export const removeFromTelegram = async (
   let removed = false;
   try {
     const result = await deleteMessageIfPresent(
-      env.TELEGRAM_BOT_TOKEN,
+      env,
       mapping.tg_chat_id,
       mapping.tg_message_id,
     );
@@ -108,9 +108,9 @@ export const syncStarPinState = async (
 ): Promise<void> => {
   try {
     if (starred) {
-      await pinChatMessage(env.TELEGRAM_BOT_TOKEN, chatId, tgMessageId);
+      await pinChatMessage(env, chatId, tgMessageId);
     } else {
-      await unpinChatMessage(env.TELEGRAM_BOT_TOKEN, chatId, tgMessageId);
+      await unpinChatMessage(env, chatId, tgMessageId);
     }
   } catch (err) {
     await reportErrorToObservability(env, "tg.pin_sync_failed", err, {
@@ -181,7 +181,7 @@ export const reconcileMessageState = async (
       mapping.tg_message_id,
     );
     await setReplyMarkup(
-      env.TELEGRAM_BOT_TOKEN,
+      env,
       mapping.tg_chat_id,
       mapping.tg_message_id,
       keyboard,
@@ -246,12 +246,7 @@ export const refreshEmailKeyboardAfterReminderChange = async (
     m.tg_message_id,
   );
   try {
-    await setReplyMarkup(
-      env.TELEGRAM_BOT_TOKEN,
-      m.tg_chat_id,
-      m.tg_message_id,
-      keyboard,
-    );
+    await setReplyMarkup(env, m.tg_chat_id, m.tg_message_id, keyboard);
   } catch (err) {
     if (err instanceof Error && err.message.includes("message is not modified"))
       return;
@@ -459,7 +454,7 @@ const markTelegramMessageAsRemoved = async (
 ): Promise<boolean> => {
   try {
     await editTextMessage(
-      env.TELEGRAM_BOT_TOKEN,
+      env,
       mapping.tg_chat_id,
       mapping.tg_message_id,
       REMOVED_FROM_INBOX_TEXT,
@@ -476,7 +471,7 @@ const markTelegramMessageAsRemoved = async (
 
   try {
     await editMessageCaption(
-      env.TELEGRAM_BOT_TOKEN,
+      env,
       mapping.tg_chat_id,
       mapping.tg_message_id,
       REMOVED_FROM_INBOX_TEXT,

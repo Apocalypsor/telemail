@@ -1,13 +1,58 @@
 import { http } from "@worker/clients/http";
 import { TG_API_BASE, TG_MEDIA_GROUP_LIMIT } from "@worker/constants";
-import type { Attachment } from "@worker/types";
+import type {
+  TelegramRateLimitReason,
+  TelegramRateLimitReservation,
+} from "@worker/durable-objects/telegram-rate-limiter";
+import type { Attachment, Env } from "@worker/types";
+import { sleep } from "@worker/utils/sleep";
 import { HTTPError } from "ky";
+
+interface TelegramErrorPayload {
+  description?: unknown;
+  parameters?: {
+    retry_after?: unknown;
+  };
+}
+
+type TelegramApiResponse<T> = { result: T };
 
 export type DeleteMessageResult =
   | "deleted"
   | "not_found"
   | "rate_limited"
   | "unavailable";
+
+const TELEGRAM_GATE_NAME = "default";
+const TELEGRAM_GATE_MAX_INLINE_WAIT_MS = 5_000;
+const TELEGRAM_DEFAULT_RETRY_AFTER_SECONDS = 5;
+
+export class TelegramRateLimitError extends Error {
+  readonly delaySeconds: number;
+  readonly label: string;
+  readonly reason: TelegramRateLimitReason;
+
+  constructor(
+    label: string,
+    delaySeconds: number,
+    reason: TelegramRateLimitReason,
+    description?: string,
+    cause?: unknown,
+  ) {
+    super(
+      `TG ${label} 429: retry after ${delaySeconds}s${description ? ` (${description})` : ""}`,
+      { cause },
+    );
+    this.name = "TelegramRateLimitError";
+    this.delaySeconds = delaySeconds;
+    this.label = label;
+    this.reason = reason;
+  }
+}
+
+export const isTelegramRateLimitError = (
+  err: unknown,
+): err is TelegramRateLimitError => err instanceof TelegramRateLimitError;
 
 const isEntityParseError = (description: string | undefined): boolean => {
   return !!description && /can't parse entities/i.test(description);
@@ -28,19 +73,168 @@ const extractTelegramDescription = (payload: unknown): string => {
   return typeof desc === "string" ? desc : "Unknown Telegram error";
 };
 
+const extractTelegramRetryAfter = (payload: unknown): number | null => {
+  if (!payload || typeof payload !== "object") return null;
+  const parameters = (payload as TelegramErrorPayload).parameters;
+  if (!parameters || typeof parameters !== "object") return null;
+  const retryAfter = parameters.retry_after;
+  if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
+    return Math.max(1, Math.ceil(retryAfter));
+  }
+  if (typeof retryAfter === "string") {
+    const parsed = Number.parseInt(retryAfter, 10);
+    return Number.isFinite(parsed) ? Math.max(1, parsed) : null;
+  }
+  return null;
+};
+
+const extractRetryAfterFromDescription = (
+  description: string,
+): number | null => {
+  const match = /\bretry after (\d+)\b/i.exec(description);
+  if (!match) return null;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? Math.max(1, parsed) : null;
+};
+
+const reserveTelegramRequest = async (
+  env: Env,
+  chatId: string,
+  label: string,
+): Promise<void> => {
+  const limiter = env.TELEGRAM_RATE_LIMITER.getByName(TELEGRAM_GATE_NAME);
+  const startedAt = Date.now();
+
+  for (;;) {
+    const reservation = await limiter.reserve(chatId);
+    if (reservation.ok) return;
+
+    if (
+      Date.now() - startedAt + reservation.delayMs >
+      TELEGRAM_GATE_MAX_INLINE_WAIT_MS
+    ) {
+      throw new TelegramRateLimitError(
+        label,
+        reservation.delaySeconds,
+        reservation.reason,
+      );
+    }
+
+    await sleep(reservation.delayMs);
+  }
+};
+
+const recordTelegramRateLimit = async (
+  env: Env,
+  chatId: string,
+  label: string,
+  retryAfterSeconds: number,
+  description: string,
+  cause: unknown,
+): Promise<never> => {
+  let reservation: TelegramRateLimitReservation | null = null;
+  try {
+    reservation = await env.TELEGRAM_RATE_LIMITER.getByName(
+      TELEGRAM_GATE_NAME,
+    ).recordRateLimit(chatId, retryAfterSeconds);
+  } catch {
+    // If the limiter cannot be updated, still surface a structured retry delay.
+  }
+
+  throw new TelegramRateLimitError(
+    label,
+    reservation?.ok === false
+      ? reservation.delaySeconds
+      : Math.max(1, retryAfterSeconds),
+    "blocked",
+    description,
+    cause,
+  );
+};
+
+const maybeThrowTelegramRateLimit = async (
+  env: Env,
+  chatId: string,
+  label: string,
+  err: HTTPError,
+): Promise<void> => {
+  const errDescription = extractTelegramDescription(err.data);
+  const retryAfterSeconds =
+    extractTelegramRetryAfter(err.data) ??
+    extractRetryAfterFromDescription(errDescription) ??
+    TELEGRAM_DEFAULT_RETRY_AFTER_SECONDS;
+  if (
+    err.response.status === 429 ||
+    /too many requests|retry after/i.test(errDescription)
+  ) {
+    await recordTelegramRateLimit(
+      env,
+      chatId,
+      label,
+      retryAfterSeconds,
+      errDescription,
+      err,
+    );
+  }
+};
+
+const telegramRequest = async <T>(
+  env: Env,
+  chatId: string,
+  label: string,
+  request: () => Promise<T>,
+): Promise<T> => {
+  await reserveTelegramRequest(env, chatId, label);
+  try {
+    return await request();
+  } catch (err) {
+    if (err instanceof HTTPError) {
+      await maybeThrowTelegramRateLimit(env, chatId, label, err);
+    }
+    throw err;
+  }
+};
+
+const postJsonResult = async <T>(
+  env: Env,
+  chatId: string,
+  url: string,
+  payload: Record<string, unknown>,
+  label: string,
+): Promise<T> => {
+  const data = await telegramRequest(env, chatId, label, () =>
+    http.post(url, { json: payload }).json<TelegramApiResponse<T>>(),
+  );
+  return data.result;
+};
+
+const postFormResult = async <T>(
+  env: Env,
+  chatId: string,
+  url: string,
+  form: FormData,
+  label: string,
+): Promise<T> => {
+  const data = await telegramRequest(env, chatId, label, () =>
+    http.post(url, { body: form }).json<TelegramApiResponse<T>>(),
+  );
+  return data.result;
+};
+
 /**
  * 通用 Telegram JSON API 请求，带 MarkdownV2 parse error 自动回退。
- * 429 由 ky 内置 retry 自动处理。
+ * 429 会解析 Telegram `parameters.retry_after` 并写回全局 gate。
  * 当 parse_mode 存在且返回 entity parse error 时，自动去掉 parse_mode 并将 text/caption 转为纯文本重试。
  */
 const tgPost = async <T = unknown>(
+  env: Env,
+  chatId: string,
   url: string,
   payload: Record<string, unknown>,
   label: string,
 ): Promise<T> => {
   try {
-    return ((await http.post(url, { json: payload }).json()) as { result: T })
-      .result;
+    return await postJsonResult(env, chatId, url, payload, label);
   } catch (err) {
     if (!(err instanceof HTTPError)) throw err;
     const { response } = err;
@@ -55,8 +249,17 @@ const tgPost = async <T = unknown>(
         console.warn(`TG ${label} parse_mode failed, retrying as plain text`);
         const { parse_mode: _, ...rest } = payload;
         rest[textKey] = markdownV2ToPlainText(textValue);
-        return ((await http.post(url, { json: rest }).json()) as { result: T })
-          .result;
+        try {
+          return await postJsonResult(env, chatId, url, rest, label);
+        } catch (fallbackErr) {
+          if (!(fallbackErr instanceof HTTPError)) throw fallbackErr;
+          const fallbackDescription = extractTelegramDescription(
+            fallbackErr.data,
+          );
+          throw new Error(
+            `TG ${label} ${fallbackErr.response.status}: ${fallbackDescription}`,
+          );
+        }
       }
     }
 
@@ -67,13 +270,13 @@ const tgPost = async <T = unknown>(
 /** 发送纯文字消息，返回 message_id。`extras` 用于透传 reply_to_message_id /
  *  link_preview_options 等可选字段（与 chat_id/text/parse_mode 同层）。 */
 export const sendTextMessage = async (
-  token: string,
+  env: Env,
   chatId: string,
   text: string,
   replyMarkup?: unknown,
   extras?: Record<string, unknown>,
 ): Promise<number> => {
-  const url = `${TG_API_BASE}${token}/sendMessage`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
   const payload: Record<string, unknown> = {
     chat_id: chatId,
     text,
@@ -82,6 +285,8 @@ export const sendTextMessage = async (
   };
   if (replyMarkup) payload.reply_markup = replyMarkup;
   const data = await tgPost<{ message_id: number }>(
+    env,
+    chatId,
     url,
     payload,
     "sendMessage",
@@ -91,13 +296,13 @@ export const sendTextMessage = async (
 
 /** 编辑已发送的文字消息 */
 export const editTextMessage = async (
-  token: string,
+  env: Env,
   chatId: string,
   messageId: number,
   text: string,
   replyMarkup?: unknown,
 ): Promise<void> => {
-  const url = `${TG_API_BASE}${token}/editMessageText`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/editMessageText`;
   const payload: Record<string, unknown> = {
     chat_id: chatId,
     message_id: messageId,
@@ -105,7 +310,7 @@ export const editTextMessage = async (
     parse_mode: "MarkdownV2",
   };
   if (replyMarkup) payload.reply_markup = replyMarkup;
-  await tgPost(url, payload, "editMessageText");
+  await tgPost(env, chatId, url, payload, "editMessageText");
 };
 
 const attToBlob = (att: Attachment): Blob => {
@@ -129,7 +334,7 @@ export type PinResult = "ok" | "not_found" | "rate_limited";
  * - 超过 10 个附件: 分批发送，每批最多 10 个
  */
 export const sendWithAttachments = async (
-  token: string,
+  env: Env,
   chatId: string,
   caption: string,
   attachments: Attachment[],
@@ -150,12 +355,16 @@ export const sendWithAttachments = async (
       form.append("parse_mode", "MarkdownV2");
       if (replyMarkup) form.append("reply_markup", JSON.stringify(replyMarkup));
 
-      const url = `${TG_API_BASE}${token}/sendDocument`;
+      const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/sendDocument`;
       try {
-        const data = (await http.post(url, { body: form }).json()) as {
-          result: { message_id: number };
-        };
-        return data.result.message_id;
+        const data = await postFormResult<{ message_id: number }>(
+          env,
+          chatId,
+          url,
+          form,
+          "sendDocument",
+        );
+        return data.message_id;
       } catch (err) {
         if (!(err instanceof HTTPError)) throw err;
 
@@ -180,12 +389,14 @@ export const sendWithAttachments = async (
           fallbackForm.append("caption", markdownV2ToPlainText(caption));
           if (replyMarkup)
             fallbackForm.append("reply_markup", JSON.stringify(replyMarkup));
-          const fallbackData = (await http
-            .post(url, { body: fallbackForm })
-            .json()) as {
-            result: { message_id: number };
-          };
-          return fallbackData.result.message_id;
+          const fallbackData = await postFormResult<{ message_id: number }>(
+            env,
+            chatId,
+            url,
+            fallbackForm,
+            "sendDocument",
+          );
+          return fallbackData.message_id;
         }
 
         throw new Error(
@@ -194,7 +405,7 @@ export const sendWithAttachments = async (
       }
     } else {
       const textMsgId = await sendTextMessage(
-        token,
+        env,
         chatId,
         caption,
         replyMarkup,
@@ -209,7 +420,7 @@ export const sendWithAttachments = async (
       }
       for (const chunk of chunks) {
         await sendMediaGroupChunk(
-          token,
+          env,
           chatId,
           "",
           chunk,
@@ -220,6 +431,7 @@ export const sendWithAttachments = async (
       return textMsgId;
     }
   } catch (e) {
+    if (isTelegramRateLimitError(e)) throw e;
     throw new Error(
       `发送附件消息异常: ${e instanceof Error ? e.message : String(e)}`,
     );
@@ -228,13 +440,13 @@ export const sendWithAttachments = async (
 
 /** 编辑附件消息的 caption */
 export const editMessageCaption = async (
-  token: string,
+  env: Env,
   chatId: string,
   messageId: number,
   caption: string,
   replyMarkup?: unknown,
 ): Promise<void> => {
-  const url = `${TG_API_BASE}${token}/editMessageCaption`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/editMessageCaption`;
   const payload: Record<string, unknown> = {
     chat_id: chatId,
     message_id: messageId,
@@ -242,7 +454,7 @@ export const editMessageCaption = async (
     parse_mode: "MarkdownV2",
   };
   if (replyMarkup) payload.reply_markup = replyMarkup;
-  await tgPost(url, payload, "editMessageCaption");
+  await tgPost(env, chatId, url, payload, "editMessageCaption");
 };
 
 /**
@@ -250,13 +462,15 @@ export const editMessageCaption = async (
  * 默认 disable_notification=true，避免每次 ⭐ 都刷一条「已置顶」提示。
  */
 export const pinChatMessage = async (
-  token: string,
+  env: Env,
   chatId: string,
   messageId: number,
 ): Promise<PinResult> => {
-  const url = `${TG_API_BASE}${token}/pinChatMessage`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/pinChatMessage`;
   try {
     await tgPost(
+      env,
+      chatId,
       url,
       { chat_id: chatId, message_id: messageId, disable_notification: true },
       "pinChatMessage",
@@ -278,13 +492,15 @@ export const pinChatMessage = async (
 
 /** 取消置顶指定消息。幂等：未置顶 / 消息不存在 / 被限流，全部静默返回。 */
 export const unpinChatMessage = async (
-  token: string,
+  env: Env,
   chatId: string,
   messageId: number,
 ): Promise<void> => {
-  const url = `${TG_API_BASE}${token}/unpinChatMessage`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/unpinChatMessage`;
   try {
     await tgPost(
+      env,
+      chatId,
       url,
       { chat_id: chatId, message_id: messageId },
       "unpinChatMessage",
@@ -303,13 +519,15 @@ export const unpinChatMessage = async (
 
 /** 设置/更新消息的 inline keyboard */
 export const setReplyMarkup = async (
-  token: string,
+  env: Env,
   chatId: string,
   messageId: number,
   replyMarkup: unknown,
 ): Promise<void> => {
-  const url = `${TG_API_BASE}${token}/editMessageReplyMarkup`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/editMessageReplyMarkup`;
   await tgPost(
+    env,
+    chatId,
     url,
     { chat_id: chatId, message_id: messageId, reply_markup: replyMarkup },
     "editMessageReplyMarkup",
@@ -330,12 +548,14 @@ export const buildTgMessageLink = (
 };
 
 export const deleteMessage = async (
-  token: string,
+  env: Env,
   chatId: string,
   messageId: number,
 ): Promise<void> => {
-  const url = `${TG_API_BASE}${token}/deleteMessage`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/deleteMessage`;
   await tgPost(
+    env,
+    chatId,
     url,
     { chat_id: chatId, message_id: messageId },
     "deleteMessage",
@@ -344,12 +564,12 @@ export const deleteMessage = async (
 
 /** 删除消息并把可重试 / 幂等结果交给调用方判断是否可以清 mapping。 */
 export const deleteMessageIfPresent = async (
-  token: string,
+  env: Env,
   chatId: string,
   messageId: number,
 ): Promise<DeleteMessageResult> => {
   try {
-    await deleteMessage(token, chatId, messageId);
+    await deleteMessage(env, chatId, messageId);
     return "deleted";
   } catch (err) {
     if (err instanceof Error) {
@@ -376,7 +596,7 @@ export const deleteMessageIfPresent = async (
 };
 
 const sendMediaGroupChunk = async (
-  token: string,
+  env: Env,
   chatId: string,
   caption: string,
   attachments: Attachment[],
@@ -409,12 +629,16 @@ const sendMediaGroupChunk = async (
 
   form.append("media", JSON.stringify(media));
 
-  const url = `${TG_API_BASE}${token}/sendMediaGroup`;
+  const url = `${TG_API_BASE}${env.TELEGRAM_BOT_TOKEN}/sendMediaGroup`;
   try {
-    const data = (await http.post(url, { body: form }).json()) as {
-      result: Array<{ message_id: number }>;
-    };
-    return data.result[0].message_id;
+    const data = await postFormResult<Array<{ message_id: number }>>(
+      env,
+      chatId,
+      url,
+      form,
+      "sendMediaGroup",
+    );
+    return data[0].message_id;
   } catch (err) {
     if (!(err instanceof HTTPError)) throw err;
 
@@ -453,12 +677,14 @@ const sendMediaGroupChunk = async (
         return entry;
       });
       fallbackForm.append("media", JSON.stringify(fallbackMedia));
-      const fallbackData = (await http
-        .post(url, { body: fallbackForm })
-        .json()) as {
-        result: Array<{ message_id: number }>;
-      };
-      return fallbackData.result[0].message_id;
+      const fallbackData = await postFormResult<Array<{ message_id: number }>>(
+        env,
+        chatId,
+        url,
+        fallbackForm,
+        "sendMediaGroup",
+      );
+      return fallbackData[0].message_id;
     }
 
     throw new Error(
