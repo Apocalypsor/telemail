@@ -5,6 +5,9 @@
   "schedule": ["before 6am"],
   "minimumReleaseAge": "14 days",
   "internalChecksFilter": "strict",
+  "constraints": {
+    "bun": ">=1.3.0"
+  },
   "automergeType": "pr",
   "platformAutomerge": false,
   "lockFileMaintenance": {
@@ -17,7 +20,12 @@
       "automerge": true
     },
     {
+      "description": "Lockfile maintenance is driven by package managers and cannot be age-gated by Renovate.",
       "matchUpdateTypes": ["lockFileMaintenance"],
+      "minimumReleaseAge": null,
+      "prBodyNotes": [
+        "Renovate cannot validate `minimumReleaseAge` for lockfile maintenance because package managers perform the lockfile refresh."
+      ],
       "automerge": true
     }
   ]
