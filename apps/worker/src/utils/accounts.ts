@@ -3,6 +3,7 @@ import { deleteFailedEmailsByAccountId } from "@worker/db/failed-emails";
 import {
   deleteCachedAccessToken,
   deleteCachedOutlookFolderIds,
+  deleteImapFolderPaths,
 } from "@worker/db/kv";
 import { deleteMappingsByAccountId } from "@worker/db/message-map";
 import { getEmailProvider } from "@worker/providers";
@@ -41,5 +42,6 @@ export const cleanupAndDeleteAccount = async (
     deleteFailedEmailsByAccountId(env.DB, account.id),
     deleteCachedAccessToken(env.EMAIL_KV, account.id),
     deleteCachedOutlookFolderIds(env.EMAIL_KV, account.id),
+    deleteImapFolderPaths(env.EMAIL_KV, account.id),
   ]);
 };

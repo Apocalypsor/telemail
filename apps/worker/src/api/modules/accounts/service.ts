@@ -10,10 +10,6 @@ import {
 import { getAllUsers, getUserByTelegramId } from "@worker/db/users";
 import { getEmailProvider, PROVIDERS } from "@worker/providers";
 import type { GmailProvider } from "@worker/providers/gmail";
-import {
-  isImapBridgeConfigured,
-  syncAccounts,
-} from "@worker/providers/imap/utils/client";
 import type { Env } from "@worker/types";
 import { cleanupAndDeleteAccount } from "@worker/utils/accounts";
 import { reportErrorToObservability } from "@worker/utils/observability";
@@ -32,6 +28,7 @@ import type {
   CreateOAuthAccountResult,
 } from "./types";
 import {
+  createForwardToken,
   getAuthorizedAccountOrResult,
   normalizeChatId,
   normalizeTopicId,
@@ -148,14 +145,6 @@ export abstract class AccountsService {
     userId: string,
     body: CreateImapAccountBody,
   ): Promise<AccountMutationResult> {
-    if (!isImapBridgeConfigured(env)) {
-      return {
-        ok: false,
-        status: 400,
-        error: "IMAP 中间件未配置，请联系管理员",
-      };
-    }
-
     const chatId = normalizeChatId(body.chatId);
     if (!chatId) return { ok: false, status: 400, error: "Chat ID 必须为数字" };
     const topicId = normalizeTopicId(body.topicId);
@@ -185,13 +174,8 @@ export abstract class AccountsService {
       imapSecure: body.imapSecure ? 1 : 0,
       imapUser,
       imapPass,
+      imapForwardToken: createForwardToken(),
     });
-
-    await syncAccounts(env).catch((err) =>
-      reportErrorToObservability(env, "imap.sync_after_create_failed", err, {
-        accountId: account.id,
-      }),
-    );
 
     return {
       ok: true,

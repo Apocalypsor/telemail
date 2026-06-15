@@ -47,7 +47,7 @@ export const extractErrorMessage = async (err: unknown): Promise<string> => {
 // ─── Route search-param validator ──────────────────────────────────────────
 
 /**
- * TanStack Router `validateSearch` 的 TypeBox 适配器 —— 跟 worker / middleware
+ * TanStack Router `validateSearch` 的 TypeBox 适配器 —— 跟 worker
  * 同一套 schema runtime（Elysia 的 `t`），page 这边复用一份。
  *
  * 流水线：

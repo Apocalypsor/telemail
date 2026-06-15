@@ -113,7 +113,7 @@
    * Cron Triggers
    *  - 每分钟：分发到期提醒（Mini App 设置的）
    *  - 每 15 分钟：检查是否有用户到达本地 19:00 邮件摘要时间
-   *  - 每整点（minute=0）：健康检查、重试失败邮件；UTC 凌晨额外续订 Gmail watch
+   *  - 每整点（minute=0）：重试失败邮件；UTC 凌晨额外续订 Gmail / Outlook push
    *  scheduled tasks 各自声明 shouldRun 条件
    */
   "triggers": {

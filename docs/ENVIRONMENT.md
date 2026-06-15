@@ -31,22 +31,13 @@
 | `MS_CLIENT_SECRET`  | Microsoft Entra ID Client Secret                  |
 | `MS_WEBHOOK_SECRET` | 自定义密钥，验证 Microsoft Graph webhook 签名     |
 
-### IMAP Bridge（用 IMAP 时必填）
+### IMAP Forwarding（用 IMAP 实时收件时必填）
 
-Worker secrets：
+| Secret                | 说明                                                  |
+| --------------------- | ----------------------------------------------------- |
+| `IMAP_FORWARD_DOMAIN` | Cloudflare Email Routing 路由到 Worker 的收件域名，例如 `in.telemail.example.com` |
 
-| Secret               | 说明                                                  |
-| -------------------- | ----------------------------------------------------- |
-| `IMAP_BRIDGE_URL`    | VPS 上 IMAP Bridge 的 HTTPS URL，例如 `https://imap.example.com` |
-| `IMAP_BRIDGE_SECRET` | Worker 调 middleware、middleware 回调 Worker 共用的 Bearer secret |
-
-middleware `apps/middleware/.env`：
-
-| Env             | 说明                                                  |
-| --------------- | ----------------------------------------------------- |
-| `BRIDGE_SECRET` | 与 Worker `IMAP_BRIDGE_SECRET` 相同的 Bearer secret   |
-| `TELEMAIL_URL`  | Worker 对外 URL，例如 `https://telemail.example.com`  |
-| `PORT`          | middleware 本地监听端口，默认 `3000`                  |
+IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存到 `accounts` 表。`IMAP_FORWARD_DOMAIN` 只用来生成每个账号的转发地址；用户把 iCloud / 邮箱服务的自动转发地址设为该地址后，Email Routing handler 会用转发邮件里的 `Message-ID` 触发 Worker 通过 IMAP 拉取原邮箱中的同一封邮件。
 
 ### LLM / AI 摘要（可选）
 
@@ -85,7 +76,7 @@ middleware `apps/middleware/.env`：
 | Binding                 | 类型           | 用途                                                                 |
 | ----------------------- | -------------- | -------------------------------------------------------------------- |
 | `DB`                    | D1             | 账号 / 消息映射 / 提醒 / 用户 / 失败邮件                             |
-| `EMAIL_KV`              | KV             | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
+| `EMAIL_KV`              | KV             | access_token 缓存、消息去重、OAuth state、IMAP folder cache、预览 HTML（7 天 TTL） |
 | `EMAIL_QUEUE`           | Queue          | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
 | `TELEGRAM_RATE_LIMITER` | Durable Object | Telegram API 写请求限流闸门；Queue 遇到 TG 429 时按 retry_after 延迟重试 |
 | `OBS_SERVICE`           | Service        | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
@@ -96,7 +87,6 @@ middleware `apps/middleware/.env`：
 
 - **每分钟**：分发到期的 Mini App 提醒
 - **每 15 分钟**：按用户本地时区检查是否到 19:00，发送未读 / 垃圾邮件摘要（都为 0 时跳过；非零列表会附 Mini App 入口）
-- **每 5 分钟**（`minute % 5 === 0`）：检查 IMAP Bridge 健康
 - **每小时**（`minute === 0`）：重试失败的 LLM 摘要
 - **每天 UTC 0 点**（额外）：为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）
 
@@ -104,7 +94,7 @@ middleware `apps/middleware/.env`：
 
 用户可见的表：
 
-- `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、可选 `topic_id`、`refresh_token` 加密等）
+- `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、可选 `topic_id`、`refresh_token`、IMAP credentials / forward token 等）
 - `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id, tg_thread_id)`，幂等去重用
 - `reminders` —— Mini App 设的提醒，可选记录推送到 Things Cloud 的 task UUID
 - `users` —— Telegram 用户记录（`approved` 状态控制访问 Mini App、web 工具页 `/preview` / `/junk-check` 与 `/api/mcp`），以及可选的 per-user Things Cloud 设置和 MCP API key hash

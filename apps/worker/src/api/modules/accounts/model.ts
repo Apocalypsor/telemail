@@ -73,6 +73,7 @@ export const AccountResponse = t.Object({
   imapPort: t.Union([t.Number(), t.Null()]),
   imapSecure: t.Boolean(),
   imapUser: t.Union([t.String(), t.Null()]),
+  imapForwardAddress: t.Union([t.String(), t.Null()]),
 });
 export type AccountResponse = UnwrapSchema<typeof AccountResponse>;
 

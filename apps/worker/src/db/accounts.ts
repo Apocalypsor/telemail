@@ -30,6 +30,20 @@ export const getAccountsByEmail = async (
     .orderBy(asc(accounts.id));
 };
 
+export const getImapAccountByForwardToken = async (
+  d1: D1Database,
+  token: string,
+): Promise<Account | null> => {
+  const db = getDb(d1);
+  const [row] = await db
+    .select()
+    .from(accounts)
+    .where(
+      and(eq(accounts.type, "imap"), eq(accounts.imap_forward_token, token)),
+    );
+  return row ?? null;
+};
+
 /** 获取用户自己绑定的账号 */
 export const getOwnAccounts = async (
   d1: D1Database,
@@ -143,16 +157,6 @@ export const updateAccount = async (
   await db.update(accounts).set(patch).where(eq(accounts.id, id));
 };
 
-/** 获取所有启用状态的 IMAP 账号（供中间件拉取，disabled 账号会被跳过） */
-export const getImapAccounts = async (d1: D1Database): Promise<Account[]> => {
-  const db = getDb(d1);
-  return db
-    .select()
-    .from(accounts)
-    .where(and(eq(accounts.type, "imap"), eq(accounts.disabled, 0)))
-    .orderBy(asc(accounts.id));
-};
-
 /** 切换账号启用 / 禁用状态 */
 export const setAccountDisabled = async (
   d1: D1Database,
@@ -224,6 +228,7 @@ export const createImapAccount = async (
     imapSecure: number;
     imapUser: string;
     imapPass: string;
+    imapForwardToken: string;
   },
 ): Promise<Account> => {
   const db = getDb(d1);
@@ -240,6 +245,7 @@ export const createImapAccount = async (
       imap_secure: params.imapSecure,
       imap_user: params.imapUser,
       imap_pass: params.imapPass,
+      imap_forward_token: params.imapForwardToken,
     })
     .returning();
   if (!row) throw new Error("Failed to create IMAP account");

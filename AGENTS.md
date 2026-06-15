@@ -6,7 +6,7 @@
 
 User-facing docs: `README.md`, `docs/DEVELOPMENT.md`, `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
 
-Per-workspace guides: [`apps/worker/AGENTS.md`](./apps/worker/AGENTS.md) · [`apps/page/AGENTS.md`](./apps/page/AGENTS.md) · [`apps/middleware/AGENTS.md`](./apps/middleware/AGENTS.md).
+Per-workspace guides: [`apps/worker/AGENTS.md`](./apps/worker/AGENTS.md) · [`apps/page/AGENTS.md`](./apps/page/AGENTS.md).
 
 ## Explore first
 
@@ -20,7 +20,6 @@ Cloudflare API knowledge may be stale — fetch <https://developers.cloudflare.c
 
 - **`apps/worker/`** Worker-side backend runtime.
 - **`apps/page/`** Browser / Mini App frontend.
-- **`apps/middleware/`** IMAP bridge service.
 
 Routing, domains, deploy conditions, runtime topology, and required secrets belong to source/config/docs. Verify those files instead of assuming the topology from this guide.
 
@@ -35,7 +34,7 @@ All scripts run from repo root. Read root + per-workspace `package.json` for the
 - **Type placement**: in regular `.ts` / `.tsx` implementation files, keep module-level `interface` and `type` declarations immediately after imports, before runtime constants/functions/classes/components/hooks. Schema-derived aliases such as `UnwrapSchema<typeof Foo>` or `typeof app` may stay next to the value they derive from. Do not park local interfaces at the bottom of a file.
 - **Error reporting** (worker): `reportErrorToObservability(env, "tag", err)`, never `console.error`. Page side: surface via `extractErrorMessage()`, no silent swallowing.
 - **Cross-package imports**: only the TS path aliases declared in `tsconfig.base.json` are allowed. Page-side imports from backend packages must stay type-only unless the current bundler config explicitly supports the runtime import. Do not add short aliases that hide package ownership.
-- **Auth + API contract**: do not hand-write HTTP contracts. Start from the current clients, Elysia apps, and auth plugins in source, then let exported types drive route/method/body/query/response shapes. Verify current headers, cookies, tokens, and transports before changing auth or bridge routes.
+- **Auth + API contract**: do not hand-write HTTP contracts. Start from the current clients, Elysia apps, and auth plugins in source, then let exported types drive route/method/body/query/response shapes. Verify current headers, cookies, tokens, and transports before changing auth or provider routes.
 
 ## Elysia layout
 

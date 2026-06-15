@@ -9,7 +9,7 @@
 - 接收消息的 Telegram Chat ID（每个邮箱账号可配置不同的 Chat）
 - **Gmail**：启用了 Gmail API 的 [Google Cloud](https://console.cloud.google.com) 项目
 - **Outlook**：[Microsoft Entra ID](https://entra.microsoft.com) 应用注册
-- **IMAP**：IMAP Bridge（`apps/middleware/`，Docker 跑在 VPS，见 §6.4）
+- **IMAP**：邮箱服务支持 IMAP 读取，并能设置自动转发到 Cloudflare Email Routing 地址
 
 安装依赖：
 
@@ -128,12 +128,13 @@ bun wrangler secret put THINGS_CLOUD_ENDPOINT     # 调试用
 
 Things Cloud 账号不是全局 Worker secret；每个用户在 Mini App 的 Things 设置页保存自己的邮箱 / 密码。用户设备时区会随 Mini App 请求自动记录，缺省固定 fallback 到 UTC。
 
-如果要接 IMAP 账号，还要配置 IMAP Bridge：
+如果要接 IMAP 实时转发，还要配置 Email Routing 收件域名：
 
 ```sh
-bun wrangler secret put IMAP_BRIDGE_URL       # https://YOUR_IMAP_BRIDGE_DOMAIN
-bun wrangler secret put IMAP_BRIDGE_SECRET    # 与 middleware BRIDGE_SECRET 相同
+bun wrangler secret put IMAP_FORWARD_DOMAIN  # 例如 in.telemail.example.com
 ```
+
+`IMAP_FORWARD_DOMAIN` 不是敏感值，但用 secret / `.dev.vars` 配置可以避免把部署域名写进代码。每个 IMAP 账号会生成 `fwd-<token>@IMAP_FORWARD_DOMAIN`，用户把原邮箱自动转发到这个地址后，Worker 用 Email Routing 收到的 `Message-ID` 触发 IMAP 拉取原邮箱中的同一封邮件。
 
 ## 5. Worker 部署
 
@@ -227,54 +228,30 @@ BotFather：
 bun wrangler secret put TG_MINI_APP_SHORT_NAME
 ```
 
-## 6.4 部署 IMAP Middleware（可选，仅当要接 IMAP 账号时）
+## 6.4 配置 IMAP Email Routing（可选，仅当要接 IMAP 账号时）
 
-IMAP Bridge 是独立 Docker 服务，建议跑在 VPS 上，并由 nginx / Caddy / Cloudflare Tunnel 提供 HTTPS。Worker 通过 `IMAP_BRIDGE_URL` 调 middleware；middleware 通过 `TELEMAIL_URL` 回调 Worker 的 `/api/imap/*` endpoints。两边请求都带同一个 Bearer secret。
+IMAP 账号不再需要独立桥接服务。Worker 直接按需连接用户的 IMAP server；Cloudflare Email Routing 只提供实时 push signal。
 
 ### 准备
 
-- VPS 安装 Docker / Docker Compose。
-- 给 middleware 准备一个 HTTPS 域名，例如 `https://imap.example.com`，反向代理到 VPS `127.0.0.1:3000`。
-- `lastUid` / folder cache 通过 Worker API 写入 `EMAIL_KV`。
-
-### Worker secrets
-
-在 `apps/worker/` 目录配置：
+- 在 Cloudflare 上选择一个收件域名，例如 `in.telemail.example.com`。
+- 启用 Email Routing，并把 catch-all 或 `fwd-*` 地址路由到 `telemail` Worker。
+- 在 Worker secrets / `.dev.vars` 里配置同一个域名：
 
 ```sh
-bun wrangler secret put IMAP_BRIDGE_URL
-bun wrangler secret put IMAP_BRIDGE_SECRET
+bun wrangler secret put IMAP_FORWARD_DOMAIN
 ```
-
-`IMAP_BRIDGE_URL` 填 middleware 的 HTTPS URL。`IMAP_BRIDGE_SECRET` 是一段随机强密钥，middleware `.env` 的 `BRIDGE_SECRET` 必须填同一个值。
-
-### VPS `.env`
-
-在 VPS 上放 `apps/middleware/.env`：
-
-```env
-BRIDGE_SECRET=your-strong-random-secret
-TELEMAIL_URL=https://YOUR_WORKER_DOMAIN
-PORT=3000
-```
-
-### 部署与更新
-
-本地或 CI 会构建 `ghcr.io/<owner>/telemail-middleware` 镜像。VPS 上：
-
-```sh
-cd apps/middleware
-docker compose pull
-docker compose up -d
-```
-
-`docker-compose.yaml` 默认只把服务绑定到 `127.0.0.1:3000`，由反向代理负责对外 HTTPS。Worker 的定时健康检查会请求 middleware `/api/health`。
 
 ### 通信模型
 
-- Worker → middleware：`IMAP_BRIDGE_URL` + `Authorization: Bearer <IMAP_BRIDGE_SECRET>`。
-- middleware → Worker：`TELEMAIL_URL/api/imap/*` + `Authorization: Bearer <BRIDGE_SECRET>`。
-- middleware → IMAP server：VPS 容器直接连接外部 IMAP `993/143`。
+1. 用户在 Mini App 创建 IMAP 账号，保存 IMAP host / port / username / password。
+2. Mini App 账号详情显示 `fwd-<token>@IMAP_FORWARD_DOMAIN`。
+3. 用户在 iCloud / 邮箱服务里把自动转发目标设置为该地址。
+4. Cloudflare Email Routing 调用 Worker `email()` handler。
+5. Worker 从转发邮件 envelope recipient 解析账号，从 headers 取 RFC `Message-ID`，入队。
+6. Queue consumer 通过 IMAP `SEARCH HEADER Message-ID` 找到原邮箱里的邮件，再拉取 raw MIME 投递到 Telegram。
+
+未知转发地址和禁用账号会被 Worker 拒收，避免 catch-all 变成垃圾邮件入口。转发邮件本身的正文不会写入 D1；邮件正文仍由 IMAP 从原邮箱实时读取。
 
 ## 7. 添加邮箱账号
 
@@ -282,27 +259,27 @@ docker compose up -d
 
 1. 向 Bot 发送 `/start` → **账号管理** 打开 Mini App
 2. 在 Mini App 里选择账号类型（Gmail / Outlook / IMAP），填写 Chat ID 和必要配置
-3. Gmail / Outlook 需完成 OAuth 授权（先确保 `WORKER_URL` 已配置，且 OAuth redirect URI 指向同一域名）；IMAP 需填写服务器信息和密码
-4. 授权成功后自动创建 webhook 订阅，新邮件实时推送到 Telegram
+3. Gmail / Outlook 需完成 OAuth 授权（先确保 `WORKER_URL` 已配置，且 OAuth redirect URI 指向同一域名）；IMAP 需填写服务器信息和密码，并把邮箱自动转发到账号详情显示的转发地址
+4. 授权或转发设置完成后，新邮件实时推送到 Telegram
 
 管理员可从 `/start` → **全局管理** → **用户管理** 打开 Mini App 审批、撤回或删除用户。
 
-后续 Cron Trigger 会自动维护：每分钟分发到期提醒，并按用户本地时区在 19:00 发送未读 / 垃圾邮件摘要（非零列表会附 Mini App 入口）；每 5 分钟检查 IMAP 中间件健康；每小时重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
+后续 Cron Trigger 会自动维护：每分钟分发到期提醒，并按用户本地时区在 19:00 发送未读 / 垃圾邮件摘要（非零列表会附 Mini App 入口）；每小时重试失败的 LLM 摘要；每天凌晨（UTC 0 点）自动续订所有账号的推送通知。
 
 ## 8. CI/CD（GitHub Actions）
 
-`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` / `middleware` 三个 boolean，后续 deploy / preview / Docker job 按这些 flag + 事件类型决定跑不跑。Markdown 变更会跑 CI，但不会触发 Worker / Pages deploy 或 middleware Docker build/push。CI 验证拆成 Biome、typecheck、page build、middleware build 四个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
+`.github/workflows/ci.yml` 一个 workflow。`changes` job 用 `dorny/paths-filter` 输出 `worker` / `page` 两个 boolean，后续 deploy / preview job 按这些 flag + 事件类型决定跑不跑。Markdown 变更会跑 CI，但不会触发 Worker / Pages deploy。CI 验证拆成 Biome、typecheck、page build 三个并行 job，再由 `ci` 聚合 job 供部署链路依赖。
 
 ### 8.1 行为矩阵
 
 | 触发 | 跑什么 |
 | --- | --- |
-| `pull_request` | CI 总跑（Biome / typecheck / build page / build middleware 并行）<br/>`apps/worker/**` 非 Markdown 变更 → `preview-worker`（`wrangler versions upload`，输出 preview URL，不接生产流量）<br/>`apps/page/**` 非 Markdown 变更 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>`apps/middleware/**` 或 `.dockerignore` 非 Markdown 变更 → `docker-middleware`（build only，不 push）<br/>**`preview-comment`** sticky comment 把 URL / 状态贴到 PR |
-| `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`、pages `wrangler pages deploy --branch=main`、middleware Docker build/push 到 GHCR。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
-| `workflow_dispatch` on `main` | **强制**Worker / Pages deploy + middleware Docker build/push 全跑（绕过 path filter）—— 适合 hotfix 重发 |
+| `pull_request` | CI 总跑（Biome / typecheck / build page 并行）<br/>`apps/worker/**` 非 Markdown 变更 → `preview-worker`（`wrangler versions upload`，输出 preview URL，不接生产流量）<br/>`apps/page/**` 非 Markdown 变更 → `preview-page`（`wrangler pages deploy --branch=<head-ref>`）<br/>**`preview-comment`** sticky comment 把 URL / 状态贴到 PR |
+| `push` to `main` | CI + 按 filter 自动部署：worker `bun deploy:worker`、pages `wrangler pages deploy --branch=main`。注意：Worker deploy 不自动 apply D1 migrations，schema 变更需先跑 `bun migrate:worker:remote` |
+| `workflow_dispatch` on `main` | **强制**Worker / Pages deploy 全跑（绕过 path filter）—— 适合 hotfix 重发 |
 | `workflow_dispatch` on 其他 branch | 仅 CI |
 
-Path filter 故意**不含** `bun.lock`：免得改个 lockfile 牵连所有 workspace 重部署。Markdown 只影响 CI，不触发 deploy / Docker build。根 `package.json` 同时影响 worker / page / middleware（共享 devDeps）。
+Path filter 故意**不含** `bun.lock`：免得改个 lockfile 牵连所有 workspace 重部署。Markdown 只影响 CI，不触发 deploy。根 `package.json` 同时影响 worker / page（共享 devDeps）。
 
 ### 8.2 配置 Repo Secrets
 
@@ -317,14 +294,11 @@ GitHub repo → **Settings → Secrets and variables → Actions** 加：
 
 `apps/worker/wrangler.jsonc` 是 gitignored 的 templated 文件 —— `deploy-worker` / `preview-worker` job 在跑 wrangler 之前会先 `envsubst < apps/worker/wrangler.example.jsonc > apps/worker/wrangler.jsonc`，把 `${D1_DATABASE_ID}` / `${KV_NAMESPACE_ID}` 替换成上面两个 secrets。
 
-Middleware Docker 镜像由 `docker-middleware` job 构建并推送到 GHCR，镜像名为 `ghcr.io/<owner>/telemail-middleware`。
-
 ### 8.3 资源命名
 
 | 资源 | 名字 | 改名要动哪 |
 | --- | --- | --- |
 | Worker | `telemail` | `apps/worker/wrangler.jsonc` 的 `name` |
-| Middleware 镜像 | `ghcr.io/<owner>/telemail-middleware` | `.github/workflows/ci.yml` 的 `docker/metadata-action` 配置 |
 | Pages 项目 | `telemail-web` | `.github/workflows/ci.yml` 里的 `--project-name`（出现 2 次）|
 
 ### 8.4 Pages Build 设置
@@ -340,7 +314,6 @@ Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Di
 | 🔧 Worker version  | https://<id>-telemail.<account>.workers.dev |
 | 📄 Pages preview   | https://<id>.telemail-web.pages.dev |
 | 📄 Pages alias     | https://<sanitized-branch>.telemail-web.pages.dev |
-| 🐳 Middleware      | ✅ build OK (no push on PR) |
 ```
 
 跳过 / 失败的资源会显示 `_(unchanged)_` / `❌ failed`。同一个 PR 反复 push 评论会**原地更新**，不刷屏。
@@ -351,4 +324,4 @@ Pages 项目 Settings → **Builds & deployments** → **Build with Git** → Di
 
 - 改 docs / Markdown / 根配置 / `.github/`：path filter 自然过滤，不触发 deploy
 - 整个 workflow 都不想跑：commit message 带 `[skip ci]`
-- 改 worker / page / middleware：Worker、Pages、Docker job 并行跑，互不依赖
+- 改 worker / page：Worker、Pages job 并行跑，互不依赖

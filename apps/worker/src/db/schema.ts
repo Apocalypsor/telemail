@@ -19,37 +19,45 @@ const tsMs = (name: string) => integer(name, { mode: "timestamp_ms" });
 const nowDefault = sql`(CAST(strftime('%s', 'now') AS INTEGER) * 1000)`;
 
 /** D1 accounts 表 */
-export const accounts = sqliteTable("accounts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  type: text("type", { enum: ["gmail", "imap", "outlook"] })
-    .notNull()
-    .default("gmail"),
-  email: text("email"),
-  chat_id: text("chat_id").notNull(),
-  /** Telegram forum topic id for mail delivery. NULL = send to the chat's default destination. */
-  topic_id: integer("topic_id"),
-  refresh_token: text("refresh_token"),
-  telegram_user_id: text("telegram_user_id"),
-  /** IMAP only */
-  imap_host: text("imap_host"),
-  /** IMAP only */
-  imap_port: integer("imap_port"),
-  /** IMAP only —— 0 | 1 */
-  imap_secure: integer("imap_secure"),
-  /** IMAP only */
-  imap_user: text("imap_user"),
-  /** IMAP only */
-  imap_pass: text("imap_pass"),
-  created_at: tsMs("created_at").notNull().default(nowDefault),
-  updated_at: tsMs("updated_at").notNull().default(nowDefault),
-  history_id: text("history_id"),
-  /** 归档目标：Gmail = label ID（NULL 时禁用归档）；IMAP = 文件夹名（NULL 时回退到 "Archive"）；Outlook 不用 */
-  archive_folder: text("archive_folder"),
-  /** 归档目标的人类可读名称（仅 Gmail 需要：label ID 用户不可读，存这份用于 UI 展示） */
-  archive_folder_name: text("archive_folder_name"),
-  /** 1 = 暂停：push/队列/定时任务/列表都会跳过；账号配置保留，可随时恢复 */
-  disabled: integer("disabled").notNull().default(0),
-});
+export const accounts = sqliteTable(
+  "accounts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    type: text("type", { enum: ["gmail", "imap", "outlook"] })
+      .notNull()
+      .default("gmail"),
+    email: text("email"),
+    chat_id: text("chat_id").notNull(),
+    /** Telegram forum topic id for mail delivery. NULL = send to the chat's default destination. */
+    topic_id: integer("topic_id"),
+    refresh_token: text("refresh_token"),
+    telegram_user_id: text("telegram_user_id"),
+    /** IMAP only */
+    imap_host: text("imap_host"),
+    /** IMAP only */
+    imap_port: integer("imap_port"),
+    /** IMAP only —— 0 | 1 */
+    imap_secure: integer("imap_secure"),
+    /** IMAP only */
+    imap_user: text("imap_user"),
+    /** IMAP only */
+    imap_pass: text("imap_pass"),
+    /** IMAP forwarding local token, used by Cloudflare Email Routing as a push signal. */
+    imap_forward_token: text("imap_forward_token"),
+    created_at: tsMs("created_at").notNull().default(nowDefault),
+    updated_at: tsMs("updated_at").notNull().default(nowDefault),
+    history_id: text("history_id"),
+    /** 归档目标：Gmail = label ID（NULL 时禁用归档）；IMAP = 文件夹名（NULL 时回退到 "Archive"）；Outlook 不用 */
+    archive_folder: text("archive_folder"),
+    /** 归档目标的人类可读名称（仅 Gmail 需要：label ID 用户不可读，存这份用于 UI 展示） */
+    archive_folder_name: text("archive_folder_name"),
+    /** 1 = 暂停：push/队列/定时任务/列表都会跳过；账号配置保留，可随时恢复 */
+    disabled: integer("disabled").notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex("idx_accounts_imap_forward_token").on(t.imap_forward_token),
+  ],
+);
 
 /** D1 users 表（登录过的 Telegram 用户） */
 export const users = sqliteTable(

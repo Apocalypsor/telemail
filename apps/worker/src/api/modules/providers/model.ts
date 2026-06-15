@@ -9,25 +9,3 @@ export const OutlookPushQuery = t.Object({
   validationToken: t.Optional(t.String()),
   secret: t.Optional(t.String()),
 });
-
-export const ImapPushBody = t.Object({
-  accountId: t.Number(),
-  rfcMessageId: t.String(),
-});
-
-export const ImapAccountParams = t.Object({
-  accountId: t.String(),
-});
-
-export const ImapFolderParams = t.Object({
-  accountId: t.String(),
-  kind: t.Union([t.Literal("junk"), t.Literal("trash"), t.Literal("archive")]),
-});
-
-export const ImapLastUidBody = t.Object({
-  uid: t.Number(),
-});
-
-export const ImapFolderBody = t.Object({
-  path: t.Union([t.String(), t.Null()]),
-});
