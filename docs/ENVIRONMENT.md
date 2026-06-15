@@ -37,7 +37,7 @@
 | --------------------- | ----------------------------------------------------- |
 | `IMAP_FORWARD_DOMAIN` | Cloudflare Email Routing 路由到 Worker 的收件域名，例如 `in.telemail.example.com` |
 
-IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存到 `accounts` 表。`IMAP_FORWARD_DOMAIN` 只用来生成每个账号的转发地址；用户把 iCloud / 邮箱服务的自动转发地址设为该地址后，Email Routing handler 会用转发邮件里的 `Message-ID` 触发 Worker 通过 IMAP 拉取原邮箱中的同一封邮件。
+IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存到 `accounts` 表。`IMAP_FORWARD_DOMAIN` 只用来生成每个账号的 `fwd+<token>` 转发地址；用户把 iCloud / 邮箱服务的自动转发地址设为该地址后，Email Routing handler 会用转发邮件里的 `Message-ID` 触发 Worker 通过 IMAP 拉取原邮箱中的同一封邮件。
 
 ### LLM / AI 摘要（可选）
 

@@ -138,5 +138,5 @@ const buildImapForwardAddress = (env: Env, account: Account): string | null => {
   if (account.type !== "imap") return null;
   const domain = env.IMAP_FORWARD_DOMAIN?.trim().replace(/^@+/, "");
   if (!domain || !account.imap_forward_token) return null;
-  return `fwd-${account.imap_forward_token}@${domain.toLowerCase()}`;
+  return `fwd+${account.imap_forward_token}@${domain.toLowerCase()}`;
 };

@@ -134,7 +134,7 @@ Things Cloud 账号不是全局 Worker secret；每个用户在 Mini App 的 Thi
 bun wrangler secret put IMAP_FORWARD_DOMAIN  # 例如 in.telemail.example.com
 ```
 
-`IMAP_FORWARD_DOMAIN` 不是敏感值，但用 secret / `.dev.vars` 配置可以避免把部署域名写进代码。每个 IMAP 账号会生成 `fwd-<token>@IMAP_FORWARD_DOMAIN`，用户把原邮箱自动转发到这个地址后，Worker 用 Email Routing 收到的 `Message-ID` 触发 IMAP 拉取原邮箱中的同一封邮件。
+`IMAP_FORWARD_DOMAIN` 不是敏感值，但用 secret / `.dev.vars` 配置可以避免把部署域名写进代码。每个 IMAP 账号会生成 `fwd+<token>@IMAP_FORWARD_DOMAIN`，用户把原邮箱自动转发到这个地址后，Worker 用 Email Routing 收到的 `Message-ID` 触发 IMAP 拉取原邮箱中的同一封邮件。
 
 ## 5. Worker 部署
 
@@ -235,7 +235,7 @@ IMAP 账号不再需要独立桥接服务。Worker 直接按需连接用户的 I
 ### 准备
 
 - 在 Cloudflare 上选择一个收件域名，例如 `in.telemail.example.com`。
-- 启用 Email Routing，并把 catch-all 或 `fwd-*` 地址路由到 `telemail` Worker。
+- 启用 Email Routing Subaddressing，并把 `fwd` 地址路由到 `telemail` Worker。`fwd+<token>` 会命中 `fwd` 规则，Worker 仍能从完整收件地址里读到 token。
 - 在 Worker secrets / `.dev.vars` 里配置同一个域名：
 
 ```sh
@@ -245,13 +245,13 @@ bun wrangler secret put IMAP_FORWARD_DOMAIN
 ### 通信模型
 
 1. 用户在 Mini App 创建 IMAP 账号，保存 IMAP host / port / username / password。
-2. Mini App 账号详情显示 `fwd-<token>@IMAP_FORWARD_DOMAIN`。
+2. Mini App 账号详情显示 `fwd+<token>@IMAP_FORWARD_DOMAIN`。
 3. 用户在 iCloud / 邮箱服务里把自动转发目标设置为该地址。
 4. Cloudflare Email Routing 调用 Worker `email()` handler。
 5. Worker 从转发邮件 envelope recipient 解析账号，从 headers 取 RFC `Message-ID`，入队。
 6. Queue consumer 通过 IMAP `SEARCH HEADER Message-ID` 找到原邮箱里的邮件，再拉取 raw MIME 投递到 Telegram。
 
-未知转发地址和禁用账号会被 Worker 拒收，避免 catch-all 变成垃圾邮件入口。转发邮件本身的正文不会写入 D1；邮件正文仍由 IMAP 从原邮箱实时读取。
+未知 token 和禁用账号会被 Worker 拒收。转发邮件本身的正文不会写入 D1；邮件正文仍由 IMAP 从原邮箱实时读取。
 
 ## 7. 添加邮箱账号
 
