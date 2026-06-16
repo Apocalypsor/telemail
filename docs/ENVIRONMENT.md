@@ -35,9 +35,9 @@
 
 | Secret                | 说明                                                  |
 | --------------------- | ----------------------------------------------------- |
-| `IMAP_FORWARD_DOMAIN` | Cloudflare Email Routing 路由到 Worker 的收件域名，例如 `in.telemail.example.com` |
+| `IMAP_FORWARD_DOMAIN` | Cloudflare Email Routing 路由到 Worker 的独立收件域名，例如 `telemail-inbox.example` |
 
-IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存到 `accounts` 表。`IMAP_FORWARD_DOMAIN` 只用来生成每个账号的 `fwd+<token>` 转发地址；用户把 iCloud / 邮箱服务的自动转发地址设为该地址后，Email Routing handler 会用转发邮件里的 `Message-ID` 触发 Worker 通过 IMAP 拉取原邮箱中的同一封邮件。
+IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存到 `accounts` 表。`IMAP_FORWARD_DOMAIN` 只用来生成每个账号的 `fwd+<token>` 转发地址；Cloudflare Email Routing 侧应启用 Subaddressing，并把 `fwd` 地址路由到 Worker。
 
 ### LLM / AI 摘要（可选）
 
@@ -68,6 +68,25 @@ IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存
 | `THINGS_CLOUD_ENDPOINT`   | Things Cloud API endpoint override（调试用，默认官方 endpoint） |
 
 用户 Things Cloud 凭据和 `user_timezone` 存储在 D1 `users` 表，API 不回显密码；每个用户的 Things app instance id 存在 KV。注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径。
+
+## Vars
+
+`apps/worker/wrangler.jsonc` 的 `vars` 配置，不用 `wrangler secret put`：
+
+| Var           | 说明                                               |
+| ------------- | -------------------------------------------------- |
+| `WORKER_NAME` | Worker 名称，用于 observability 上报来源；默认 `telemail` |
+
+## GitHub Actions Secrets
+
+这些是 repo secrets，用于 CI/CD，不是 Worker runtime secrets，也不用写进 `.dev.vars`：
+
+| Secret                  | 说明                                      |
+| ----------------------- | ----------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | Wrangler Action 部署 Worker / Pages 用     |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID                     |
+| `CF_D1_DATABASE_ID`     | 生成 `apps/worker/wrangler.jsonc` 的 D1 database id |
+| `CF_KV_NAMESPACE_ID`    | 生成 `apps/worker/wrangler.jsonc` 的 KV namespace id |
 
 ## Cloudflare Bindings
 

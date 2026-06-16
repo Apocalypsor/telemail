@@ -19,7 +19,6 @@
 ## 文档
 
 - **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** —— 从 0 部署到 Cloudflare（GCP / MS Entra / D1 / KV / Queue / Workers + Pages / Bot webhook）
-- **[docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)** —— 本地开发命令、前端调试流程、i18n
 - **[docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md)** —— 所有 secrets、Bindings、Cron、D1 schema 的参考
 
 ## 多账号

@@ -1,33 +1,40 @@
 # Worker — Agent Guide
 
-Cloudflare Worker (Elysia + grammY). Cross-workspace rules in [root AGENTS.md](../../AGENTS.md).
+Follow the parent guide first. This file adds only durable Worker-side expectations; it is not a source map.
 
-Before changing worker behavior, follow root "Explore first"; start from the current Worker entrypoint, runtime config, handlers, and the relevant provider/module files.
+## Explore First
 
-## Layout (`src/`)
+Before changing Worker behavior, inspect the current entrypoints, runtime config, bindings, handlers, provider abstractions, persistence wrappers, and user-facing docs relevant to the task. Do not rely on this file for source structure, route inventory, provider inventory, binding names, secret names, cron cadence, or deployment topology.
 
-- **`api/`** — HTTP layer (Elysia). Module / plugin file rules in root [AGENTS.md](../../AGENTS.md) "Elysia layout". Start at `api/index.ts` to see the current app composition and exported `App` type.
-- **`bot/`** — Telegram bot (grammY). Self-contained tree, **no** sub-`services/`. Handler folders should stay focused on callback/command registration; shared or extracted bot helper code lives in `bot/utils/` with purpose-named files.
-- **`handlers/`** — non-HTTP entry points (queue consumer + cron).
-- **`clients/`** — outbound HTTP: shared `ky` instance + hand-written external API wrappers.
-- **`providers/`** — email provider impls (Gmail / Outlook / IMAP), abstract base in `base.ts`. `index.ts` is the dispatcher (`PROVIDERS` map + helper fns); no barrel re-exports of classes or types. Per-provider differences stay on the class — **never `branch on account.type` outside `providers/`**.
-- **`db/`** — D1 + KV access. Schema-typed wrappers only.
-- **`utils/`** — pure helpers (formatters, crypto, encoders, thin lib wrappers), and cross-feature orchestration that has no single-module owner. Single-owner orchestration goes to that module's `service.ts`, not here.
-- **`i18n/`** — translations.
+## Elysia Pattern
 
-Decision tree for a new file: public HTTP route → `api/modules/<feature>/`; bot command → `bot/handlers/`; new email provider → `providers/`; SQL/KV → `db/`; outbound API SDK → `clients/`; cross-cutting helper → `utils/`. Anything else used by only one consumer goes file-private next to it.
+This is a fixed code organization rule for Elysia code, not an inventory of current routes.
+
+[Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) means two different patterns here:
+
+- **Non-request-dependent** - does not read cookies, headers, or Elysia `Context`; dependencies are passed explicitly, such as `env`. Use `abstract class XxxService { static foo(env, ...) {} }` in the feature module's `service.ts`.
+- **Request-dependent** - reads cookies, headers, or Elysia `Context` for auth, env injection, and similar concerns. This should be an Elysia instance under `plugins/<name>/` or an equivalent plugin file. The plugin itself is the service; do not add a separate `service.ts` inside a plugin directory.
+
+Module directories use only these file roles:
+
+```
+index.ts        # Elysia controller - routes + handlers
+model.ts        # request / response schema
+types.ts        # unions / interfaces that do not fit in schema
+service.ts      # business orchestration across DB / provider / KV / HMAC
+utils.ts        # pure helpers - single-purpose, no business context dependency
+components.ts   # SSR HTML when needed
+```
+
+How to decide service vs utils: needs runtime env plus multiple DB / provider calls -> service; formatter / parser / one-line lookup -> util.
+
+When `utils.ts` grows too large, promote it to a `utils/` directory with purpose-named files. Do not use generic child filenames like `service.ts`, `lib.ts`, or `helpers.ts`; `service.ts` is only allowed at the module root.
 
 ## Conventions
 
-- **Imports / aliases**: use the root alias rules; do not repeat or add workspace-specific shortcuts here.
-- **HTTP**: generic outbound requests use the existing worker HTTP client. Provider-specific transports stay in that provider's established utility files.
-- **IMAP transport**: IMAP accounts are handled inside the Worker. Cloudflare Email Routing provides the push signal; provider methods open short-lived IMAP socket connections on demand for reads and message actions.
-- **Env / waitUntil**: in Elysia handlers, destructure `{ env, executionCtx, waitUntil }` from context (provided by `cf` plugin). Queue and cron code receive `env` from the Worker runtime entry point and pass it explicitly to services/providers. Use `waitUntil` for side effects that should survive the response or current batch item.
-- **Bot commands**: before adding command auth or chat-scope checks, inspect `bot/index.ts` for global guards and the relevant handler folder for local exceptions.
-- **State reconciliation**: all "remote → TG" syncs go through `reconcileMessageState`; star pin goes through `syncStarPinState`. **Don't** patch state in multiple places.
-- **Disable/enable**: `accounts.disabled` pauses an account without deleting data. Before adding a new account workflow, `rg "disabled" apps/worker/src` and preserve the existing enforcement pattern.
-- **IMAP message id = RFC 822 Message-Id** (not the per-folder UID). Provider methods search `HEADER Message-ID` in the relevant mailbox; UIDs aren't stable across folders. Forwarded emails without Message-Id are rejected. Gmail / Outlook keep their native ids.
-- **Archive**: `provider.archiveMessage(id)` + `accountCanArchive(account)`. Gmail needs the user to pick a label (`accounts.archive_folder`); without one `canArchive()` returns false.
-- **Cron**: inspect the scheduled handler and current runtime config for triggers and time gates before changing cadence. Keep scheduling decisions centralized in the cron path instead of scattering timers across providers.
-- **Email keyboard**: `buildEmailKeyboard` requires `tgMessageId`, so the delivery flow is send naked → insert message_map → build keyboard → `setReplyMarkup`. **One code path** covers both private chat and groups.
-- **Reminders**: start from the reminder module, auth plugin, and cron handler before changing entry points or delivery behavior. Preserve threading under the original email unless the product flow changes deliberately.
+- **Use current boundaries**: find the existing owner for a behavior before adding code. Preserve established provider, API, bot, persistence, and utility boundaries unless the change is intentionally restructuring them.
+- **Provider behavior**: start from the current provider abstraction and dispatch pattern before changing mail sync, message actions, archive, forwarding, or OAuth behavior. Do not duplicate provider-specific branching in unrelated layers.
+- **Runtime context**: follow the current handler pattern for passing runtime environment, queue context, background work, and side effects. Do not introduce hidden globals for request/runtime state.
+- **Error reporting**: use the existing Worker error-reporting path instead of ad hoc logging.
+- **Persistence**: use existing typed database / KV wrappers. Do not hand-write storage access in feature code when a local wrapper pattern already exists.
+- **User-visible behavior**: update user-facing docs when changing account setup, delivery behavior, auth, reminders, or deployment requirements.
