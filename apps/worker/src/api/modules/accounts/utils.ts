@@ -1,7 +1,6 @@
 import { getAuthorizedAccount } from "@worker/db/accounts";
 import { getUserByTelegramId } from "@worker/db/users";
 import { accountCanArchive, PROVIDERS } from "@worker/providers";
-import { isImapBridgeConfigured } from "@worker/providers/imap/utils/client";
 import type { Account, AccountType, Env, TelegramUser } from "@worker/types";
 import { getWorkerBaseUrl } from "@worker/utils/url";
 import { formatUserName } from "@worker/utils/user-format";
@@ -101,6 +100,7 @@ export const toAccountResponse = async (
     imapPort: account.imap_port,
     imapSecure: !!account.imap_secure,
     imapUser: account.imap_user,
+    imapForwardAddress: buildImapForwardAddress(env, account),
   };
 };
 
@@ -115,9 +115,7 @@ export const toProviderOptions = (env: Env): AccountProviderOption[] => {
     displayName: klass.displayName,
     oauth: !!klass.oauth,
     oauthProviderName: klass.oauth?.name ?? null,
-    configured: klass.oauth
-      ? klass.oauth.isConfigured(env)
-      : isImapBridgeConfigured(env),
+    configured: klass.oauth ? klass.oauth.isConfigured(env) : true,
     needsArchiveSetup: klass.needsArchiveSetup,
   }));
 };
@@ -127,3 +125,18 @@ export const toUserOption = (user: TelegramUser): AccountUserOption => ({
   label: user.username ? `@${user.username}` : formatUserName(user),
   username: user.username,
 });
+
+export const createForwardToken = (): string => {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const buildImapForwardAddress = (env: Env, account: Account): string | null => {
+  if (account.type !== "imap") return null;
+  const domain = env.IMAP_FORWARD_DOMAIN?.trim().replace(/^@+/, "");
+  if (!domain || !account.imap_forward_token) return null;
+  return `fwd+${account.imap_forward_token}@${domain.toLowerCase()}`;
+};

@@ -4,12 +4,12 @@
 
 - **Gmail**：Google Cloud Pub/Sub 推送通知实时接收
 - **Outlook**：Microsoft Graph webhook 订阅实时接收
-- **IMAP**（可选）：独立 IMAP Bridge Docker 服务，通过 IMAP IDLE 实时推送
+- **IMAP**（可选）：Cloudflare Email Routing 接收自动转发信号，Worker 按需通过 IMAP 读取原邮箱
 - **MCP**：用户可在 bot 里生成 API key，让 agent 通过 `/api/mcp` 搜索和读取自己的邮件
 
 ## 技术栈
 
-- **Runtime**：Cloudflare Workers（后端）+ Cloudflare Pages（Mini App 前端 + web 工具页）+ VPS Docker（IMAP Bridge）
+- **Runtime**：Cloudflare Workers（后端）+ Cloudflare Pages（Mini App 前端 + web 工具页）
 - **后端**：[Elysia](https://elysiajs.com)（CloudflareAdapter）+ [grammY](https://grammy.dev) + Cloudflare D1 / KV / Queue / Cron
 - **前端**：[Vite](https://vite.dev) + React 19 + [TanStack Router](https://tanstack.com/router) + [TanStack Query](https://tanstack.com/query) + [HeroUI](https://heroui.com) + [Eden treaty](https://elysiajs.com/eden/treaty/overview)（端到端类型安全 RPC）+ [TypeBox](https://github.com/sinclairzx81/typebox)
 - **邮件解析**：[postal-mime](https://github.com/postalsys/postal-mime)；HTML → Markdown：[turndown](https://github.com/mixmark-io/turndown) → Telegram MarkdownV2
@@ -19,7 +19,6 @@
 ## 文档
 
 - **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** —— 从 0 部署到 Cloudflare（GCP / MS Entra / D1 / KV / Queue / Workers + Pages / Bot webhook）
-- **[docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)** —— 本地开发命令、前端调试流程、i18n
 - **[docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md)** —— 所有 secrets、Bindings、Cron、D1 schema 的参考
 
 ## 多账号
@@ -29,7 +28,7 @@
 - Forum supergroup 可在 General 里 `/start` 自动创建 `Inbox` topic，用 General 做操作区、Inbox 放邮件
 - 所有 Gmail 账号共享同一个 GCP 项目；所有 Outlook 账号共享同一个 Entra ID 应用；所有账号共享同一个 Telegram Bot
 - 账号信息存 D1，通过 Mini App 管理（`/start` → 账号管理）
-- 支持**临时禁用**：推送 / cron / 列表跳过该账号，IMAP 额外通知 bridge 断开连接；配置保留随时可恢复
+- 支持**临时禁用**：推送 / cron / 列表跳过该账号；配置保留随时可恢复
 
 ## Bot 命令
 

@@ -1,3 +1,2 @@
 bun typecheck
 bun lint-staged
-bun check:wrangler

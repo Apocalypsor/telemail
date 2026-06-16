@@ -1,6 +1,5 @@
 import type { ScheduledTaskContext } from "@worker/handlers/scheduled/base";
 import { DailyMailSummaryTask } from "@worker/handlers/scheduled/tasks/daily-summary";
-import { ImapBridgeHealthTask } from "@worker/handlers/scheduled/tasks/imap-bridge-health";
 import { DueRemindersTask } from "@worker/handlers/scheduled/tasks/reminders";
 import { RenewPushTask } from "@worker/handlers/scheduled/tasks/renew-push";
 import { RetryFailedEmailsTask } from "@worker/handlers/scheduled/tasks/retry-failed-emails";
@@ -10,7 +9,6 @@ const SCHEDULED_TASKS = [
   new DueRemindersTask(),
   new DailyMailSummaryTask(),
   new RetryFailedEmailsTask(),
-  new ImapBridgeHealthTask(),
   new RenewPushTask(),
 ];
 

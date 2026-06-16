@@ -31,22 +31,13 @@
 | `MS_CLIENT_SECRET`  | Microsoft Entra ID Client Secret                  |
 | `MS_WEBHOOK_SECRET` | 自定义密钥，验证 Microsoft Graph webhook 签名     |
 
-### IMAP Bridge（用 IMAP 时必填）
+### IMAP Forwarding（用 IMAP 实时收件时必填）
 
-Worker secrets：
+| Secret                | 说明                                                  |
+| --------------------- | ----------------------------------------------------- |
+| `IMAP_FORWARD_DOMAIN` | Cloudflare Email Routing 路由到 Worker 的独立收件域名，例如 `telemail-inbox.example` |
 
-| Secret               | 说明                                                  |
-| -------------------- | ----------------------------------------------------- |
-| `IMAP_BRIDGE_URL`    | VPS 上 IMAP Bridge 的 HTTPS URL，例如 `https://imap.example.com` |
-| `IMAP_BRIDGE_SECRET` | Worker 调 middleware、middleware 回调 Worker 共用的 Bearer secret |
-
-middleware `apps/middleware/.env`：
-
-| Env             | 说明                                                  |
-| --------------- | ----------------------------------------------------- |
-| `BRIDGE_SECRET` | 与 Worker `IMAP_BRIDGE_SECRET` 相同的 Bearer secret   |
-| `TELEMAIL_URL`  | Worker 对外 URL，例如 `https://telemail.example.com`  |
-| `PORT`          | middleware 本地监听端口，默认 `3000`                  |
+IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存到 `accounts` 表。`IMAP_FORWARD_DOMAIN` 只用来生成每个账号的 `fwd+<token>` 转发地址；Cloudflare Email Routing 侧应启用 Subaddressing，并把 `fwd` 地址路由到 Worker。
 
 ### LLM / AI 摘要（可选）
 
@@ -78,6 +69,25 @@ middleware `apps/middleware/.env`：
 
 用户 Things Cloud 凭据和 `user_timezone` 存储在 D1 `users` 表，API 不回显密码；每个用户的 Things app instance id 存在 KV。注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径。
 
+## Vars
+
+`apps/worker/wrangler.jsonc` 的 `vars` 配置，不用 `wrangler secret put`：
+
+| Var           | 说明                                               |
+| ------------- | -------------------------------------------------- |
+| `WORKER_NAME` | Worker 名称，用于 observability 上报来源；默认 `telemail` |
+
+## GitHub Actions Secrets
+
+这些是 repo secrets，用于 CI/CD，不是 Worker runtime secrets，也不用写进 `.dev.vars`：
+
+| Secret                  | 说明                                      |
+| ----------------------- | ----------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | Wrangler Action 部署 Worker / Pages 用     |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID                     |
+| `CF_D1_DATABASE_ID`     | 生成 `apps/worker/wrangler.jsonc` 的 D1 database id |
+| `CF_KV_NAMESPACE_ID`    | 生成 `apps/worker/wrangler.jsonc` 的 KV namespace id |
+
 ## Cloudflare Bindings
 
 `apps/worker/wrangler.jsonc` 里声明，`bun typegen:worker` 把类型同步到 `apps/worker/worker-configuration.d.ts`。
@@ -85,7 +95,7 @@ middleware `apps/middleware/.env`：
 | Binding                 | 类型           | 用途                                                                 |
 | ----------------------- | -------------- | -------------------------------------------------------------------- |
 | `DB`                    | D1             | 账号 / 消息映射 / 提醒 / 用户 / 失败邮件                             |
-| `EMAIL_KV`              | KV             | access_token 缓存、消息去重、OAuth state、IMAP bridge lastUid / folder cache、预览 HTML（7 天 TTL） |
+| `EMAIL_KV`              | KV             | access_token 缓存、消息去重、OAuth state、IMAP folder cache、预览 HTML（7 天 TTL） |
 | `EMAIL_QUEUE`           | Queue          | 邮件处理队列（max_batch_size=5, max_retries=3, max_concurrency=3）   |
 | `TELEGRAM_RATE_LIMITER` | Durable Object | Telegram API 写请求限流闸门；Queue 遇到 TG 429 时按 retry_after 延迟重试 |
 | `OBS_SERVICE`           | Service        | 错误上报到 [workers-observability-hub](https://www.npmjs.com/package/workers-observability-hub) |
@@ -96,7 +106,6 @@ middleware `apps/middleware/.env`：
 
 - **每分钟**：分发到期的 Mini App 提醒
 - **每 15 分钟**：按用户本地时区检查是否到 19:00，发送未读 / 垃圾邮件摘要（都为 0 时跳过；非零列表会附 Mini App 入口）
-- **每 5 分钟**（`minute % 5 === 0`）：检查 IMAP Bridge 健康
 - **每小时**（`minute === 0`）：重试失败的 LLM 摘要
 - **每天 UTC 0 点**（额外）：为所有已授权账号续订推送通知（Gmail watch / Outlook Graph subscription）
 
@@ -104,7 +113,7 @@ middleware `apps/middleware/.env`：
 
 用户可见的表：
 
-- `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、可选 `topic_id`、`refresh_token` 加密等）
+- `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、可选 `topic_id`、`refresh_token`、IMAP credentials / forward token 等）
 - `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id, tg_thread_id)`，幂等去重用
 - `reminders` —— Mini App 设的提醒，可选记录推送到 Things Cloud 的 task UUID
 - `users` —— Telegram 用户记录（`approved` 状态控制访问 Mini App、web 工具页 `/preview` / `/junk-check` 与 `/api/mcp`），以及可选的 per-user Things Cloud 设置和 MCP API key hash

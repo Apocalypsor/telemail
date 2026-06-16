@@ -6,8 +6,7 @@
   "author": "Apocalypsor <chthon605@gmail.com>",
   "workspaces": [
     "apps/worker",
-    "apps/page",
-    "apps/middleware"
+    "apps/page"
   ],
   "scripts": {
     "dev:worker": "bun --filter telemail-worker dev",
@@ -20,10 +19,8 @@
     "dev:page": "bun --filter telemail-page dev",
     "build:page": "bun --filter telemail-page build",
     "deploy:page": "bun --filter telemail-page deploy",
-    "build:middleware": "bun --filter telemail-middleware build",
     "check": "biome check --no-errors-on-unmatched --files-ignore-unknown=true",
-    "check:wrangler": "bun --filter '*' check:wrangler",
-    "typecheck": "bun --filter '*' typecheck",
+    "typecheck": "bun --cwd apps/page generate:routes && tsc -b --noEmit",
     "prepare": "husky",
     "skills:install": "bunx skills experimental_install && mkdir -p .claude/ && ln -sf ../.agents/skills .claude/",
     "skills:update": "bunx skills update"

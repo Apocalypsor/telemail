@@ -49,10 +49,8 @@ interface WorkerSecrets {
   MS_CLIENT_SECRET?: string;
   /** Microsoft Graph webhook 共享密钥，校验通知来源 */
   MS_WEBHOOK_SECRET?: string;
-  /** IMAP bridge public URL, e.g. https://imap.example.com */
-  IMAP_BRIDGE_URL?: string;
-  /** Shared Bearer secret for Worker ↔ IMAP bridge calls */
-  IMAP_BRIDGE_SECRET?: string;
+  /** Domain routed to this Worker's Email Routing handler, e.g. in.telemail.example.com */
+  IMAP_FORWARD_DOMAIN?: string;
   /**
    * BotFather `/newapp` 注册的 Mini App short_name（如 `dovmailui`）。
    * 用于群聊里 ⏰ 按钮的 deep link `t.me/<bot>/<short_name>?startapp=...`。

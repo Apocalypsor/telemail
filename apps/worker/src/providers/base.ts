@@ -263,7 +263,7 @@ export abstract class EmailProvider {
 
   async stopPush(): Promise<void> {}
 
-  /** 账号持久化状态变化后的钩子。IMAP 用它通知 bridge reconcile 连接；OAuth 默认 no-op。 */
+  /** 账号持久化状态变化后的钩子；默认 no-op。 */
   async onPersistedChange(): Promise<void> {}
 
   /** 默认 true；Gmail override 检查 archive_folder。 */

@@ -15,8 +15,7 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@page/*": ["./apps/page/src/*"],
-      "@worker/*": ["./apps/worker/src/*"],
-      "@middleware/*": ["./apps/middleware/src/*"]
+      "@worker/*": ["./apps/worker/src/*"]
     }
   }
 }

@@ -1,5 +1,6 @@
 import { app } from "@worker/api";
 import type { RequestWithCtx } from "@worker/api/plugins/cf";
+import emailHandler from "@worker/handlers/email";
 import queueHandler from "@worker/handlers/queue";
 import scheduledHandler from "@worker/handlers/scheduled";
 import type { Env, QueueMessage } from "@worker/types";
@@ -18,6 +19,14 @@ export default {
   ): Response | Promise<Response> {
     (req as RequestWithCtx)._ctx = ctx;
     return app.fetch(req);
+  },
+
+  async email(
+    message: ForwardableEmailMessage,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<void> {
+    await emailHandler(message, env, ctx);
   },
 
   async queue(

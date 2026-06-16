@@ -1,50 +1,42 @@
+import { WorkerImapClient } from "@worker/clients/imap";
+import { quoteImapString } from "@worker/clients/imap/utils";
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@worker/constants";
 import { getAccountById } from "@worker/db/accounts";
 import { EmailProvider } from "@worker/providers/base";
+import { listImapPage } from "@worker/providers/imap/utils/list";
 import {
-  bridgeCall,
-  bridgeClient,
-  bridgeFetch,
-  bridgeRequestUrl,
-  isImapBridgeConfigured,
-  syncAccounts,
-} from "@worker/providers/imap/utils/client";
-import { listImapBridgePage } from "@worker/providers/imap/utils/list";
+  findArchiveFolder,
+  findJunkFolder,
+  findTrashFolder,
+  mailboxExists,
+  resolveArchiveFolder,
+  resolveFolderForHint,
+} from "@worker/providers/imap/utils/mailboxes";
+import {
+  buildMessagesFromHeaders,
+  type DatedEmailListItem,
+  sortByDateDesc,
+} from "@worker/providers/imap/utils/messages";
 import type {
   EmailCount,
   EmailListItem,
   EmailListPage,
   MessageState,
 } from "@worker/providers/types";
-import {
-  type Env,
-  type MailAttachmentDownload,
-  QueueMessageType,
-} from "@worker/types";
-import { base64ToArrayBuffer } from "@worker/utils/base64url";
+import { type Env, QueueMessageType } from "@worker/types";
 
 /**
  * IMAP provider —— 所有 `messageId` 参数都是 RFC 822 Message-Id（全局唯一，跨 folder
- * 稳定）。不是 IMAP UID。middleware 会按 `SEARCH HEADER Message-Id` 在相关 folder
- * 里找到当前 UID 再操作。
- *
- * Bridge 通信走 Eden treaty —— 所有 path / body / response 都从
- * `@middleware/index` 自动推导，middleware 那边改 schema 这里立刻报错。
- * Treaty 配 `throwHttpError: true`，非 2xx 直接抛 `EdenFetchError`，
- * 调用方拿到的是 success branch（`data` 是响应类型）。
+ * 稳定）。不是 IMAP UID。Provider 会按 `SEARCH HEADER Message-Id` 在相关 folder
+ * 里找到当前 UID 再操作。Cloudflare Email Routing 只负责推送 signal；真正的
+ * 邮件读取/状态操作在 Worker 内按需打开短 IMAP 连接完成。
  */
 export class ImapProvider extends EmailProvider {
   static displayName = "IMAP";
 
-  /** 账号状态变化后立即通知 bridge reconcile（不等下次 sync） */
-  async onPersistedChange() {
-    if (!isImapBridgeConfigured(this.env)) return;
-    await syncAccounts(this.env);
-  }
-
   // ─── Enqueue ──────────────────────────────────────────────────────────
 
-  /** 解析 IMAP bridge 推送通知并入队。payload 里 `rfcMessageId` 是 RFC 822 Message-Id。 */
+  /** 解析 Email Routing / IMAP signal 并入队。payload 里 `rfcMessageId` 是 RFC 822 Message-Id。 */
   static async enqueue(
     body: { accountId: number; rfcMessageId: string },
     env: Env,
@@ -74,10 +66,6 @@ export class ImapProvider extends EmailProvider {
 
   // ─── Message actions ──────────────────────────────────────────────────
 
-  private get bridge() {
-    return bridgeClient(this.env);
-  }
-
   /** archive folder 路径只在 hint 为 archive 时有意义 —— 跟 fetchRawEmail 一致 */
   private flagArchiveFolder(
     folder?: "inbox" | "junk" | "archive",
@@ -88,189 +76,214 @@ export class ImapProvider extends EmailProvider {
   }
 
   async markAsRead(messageId: string, folder?: "inbox" | "junk" | "archive") {
-    await this.bridge.api.flag.post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-      flag: IMAP_FLAG_SEEN,
-      add: true,
-      folder,
-      archiveFolder: this.flagArchiveFolder(folder),
-    });
+    await this.setFlag(messageId, IMAP_FLAG_SEEN, true, folder);
   }
 
   async addStar(messageId: string, folder?: "inbox" | "junk" | "archive") {
-    await this.bridge.api.flag.post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-      flag: IMAP_FLAG_FLAGGED,
-      add: true,
-      folder,
-      archiveFolder: this.flagArchiveFolder(folder),
-    });
+    await this.setFlag(messageId, IMAP_FLAG_FLAGGED, true, folder);
   }
 
   async removeStar(messageId: string, folder?: "inbox" | "junk" | "archive") {
-    await this.bridge.api.flag.post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-      flag: IMAP_FLAG_FLAGGED,
-      add: false,
-      folder,
-      archiveFolder: this.flagArchiveFolder(folder),
-    });
+    await this.setFlag(messageId, IMAP_FLAG_FLAGGED, false, folder);
   }
 
   async isStarred(messageId: string, folder?: "inbox" | "junk" | "archive") {
-    const data = await bridgeCall(
-      this.bridge.api["is-starred"].post({
-        accountId: this.account.id,
-        rfcMessageId: messageId,
+    return this.withClient(async (client) => {
+      const resolved = await resolveFolderForHint(
+        this.env,
+        client,
+        this.account.id,
         folder,
-        archiveFolder: this.flagArchiveFolder(folder),
-      }),
-    );
-    return data.starred;
+        this.flagArchiveFolder(folder),
+      );
+      if (resolved === null) return false;
+      await client.selectMailbox(resolved);
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null) return false;
+      const flags = await client.fetchFlags(uid);
+      return flags.some((flag) => flag.toLowerCase() === "\\flagged");
+    });
   }
 
   async isJunk(messageId: string) {
-    const data = await bridgeCall(
-      this.bridge.api["is-junk"].post({
-        accountId: this.account.id,
-        rfcMessageId: messageId,
-      }),
-    );
-    return data.junk;
+    return this.withClient(async (client) => {
+      const junkPath = await findJunkFolder(this.env, client, this.account.id);
+      if (!junkPath) return false;
+      return (
+        (await this.findUidByMessageId(client, junkPath, messageId)) !== null
+      );
+    });
   }
 
   /**
-   * 按 RFC Message-Id 跨 folder 定位邮件。bridge `/api/locate` 并行查 INBOX / junk /
-   * archive / trash，返回精确位置 + （inbox 时的）星标状态。
+   * 按 RFC Message-Id 跨 folder 定位邮件。
    *
-   * 不吞 error —— bridge 瞬时不可达就直接抛给 `reconcileMessageState`，不会误删 TG。
+   * 不吞 error —— IMAP 瞬时不可达就直接抛给 `reconcileMessageState`，不会误删 TG。
    */
   async resolveMessageState(messageId: string): Promise<MessageState> {
-    const data = await bridgeCall(
-      this.bridge.api.locate.post({
-        accountId: this.account.id,
-        rfcMessageId: messageId,
-        // 用户自定义的归档文件夹路径；bridge 没配就自动探测 \Archive special-use
-        archiveFolder: this.account.archive_folder ?? undefined,
-      }),
-    );
-    if (data.location === "inbox") {
-      return { location: "inbox", starred: data.starred ?? false };
-    }
-    return { location: data.location };
+    return this.withClient(async (client) => {
+      await client.selectMailbox("INBOX");
+      const inboxUid = await this.findUidInSelectedMailbox(client, messageId);
+      if (inboxUid !== null) {
+        const flags = await client.fetchFlags(inboxUid);
+        return {
+          location: "inbox",
+          starred: flags.some((flag) => flag.toLowerCase() === "\\flagged"),
+        };
+      }
+
+      const junkPath = await findJunkFolder(this.env, client, this.account.id);
+      if (
+        junkPath &&
+        (await this.findUidByMessageId(client, junkPath, messageId)) !== null
+      ) {
+        return { location: "junk" };
+      }
+
+      const archivePath = this.account.archive_folder
+        ? (await mailboxExists(client, this.account.archive_folder))
+          ? this.account.archive_folder
+          : null
+        : await findArchiveFolder(this.env, client, this.account.id);
+      if (
+        archivePath &&
+        (await this.findUidByMessageId(client, archivePath, messageId)) !== null
+      ) {
+        return { location: "archive" };
+      }
+
+      const trashPath = await findTrashFolder(
+        this.env,
+        client,
+        this.account.id,
+      );
+      if (
+        trashPath &&
+        (await this.findUidByMessageId(client, trashPath, messageId)) !== null
+      ) {
+        return { location: "deleted" };
+      }
+
+      return { location: "deleted" };
+    });
   }
 
   async listUnread(maxResults: number = 20) {
-    const data = await bridgeCall(
-      this.bridge.api.unread.post({
-        accountId: this.account.id,
-        maxResults,
-      }),
-    );
-    return data.messages ?? [];
+    return this.searchAndFetch("INBOX", "UNSEEN", maxResults, 0);
   }
 
   async countUnread(): Promise<EmailCount> {
-    const data = await bridgeCall(
-      this.bridge.api["unread-count"].post({
-        accountId: this.account.id,
-      }),
-    );
-    return { count: data.count, truncated: false };
+    return {
+      count: await this.countSearchResults("INBOX", "UNSEEN"),
+      truncated: false,
+    };
   }
 
   async listUnreadPage(
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
-    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
-      this.bridge.api.unread.post({
-        accountId: this.account.id,
-        maxResults: limit,
-        offset,
-      }),
+    return listImapPage(maxResults, cursor, (limit, offset) =>
+      this.searchAndFetch("INBOX", "UNSEEN", limit, offset),
     );
   }
 
   async listStarred(maxResults: number = 20) {
-    const data = await bridgeCall(
-      this.bridge.api.starred.post({
-        accountId: this.account.id,
-        maxResults,
-      }),
-    );
-    return data.messages ?? [];
+    return this.searchAndFetch("INBOX", "FLAGGED", maxResults, 0);
   }
 
   async listStarredPage(
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
-    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
-      this.bridge.api.starred.post({
-        accountId: this.account.id,
-        maxResults: limit,
-        offset,
-      }),
+    return listImapPage(maxResults, cursor, (limit, offset) =>
+      this.searchAndFetch("INBOX", "FLAGGED", limit, offset),
     );
   }
 
   async listJunk(maxResults: number = 20) {
-    const data = await bridgeCall(
-      this.bridge.api.junk.post({
-        accountId: this.account.id,
+    return this.withClient(async (client) => {
+      const junkPath = await findJunkFolder(this.env, client, this.account.id);
+      if (!junkPath) return [];
+      return this.searchAndFetchWithClient(
+        client,
+        junkPath,
+        "ALL",
         maxResults,
-      }),
-    );
-    return data.messages ?? [];
+        0,
+      );
+    });
   }
 
   async countJunk(): Promise<EmailCount> {
-    const data = await bridgeCall(
-      this.bridge.api["junk-count"].post({
-        accountId: this.account.id,
-      }),
-    );
-    return { count: data.count, truncated: false };
+    const count = await this.withClient(async (client) => {
+      const junkPath = await findJunkFolder(this.env, client, this.account.id);
+      if (!junkPath) return 0;
+      return this.countSearchResultsWithClient(client, junkPath, "ALL");
+    });
+    return { count, truncated: false };
   }
 
   async listJunkPage(
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
-    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
-      this.bridge.api.junk.post({
-        accountId: this.account.id,
-        maxResults: limit,
-        offset,
+    return listImapPage(maxResults, cursor, (limit, offset) =>
+      this.withClient(async (client) => {
+        const junkPath = await findJunkFolder(
+          this.env,
+          client,
+          this.account.id,
+        );
+        if (!junkPath) return [];
+        return this.searchAndFetchWithClient(
+          client,
+          junkPath,
+          "ALL",
+          limit,
+          offset,
+        );
       }),
     );
   }
 
   async listArchived(maxResults: number = 20): Promise<EmailListItem[]> {
-    const data = await bridgeCall(
-      this.bridge.api["list-folder"].post({
-        accountId: this.account.id,
-        folder: this.account.archive_folder ?? undefined,
+    return this.withClient(async (client) => {
+      const archivePath = this.account.archive_folder
+        ? (await mailboxExists(client, this.account.archive_folder))
+          ? this.account.archive_folder
+          : null
+        : await findArchiveFolder(this.env, client, this.account.id);
+      if (!archivePath) return [];
+      return this.searchAndFetchWithClient(
+        client,
+        archivePath,
+        "ALL",
         maxResults,
-      }),
-    );
-    return data.messages ?? [];
+        0,
+      );
+    });
   }
 
   async listArchivedPage(
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
-    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
-      this.bridge.api["list-folder"].post({
-        accountId: this.account.id,
-        folder: this.account.archive_folder ?? undefined,
-        maxResults: limit,
-        offset,
+    return listImapPage(maxResults, cursor, (limit, offset) =>
+      this.withClient(async (client) => {
+        const archivePath = this.account.archive_folder
+          ? (await mailboxExists(client, this.account.archive_folder))
+            ? this.account.archive_folder
+            : null
+          : await findArchiveFolder(this.env, client, this.account.id);
+        if (!archivePath) return [];
+        return this.searchAndFetchWithClient(
+          client,
+          archivePath,
+          "ALL",
+          limit,
+          offset,
+        );
       }),
     );
   }
@@ -279,14 +292,7 @@ export class ImapProvider extends EmailProvider {
     query: string,
     maxResults: number = 20,
   ): Promise<EmailListItem[]> {
-    const data = await bridgeCall(
-      this.bridge.api.search.post({
-        accountId: this.account.id,
-        query,
-        maxResults,
-      }),
-    );
-    return data.messages ?? [];
+    return this.searchMessagesWithOffset(query, maxResults, 0);
   }
 
   async searchMessagesPage(
@@ -294,31 +300,31 @@ export class ImapProvider extends EmailProvider {
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
-    return listImapBridgePage(maxResults, cursor, (limit, offset) =>
-      this.bridge.api.search.post({
-        accountId: this.account.id,
-        query,
-        maxResults: limit,
-        offset,
-      }),
+    return listImapPage(maxResults, cursor, (limit, offset) =>
+      this.searchMessagesWithOffset(query, limit, offset),
     );
   }
 
   async markAllAsRead(_maxResults?: number) {
-    // IMAP 一条 STORE +\Seen 就把整 INBOX 未读全标了，maxResults 在这里被忽略 ——
-    // bridge 会 SEARCH UNSEEN 拿全部未读 UID 一起 STORE，没有 partial-failure 概念。
-    const data = await bridgeCall(
-      this.bridge.api["mark-all-read"].post({
-        accountId: this.account.id,
-      }),
-    );
-    return { success: data.count, failed: 0 };
+    // IMAP 一条 STORE +\Seen 就把整 INBOX 未读全标了，maxResults 在这里被忽略。
+    const count = await this.withClient(async (client) => {
+      await client.selectMailbox("INBOX");
+      const uids = await client.search("UNSEEN");
+      await client.addFlags(uids, [IMAP_FLAG_SEEN]);
+      return uids.length;
+    });
+    return { success: count, failed: 0 };
   }
 
   async markAsJunk(messageId: string) {
-    await this.bridge.api["mark-as-junk"].post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
+    await this.withClient(async (client) => {
+      const junkPath = await findJunkFolder(this.env, client, this.account.id);
+      if (!junkPath) throw new Error("IMAP junk folder not found");
+      await client.selectMailbox("INBOX");
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null)
+        throw new Error(`Message-Id not in INBOX: ${messageId}`);
+      await client.moveToFolder(uid, junkPath);
     });
   }
 
@@ -327,104 +333,271 @@ export class ImapProvider extends EmailProvider {
    * 保持 abstract signature（Outlook/Gmail 会换 id）的 `Promise<string>`。
    */
   async moveToInbox(messageId: string): Promise<string> {
-    await this.bridge.api["move-to-inbox"].post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
+    await this.withClient(async (client) => {
+      const junkPath = await findJunkFolder(this.env, client, this.account.id);
+      if (!junkPath) throw new Error("IMAP junk folder not found");
+      await client.selectMailbox(junkPath);
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null)
+        throw new Error(`Message-Id not in ${junkPath}: ${messageId}`);
+      await client.moveToFolder(uid, "INBOX");
     });
     return messageId;
   }
 
   async unarchiveMessage(messageId: string): Promise<string> {
-    await this.bridge.api.unarchive.post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-      archiveFolder: this.account.archive_folder ?? undefined,
+    await this.withClient(async (client) => {
+      const archivePath = await resolveArchiveFolder(
+        this.env,
+        client,
+        this.account.id,
+        this.account.archive_folder ?? undefined,
+      );
+      await client.selectMailbox(archivePath);
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null)
+        throw new Error(`Message-Id not in ${archivePath}: ${messageId}`);
+      await client.moveToFolder(uid, "INBOX");
     });
     return messageId;
   }
 
   async trashMessage(messageId: string) {
-    await this.bridge.api.trash.post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
+    await this.withClient(async (client) => {
+      const [junkPath, archivePath, trashPath] = await Promise.all([
+        findJunkFolder(this.env, client, this.account.id),
+        findArchiveFolder(this.env, client, this.account.id),
+        findTrashFolder(this.env, client, this.account.id),
+      ]);
+      const candidates = ["INBOX", junkPath, archivePath].filter(
+        (folder): folder is string => !!folder,
+      );
+      const hit = await this.locateMessage(client, messageId, candidates);
+      if (!hit) throw new Error(`Message-Id not found: ${messageId}`);
+
+      await client.selectMailbox(hit.folder);
+      if (trashPath) await client.moveToFolder(hit.uid, trashPath);
+      else await client.deleteUid(hit.uid);
     });
   }
 
   async archiveMessage(messageId: string) {
-    await this.bridge.api.archive.post({
-      accountId: this.account.id,
-      rfcMessageId: messageId,
-      // 只在用户明确配置过时传；否则让 bridge 自动探测 \Archive special-use
-      folder: this.account.archive_folder ?? undefined,
+    await this.withClient(async (client) => {
+      const archivePath = this.account.archive_folder
+        ? this.account.archive_folder
+        : ((await findArchiveFolder(this.env, client, this.account.id)) ??
+          "Archive");
+      if (!(await mailboxExists(client, archivePath))) {
+        await client.createMailbox(archivePath);
+      }
+
+      await client.selectMailbox("INBOX");
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null)
+        throw new Error(`Message-Id not in INBOX: ${messageId}`);
+      await client.moveToFolder(uid, archivePath);
     });
   }
 
   async trashAllJunk() {
-    const data = await bridgeCall(
-      this.bridge.api["trash-all-junk"].post({
-        accountId: this.account.id,
-      }),
-    );
-    return data.count;
+    return this.withClient(async (client) => {
+      const junkPath = await findJunkFolder(this.env, client, this.account.id);
+      if (!junkPath) return 0;
+      const trashPath = await findTrashFolder(
+        this.env,
+        client,
+        this.account.id,
+      );
+      await client.selectMailbox(junkPath);
+      const uids = await client.search("ALL");
+      if (uids.length === 0) return 0;
+      if (trashPath) {
+        for (const uid of uids) await client.moveToFolder(uid, trashPath);
+      } else {
+        for (const uid of uids) await client.deleteUid(uid);
+      }
+      return uids.length;
+    });
   }
 
-  async fetchAttachment(
-    messageId: string,
-    attachmentId: string,
-    folder: "inbox" | "junk" | "archive",
-  ): Promise<MailAttachmentDownload | null> {
-    const resp = await bridgeFetch(this.env)(
-      bridgeRequestUrl(this.env, "/api/attachment"),
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          accountId: this.account.id,
-          rfcMessageId: messageId,
-          attachmentId,
-          folder,
-          archiveFolder:
-            folder === "archive"
-              ? (this.account.archive_folder ?? undefined)
-              : undefined,
-        }),
-      },
-    );
-    if (!resp.ok) {
-      if (resp.status === 404) return null;
-      throw new Error(`IMAP attachment download failed: ${await resp.text()}`);
-    }
-    if (!resp.body) return null;
-
-    const encodedFilename = resp.headers.get("x-attachment-filename");
-    return {
-      filename: encodedFilename
-        ? decodeURIComponent(encodedFilename)
-        : "attachment",
-      mimeType: resp.headers.get("content-type"),
-      body: resp.body,
-    };
-  }
-
-  /** 通过 IMAP bridge 拉取单封邮件原文，返回 ArrayBuffer */
+  /** 通过 Worker-native IMAP 拉取单封邮件原文，返回 ArrayBuffer */
   async fetchRawEmail(
     messageId: string,
     folder?: "inbox" | "junk" | "archive",
   ): Promise<ArrayBuffer> {
-    const data = await bridgeCall(
-      this.bridge.api.fetch.post({
-        accountId: this.account.id,
-        rfcMessageId: messageId,
+    return this.withClient(async (client) => {
+      const resolved = await resolveFolderForHint(
+        this.env,
+        client,
+        this.account.id,
         folder,
-        // archive folder 路径只在 hint 为 archive 时有意义
-        archiveFolder:
-          folder === "archive"
-            ? (this.account.archive_folder ?? undefined)
-            : undefined,
-      }),
+        this.flagArchiveFolder(folder),
+      );
+      if (resolved === null) {
+        throw new Error(`IMAP folder not found for hint=${folder}`);
+      }
+      await client.selectMailbox(resolved);
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null) {
+        throw new Error(`Message-Id not found in ${resolved}: ${messageId}`);
+      }
+      return client.fetchRaw(uid);
+    });
+  }
+
+  private async setFlag(
+    messageId: string,
+    flag: string,
+    add: boolean,
+    folder?: "inbox" | "junk" | "archive",
+  ): Promise<void> {
+    await this.withClient(async (client) => {
+      const resolved = await resolveFolderForHint(
+        this.env,
+        client,
+        this.account.id,
+        folder,
+        this.flagArchiveFolder(folder),
+      );
+      if (resolved === null) return;
+      await client.selectMailbox(resolved);
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null) return;
+      if (add) await client.addFlags([uid], [flag]);
+      else await client.removeFlags([uid], [flag]);
+    });
+  }
+
+  private async searchAndFetch(
+    folder: string,
+    criteria: string,
+    maxResults: number,
+    offset: number,
+  ): Promise<DatedEmailListItem[]> {
+    return this.withClient((client) =>
+      this.searchAndFetchWithClient(
+        client,
+        folder,
+        criteria,
+        maxResults,
+        offset,
+      ),
     );
-    return base64ToArrayBuffer(data.rawEmail);
+  }
+
+  private async searchAndFetchWithClient(
+    client: WorkerImapClient,
+    folder: string,
+    criteria: string,
+    maxResults: number,
+    offset: number,
+  ): Promise<DatedEmailListItem[]> {
+    await client.selectMailbox(folder);
+    const uids = (await client.search(criteria))
+      .sort((a, b) => b - a)
+      .slice(offset, offset + maxResults);
+    const blocks = await client.fetchHeaderBlocks(uids);
+    return buildMessagesFromHeaders(blocks);
+  }
+
+  private async countSearchResults(
+    folder: string,
+    criteria: string,
+  ): Promise<number> {
+    return this.withClient((client) =>
+      this.countSearchResultsWithClient(client, folder, criteria),
+    );
+  }
+
+  private async countSearchResultsWithClient(
+    client: WorkerImapClient,
+    folder: string,
+    criteria: string,
+  ): Promise<number> {
+    await client.selectMailbox(folder);
+    return (await client.search(criteria)).length;
+  }
+
+  private async searchMessagesWithOffset(
+    query: string,
+    maxResults: number,
+    offset: number,
+  ): Promise<EmailListItem[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    return this.withClient(async (client) => {
+      const [junkPath, archivePath] = await Promise.all([
+        findJunkFolder(this.env, client, this.account.id),
+        findArchiveFolder(this.env, client, this.account.id),
+      ]);
+      const folders = ["INBOX", junkPath, archivePath]
+        .filter((folder): folder is string => !!folder)
+        .filter((folder, index, all) => all.indexOf(folder) === index);
+
+      const all: DatedEmailListItem[] = [];
+      for (const folder of folders) {
+        all.push(
+          ...(await this.searchAndFetchWithClient(
+            client,
+            folder,
+            `TEXT ${quoteImapString(trimmed)}`,
+            offset + maxResults,
+            0,
+          )),
+        );
+      }
+
+      const seen = new Set<string>();
+      const dedup = all.filter((message) => {
+        if (seen.has(message.id)) return false;
+        seen.add(message.id);
+        return true;
+      });
+      return sortByDateDesc(dedup).slice(offset, offset + maxResults);
+    });
+  }
+
+  private async locateMessage(
+    client: WorkerImapClient,
+    messageId: string,
+    folders: string[],
+  ): Promise<{ folder: string; uid: number } | null> {
+    for (const folder of folders) {
+      const uid = await this.findUidByMessageId(client, folder, messageId);
+      if (uid !== null) return { folder, uid };
+    }
+    return null;
+  }
+
+  private async findUidByMessageId(
+    client: WorkerImapClient,
+    folder: string,
+    messageId: string,
+  ): Promise<number | null> {
+    await client.selectMailbox(folder);
+    return this.findUidInSelectedMailbox(client, messageId);
+  }
+
+  private async findUidInSelectedMailbox(
+    client: WorkerImapClient,
+    messageId: string,
+  ): Promise<number | null> {
+    const hits = await client.search(
+      `HEADER Message-ID ${quoteImapString(messageId)}`,
+    );
+    if (hits.length === 0) return null;
+    return hits.sort((a, b) => b - a)[0] ?? null;
+  }
+
+  private async withClient<T>(
+    fn: (client: WorkerImapClient) => Promise<T>,
+  ): Promise<T> {
+    const client = await WorkerImapClient.connect(this.account);
+    try {
+      return await fn(client);
+    } finally {
+      await client.logout();
+    }
   }
 }

@@ -115,6 +115,9 @@ export const AccountCard = ({
           />
         )}
         {account.imapUser && <Meta label="User" value={account.imapUser} />}
+        {account.imapForwardAddress && (
+          <Meta label="Forward" value={account.imapForwardAddress} />
+        )}
         {account.ownerTelegramId && (
           <Meta
             label="Owner"
