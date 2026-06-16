@@ -33,6 +33,7 @@ export const htmlToMarkdown = (html: string): string => {
   const htmlTagIdx = html.search(/<html[\s>]/i);
   if (htmlTagIdx > 0) html = html.substring(htmlTagIdx);
   else if (htmlTagIdx < 0) html = `<html><body>${html}</body></html>`;
+  html = stripPreHeadNodes(html);
 
   const { document } = parseHTML(html);
   for (const node of document.querySelectorAll("head, style, script")) {
@@ -42,6 +43,17 @@ export const htmlToMarkdown = (html: string): string => {
     .turndown(document.body)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+};
+
+const stripPreHeadNodes = (html: string): string => {
+  const htmlOpen = html.match(/<html\b[^>]*>/i);
+  if (htmlOpen?.index == null) return html;
+  const htmlOpenEnd = htmlOpen.index + htmlOpen[0].length;
+  const headIdx = html.slice(htmlOpenEnd).search(/<head[\s>]/i);
+  if (headIdx < 0) return html;
+  const absoluteHeadIdx = htmlOpenEnd + headIdx;
+  if (!html.slice(htmlOpenEnd, absoluteHeadIdx).trim()) return html;
+  return html.slice(0, htmlOpenEnd) + html.slice(absoluteHeadIdx);
 };
 
 /** 修复 Telegram MarkdownV2 易出错片段（例如单独一行的 "***"） */
