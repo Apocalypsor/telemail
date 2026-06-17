@@ -3,6 +3,7 @@ import {
   findLongestValidMdV2Prefix,
   markdownToMdV2,
 } from "@worker/utils/markdown-v2";
+import { escapeHtmlText, stripHtmlTags } from "@worker/utils/string";
 import { parseHTML } from "linkedom";
 import type { Address } from "postal-mime";
 import TurndownService from "turndown";
@@ -98,7 +99,7 @@ export const formatBody = (
   if (!raw) return escapeMdV2("（正文为空）");
 
   // 残留 HTML 标签
-  raw = raw.replace(/<[^>]*>/g, "");
+  raw = stripHtmlTags(raw);
 
   const truncated = raw.length > maxLen;
   const truncatedHint = `\n\n${toTelegramMdV2("*… 正文过长，已截断 …*")}`;
@@ -141,10 +142,7 @@ export const parseEmailDate = (
 
 /** 将纯文本包裹成可读的 HTML 页面 */
 export const wrapPlainText = (text: string): string => {
-  const escaped = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  const escaped = escapeHtmlText(text);
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:monospace;white-space:pre-wrap;word-break:break-word;max-width:800px;margin:2em auto;padding:0 1em;line-height:1.5;color:#333}</style></head><body>${escaped}</body></html>`;
 };
 const utf8Decoder = new TextDecoder("utf-8", {

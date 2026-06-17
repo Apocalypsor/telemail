@@ -4,6 +4,7 @@ import { countFailedEmails, type FailedEmail } from "@worker/db/failed-emails";
 import { t } from "@worker/i18n";
 import type { Env } from "@worker/types";
 import { escapeMdV2 } from "@worker/utils/markdown-v2";
+import { escapeBackslashAndBacktick } from "@worker/utils/string";
 import { getWorkerBaseUrl } from "@worker/utils/url";
 import { InlineKeyboard } from "grammy";
 
@@ -54,13 +55,17 @@ export const buildSecretsText = (env: Env): string => {
 
   const lines: string[] = [`*${escapeMdV2(t("admin:secrets.title"))}*`];
   for (const { label, value } of secrets) {
-    lines.push(``, escapeMdV2(label), `\`${codeEsc(value)}\``);
+    lines.push(
+      ``,
+      escapeMdV2(label),
+      `\`${escapeBackslashAndBacktick(value)}\``,
+    );
   }
   const url = `${getWorkerBaseUrl(env)}/api/telegram/webhook?secret=${env.TELEGRAM_WEBHOOK_SECRET}`;
   lines.push(
     ``,
     escapeMdV2(t("admin:secrets.webhookUrlLabel")),
-    `\`${codeEsc(url)}\``,
+    `\`${escapeBackslashAndBacktick(url)}\``,
   );
 
   lines.push(
@@ -111,5 +116,3 @@ export const failedEmailListMessage = (
     keyboard: kb,
   };
 };
-
-const codeEsc = (s: string) => s.replace(/\\/g, "\\\\").replace(/`/g, "\\`");

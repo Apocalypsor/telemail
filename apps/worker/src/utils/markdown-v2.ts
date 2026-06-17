@@ -1,3 +1,5 @@
+import { escapeBackslashAndBacktick } from "@worker/utils/string";
+
 /**
  * 转义 Telegram MarkdownV2 特殊字符。
  * 参考: https://core.telegram.org/bots/api#markdownv2-style
@@ -55,7 +57,7 @@ const isExpandableBlockquoteMarker = (
 
 /** Escape content inside ` ` or ``` ``` (only ` and \ need escaping per Telegram spec). */
 const escapeCode = (s: string): string => {
-  return s.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+  return escapeBackslashAndBacktick(s);
 };
 
 /** Escape a URL inside (...) of an inline link (only ) and \ need escaping per Telegram spec). */

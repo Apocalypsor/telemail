@@ -6,6 +6,7 @@ import type {
 import { getOwnAccounts } from "@worker/db/accounts";
 import type { Account, Env } from "@worker/types";
 import { htmlToMarkdown } from "@worker/utils/mail/body";
+import { stripHtmlTags } from "@worker/utils/string";
 
 export const mcpJsonResult = (data: unknown): CallToolResult => {
   return {
@@ -41,7 +42,7 @@ export const safeHtmlToMarkdown = (html: string): string => {
   try {
     return htmlToMarkdown(html);
   } catch {
-    return html.replace(/<[^>]*>/g, "").trim();
+    return stripHtmlTags(html).trim();
   }
 };
 

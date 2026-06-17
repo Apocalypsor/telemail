@@ -9,11 +9,12 @@ import type {
   WireExtension,
   WireNote,
 } from "@worker/clients/things-cloud/types";
+import { trimTrailingSlashes } from "@worker/utils/string";
 
 let crcTable: Uint32Array | null = null;
 
 export const endpointUrl = (endpoint: string, path: string): string => {
-  return `${endpoint.replace(/\/+$/, "")}${path}`;
+  return `${trimTrailingSlashes(endpoint)}${path}`;
 };
 
 const encodeBase64Ascii = (value: string): string => {

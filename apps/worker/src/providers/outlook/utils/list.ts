@@ -8,6 +8,7 @@ import type {
   EmailListItem,
   EmailListPage,
 } from "@worker/providers/types";
+import { escapeBackslashAndDoubleQuote } from "@worker/utils/string";
 
 const OUTLOOK_LIST_SELECT = "id,subject,from,toRecipients";
 const OUTLOOK_COUNT_PAGE_SIZE = 100;
@@ -57,7 +58,7 @@ export const buildOutlookSearchListPath = (
   query: string,
   maxResults: number,
 ): string => {
-  const escaped = query.replace(/"/g, '\\"');
+  const escaped = escapeBackslashAndDoubleQuote(query);
   return `/me/messages?$search=${encodeURIComponent(`"${escaped}"`)}&$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
 };
 
