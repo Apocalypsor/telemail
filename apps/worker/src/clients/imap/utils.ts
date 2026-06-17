@@ -1,8 +1,9 @@
 import type { ImapMailbox } from "@worker/clients/imap/types";
+import { escapeBackslashAndDoubleQuote } from "@worker/utils/string";
 
 export const quoteImapString = (value: string): string => {
   if (/[\r\n]/.test(value)) throw new Error("Invalid IMAP string");
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return `"${escapeBackslashAndDoubleQuote(value)}"`;
 };
 
 export const parseLiteralLength = (line: string): number | null => {

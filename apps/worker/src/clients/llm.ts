@@ -2,6 +2,7 @@
 
 import { LLM_TIMEOUT_MS, MAX_LINKS } from "@worker/constants";
 import { extractLinks, prepareBody } from "@worker/utils/mail/llm-input";
+import { trimTrailingSlashes } from "@worker/utils/string";
 
 interface ResponsesStreamEvent {
   type?: string;
@@ -134,7 +135,7 @@ const callLLM = async (
   prompt: string,
   json?: boolean,
 ): Promise<string> => {
-  const url = `${baseUrl.replace(/\/+$/, "")}/responses`;
+  const url = `${trimTrailingSlashes(baseUrl)}/responses`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
