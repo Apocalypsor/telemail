@@ -28,7 +28,7 @@ export const previewController = new Elysia({ name: "controller.preview" })
     "/api/cors-proxy",
     async ({ env, query, status }) => {
       const { url, sig } = query;
-      if (!verifyProxySignature(env.ADMIN_SECRET, url, sig))
+      if (!(await verifyProxySignature(env.ADMIN_SECRET, url, sig)))
         return status(403, "Invalid signature");
 
       try {
