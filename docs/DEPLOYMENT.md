@@ -195,6 +195,6 @@ Email Routing rule：
 1. 向 Bot 发送 `/start` → **账号管理** 打开 Mini App
 2. 在 Mini App 里选择账号类型（Gmail / Outlook / IMAP），填写 Chat ID 和必要配置
 3. Gmail / Outlook 需完成 OAuth 授权（先确保 `WORKER_URL` 已配置，且 OAuth redirect URI 指向同一域名）；IMAP 需填写服务器信息和密码，并把邮箱自动转发到账号详情显示的 `fwd+<token>` 地址
-4. 授权或转发设置完成后，新邮件实时推送到 Telegram
+4. 授权或转发设置完成后，新邮件会实时推送到 Telegram，并由每 10 分钟的未读邮件拉取兜底
 
 管理员可从 `/start` → **全局管理** → **用户管理** 打开 Mini App 审批、撤回或删除用户。

@@ -2,9 +2,9 @@
 
 运行在 Cloudflare Workers + Pages 上的邮件转发系统，监控 **Gmail / Outlook / IMAP** 收件箱，把新邮件转发到 Telegram 聊天——支持**多账号**、附件、AI 摘要、Mini App 稍后提醒。
 
-- **Gmail**：Google Cloud Pub/Sub 推送通知实时接收
-- **Outlook**：Microsoft Graph webhook 订阅实时接收
-- **IMAP**（可选）：Cloudflare Email Routing 接收自动转发信号，Worker 按需通过 IMAP 读取原邮箱
+- **Gmail**：Google Cloud Pub/Sub 推送通知实时接收，Cron 每 10 分钟拉取未读邮件兜底
+- **Outlook**：Microsoft Graph webhook 订阅实时接收，Cron 每 10 分钟拉取未读邮件兜底
+- **IMAP**（可选）：Cloudflare Email Routing 接收自动转发信号，Worker 也会每 10 分钟通过 IMAP 拉取未读邮件兜底
 - **MCP**：用户可在 bot 里生成 API key，让 agent 通过 `/api/mcp` 搜索和读取自己的邮件
 
 ## 技术栈

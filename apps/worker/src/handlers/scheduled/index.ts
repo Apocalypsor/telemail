@@ -3,10 +3,12 @@ import { DailyMailSummaryTask } from "@worker/handlers/scheduled/tasks/daily-sum
 import { DueRemindersTask } from "@worker/handlers/scheduled/tasks/reminders";
 import { RenewPushTask } from "@worker/handlers/scheduled/tasks/renew-push";
 import { RetryFailedEmailsTask } from "@worker/handlers/scheduled/tasks/retry-failed-emails";
+import { SyncUnreadMailTask } from "@worker/handlers/scheduled/tasks/sync-unread-mail";
 import type { Env } from "@worker/types";
 
 const SCHEDULED_TASKS = [
   new DueRemindersTask(),
+  new SyncUnreadMailTask(),
   new DailyMailSummaryTask(),
   new RetryFailedEmailsTask(),
   new RenewPushTask(),

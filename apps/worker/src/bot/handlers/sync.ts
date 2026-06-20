@@ -1,51 +1,8 @@
 import { getOwnAccounts } from "@worker/db/accounts";
-import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { t } from "@worker/i18n";
-import { getEmailProvider } from "@worker/providers";
-import { type Account, type Env, QueueMessageType } from "@worker/types";
-import { reportErrorToObservability } from "@worker/utils/observability";
+import type { Env } from "@worker/types";
+import { syncAccountsUnreadMail } from "@worker/utils/mail-sync";
 import type { Bot } from "grammy";
-
-/** 同步单个账号的未读邮件，返回入队数量 */
-const syncAccount = async (
-  env: Env,
-  account: Account,
-): Promise<{ enqueued: number; error?: string }> => {
-  try {
-    const provider = getEmailProvider(account, env);
-    const unread = await provider.listUnread(MAX_SYNC_PER_ACCOUNT);
-    if (unread.length === 0) return { enqueued: 0 };
-
-    // 过滤已投递的邮件
-    const mappings = await getMappingsByEmailIds(
-      env.DB,
-      account.id,
-      unread.map((m) => m.id),
-    );
-    const delivered = new Set(mappings.map((m) => m.email_message_id));
-    const newMessages = unread.filter((m) => !delivered.has(m.id));
-    if (newMessages.length === 0) return { enqueued: 0 };
-
-    await env.EMAIL_QUEUE.sendBatch(
-      newMessages.map((m) => ({
-        body: {
-          type: QueueMessageType.Email,
-          accountId: account.id,
-          emailMessageId: m.id,
-        },
-      })),
-    );
-    return { enqueued: newMessages.length };
-  } catch (err) {
-    await reportErrorToObservability(env, "bot.sync_account_failed", err, {
-      accountId: account.id,
-    });
-    return {
-      enqueued: 0,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-};
 
 /** 同步用户所有账号的未读邮件 */
 const syncAllAccounts = async (env: Env, userId: string): Promise<string> => {
@@ -54,12 +11,7 @@ const syncAllAccounts = async (env: Env, userId: string): Promise<string> => {
   );
   if (accounts.length === 0) return t("common:label.noAccounts");
 
-  const results = await Promise.all(
-    accounts.map(async (acc) => {
-      const result = await syncAccount(env, acc);
-      return { account: acc, ...result };
-    }),
-  );
+  const results = await syncAccountsUnreadMail(env, accounts);
 
   let totalEnqueued = 0;
   const lines: string[] = [];
@@ -91,4 +43,3 @@ export const registerSyncHandler = (bot: Bot, env: Env) => {
     await ctx.reply(result);
   });
 };
-const MAX_SYNC_PER_ACCOUNT = 50;
