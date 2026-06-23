@@ -1,7 +1,7 @@
 import { authSession } from "@worker/api/plugins/auth-session";
 import { cf } from "@worker/api/plugins/cf";
 import { http } from "@worker/clients/http";
-import { analyzeEmail } from "@worker/clients/llm";
+import { analyzeEmail, hasLlm } from "@worker/clients/llm";
 import { MAX_BODY_CHARS } from "@worker/constants";
 import { formatBody } from "@worker/utils/mail/body";
 import { verifyProxySignature } from "@worker/utils/mail/image-proxy";
@@ -70,12 +70,9 @@ export const previewController = new Elysia({ name: "controller.preview" })
   .post(
     "/api/junk-check",
     async ({ env, body, status }) => {
-      if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL)
-        return status(500, { error: "LLM not configured" });
+      if (!hasLlm(env)) return status(500, { error: "LLM not configured" });
       const result = await analyzeEmail(
-        env.LLM_API_URL,
-        env.LLM_API_KEY,
-        env.LLM_MODEL,
+        env,
         body.subject ?? "",
         body.body ?? "",
       );

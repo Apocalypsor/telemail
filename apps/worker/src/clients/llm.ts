@@ -1,6 +1,7 @@
-/** 使用 OpenAI Responses API 对邮件正文进行 AI 分析（摘要 + 标签） */
+/** 使用 Workers AI 优先、OpenAI Responses API fallback 对邮件正文做 AI 分析 */
 
 import { LLM_TIMEOUT_MS, MAX_LINKS } from "@worker/constants";
+import type { Env } from "@worker/types";
 import { extractLinks, prepareBody } from "@worker/utils/mail/llm-input";
 import { trimTrailingSlashes } from "@worker/utils/string";
 
@@ -17,6 +18,15 @@ interface ResponsesStreamState {
   fallbackText: string | null;
 }
 
+interface WorkersAiChatCompletion {
+  choices?: {
+    message?: { content?: string | null };
+    text?: string | null;
+  }[];
+  output_text?: string;
+  response?: string;
+}
+
 /** LLM 一次调用返回结果 */
 export interface EmailAnalysis {
   /** 摘要（bullet list） */
@@ -31,11 +41,14 @@ export interface EmailAnalysis {
   junkConfidence: number;
 }
 
+const WORKERS_AI_MODEL = "@cf/zai-org/glm-4.7-flash";
+
+export const hasLlm = (env: Env): boolean =>
+  !!env.AI || !!(env.LLM_API_URL && env.LLM_API_KEY && env.LLM_MODEL);
+
 /** 一次 LLM 调用完成邮件分析：摘要 + 标签 */
 export const analyzeEmail = async (
-  baseUrl: string,
-  apiKey: string,
-  model: string,
+  env: Env,
   subject: string,
   rawBody: string,
 ): Promise<EmailAnalysis> => {
@@ -89,7 +102,7 @@ export const analyzeEmail = async (
     `Body:\n${body}` +
     linksSection;
 
-  const raw = await callLLM(baseUrl, apiKey, model, prompt, true);
+  const raw = await callConfiguredLLM(env, prompt, true);
 
   // 解析 JSON，容忍 markdown code fence 包裹
   const jsonStr = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
@@ -118,6 +131,38 @@ export const analyzeEmail = async (
   }
 };
 
+const callConfiguredLLM = async (
+  env: Env,
+  prompt: string,
+  json?: boolean,
+): Promise<string> => {
+  try {
+    if (env.AI) return await callWorkersAI(env.AI, prompt, json);
+  } catch (err) {
+    if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL) throw err;
+    console.warn("Workers AI failed, falling back to LLM endpoint", err);
+  }
+
+  if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL)
+    throw new Error("LLM not configured");
+
+  return callLLM(env.LLM_API_URL, env.LLM_API_KEY, env.LLM_MODEL, prompt, json);
+};
+
+const callWorkersAI = async (
+  ai: Ai,
+  prompt: string,
+  json?: boolean,
+): Promise<string> => {
+  const response = await ai.run(WORKERS_AI_MODEL, {
+    messages: [{ role: "user", content: prompt }],
+    ...(json && { response_format: { type: "json_object" } }),
+  });
+  const content = extractWorkersAIText(response);
+  if (!content) throw new Error("Workers AI returned no output text");
+  return content.trim();
+};
+
 /** 从逗号分隔的 API Key 列表中随机选一个 */
 const pickRandomKey = (apiKeys: string): string => {
   const keys = apiKeys
@@ -125,6 +170,19 @@ const pickRandomKey = (apiKeys: string): string => {
     .map((k) => k.trim())
     .filter(Boolean);
   return keys[Math.floor(Math.random() * keys.length)];
+};
+
+const extractWorkersAIText = (response: unknown): string | null => {
+  if (typeof response === "string") return response;
+  if (!response || typeof response !== "object") return null;
+
+  const result = response as WorkersAiChatCompletion;
+  if (typeof result.response === "string") return result.response;
+  if (typeof result.output_text === "string") return result.output_text;
+
+  const content =
+    result.choices?.[0]?.message?.content ?? result.choices?.[0]?.text;
+  return typeof content === "string" ? content : null;
 };
 
 /** 调用 OpenAI /v1/responses 接口，以 SSE 流式读取文本增量。 */

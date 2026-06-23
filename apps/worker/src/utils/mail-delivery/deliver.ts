@@ -2,6 +2,7 @@ import {
   buildEmailKeyboard,
   buildInitialEmailKeyboard,
 } from "@worker/bot/keyboards";
+import { hasLlm } from "@worker/clients/llm";
 import {
   deleteMessage,
   sendTextMessage,
@@ -67,7 +68,7 @@ export const deliverEmailToTelegram = async (
     : "";
   const text = header + codeSection + wrapExpandableQuote(formattedBody);
 
-  const hasLlm = !!(env.LLM_API_URL && env.LLM_API_KEY && env.LLM_MODEL);
+  const canAnalyze = hasLlm(env);
 
   // 投递流程：先带"最小键盘"（仅刷新）发消息 → 拿到 sentMessageId → 建
   // 完整键盘 → setReplyMarkup 升级。首发就挂刷新键是保底 —— 完整键盘要求
@@ -128,7 +129,7 @@ export const deliverEmailToTelegram = async (
     await syncStarPinState(env, chatId, sentMessageId, true);
   }
 
-  if (!hasLlm) return;
+  if (!canAnalyze) return;
 
   if (!plainBody.trim()) return;
 

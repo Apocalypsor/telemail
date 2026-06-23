@@ -1,6 +1,7 @@
 import { authAny } from "@worker/api/plugins/auth-any";
 import { cf } from "@worker/api/plugins/cf";
 import { buildEmailKeyboard } from "@worker/bot/keyboards";
+import { hasLlm } from "@worker/clients/llm";
 import { buildTgMessageLink, setReplyMarkup } from "@worker/clients/telegram";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
@@ -179,7 +180,7 @@ const mailMutations = new Elysia({ name: "controller.mail.mutations" })
     "/api/mail/:id/refresh",
     async ({ env, executionCtx, account, emailMessageId, status }) => {
       try {
-        if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL) {
+        if (!hasLlm(env)) {
           return status(400, { ok: false, error: "LLM 未配置" });
         }
 

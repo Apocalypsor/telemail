@@ -1,4 +1,5 @@
 import { buildEmailKeyboard } from "@worker/bot/keyboards";
+import { hasLlm } from "@worker/clients/llm";
 import { getAccountById } from "@worker/db/accounts";
 import {
   deleteFailedEmail,
@@ -90,8 +91,7 @@ export const retryFailedEmail = async (
   const account = await getAccountById(env.DB, failed.account_id);
   if (!account) throw new Error(`Account ${failed.account_id} not found`);
 
-  if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL)
-    throw new Error("LLM not configured");
+  if (!hasLlm(env)) throw new Error("LLM not configured");
 
   // 拉真正的 mapping；已消失就视为孤儿
   // —— 原消息大概率已被 junk/archive 路径清理掉了，对应的 failed_email 没必要再重试
@@ -124,7 +124,7 @@ export const refreshEmail = async (
   | { ok: true; removed?: "junk" | "archive" | "deleted" }
   | { ok: false; reason: string }
 > => {
-  if (!env.LLM_API_URL || !env.LLM_API_KEY || !env.LLM_MODEL) {
+  if (!hasLlm(env)) {
     return { ok: false, reason: t("bridge:refreshNoLlm") };
   }
 

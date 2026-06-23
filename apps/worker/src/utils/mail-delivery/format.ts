@@ -251,13 +251,7 @@ export const editMessageWithAnalysis = async (
       ? editMessageCaption(env, chatId, tgMessageId, newText, keyboard)
       : editTextMessage(env, chatId, tgMessageId, newText, keyboard);
 
-  const result = await analyzeEmail(
-    env.LLM_API_URL as string,
-    env.LLM_API_KEY as string,
-    env.LLM_MODEL as string,
-    subject,
-    plainBody,
-  );
+  const result = await analyzeEmail(env, subject, plainBody);
 
   // 高置信度垃圾邮件仅添加 Junk 标签，不移动到垃圾箱
   if (
