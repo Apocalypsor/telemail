@@ -60,7 +60,6 @@ import { HTTPError } from "ky";
 export class GmailProvider extends EmailProvider {
   static displayName = "Gmail";
   static needsArchiveSetup = true;
-  private accessTokenPromise?: Promise<string>;
 
   static canArchive(account: Account): boolean {
     return !!account.archive_folder;
@@ -102,13 +101,9 @@ export class GmailProvider extends EmailProvider {
   });
 
   private async token(): Promise<string> {
-    this.accessTokenPromise ??= getAccessToken(this.env, this.account).catch(
-      (err) => {
-        this.accessTokenPromise = undefined;
-        throw err;
-      },
+    return this.memoizeAccessToken(() =>
+      getAccessToken(this.env, this.account),
     );
-    return this.accessTokenPromise;
   }
 
   // ─── Enqueue ──────────────────────────────────────────────────────────
@@ -408,14 +403,6 @@ export class GmailProvider extends EmailProvider {
       `/users/me/messages/${messageId}?format=MINIMAL`,
     );
     return msg.labelIds?.includes("STARRED") ?? false;
-  }
-
-  async isJunk(messageId: string) {
-    const msg = await gmailGet<GmailMessage>(
-      await this.token(),
-      `/users/me/messages/${messageId}?format=MINIMAL`,
-    );
-    return msg.labelIds?.includes("SPAM") ?? false;
   }
 
   /**

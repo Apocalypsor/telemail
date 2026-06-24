@@ -43,6 +43,7 @@ export abstract class EmailProvider {
 
   protected account: Account;
   protected env: Env;
+  private accessTokenPromise?: Promise<string>;
 
   constructor(account: Account, env: Env) {
     this.account = account;
@@ -68,8 +69,6 @@ export abstract class EmailProvider {
     messageId: string,
     folder?: "inbox" | "junk" | "archive",
   ): Promise<boolean>;
-
-  abstract isJunk(messageId: string): Promise<boolean>;
 
   abstract resolveMessageState(messageId: string): Promise<MessageState>;
 
@@ -182,6 +181,16 @@ export abstract class EmailProvider {
       1,
       Math.trunc(maxCount ?? EmailProvider.DEFAULT_COUNT_LIMIT),
     );
+  }
+
+  protected memoizeAccessToken(
+    fetchToken: () => Promise<string>,
+  ): Promise<string> {
+    this.accessTokenPromise ??= fetchToken().catch((err) => {
+      this.accessTokenPromise = undefined;
+      throw err;
+    });
+    return this.accessTokenPromise;
   }
 
   abstract markAsJunk(messageId: string): Promise<void>;

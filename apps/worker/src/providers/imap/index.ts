@@ -106,16 +106,6 @@ export class ImapProvider extends EmailProvider {
     });
   }
 
-  async isJunk(messageId: string) {
-    return this.withClient(async (client) => {
-      const junkPath = await findJunkFolder(this.env, client, this.account.id);
-      if (!junkPath) return false;
-      return (
-        (await this.findUidByMessageId(client, junkPath, messageId)) !== null
-      );
-    });
-  }
-
   /**
    * 按 RFC Message-Id 跨 folder 定位邮件。
    *
@@ -141,11 +131,7 @@ export class ImapProvider extends EmailProvider {
         return { location: "junk" };
       }
 
-      const archivePath = this.account.archive_folder
-        ? (await mailboxExists(client, this.account.archive_folder))
-          ? this.account.archive_folder
-          : null
-        : await findArchiveFolder(this.env, client, this.account.id);
+      const archivePath = await this.findExistingArchiveFolder(client);
       if (
         archivePath &&
         (await this.findUidByMessageId(client, archivePath, messageId)) !== null
@@ -250,11 +236,7 @@ export class ImapProvider extends EmailProvider {
 
   async listArchived(maxResults: number = 20): Promise<EmailListItem[]> {
     return this.withClient(async (client) => {
-      const archivePath = this.account.archive_folder
-        ? (await mailboxExists(client, this.account.archive_folder))
-          ? this.account.archive_folder
-          : null
-        : await findArchiveFolder(this.env, client, this.account.id);
+      const archivePath = await this.findExistingArchiveFolder(client);
       if (!archivePath) return [];
       return this.searchAndFetchWithClient(
         client,
@@ -272,11 +254,7 @@ export class ImapProvider extends EmailProvider {
   ): Promise<EmailListPage> {
     return listImapPage(maxResults, cursor, (limit, offset) =>
       this.withClient(async (client) => {
-        const archivePath = this.account.archive_folder
-          ? (await mailboxExists(client, this.account.archive_folder))
-            ? this.account.archive_folder
-            : null
-          : await findArchiveFolder(this.env, client, this.account.id);
+        const archivePath = await this.findExistingArchiveFolder(client);
         if (!archivePath) return [];
         return this.searchAndFetchWithClient(
           client,
@@ -535,6 +513,17 @@ export class ImapProvider extends EmailProvider {
   ): Promise<number> {
     await client.selectMailbox(folder);
     return (await client.search(criteria)).length;
+  }
+
+  private async findExistingArchiveFolder(
+    client: WorkerImapClient,
+  ): Promise<string | null> {
+    if (!this.account.archive_folder) {
+      return findArchiveFolder(this.env, client, this.account.id);
+    }
+    return (await mailboxExists(client, this.account.archive_folder))
+      ? this.account.archive_folder
+      : null;
   }
 
   private async searchMessagesWithOffset(
