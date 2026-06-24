@@ -5,6 +5,7 @@ import {
 import { getAccountById } from "@worker/db/accounts";
 import { getEmailProvider } from "@worker/providers";
 import type { EmailProvider } from "@worker/providers/base";
+import { EmailMessageNotFoundError } from "@worker/providers/errors";
 import {
   type Account,
   type EmailQueueMessage,
@@ -48,6 +49,15 @@ const queueHandler = async (
     } catch (error: unknown) {
       if (isTelegramRateLimitError(error)) {
         msg.retry({ delaySeconds: error.delaySeconds });
+        continue;
+      }
+      if (isStaleEmailQueueMessageError(msg.body, error)) {
+        console.log("Email queue message no longer exists in INBOX, dropping", {
+          attempt: msg.attempts,
+          accountId: msg.body.accountId,
+          emailMessageId: msg.body.emailMessageId,
+        });
+        msg.ack();
         continue;
       }
       await reportErrorToObservability(env, "queue.message_failed", error, {
@@ -136,5 +146,12 @@ const isDeliveryFailure = (rawEmail: ArrayBuffer): boolean => {
     (/^reporting-mta:\s*.+$/im.test(raw) && /^action:\s*failed\b/im.test(raw))
   );
 };
+
+const isStaleEmailQueueMessageError = (
+  body: QueueMessage,
+  error: unknown,
+): body is EmailQueueMessage =>
+  body.type === QueueMessageType.Email &&
+  error instanceof EmailMessageNotFoundError;
 
 export default queueHandler;

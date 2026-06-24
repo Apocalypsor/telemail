@@ -3,6 +3,7 @@ import { quoteImapString } from "@worker/clients/imap/utils";
 import { IMAP_FLAG_FLAGGED, IMAP_FLAG_SEEN } from "@worker/constants";
 import { getAccountById } from "@worker/db/accounts";
 import { EmailProvider } from "@worker/providers/base";
+import { EmailMessageNotFoundError } from "@worker/providers/errors";
 import { listImapPage } from "@worker/providers/imap/utils/list";
 import {
   findArchiveFolder,
@@ -429,7 +430,7 @@ export class ImapProvider extends EmailProvider {
       await client.selectMailbox("INBOX");
       const uid = await this.findUidInSelectedMailbox(client, messageId);
       if (uid === null) {
-        throw new Error(`Message-Id not found in INBOX: ${messageId}`);
+        throw new EmailMessageNotFoundError(messageId, "INBOX");
       }
       const { rawEmail, flags } = await client.fetchRawAndFlags(uid);
       return {
