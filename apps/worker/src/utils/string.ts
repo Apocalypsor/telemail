@@ -1,3 +1,8 @@
+export const utf8Decoder = new TextDecoder("utf-8", {
+  fatal: false,
+  ignoreBOM: false,
+});
+
 export const escapeBackslashAndDoubleQuote = (value: string): string => {
   let escaped = "";
   for (const char of value) {

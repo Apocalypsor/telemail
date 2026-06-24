@@ -12,6 +12,7 @@ import {
 } from "@worker/types";
 import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import { reportErrorToObservability } from "@worker/utils/observability";
+import { utf8Decoder } from "@worker/utils/string";
 
 /** Queue consumer: 按 type 派发邮件投递 / 延迟删 TG 消息等任务 */
 const queueHandler = async (
@@ -67,6 +68,19 @@ const processEmailMessage = async (
 
   const provider = getEmailProvider(account, env);
   const rawEmail = await provider.fetchRawEmail(msg.emailMessageId);
+  if (isDeliveryFailure(rawEmail)) {
+    try {
+      await provider.markAsRead(msg.emailMessageId);
+    } catch (err) {
+      await reportErrorToObservability(
+        env,
+        "queue.mark_delivery_failure_read_failed",
+        err,
+        { accountId: msg.accountId, emailMessageId: msg.emailMessageId },
+      );
+    }
+    return;
+  }
 
   await deliverEmailToTelegram(
     rawEmail,
@@ -74,6 +88,14 @@ const processEmailMessage = async (
     account,
     env,
     waitUntil,
+  );
+};
+
+const isDeliveryFailure = (rawEmail: ArrayBuffer): boolean => {
+  const raw = utf8Decoder.decode(rawEmail).replace(/\r\n/g, "\n");
+  return (
+    /^content-type:\s*message\/delivery-status\b/im.test(raw) ||
+    (/^reporting-mta:\s*.+$/im.test(raw) && /^action:\s*failed\b/im.test(raw))
   );
 };
 

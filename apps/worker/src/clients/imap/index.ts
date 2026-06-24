@@ -18,12 +18,12 @@ import {
   toArrayBuffer,
 } from "@worker/clients/imap/utils";
 import type { Account } from "@worker/types";
+import { utf8Decoder } from "@worker/utils/string";
 
 export class WorkerImapClient {
   private readonly reader: ImapStreamReader;
   private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
   private readonly encoder = new TextEncoder();
-  private readonly decoder = new TextDecoder();
   private buffer = new Uint8Array(0);
   private tagSeq = 1;
 
@@ -202,7 +202,7 @@ export class WorkerImapClient {
       if (index >= 0) {
         const lineBytes = this.buffer.slice(0, index);
         this.buffer = this.buffer.slice(index + 2);
-        return this.decoder.decode(lineBytes);
+        return utf8Decoder.decode(lineBytes);
       }
       await this.readMore();
     }

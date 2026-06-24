@@ -1,3 +1,5 @@
+import { utf8Decoder } from "@worker/utils/string";
+
 /** base64url → 原始字节 */
 export const base64urlToBytes = (b64url: string): Uint8Array => {
   let b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
@@ -17,7 +19,7 @@ export const base64urlToArrayBuffer = (b64url: string): ArrayBuffer => {
 
 /** base64url → UTF-8 string */
 export const base64urlToString = (b64url: string): string => {
-  return new TextDecoder("utf-8").decode(base64urlToBytes(b64url));
+  return utf8Decoder.decode(base64urlToBytes(b64url));
 };
 
 /** base64url → byte stream，用于避免一次性构造完整附件二进制。 */

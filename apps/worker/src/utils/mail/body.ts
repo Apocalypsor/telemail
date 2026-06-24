@@ -3,7 +3,11 @@ import {
   findLongestValidMdV2Prefix,
   markdownToMdV2,
 } from "@worker/utils/markdown-v2";
-import { escapeHtmlText, stripHtmlTags } from "@worker/utils/string";
+import {
+  escapeHtmlText,
+  stripHtmlTags,
+  utf8Decoder,
+} from "@worker/utils/string";
 import { parseHTML } from "linkedom";
 import type { Address } from "postal-mime";
 import TurndownService from "turndown";
@@ -145,11 +149,6 @@ export const wrapPlainText = (text: string): string => {
   const escaped = escapeHtmlText(text);
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:monospace;white-space:pre-wrap;word-break:break-word;max-width:800px;margin:2em auto;padding:0 1em;line-height:1.5;color:#333}</style></head><body>${escaped}</body></html>`;
 };
-const utf8Decoder = new TextDecoder("utf-8", {
-  fatal: false,
-  ignoreBOM: false,
-});
-
 /** HTML → Markdown 转换器实例（linkedom DOM + turndown） */
 const turndown = new TurndownService({
   bulletListMarker: "-",
