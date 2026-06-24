@@ -22,6 +22,7 @@ import type {
   EmailListItem,
   EmailListPage,
   MessageState,
+  RawEmailWithState,
 } from "@worker/providers/types";
 import { type Env, QueueMessageType } from "@worker/types";
 
@@ -442,6 +443,24 @@ export class ImapProvider extends EmailProvider {
         throw new Error(`Message-Id not found in ${resolved}: ${messageId}`);
       }
       return client.fetchRaw(uid);
+    });
+  }
+
+  async fetchRawEmailWithState(messageId: string): Promise<RawEmailWithState> {
+    return this.withClient(async (client) => {
+      await client.selectMailbox("INBOX");
+      const uid = await this.findUidInSelectedMailbox(client, messageId);
+      if (uid === null) {
+        throw new Error(`Message-Id not found in INBOX: ${messageId}`);
+      }
+      const { rawEmail, flags } = await client.fetchRawAndFlags(uid);
+      return {
+        rawEmail,
+        state: {
+          location: "inbox",
+          starred: flags.some((flag) => flag.toLowerCase() === "\\flagged"),
+        },
+      };
     });
   }
 

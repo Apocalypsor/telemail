@@ -12,6 +12,7 @@ import {
 import { putFailedEmail } from "@worker/db/failed-emails";
 import { putMessageMapping, updateShortSummary } from "@worker/db/message-map";
 import { accountCanArchive, getEmailProvider } from "@worker/providers";
+import type { MessageState } from "@worker/providers/types";
 import type { Account, Env } from "@worker/types";
 import {
   buildVerificationCodeSection,
@@ -38,6 +39,7 @@ export const deliverEmailToTelegram = async (
   account: Account,
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
+  resolvedState?: MessageState | null,
 ): Promise<void> => {
   const chatId = account.chat_id;
   const topicId = account.topic_id;
@@ -47,10 +49,12 @@ export const deliverEmailToTelegram = async (
 
   // 查远端状态：队列入队到处理之间可能已被用户在远端 junk/archive/delete；仅 inbox 才投递。
   // 顺带拿到 starred 给初始 keyboard，避免 TG 键盘从 ☆ → ★ 闪烁
-  const provider = getEmailProvider(account, env);
-  const state = await provider
-    .resolveMessageState(emailMessageId)
-    .catch(() => null);
+  const state =
+    resolvedState !== undefined
+      ? resolvedState
+      : await getEmailProvider(account, env)
+          .resolveMessageState(emailMessageId)
+          .catch(() => null);
   if (state && state.location !== "inbox") {
     console.log(
       `Skip delivery: email=${emailMessageId} already at ${state.location} on remote`,

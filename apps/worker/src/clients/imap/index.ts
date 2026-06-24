@@ -122,6 +122,24 @@ export class WorkerImapClient {
     return toArrayBuffer(literal.bytes);
   }
 
+  async fetchRawAndFlags(
+    uid: number,
+  ): Promise<{ rawEmail: ArrayBuffer; flags: string[] }> {
+    const response = await this.commandOk(
+      `UID FETCH ${uid} (UID FLAGS BODY.PEEK[])`,
+    );
+    const literal = response.literals.find((item) =>
+      /\bBODY(?:\[\]|\[)/i.test(item.prefix),
+    );
+    if (!literal)
+      throw new Error(`IMAP FETCH returned no raw body for UID ${uid}`);
+    const flags =
+      response.lines
+        .map(parseFlags)
+        .find((parsed): parsed is string[] => parsed !== null) ?? [];
+    return { rawEmail: toArrayBuffer(literal.bytes), flags };
+  }
+
   async fetchFlags(uid: number): Promise<string[]> {
     const response = await this.commandOk(`UID FETCH ${uid} (UID FLAGS)`);
     for (const line of response.lines) {

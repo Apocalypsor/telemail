@@ -65,6 +65,7 @@ export class OutlookProvider extends EmailProvider {
   static displayName = "Outlook";
   /** Microsoft Graph webhook 推送变更通知的 HTTP 路径 */
   private static readonly ROUTE_PUSH = "/api/outlook/push";
+  private accessTokenPromise?: Promise<string>;
 
   static oauth = EmailProvider.createOAuthHandler({
     name: "Microsoft",
@@ -93,7 +94,13 @@ export class OutlookProvider extends EmailProvider {
   });
 
   private async token(): Promise<string> {
-    return getAccessToken(this.env, this.account);
+    this.accessTokenPromise ??= getAccessToken(this.env, this.account).catch(
+      (err) => {
+        this.accessTokenPromise = undefined;
+        throw err;
+      },
+    );
+    return this.accessTokenPromise;
   }
 
   // ─── Enqueue ──────────────────────────────────────────────────────────

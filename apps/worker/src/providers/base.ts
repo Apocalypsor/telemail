@@ -20,6 +20,7 @@ import type {
   OAuthProviderConfig,
   OAuthTokenResponse,
   PreviewContent,
+  RawEmailWithState,
 } from "@worker/providers/types";
 import { attachmentBody, parseOffsetCursor } from "@worker/providers/utils";
 import type { Account, Env, MailAttachmentDownload } from "@worker/types";
@@ -205,6 +206,12 @@ export abstract class EmailProvider {
     messageId: string,
     folder?: "inbox" | "junk" | "archive",
   ): Promise<ArrayBuffer>;
+
+  async fetchRawEmailWithState(messageId: string): Promise<RawEmailWithState> {
+    const rawEmail = await this.fetchRawEmail(messageId);
+    const state = await this.resolveMessageState(messageId).catch(() => null);
+    return { rawEmail, state };
+  }
 
   private async pageByOffset(
     fetcher: (maxResults: number) => Promise<EmailListItem[]>,

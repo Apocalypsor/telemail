@@ -17,6 +17,10 @@ export interface GmailMessage {
   payload?: GmailPayload;
 }
 
+export interface GmailRawMessage extends GmailMessage {
+  raw: string;
+}
+
 export interface GmailMessageList {
   messages?: { id: string }[];
   nextPageToken?: string;

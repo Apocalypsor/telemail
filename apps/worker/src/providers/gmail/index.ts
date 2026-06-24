@@ -15,6 +15,7 @@ import type {
   GmailMessageList,
   GmailPayload,
   GmailProfile,
+  GmailRawMessage,
   GmailWatchResponse,
 } from "@worker/providers/gmail/types";
 import { gmailGet, gmailPost } from "@worker/providers/gmail/utils/api";
@@ -40,6 +41,7 @@ import type {
   EmailListPage,
   MessageState,
   PreviewContent,
+  RawEmailWithState,
 } from "@worker/providers/types";
 import {
   type Account,
@@ -58,9 +60,17 @@ import { HTTPError } from "ky";
 export class GmailProvider extends EmailProvider {
   static displayName = "Gmail";
   static needsArchiveSetup = true;
+  private accessTokenPromise?: Promise<string>;
 
   static canArchive(account: Account): boolean {
     return !!account.archive_folder;
+  }
+
+  private static messageStateFromLabels(labels: string[]): MessageState {
+    if (labels.includes("TRASH")) return { location: "deleted" };
+    if (labels.includes("SPAM")) return { location: "junk" };
+    if (!labels.includes("INBOX")) return { location: "archive" };
+    return { location: "inbox", starred: labels.includes("STARRED") };
   }
 
   static oauth = EmailProvider.createOAuthHandler({
@@ -92,7 +102,13 @@ export class GmailProvider extends EmailProvider {
   });
 
   private async token(): Promise<string> {
-    return getAccessToken(this.env, this.account);
+    this.accessTokenPromise ??= getAccessToken(this.env, this.account).catch(
+      (err) => {
+        this.accessTokenPromise = undefined;
+        throw err;
+      },
+    );
+    return this.accessTokenPromise;
   }
 
   // ─── Enqueue ──────────────────────────────────────────────────────────
@@ -259,6 +275,19 @@ export class GmailProvider extends EmailProvider {
     return base64urlToArrayBuffer(msg.raw);
   }
 
+  async fetchRawEmailWithState(messageId: string): Promise<RawEmailWithState> {
+    const msg = await gmailGet<GmailRawMessage>(
+      await this.token(),
+      `/users/me/messages/${messageId}?format=raw`,
+    );
+    return {
+      rawEmail: base64urlToArrayBuffer(msg.raw),
+      state: msg.labelIds
+        ? GmailProvider.messageStateFromLabels(msg.labelIds)
+        : null,
+    };
+  }
+
   /** Gmail 走 API 直接取结构化 payload，比 fetchRawEmail + PostalMime 高效 */
   async fetchForPreview(messageId: string): Promise<PreviewContent | null> {
     const token = await this.token();
@@ -400,11 +429,7 @@ export class GmailProvider extends EmailProvider {
         await this.token(),
         `/users/me/messages/${messageId}?format=MINIMAL`,
       );
-      const labels = msg.labelIds ?? [];
-      if (labels.includes("TRASH")) return { location: "deleted" };
-      if (labels.includes("SPAM")) return { location: "junk" };
-      if (!labels.includes("INBOX")) return { location: "archive" };
-      return { location: "inbox", starred: labels.includes("STARRED") };
+      return GmailProvider.messageStateFromLabels(msg.labelIds ?? []);
     } catch (err) {
       if (err instanceof HTTPError && err.response.status === 404) {
         return { location: "deleted" };

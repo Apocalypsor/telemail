@@ -4,7 +4,9 @@ import {
 } from "@worker/clients/telegram";
 import { getAccountById } from "@worker/db/accounts";
 import { getEmailProvider } from "@worker/providers";
+import type { EmailProvider } from "@worker/providers/base";
 import {
+  type Account,
   type EmailQueueMessage,
   type Env,
   type QueueMessage,
@@ -14,6 +16,11 @@ import { deliverEmailToTelegram } from "@worker/utils/mail-delivery/deliver";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { utf8Decoder } from "@worker/utils/string";
 
+interface EmailProcessingContext {
+  account: Account;
+  provider: EmailProvider;
+}
+
 /** Queue consumer: 按 type 派发邮件投递 / 延迟删 TG 消息等任务 */
 const queueHandler = async (
   batch: MessageBatch<QueueMessage>,
@@ -21,11 +28,17 @@ const queueHandler = async (
   ctx: ExecutionContext,
 ): Promise<void> => {
   const waitUntil = ctx.waitUntil.bind(ctx);
+  const emailContextCache = new Map<number, EmailProcessingContext | null>();
   for (const msg of batch.messages) {
     try {
       switch (msg.body.type) {
         case QueueMessageType.Email:
-          await processEmailMessage(msg.body, env, waitUntil);
+          await processEmailMessage(
+            msg.body,
+            env,
+            waitUntil,
+            emailContextCache,
+          );
           break;
         case QueueMessageType.DeleteTgMessage:
           await deleteMessage(env, msg.body.chatId, msg.body.messageId);
@@ -51,23 +64,17 @@ const processEmailMessage = async (
   msg: EmailQueueMessage,
   env: Env,
   waitUntil: (p: Promise<unknown>) => void,
+  contextCache: Map<number, EmailProcessingContext | null>,
 ): Promise<void> => {
-  const account = await getAccountById(env.DB, msg.accountId);
-  if (!account) {
-    console.log(
-      `Account ${msg.accountId} not found, skipping email ${msg.emailMessageId}`,
-    );
+  const context = await getEmailProcessingContext(env, msg, contextCache);
+  if (!context) {
     return;
   }
-  if (account.disabled) {
-    console.log(
-      `Account ${msg.accountId} is disabled, dropping email ${msg.emailMessageId}`,
-    );
-    return;
-  }
+  const { account, provider } = context;
 
-  const provider = getEmailProvider(account, env);
-  const rawEmail = await provider.fetchRawEmail(msg.emailMessageId);
+  const { rawEmail, state } = await provider.fetchRawEmailWithState(
+    msg.emailMessageId,
+  );
   if (isDeliveryFailure(rawEmail)) {
     try {
       await provider.markAsRead(msg.emailMessageId);
@@ -88,7 +95,38 @@ const processEmailMessage = async (
     account,
     env,
     waitUntil,
+    state,
   );
+};
+
+const getEmailProcessingContext = async (
+  env: Env,
+  msg: EmailQueueMessage,
+  contextCache: Map<number, EmailProcessingContext | null>,
+): Promise<EmailProcessingContext | null> => {
+  if (contextCache.has(msg.accountId)) {
+    return contextCache.get(msg.accountId) ?? null;
+  }
+
+  const account = await getAccountById(env.DB, msg.accountId);
+  if (!account) {
+    console.log(
+      `Account ${msg.accountId} not found, skipping email ${msg.emailMessageId}`,
+    );
+    contextCache.set(msg.accountId, null);
+    return null;
+  }
+  if (account.disabled) {
+    console.log(
+      `Account ${msg.accountId} is disabled, dropping email ${msg.emailMessageId}`,
+    );
+    contextCache.set(msg.accountId, null);
+    return null;
+  }
+
+  const context = { account, provider: getEmailProvider(account, env) };
+  contextCache.set(msg.accountId, context);
+  return context;
 };
 
 const isDeliveryFailure = (rawEmail: ArrayBuffer): boolean => {

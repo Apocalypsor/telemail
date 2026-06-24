@@ -31,6 +31,11 @@ export type MessageState =
   | { location: "inbox"; starred: boolean }
   | { location: "junk" | "archive" | "deleted" };
 
+export interface RawEmailWithState {
+  rawEmail: ArrayBuffer;
+  state: MessageState | null;
+}
+
 /** 邮件 web 预览用的渲染内容 */
 export interface PreviewContent {
   html: string;
