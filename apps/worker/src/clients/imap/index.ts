@@ -26,6 +26,7 @@ export class WorkerImapClient {
   private readonly encoder = new TextEncoder();
   private buffer = new Uint8Array(0);
   private tagSeq = 1;
+  private commandTail: Promise<void> = Promise.resolve();
 
   private constructor(private readonly socket: Socket) {
     this.reader = socket.readable.getReader() as ImapStreamReader;
@@ -191,26 +192,37 @@ export class WorkerImapClient {
   private async command(
     command: string,
   ): Promise<{ response: ImapResponse; statusLine: string }> {
-    const tag = `A${String(this.tagSeq++).padStart(4, "0")}`;
-    await this.writer.write(this.encoder.encode(`${tag} ${command}\r\n`));
+    const previous = this.commandTail;
+    let release = () => {};
+    this.commandTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
 
-    const lines: string[] = [];
-    const literals: ImapLiteral[] = [];
-    while (true) {
-      const line = await this.readLine();
-      lines.push(line);
+    await previous;
+    try {
+      const tag = `A${String(this.tagSeq++).padStart(4, "0")}`;
+      await this.writer.write(this.encoder.encode(`${tag} ${command}\r\n`));
 
-      const literalLength = parseLiteralLength(line);
-      if (literalLength !== null) {
-        literals.push({
-          prefix: line,
-          bytes: await this.readBytes(literalLength),
-        });
+      const lines: string[] = [];
+      const literals: ImapLiteral[] = [];
+      while (true) {
+        const line = await this.readLine();
+        lines.push(line);
+
+        const literalLength = parseLiteralLength(line);
+        if (literalLength !== null) {
+          literals.push({
+            prefix: line,
+            bytes: await this.readBytes(literalLength),
+          });
+        }
+
+        if (line.startsWith(`${tag} `)) {
+          return { response: { lines, literals }, statusLine: line };
+        }
       }
-
-      if (line.startsWith(`${tag} `)) {
-        return { response: { lines, literals }, statusLine: line };
-      }
+    } finally {
+      release();
     }
   }
 
