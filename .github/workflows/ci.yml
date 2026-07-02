@@ -23,7 +23,7 @@ jobs:
       worker: ${{ steps.filter.outputs.worker == 'true' || steps.filter.outputs.root_package == 'true' }}
       page: ${{ steps.filter.outputs.page == 'true' || steps.filter.outputs.root_package == 'true' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -42,7 +42,7 @@ jobs:
     name: Biome check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
       - run: bun check
 
@@ -50,7 +50,7 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
       - run: bun typecheck
 
@@ -58,7 +58,7 @@ jobs:
     name: Build page
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
       - run: bun build:page
       - uses: actions/upload-artifact@v7
@@ -93,7 +93,7 @@ jobs:
     outputs:
       url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
       # wrangler.jsonc 是 gitignored 的 templated 文件，envsubst 从
       # wrangler.example.jsonc 生成：占位符 ${D1_DATABASE_ID} / ${KV_NAMESPACE_ID}
@@ -125,7 +125,7 @@ jobs:
     outputs:
       url: ${{ steps.upload.outputs.deployment-url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
       - name: Generate wrangler.jsonc
         env:
@@ -160,7 +160,7 @@ jobs:
       url: ${{ steps.deploy.outputs.deployment-url }}
       alias_url: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
       - uses: actions/download-artifact@v8
         with:
@@ -188,7 +188,7 @@ jobs:
       url: ${{ steps.deploy.outputs.deployment-url }}
       alias_url: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
       - uses: actions/download-artifact@v8
         with:
@@ -219,7 +219,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/github-script@v9
         env:
           MODE: preview
@@ -246,7 +246,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/github-script@v9
         env:
           MODE: deploy
