@@ -12,11 +12,8 @@ import type { Env, TelegramUser } from "@worker/types";
 import { cleanupAndDeleteAccount } from "@worker/utils/accounts";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { UserListResponse, UserResponse } from "./model";
+import type { UserResult } from "./types";
 import { userToResponse } from "./utils";
-
-type UserResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
 
 export abstract class UsersService {
   static async listUsers(

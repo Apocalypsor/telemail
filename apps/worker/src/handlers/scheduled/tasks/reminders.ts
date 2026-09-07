@@ -50,15 +50,12 @@ export class DueRemindersTask extends ScheduledTask {
     if (!due) return;
     if (due.length === 0) return;
 
+    waitUntil(RemindersService.pushThingsTasksForDueEmailReminders(env, due));
+
     await Promise.allSettled(
       due.map(async (r) => {
         try {
           if (r.account_id != null && r.email_message_id != null) {
-            waitUntil(
-              RemindersService.pushThingsTaskForDueEmailReminder(env, r).catch(
-                () => {},
-              ),
-            );
             await this.sendEmailReminder(env, r, waitUntil);
           } else {
             await this.sendGenericReminder(env, r);

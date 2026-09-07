@@ -25,6 +25,7 @@ const updateUserTimezoneIfChanged = async (
     );
   }
 };
+
 /**
  * Mini App 鉴权：X-Telegram-Init-Data 头验签 + users.approved 检查（管理员豁免）。
  * 失败返回 401 JSON。通过则在 context 里挂 `userId` + `isAdmin`。

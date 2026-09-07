@@ -1,7 +1,7 @@
-/** Reminders 模块的业务用例编排。目前只有一项：list 接口的 enrich 流程
- *  （给 reminder 行附加 mail_token + email_summary）。 */
+/** Reminders 列表补充邮件信息，以及到期邮件提醒的 Things Cloud 批量推送。 */
 import { MailService } from "@worker/api/modules/mail/service";
 import { ThingsCloudClient } from "@worker/clients/things-cloud";
+import type { ThingsTodoInput } from "@worker/clients/things-cloud/types";
 import {
   deriveThingsUuid,
   generateThingsAppInstanceId,
@@ -25,16 +25,6 @@ import { resolveUserTimeZone } from "@worker/utils/time-zone";
 import { getWorkerBaseUrl } from "@worker/utils/url";
 import type { EnrichedReminder } from "./types";
 
-const getOrCreateThingsAppInstanceId = async (
-  env: Env,
-  telegramUserId: string,
-): Promise<string> => {
-  const cached = await getThingsAppInstanceId(env.EMAIL_KV, telegramUserId);
-  if (cached) return cached;
-  const generated = generateThingsAppInstanceId();
-  await putThingsAppInstanceId(env.EMAIL_KV, telegramUserId, generated);
-  return generated;
-};
 export abstract class RemindersService {
   /** 给 listOnly 模式（主菜单"我的提醒"）的 reminder 列表附加 mail_token + email_summary。
    *  按 (accountId, emailMessageId) 去重，HMAC + mapping 计算两路并发。 */
@@ -99,86 +89,120 @@ export abstract class RemindersService {
     });
   }
 
-  static async pushThingsTaskForDueEmailReminder(
+  static async pushThingsTasksForDueEmailReminders(
+    env: Env,
+    reminders: Reminder[],
+  ): Promise<void> {
+    const byUser = new Map<string, Reminder[]>();
+    for (const reminder of reminders) {
+      if (reminder.account_id == null || reminder.email_message_id == null)
+        continue;
+      const group = byUser.get(reminder.telegram_user_id) ?? [];
+      group.push(reminder);
+      byUser.set(reminder.telegram_user_id, group);
+    }
+    await Promise.all(
+      Array.from(byUser.entries(), async ([userId, group]) => {
+        try {
+          const user = await getUserByTelegramId(env.DB, userId);
+          const email = user?.things_cloud_email?.trim();
+          const password = user?.things_cloud_password;
+          if (!email || !password) return;
+
+          const pending: { reminderId: number; input: ThingsTodoInput }[] = [];
+          for (const reminder of group) {
+            const input = await RemindersService.prepareThingsTodo(
+              env,
+              reminder,
+            );
+            if (input) pending.push({ reminderId: reminder.id, input });
+          }
+          if (pending.length === 0) return;
+          const client = new ThingsCloudClient({
+            email,
+            password,
+            appInstanceId:
+              await RemindersService.getOrCreateThingsAppInstanceId(
+                env,
+                userId,
+              ),
+            endpoint: env.THINGS_CLOUD_ENDPOINT,
+          });
+          const ids = await client.createTodos(
+            pending.map(({ input }) => ({
+              ...input,
+              timeZone: resolveUserTimeZone(user.user_timezone),
+            })),
+          );
+          await Promise.all(
+            pending.map(({ reminderId }, index) =>
+              updateReminderThingsTaskId(env.DB, reminderId, ids[index]),
+            ),
+          );
+        } catch (err) {
+          await reportErrorToObservability(
+            env,
+            "reminders.things_push_failed",
+            err,
+            {
+              reminderIds: group.map(({ id }) => id),
+              telegramUserId: userId,
+            },
+          );
+        }
+      }),
+    );
+  }
+
+  private static async getOrCreateThingsAppInstanceId(
+    env: Env,
+    telegramUserId: string,
+  ): Promise<string> {
+    const cached = await getThingsAppInstanceId(env.EMAIL_KV, telegramUserId);
+    if (cached) return cached;
+    const generated = generateThingsAppInstanceId();
+    await putThingsAppInstanceId(env.EMAIL_KV, telegramUserId, generated);
+    return generated;
+  }
+
+  private static async prepareThingsTodo(
     env: Env,
     reminder: Reminder,
-  ): Promise<void> {
+  ): Promise<ThingsTodoInput | null> {
     if (reminder.account_id == null || reminder.email_message_id == null)
-      return;
-
-    try {
-      const current = await getReminderById(env.DB, reminder.id);
-      if (!current || current.things_task_id) return;
-
-      const user = await getUserByTelegramId(env.DB, reminder.telegram_user_id);
-      const thingsEmail = user?.things_cloud_email?.trim();
-      const thingsPassword = user?.things_cloud_password;
-      if (!thingsEmail || !thingsPassword) return;
-
-      const account = await getAccountById(env.DB, reminder.account_id);
-      if (!account) return;
-
-      const taskId = await deriveThingsUuid(
-        env.ADMIN_SECRET,
-        `reminder:${reminder.id}`,
-      );
-      const token = await generateMailTokenById(
-        env.ADMIN_SECRET,
-        reminder.email_message_id,
-        reminder.account_id,
-      );
-      const mailUrl = buildWebMailUrl(
-        getWorkerBaseUrl(env),
-        reminder.email_message_id,
-        reminder.account_id,
-        token,
-      );
-      const title = reminder.text || reminder.email_subject || "Email reminder";
-      const notes = [
-        reminder.text && reminder.text !== title
-          ? `Note: ${reminder.text}`
-          : null,
-        `Reminder fired: ${new Date().toISOString()}`,
-        `Original reminder time: ${reminder.remind_at.toISOString()}`,
-        account.email ? `Account: ${account.email}` : null,
-        reminder.email_subject && reminder.email_subject !== title
-          ? `Mail: ${reminder.email_subject}`
-          : null,
-        mailUrl ? `Open mail: ${mailUrl}` : null,
-        `Telemail reminder #${reminder.id}`,
-      ]
-        .filter((line): line is string => !!line)
-        .join("\n");
-
-      const client = new ThingsCloudClient({
-        email: thingsEmail,
-        password: thingsPassword,
-        appInstanceId: await getOrCreateThingsAppInstanceId(
-          env,
-          reminder.telegram_user_id,
-        ),
-        endpoint: env.THINGS_CLOUD_ENDPOINT,
-      });
-      const createdTaskId = await client.createTodo({
-        id: taskId,
-        title,
-        notes,
-        today: true,
-        timeZone: resolveUserTimeZone(user.user_timezone),
-      });
-      await updateReminderThingsTaskId(env.DB, reminder.id, createdTaskId);
-    } catch (err) {
-      await reportErrorToObservability(
-        env,
-        "reminders.things_push_failed",
-        err,
-        {
-          reminderId: reminder.id,
-          telegramUserId: reminder.telegram_user_id,
-          accountId: reminder.account_id,
-          emailMessageId: reminder.email_message_id,
-        },
-      );
-    }
+      return null;
+    const current = await getReminderById(env.DB, reminder.id);
+    if (!current || current.things_task_id) return null;
+    const account = await getAccountById(env.DB, reminder.account_id);
+    if (!account) return null;
+    const id = await deriveThingsUuid(
+      env.ADMIN_SECRET,
+      `reminder:${reminder.id}`,
+    );
+    const token = await generateMailTokenById(
+      env.ADMIN_SECRET,
+      reminder.email_message_id,
+      reminder.account_id,
+    );
+    const mailUrl = buildWebMailUrl(
+      getWorkerBaseUrl(env),
+      reminder.email_message_id,
+      reminder.account_id,
+      token,
+    );
+    const title = reminder.text || reminder.email_subject || "Email reminder";
+    const notes = [
+      `Reminder fired: ${new Date().toISOString()}`,
+      `Original reminder time: ${reminder.remind_at.toISOString()}`,
+      account.email ? `Account: ${account.email}` : null,
+      reminder.email_subject && reminder.email_subject !== title
+        ? `Mail: ${reminder.email_subject}`
+        : null,
+      mailUrl ? `Open mail: ${mailUrl}` : null,
+      `Telemail reminder #${reminder.id}`,
+    ]
+      .filter((line): line is string => !!line)
+      .join("\n");
+    return { id, title, notes, today: true };
   }
 }

@@ -13,8 +13,112 @@ import { trimTrailingSlashes } from "@worker/utils/string";
 
 let crcTable: Uint32Array | null = null;
 
+export const createTaskPayload = (
+  input: ThingsTodoInput,
+): TaskCreatePayload => {
+  const { scheduledDate, alarmOffset } = thingsSchedule(
+    input.when,
+    input.timeZone,
+  );
+  const todayParts = input.today
+    ? partsInTimeZone(new Date(), input.timeZone || "UTC")
+    : null;
+  const todayDate = todayParts
+    ? Math.floor(
+        Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day) / 1000,
+      )
+    : null;
+  const scheduleDate = scheduledDate ?? todayDate;
+  const schedule = scheduleDate == null ? 0 : 1;
+  return {
+    tp: 0,
+    sr: scheduleDate,
+    dds: null,
+    rt: [],
+    rmd: null,
+    ss: 0,
+    tr: false,
+    dl: [],
+    icp: false,
+    st: schedule,
+    ar: [],
+    tt: input.title,
+    do: 0,
+    lai: null,
+    tir: scheduleDate,
+    tg: [],
+    agr: [],
+    ix: 0,
+    cd: nowTimestamp(),
+    lt: false,
+    icc: 0,
+    md: null,
+    ti: 0,
+    dd: null,
+    ato: alarmOffset,
+    nt: textNote(input.notes ?? ""),
+    icsd: null,
+    pr: [],
+    rp: null,
+    acrd: null,
+    sp: null,
+    sb: 0,
+    rr: null,
+    xx: extension(),
+  };
+};
+
 export const endpointUrl = (endpoint: string, path: string): string => {
   return `${trimTrailingSlashes(endpoint)}${path}`;
+};
+
+export const commonHeaders = (): Record<string, string> => {
+  return {
+    "User-Agent": THINGS_USER_AGENT,
+    Accept: "application/json",
+    "Accept-Charset": "UTF-8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Things-Client-Info": thingsClientInfoHeader(),
+  };
+};
+
+export const generateThingsUuid = (): string => {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return base58Encode(bytes);
+};
+
+export const generateThingsAppInstanceId = (): string => {
+  return `${randomHex(63)}-${APP_ID}-${randomHex(63)}`;
+};
+
+export const deriveThingsUuid = async (
+  secret: string,
+  namespace: string,
+): Promise<string> => {
+  const bytes = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${secret}:${namespace}`),
+  );
+  return base58Encode(new Uint8Array(bytes).slice(0, 16));
+};
+
+/** Reject malformed identifiers before they can enter the sync history. */
+export const validateThingsUuid = (id: string): void => {
+  if (!id || id.length > 22) throw new Error("Invalid Things task ID");
+  let value = 0n;
+  for (const character of id) {
+    const digit = BASE58_ALPHABET.indexOf(character);
+    if (digit < 0) throw new Error("Invalid Things task ID");
+    value = value * 58n + BigInt(digit);
+  }
+  let bytes = 0;
+  while (value > 0n) {
+    bytes++;
+    value >>= 8n;
+  }
+  const zeros = id.match(/^1*/)?.[0].length ?? 0;
+  if (zeros + bytes !== 16) throw new Error("Invalid Things task ID");
 };
 
 const encodeBase64Ascii = (value: string): string => {
@@ -38,20 +142,11 @@ const thingsClientInfoHeader = (): string => {
   );
 };
 
-export const commonHeaders = (): Record<string, string> => {
-  return {
-    "User-Agent": THINGS_USER_AGENT,
-    Accept: "application/json",
-    "Accept-Charset": "UTF-8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Things-Client-Info": thingsClientInfoHeader(),
-  };
-};
-
 const base58Encode = (bytes: Uint8Array): string => {
   let value = 0n;
   for (const byte of bytes) value = (value << 8n) + BigInt(byte);
-  if (value === 0n) return "1";
+  let zeros = 0;
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
 
   let encoded = "";
   while (value > 0n) {
@@ -59,13 +154,7 @@ const base58Encode = (bytes: Uint8Array): string => {
     encoded = BASE58_ALPHABET[mod] + encoded;
     value /= 58n;
   }
-  return encoded;
-};
-
-export const generateThingsUuid = (): string => {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return base58Encode(bytes);
+  return "1".repeat(zeros) + encoded;
 };
 
 const randomHex = (length: number): string => {
@@ -75,21 +164,6 @@ const randomHex = (length: number): string => {
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")
     .slice(0, length);
-};
-
-export const generateThingsAppInstanceId = (): string => {
-  return `${randomHex(63)}-${APP_ID}-${randomHex(63)}`;
-};
-
-export const deriveThingsUuid = async (
-  secret: string,
-  namespace: string,
-): Promise<string> => {
-  const bytes = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(`${secret}:${namespace}`),
-  );
-  return base58Encode(new Uint8Array(bytes).slice(0, 16));
 };
 
 const getCrcTable = (): Uint32Array => {
@@ -173,59 +247,4 @@ const thingsSchedule = (
   );
   const alarmOffset = parts.hour * 60 * 60 + parts.minute * 60 + parts.second;
   return { scheduledDate, alarmOffset };
-};
-
-export const createTaskPayload = (
-  input: ThingsTodoInput,
-): TaskCreatePayload => {
-  const { scheduledDate, alarmOffset } = thingsSchedule(
-    input.when,
-    input.timeZone,
-  );
-  const todayParts = input.today
-    ? partsInTimeZone(new Date(), input.timeZone || "UTC")
-    : null;
-  const todayDate = todayParts
-    ? Math.floor(
-        Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day) / 1000,
-      )
-    : null;
-  const scheduleDate = scheduledDate ?? todayDate;
-  const schedule = scheduleDate == null ? 0 : 1;
-  return {
-    tp: 0,
-    sr: scheduleDate,
-    dds: null,
-    rt: [],
-    rmd: null,
-    ss: 0,
-    tr: false,
-    dl: [],
-    icp: false,
-    st: schedule,
-    ar: [],
-    tt: input.title,
-    do: 0,
-    lai: null,
-    tir: scheduleDate,
-    tg: [],
-    agr: [],
-    ix: 0,
-    cd: nowTimestamp(),
-    lt: false,
-    icc: 0,
-    md: null,
-    ti: 0,
-    dd: null,
-    ato: alarmOffset,
-    nt: textNote(input.notes ?? ""),
-    icsd: null,
-    pr: [],
-    rp: null,
-    acrd: null,
-    sp: null,
-    sb: 0,
-    rr: null,
-    xx: extension(),
-  };
 };

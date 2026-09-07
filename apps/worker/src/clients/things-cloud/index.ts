@@ -18,7 +18,9 @@ import {
   createTaskPayload,
   endpointUrl,
   generateThingsUuid,
+  validateThingsUuid,
 } from "@worker/clients/things-cloud/utils";
+import { HTTPError } from "ky";
 
 export class ThingsCloudClient {
   private readonly endpoint: string;
@@ -66,21 +68,58 @@ export class ThingsCloudClient {
       )
       .json<ItemsResponse>();
 
-    return {
-      id: historyKey,
-      latestServerIndex: items["current-item-index"] ?? 0,
-    };
+    const head = items["current-item-index"];
+    if (typeof head !== "number" || !Number.isSafeInteger(head) || head < 0) {
+      throw new Error("Things Cloud response has no valid history head index");
+    }
+    return { id: historyKey, latestServerIndex: head };
   }
 
   async createTodo(input: ThingsTodoInput): Promise<string> {
-    const history = await this.ownSyncedHistory();
-    const id = input.id ?? generateThingsUuid();
-    const envelope: WriteEnvelope = {
-      t: 0,
-      e: "Task6",
-      p: createTaskPayload(input),
-    };
-    const body: Record<string, WriteEnvelope> = { [id]: envelope };
+    const [id] = await this.createTodos([input]);
+    return id;
+  }
+
+  async createTodos(inputs: ThingsTodoInput[]): Promise<string[]> {
+    if (inputs.length === 0) return [];
+    const body: Record<string, WriteEnvelope> = {};
+    const ids = inputs.map((input) => {
+      const id = input.id ?? generateThingsUuid();
+      validateThingsUuid(id);
+      if (Object.hasOwn(body, id)) {
+        throw new Error("Things Cloud commit contains duplicate task IDs");
+      }
+      // Timed alarms are outside the upstream verified Task7 create scope.
+      body[id] = {
+        t: 0,
+        e: input.when ? "Task6" : "Task7",
+        p: createTaskPayload(input),
+      };
+      return id;
+    });
+    for (let attempt = 0; ; attempt++) {
+      const history = await this.ownSyncedHistory();
+      try {
+        await this.commit(history, body);
+        return ids;
+      } catch (error) {
+        // A 409 rejects this commit. Refresh the ancestor and retry the same
+        // IDs/payload; never replay an ambiguous network or server failure.
+        if (
+          !(error instanceof HTTPError) ||
+          error.response.status !== 409 ||
+          attempt >= 2
+        ) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  private async commit(
+    history: SyncedHistory,
+    body: Record<string, WriteEnvelope>,
+  ): Promise<void> {
     const response = await http
       .post(
         endpointUrl(this.endpoint, `/version/1/history/${history.id}/commit`),
@@ -99,12 +138,17 @@ export class ThingsCloudClient {
             _cnt: "1",
           },
           json: body,
+          retry: 0,
         },
       )
       .json<CommitResponse>();
-    if (typeof response["server-head-index"] !== "number") {
+    const head = response["server-head-index"];
+    if (
+      typeof head !== "number" ||
+      !Number.isSafeInteger(head) ||
+      head <= history.latestServerIndex
+    ) {
       throw new Error("Things Cloud commit response has no server head index");
     }
-    return id;
   }
 }

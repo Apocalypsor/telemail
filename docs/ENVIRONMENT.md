@@ -61,13 +61,13 @@ IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存
 
 ### Things Cloud（可选）
 
-每个用户在 Mini App 里单独保存 Things Cloud 邮箱 / 密码后，邮件提醒到期时会在后台推送创建一条 Things Today 任务。用户设备时区由 Mini App 请求自动上报并记录；推送失败只会上报 observability，不影响 Telemail 提醒分发。同一个 `user_timezone` 也用于每天本地 19:00 的晚间邮件摘要。
+每个用户在 Mini App 里单独保存 Things Cloud 邮箱 / 密码后，邮件提醒到期时会在后台推送创建 Things Today 任务。同一轮到期、同一用户的邮件提醒合并为一次 Things Cloud 提交，每条提醒仍创建独立任务；遇到明确的 HTTP 409 版本冲突时，刷新历史版本后最多重试两次。网络中断等结果不明确的提交不自动重放。用户设备时区由 Mini App 请求自动上报并记录；推送失败只会上报 observability，不影响 Telemail 提醒分发。同一个 `user_timezone` 也用于每天本地 19:00 的晚间邮件摘要。
 
 | Secret                    | 说明                                                      |
 | ------------------------- | --------------------------------------------------------- |
 | `THINGS_CLOUD_ENDPOINT`   | Things Cloud API endpoint override（调试用，默认官方 endpoint） |
 
-用户 Things Cloud 凭据和 `user_timezone` 存储在 D1 `users` 表，API 不回显密码；每个用户的 Things app instance id 存在 KV。注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径。
+用户 Things Cloud 凭据和 `user_timezone` 存储在 D1 `users` 表，API 不回显密码；每个用户的 Things app instance id 存在 KV。注意：Things Cloud 没有官方公开 REST API；这里使用的是 Things Cloud 同步协议的最小 create-task 路径，Today 任务对齐 things-cloud-sdk v0.6.0 已验证的 Task7 创建格式（带定时闹钟的底层调用保留 Task6）。任务 ID 使用保留前导零的规范 Base58 编码，并在提交前校验。已发送的 Telemail 提醒不会因 Things 推送失败而自动补推。
 
 ## Vars
 

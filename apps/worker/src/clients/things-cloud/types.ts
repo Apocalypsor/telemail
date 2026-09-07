@@ -79,7 +79,7 @@ export interface TaskCreatePayload {
 
 export interface WriteEnvelope {
   t: 0;
-  e: "Task6";
+  e: "Task6" | "Task7";
   p: TaskCreatePayload;
 }
 
