@@ -8,7 +8,7 @@
     "build": "bun generate:routes && tsc -b && vite build",
     "preview": "vite preview",
     "deploy": "bun run build && wrangler pages deploy dist --project-name=telemail-web --branch=main",
-    "generate:routes": "tsr generate",
+    "generate:routes": "node scripts/router-cli.mjs generate",
     "typecheck": "bun generate:routes && tsc -b --noEmit"
   },
   "dependencies": {

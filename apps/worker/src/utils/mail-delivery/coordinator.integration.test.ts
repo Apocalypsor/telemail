@@ -1,6 +1,5 @@
 import { env } from "cloudflare:workers";
-import { beforeEach, describe, expect, it } from "vitest";
-import { TelegramClient } from "../src/clients/telegram";
+import { TelegramClient } from "@worker/clients/telegram";
 import {
   claimEmailDelivery,
   deleteEmailDelivery,
@@ -8,23 +7,24 @@ import {
   getEmailDeliveryState,
   markEmailDeliveryRetryable,
   markEmailDeliveryUnknown,
-} from "../src/db/email-deliveries";
+} from "@worker/db/email-deliveries";
 import {
   getMappingsByEmailIds,
   putMessageMapping,
-} from "../src/db/message-map";
-import { EmailMessageNotFoundError } from "../src/errors/email-provider";
-import { TelegramRateLimitError } from "../src/errors/telegram";
+} from "@worker/db/message-map";
+import { EmailMessageNotFoundError } from "@worker/errors/email-provider";
+import { TelegramRateLimitError } from "@worker/errors/telegram";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   coordinateEmailDelivery,
   type EmailDeliveryOperations,
   type EmailDeliveryResult,
   runAfterDeliveryClaim,
-} from "../src/utils/mail-delivery/coordinator";
+} from "./coordinator";
 import {
   clearMissingEmailDelivery,
   getEmailDeliveryFailureContext,
-} from "../src/utils/mail-delivery/dispatch";
+} from "./dispatch";
 
 type InjectedDelivery = (
   beforeSend: () => Promise<boolean>,

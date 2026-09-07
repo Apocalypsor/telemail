@@ -4,7 +4,7 @@ import {
   type EmailDeliveryRequest,
   reserveEmailDeliveryRequests,
   runEmailDeliveryBatch,
-} from "../src/utils/mail-delivery/dispatch";
+} from "./dispatch";
 
 describe("direct email delivery batches", () => {
   afterEach(() => {

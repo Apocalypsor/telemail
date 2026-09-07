@@ -3,7 +3,7 @@ import {
   TelegramApiError,
   TelegramApiErrorCode,
   TelegramRateLimitError,
-} from "../src/errors/telegram";
+} from "./telegram";
 
 describe("Telegram errors", () => {
   it.each([

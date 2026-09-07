@@ -3,7 +3,7 @@ import {
   coordinateEmailDelivery,
   type EmailDeliveryOperations,
   type EmailDeliveryResult,
-} from "../src/utils/mail-delivery/coordinator";
+} from "./coordinator";
 
 type ClaimState = "pending" | "sending" | "retryable" | "unknown" | null;
 

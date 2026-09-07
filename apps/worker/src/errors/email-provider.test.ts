@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EmailMessageNotFoundError } from "../src/errors/email-provider";
+import { EmailMessageNotFoundError } from "./email-provider";
 
 describe("provider delivery errors", () => {
   it("retains the missing message context", () => {

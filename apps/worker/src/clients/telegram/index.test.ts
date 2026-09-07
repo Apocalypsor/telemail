@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TelegramClient } from "../src/clients/telegram";
-import type { TelegramClientEnv } from "../src/clients/telegram/types";
+import { TelegramClient } from "./index";
+import type { TelegramClientEnv } from "./types";
 
 describe("Telegram follow-up operations", () => {
   afterEach(() => {

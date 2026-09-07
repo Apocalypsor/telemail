@@ -1,5 +1,5 @@
-import { mailController } from "@worker/api/modules/mail";
 import { describe, expect, it } from "vitest";
+import { mailController } from "./index";
 
 describe("API controller isolation", () => {
   it("keeps the mail mutation resolver local to the mail controller", () => {

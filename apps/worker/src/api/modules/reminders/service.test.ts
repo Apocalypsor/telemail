@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
-import { RemindersService } from "@worker/api/modules/reminders/service";
 import { ThingsCloudClient } from "@worker/clients/things-cloud";
 import * as kv from "@worker/db/kv";
 import { getReminderById, listDueReminders } from "@worker/db/reminders";
 import type { Env } from "@worker/types";
 import * as observability from "@worker/utils/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RemindersService } from "./service";
 
 const testEnv: Env = {
   ...env,

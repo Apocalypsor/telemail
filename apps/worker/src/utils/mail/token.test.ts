@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildWebMailUrl,
-  parseMailPreviewCredentials,
-} from "../src/utils/mail/token";
+import { buildWebMailUrl, parseMailPreviewCredentials } from "./token";
 
 describe("mail preview links", () => {
   it("uses one access query parameter for generated web mail URLs", () => {

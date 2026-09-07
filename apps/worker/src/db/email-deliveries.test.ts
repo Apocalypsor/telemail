@@ -8,7 +8,7 @@ import {
   markEmailDeliveryRetryable,
   markEmailDeliveryUnknown,
   markStaleEmailDeliveriesUnknown,
-} from "../src/db/email-deliveries";
+} from "./email-deliveries";
 
 interface DeliveryStateRow {
   state: string;
