@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "bun generate:routes && tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "deploy": "bun run build && wrangler pages deploy dist --project-name=telemail-web --branch=main",
     "generate:routes": "node scripts/router-cli.mjs generate",
-    "typecheck": "bun generate:routes && tsc -b --noEmit"
+    "typecheck": "bun generate:routes && bun check"
   },
   "dependencies": {
     "@elysiajs/eden": "^1.4.9",

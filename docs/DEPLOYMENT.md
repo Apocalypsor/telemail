@@ -6,6 +6,7 @@
 
 ## 1. 前置条件
 
+- [Bun](https://bun.com) **1.4.3 或更新版本**（类型检查使用原生 `bun check`）
 - [Cloudflare](https://cloudflare.com) 账号
 - [Telegram Bot](https://core.telegram.org/bots#how-do-i-create-a-bot) token（`@BotFather` 创建）
 - 接收消息的 Telegram Chat ID（每个邮箱账号可配置不同的 Chat）
@@ -80,12 +81,12 @@ bun wrangler d1 create gmail-tg-bridge
 首次建库后从仓库根跑：
 
 ```sh
-bun migrate:worker:remote
+bun worker migrate:remote
 ```
 
 以后有 D1 migration 时，优先让 migration 与新旧 Worker 都兼容。若 migration
 会删除或重命名现有字段，先部署不再依赖旧字段的新 Worker，确认生效后再运行
-`bun migrate:worker:remote`；新增兼容字段的 migration 可以先执行。
+`bun worker migrate:remote`；新增兼容字段的 migration 可以先执行。
 
 ### 4.2 KV 命名空间
 
@@ -102,17 +103,17 @@ bun wrangler kv namespace create EMAIL_KV
 如果本次发布包含兼容性 migration，可以先跑：
 
 ```sh
-bun migrate:worker:remote
+bun worker migrate:remote
 ```
 
 ```sh
-bun deploy:worker
+bun worker deploy
 ```
 
 `wrangler deploy` 不会自动跑 D1 migrations。
 
-删除或重命名字段时顺序相反：先 `bun deploy:worker`，确认新版本正常，再运行
-`bun migrate:worker:remote`，避免旧 Worker 在部署窗口继续读写已经不存在的字段。
+删除或重命名字段时顺序相反：先 `bun worker deploy`，确认新版本正常，再运行
+`bun worker migrate:remote`，避免旧 Worker 在部署窗口继续读写已经不存在的字段。
 仓库的 GitHub Actions production job 已按这个顺序在 Worker 部署成功后自动执行
 D1 migrations；以上命令用于手动部署。
 
@@ -143,7 +144,7 @@ Forum supergroup 可用作“General 操作区 + Inbox 邮件区”：把 bot �
 首次创建 Pages 项目（用 wrangler 一行就行）：
 
 ```sh
-bun build:page
+bun page build
 bun wrangler pages project create telemail-web --production-branch=main
 bun wrangler pages deploy apps/page/dist --project-name=telemail-web --branch=main
 ```

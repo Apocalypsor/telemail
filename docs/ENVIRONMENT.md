@@ -90,7 +90,7 @@ IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存
 
 ## Cloudflare Bindings
 
-`apps/worker/wrangler.jsonc` 里声明，`bun typegen:worker` 把类型同步到 `apps/worker/worker-configuration.d.ts`。
+`apps/worker/wrangler.jsonc` 里声明，`bun worker typegen` 把类型同步到 `apps/worker/worker-configuration.d.ts`。
 
 | Binding                 | 类型           | 用途                                                                 |
 | ----------------------- | -------------- | -------------------------------------------------------------------- |

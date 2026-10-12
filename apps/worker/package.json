@@ -15,7 +15,7 @@
     "deploy:version": "wrangler versions upload",
     "check:wrangler": "bun scripts/check-wrangler-template.mjs",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit"
+    "typecheck": "bun check && bun check -p test/tsconfig.json"
   },
   "dependencies": {
     "@elysiajs/eden": "^1.4.9",

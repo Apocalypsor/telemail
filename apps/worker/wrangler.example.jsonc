@@ -7,7 +7,7 @@
  *   2. Replace `${D1_DATABASE_ID}` and `${KV_NAMESPACE_ID}` with the IDs
  *      `bun wrangler d1 create gmail-tg-bridge` /
  *      `bun wrangler kv namespace create EMAIL_KV` returned.
- *   3. Run `bun typegen:worker` to regenerate `apps/worker/worker-configuration.d.ts`.
+ *   3. Run `bun worker typegen` to regenerate `apps/worker/worker-configuration.d.ts`.
  *
  * CI (`.github/workflows/ci.yml`):
  *   `envsubst < apps/worker/wrangler.example.jsonc > apps/worker/wrangler.jsonc` runs before any

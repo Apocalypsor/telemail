@@ -2,7 +2,7 @@
   {
     "label": "dev: worker",
     "command": "bun",
-    "args": ["run", "dev:worker"],
+    "args": ["run", "worker", "dev"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": true,
     "allow_concurrent_runs": false
@@ -10,7 +10,7 @@
   {
     "label": "dev: page",
     "command": "bun",
-    "args": ["run", "dev:page"],
+    "args": ["run", "page", "dev"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": true,
     "allow_concurrent_runs": false
@@ -18,7 +18,7 @@
   {
     "label": "dev: cookie (sign session)",
     "command": "bun",
-    "args": ["run", "dev:cookie"],
+    "args": ["run", "worker", "dev:cookie"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": true
@@ -26,7 +26,7 @@
   {
     "label": "dev: seed admin user",
     "command": "bun",
-    "args": ["run", "dev:seed"],
+    "args": ["run", "worker", "dev:seed"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": false
@@ -34,7 +34,7 @@
   {
     "label": "dev: migrate local D1",
     "command": "bun",
-    "args": ["run", "migrate:worker:local"],
+    "args": ["run", "worker", "migrate:local"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": false

@@ -1,7 +1,7 @@
 # Telemail — Agent Guide
 
 > **Commit only when explicitly asked.** Don't auto-commit after finishing a task — wait for the user to say so.
-> **Before commit**: `bun check` (Biome) + `bun typecheck` (tsc) from repo root. Don't use `biome-ignore`. Update user-facing docs when you change behavior they describe.
+> **Before commit**: `bun lint` (Biome) + `bun typecheck` (Bun's native type checker) from repo root. Don't use `biome-ignore`. Update user-facing docs when you change behavior they describe.
 > **Commit message convention**: use Conventional Commits (`<type>(optional-scope): <summary>`). Feature work must start with `feat:` (for example, `feat: add account sync`); use `fix:`, `docs:`, `chore:`, etc. only when that type accurately describes the change.
 
 ## Explore first

@@ -21,6 +21,22 @@
 - **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** —— 从 0 部署到 Cloudflare（GCP / MS Entra / D1 / KV / Workers + Pages / Bot webhook）
 - **[docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md)** —— 所有 secrets、Bindings、Cron、D1 schema 的参考
 
+## 本地检查
+
+需要 Bun **1.4.3 或更新版本**。类型检查使用 [Bun 原生 `bun check`](https://bun.com/docs/runtime/check)。
+
+```sh
+bun install
+bun lint        # Biome 格式与 lint 检查
+bun typecheck   # 各 workspace 类型检查，含前端路由生成和 Worker 测试类型
+bun worker test
+bun page build
+```
+
+原来的 Biome `bun check` 命令已改为 `bun lint`；直接运行 `bun check` 现在执行原生类型检查。完整检查请用 `bun typecheck`，确保先生成路由。
+
+根目录通过 `bun worker <脚本>` / `bun page <脚本>` 调用对应 workspace 的脚本，例如 `bun worker dev`、`bun page dev`、`bun worker migrate:local`、`bun page deploy`。前端 `build` 只执行 Vite 构建（插件自动生成路由），类型检查独立运行。
+
 ## 多账号
 
 - Gmail / Outlook / IMAP 三种混用

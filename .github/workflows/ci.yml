@@ -44,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
-      - run: bun check
+      - run: bun lint
 
   typecheck:
     name: Typecheck
@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
-      - run: bun test:worker
+      - run: bun worker test
 
   build-page:
     name: Build page
@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-bun
-      - run: bun build:page
+      - run: bun page build
       - uses: actions/upload-artifact@v7
         with:
           name: page-dist
