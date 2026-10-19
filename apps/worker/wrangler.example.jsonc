@@ -20,14 +20,15 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "telemail",
   "main": "src/index.ts",
-  "compatibility_date": "2026-04-21",
+  "compatibility_date": "2026-10-17",
   "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
     "logs": {
-      "enabled": true,
-      "invocation_logs": true
+      "invocation_logs": false
     },
-    "traces": {
-      "enabled": false
+    "issues": {
+      "enabled": true
     }
   },
   "compatibility_flags": ["nodejs_compat"],
