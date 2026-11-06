@@ -11,7 +11,6 @@ Before changing Worker behavior, inspect the current entrypoints, runtime config
 This is a fixed code organization rule for Elysia code, not an inventory of current routes.
 
 [Elysia "Service"](https://elysiajs.com/essential/best-practice.html#service) means two different patterns here:
-
 - **Non-request-dependent** - does not read cookies, headers, or Elysia `Context`; dependencies are passed explicitly, such as `env`. Use `abstract class XxxService { static foo(env, ...) {} }` in the feature module's `service.ts`.
 - **Request-dependent** - reads cookies, headers, or Elysia `Context` for auth, env injection, and similar concerns. This should be an Elysia instance under `plugins/<name>/` or an equivalent plugin file. The plugin itself is the service; do not add a separate `service.ts` inside a plugin directory.
 

@@ -135,7 +135,6 @@ Forum supergroup 可用作“General 操作区 + Inbox 邮件区”：把 bot �
 ## 6. Pages 部署（Mini App 前端 + web 工具页）
 
 前端 SPA 和 Worker 共享一个自定义域名，通过 Workers Routes 按路径分流：
-
 - `example.com/api/*`、`/oauth/*` → Worker
 - 其它（`/`、`/mail/*`、`/preview`、`/junk-check`、`/login`、`/telegram-app/*`）→ Pages
 
@@ -163,7 +162,6 @@ example.com/oauth/*
 ### 6.3 配置 Bot / Mini App
 
 BotFather：
-
 - `/setdomain` 设为 `example.com`
 - `/newapp` 注册 Mini App，Web App URL 填 `https://example.com/telegram-app`，short name 记下来
 
@@ -180,20 +178,19 @@ BotFather：
 
 Email Routing rule：
 
-| 字段 | 值 |
-| --- | --- |
-| Email pattern | `fwd` |
-| Domain | `IMAP_FORWARD_DOMAIN` 对应域名 |
-| Subaddressing | enabled |
-| Action | Send to Worker |
-| Worker | `telemail` |
+| 字段          | 值                             |
+| ------------- | ------------------------------ |
+| Email pattern | `fwd`                          |
+| Domain        | `IMAP_FORWARD_DOMAIN` 对应域名 |
+| Subaddressing | enabled                        |
+| Action        | Send to Worker                 |
+| Worker        | `telemail`                     |
 
 不要在 Email pattern 里填 `fwd-*`；Cloudflare 这里不是 glob，`*` 不合法。启用 Subaddressing 后，`fwd+<token>@domain` 会命中 `fwd@domain` 这条规则。
 
 ## 7. 添加邮箱账号
 
 通过 Telegram Mini App 管理：
-
 1. 向 Bot 发送 `/start` → **账号管理** 打开 Mini App
 2. 在 Mini App 里选择账号类型（Gmail / Outlook / IMAP），填写 Chat ID 和必要配置
 3. Gmail / Outlook 需完成 OAuth 授权（先确保 `WORKER_URL` 已配置，且 OAuth redirect URI 指向同一域名）；IMAP 需填写服务器信息和密码，并把邮箱自动转发到账号详情显示的 `fwd+<token>` 地址
