@@ -104,6 +104,7 @@ IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存
 ## Cron Triggers
 
 `"triggers": { "crons": ["* * * * *"] }` —— 每分钟一次，scheduled tasks 各自声明 `shouldRun` 条件：
+
 - **每分钟**：分发到期的 Mini App 提醒
 - **每 10 分钟**：拉取所有启用账号的未读邮件，作为推送通知兜底
 - **每 15 分钟**：按用户本地时区检查是否到 19:00，发送未读 / 垃圾邮件摘要（都为 0 时跳过；非零列表会附 Mini App 入口）
@@ -113,6 +114,7 @@ IMAP 账号的 host / port / username / password 由用户在 Mini App 里保存
 ## D1 Schema
 
 用户可见的表：
+
 - `accounts` —— 每个邮箱账号（`type`、`email`、`chat_id`、可选 `topic_id`、`refresh_token`、IMAP credentials / forward token 等）
 - `message_map` —— `emailMessageId` ↔ `(tg_chat_id, tg_message_id, tg_thread_id)`，幂等去重用
 - `email_deliveries` —— 自动投递的短生命周期原子抢占；成功写入 `message_map` 后删除，明确限流时可重试，结果不明确或超时中断时保留为 `unknown` 以避免双发；删除账号会级联清理
