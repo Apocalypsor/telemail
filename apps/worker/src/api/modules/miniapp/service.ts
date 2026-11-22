@@ -2,6 +2,7 @@
 import { getOwnAccounts } from "@worker/db/accounts";
 import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { getEmailProvider } from "@worker/providers";
+import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
 import type { Env } from "@worker/types";
 import { generateMailTokenById } from "@worker/utils/mail/token";
 import { reportErrorToObservability } from "@worker/utils/observability";
@@ -48,7 +49,7 @@ export abstract class MiniappService {
                 items: await def.fetcher(provider, MAX_PER_ACCOUNT),
                 nextCursor: null,
               };
-          const pageMsgs = page.items;
+          const pageMsgs = sortEmailListItemsByDateDesc(page.items);
           const nextCursor = page.nextCursor;
 
           if (pageMsgs.length === 0)
@@ -86,6 +87,7 @@ export abstract class MiniappService {
                   : undefined,
                 from: msg.from,
                 to: msg.to,
+                date: msg.date,
               };
             }),
           );
@@ -157,7 +159,7 @@ export abstract class MiniappService {
                 items: await provider.searchMessages(trimmed, MAX_PER_ACCOUNT),
                 nextCursor: null,
               };
-          const pageMsgs = page.items;
+          const pageMsgs = sortEmailListItemsByDateDesc(page.items);
           const nextCursor = page.nextCursor;
 
           if (pageMsgs.length === 0)
@@ -193,6 +195,7 @@ export abstract class MiniappService {
                 tgMessageId: mapping?.tg_message_id,
                 from: msg.from,
                 to: msg.to,
+                date: msg.date,
               };
             }),
           );

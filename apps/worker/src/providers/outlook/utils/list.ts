@@ -8,9 +8,10 @@ import type {
   EmailListItem,
   EmailListPage,
 } from "@worker/providers/types";
+import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
 import { escapeBackslashAndDoubleQuote } from "@worker/utils/string";
 
-const OUTLOOK_LIST_SELECT = "id,subject,from,toRecipients";
+const OUTLOOK_LIST_SELECT = "id,subject,from,toRecipients,receivedDateTime";
 const OUTLOOK_COUNT_PAGE_SIZE = 100;
 
 type GraphEmailAddress = { name?: string; address?: string };
@@ -34,6 +35,7 @@ const toEmailListItem = (message: GraphMessage): EmailListItem => ({
     ?.map((recipient) => formatGraphAddress(recipient.emailAddress))
     .filter((value): value is string => !!value)
     .join(", "),
+  date: message.receivedDateTime,
 });
 
 export const buildOutlookUnreadListPath = (maxResults: number): string =>
@@ -69,7 +71,9 @@ export const listOutlookMessagesPage = async (
 ): Promise<EmailListPage> => {
   const data = await graphGet<GraphMessageList>(token, cursor ?? path);
   return {
-    items: (data.value ?? []).map(toEmailListItem),
+    items: sortEmailListItemsByDateDesc(
+      (data.value ?? []).map(toEmailListItem),
+    ),
     nextCursor: data["@odata.nextLink"] ?? null,
   };
 };

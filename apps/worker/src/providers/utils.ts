@@ -25,6 +25,24 @@ export const parseOffsetCursor = (cursor: string | undefined): number => {
   return Number.isInteger(offset) && offset > 0 ? offset : 0;
 };
 
+export const sortEmailListItemsByDateDesc = <T extends { date?: string }>(
+  items: T[],
+): T[] => {
+  return items.sort((a, b) => {
+    const aTime = parseSortableDate(a.date);
+    const bTime = parseSortableDate(b.date);
+    if (aTime === null) return bTime === null ? 0 : 1;
+    if (bTime === null) return -1;
+    return bTime - aTime;
+  });
+};
+
+const parseSortableDate = (value: string | undefined): number | null => {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+};
+
 /**
  * 用 refresh_token 交换 access_token（KV 缓存，按账号隔离）。
  * Gmail / Outlook 两个 OAuth provider 的刷新逻辑共用这一个实现——差异仅是

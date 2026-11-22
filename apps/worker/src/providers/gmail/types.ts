@@ -13,6 +13,7 @@ export interface GmailPayload {
 
 export interface GmailMessage {
   id: string;
+  internalDate?: string;
   labelIds?: string[];
   payload?: GmailPayload;
 }

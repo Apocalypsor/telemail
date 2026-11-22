@@ -27,6 +27,7 @@ export const MailListItem = t.Object({
   tgMessageId: t.Optional(t.Number()),
   from: t.Optional(t.String()),
   to: t.Optional(t.String()),
+  date: t.Optional(t.String()),
 });
 export type MailListItem = UnwrapSchema<typeof MailListItem>;
 
