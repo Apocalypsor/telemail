@@ -232,7 +232,7 @@ const SearchPage = () => {
                       after: e.target.value,
                     }))
                   }
-                  className={`w-full text-sm ${INPUT_CLASS}`}
+                  className={`w-full min-w-0 text-sm ${INPUT_CLASS}`}
                 />
               </label>
               <label className="space-y-1 text-xs text-zinc-400">
@@ -246,7 +246,7 @@ const SearchPage = () => {
                       before: e.target.value,
                     }))
                   }
-                  className={`w-full text-sm ${INPUT_CLASS}`}
+                  className={`w-full min-w-0 text-sm ${INPUT_CLASS}`}
                 />
               </label>
             </div>
