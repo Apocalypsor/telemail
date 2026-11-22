@@ -13,11 +13,7 @@ import {
   resolveArchiveFolder,
   resolveFolderForHint,
 } from "@worker/providers/imap/utils/mailboxes";
-import {
-  buildMessagesFromHeaders,
-  type DatedEmailListItem,
-  sortByDateDesc,
-} from "@worker/providers/imap/utils/messages";
+import { buildMessagesFromHeaders } from "@worker/providers/imap/utils/messages";
 import type {
   EmailCount,
   EmailListItem,
@@ -25,6 +21,7 @@ import type {
   MessageState,
   RawEmailWithState,
 } from "@worker/providers/types";
+import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
 import type { Env, WaitUntil } from "@worker/types";
 import { scheduleEmailDeliveries } from "@worker/utils/mail-delivery/dispatch";
 
@@ -472,7 +469,7 @@ export class ImapProvider extends EmailProvider {
     criteria: string,
     maxResults: number,
     offset: number,
-  ): Promise<DatedEmailListItem[]> {
+  ): Promise<EmailListItem[]> {
     return this.withClient((client) =>
       this.searchAndFetchWithClient(
         client,
@@ -490,7 +487,7 @@ export class ImapProvider extends EmailProvider {
     criteria: string,
     maxResults: number,
     offset: number,
-  ): Promise<DatedEmailListItem[]> {
+  ): Promise<EmailListItem[]> {
     await client.selectMailbox(folder);
     const uids = (await client.search(criteria))
       .sort((a, b) => b - a)
@@ -545,7 +542,7 @@ export class ImapProvider extends EmailProvider {
         .filter((folder): folder is string => !!folder)
         .filter((folder, index, all) => all.indexOf(folder) === index);
 
-      const all: DatedEmailListItem[] = [];
+      const all: EmailListItem[] = [];
       for (const folder of folders) {
         all.push(
           ...(await this.searchAndFetchWithClient(
@@ -564,7 +561,10 @@ export class ImapProvider extends EmailProvider {
         seen.add(message.id);
         return true;
       });
-      return sortByDateDesc(dedup).slice(offset, offset + maxResults);
+      return sortEmailListItemsByDateDesc(dedup).slice(
+        offset,
+        offset + maxResults,
+      );
     });
   }
 

@@ -37,15 +37,17 @@ export const flattenMailListPages = (
   pages: MailListPageLike[] | undefined,
 ): FlatMailListItem[] => {
   if (!pages) return [];
-  return pages.flatMap((page) =>
-    page.results.flatMap((result) =>
-      result.items.map((item) => ({
-        ...item,
-        accountId: result.accountId,
-        accountEmail: result.accountEmail,
-      })),
-    ),
-  );
+  return pages
+    .flatMap((page) =>
+      page.results.flatMap((result) =>
+        result.items.map((item) => ({
+          ...item,
+          accountId: result.accountId,
+          accountEmail: result.accountEmail,
+        })),
+      ),
+    )
+    .sort(compareMailItemsByDateDesc);
 };
 
 export const collectMailListErrors = (
@@ -55,4 +57,21 @@ export const collectMailListErrors = (
   return pages.flatMap((page) =>
     page.results.filter((result) => Boolean(result.error)),
   );
+};
+
+const compareMailItemsByDateDesc = (
+  a: FlatMailListItem,
+  b: FlatMailListItem,
+): number => {
+  const aTime = parseSortableDate(a.date);
+  const bTime = parseSortableDate(b.date);
+  if (aTime === null) return bTime === null ? 0 : 1;
+  if (bTime === null) return -1;
+  return bTime - aTime;
+};
+
+const parseSortableDate = (value: string | undefined): number | null => {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
 };

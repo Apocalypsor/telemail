@@ -11,6 +11,8 @@ export interface EmailListItem {
   from?: string;
   /** 收件人，多个地址用逗号连接。 */
   to?: string;
+  /** 邮件发送时间，统一为 ISO 8601 字符串。 */
+  date?: string;
 }
 
 export interface EmailListPage {

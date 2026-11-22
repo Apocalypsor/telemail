@@ -111,7 +111,7 @@ const SearchPage = () => {
         <input
           type="search"
           enterKeyHint="search"
-          placeholder="关键词、发件人、主题…"
+          placeholder="关键词或 Gmail 语法（from:、subject:、after:）…"
           maxLength={200}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -134,7 +134,7 @@ const SearchPage = () => {
         {errMsg ??
           (firstPage
             ? `已载入 ${items.length} 封匹配 “${firstPage.query}”`
-            : "支持跨所有账号检索（Gmail / Outlook 走原生搜索语法）")}
+            : "支持 Gmail 搜索语法（from:、subject:、after: 等）")}
       </div>
 
       {!q ? null : searchQuery.isLoading ? (

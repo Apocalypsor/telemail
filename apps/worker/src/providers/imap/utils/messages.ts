@@ -1,15 +1,14 @@
 import type { EmailListItem } from "@worker/providers/types";
+import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
 import { formatAddress } from "@worker/utils/mail/body";
 import PostalMime from "postal-mime";
 
-export interface DatedEmailListItem extends EmailListItem {
-  date?: string;
-}
+export type DatedEmailListItem = EmailListItem;
 
 export const buildMessagesFromHeaders = async (
   blocks: { header: ArrayBuffer }[],
-): Promise<DatedEmailListItem[]> => {
-  const messages: DatedEmailListItem[] = [];
+): Promise<EmailListItem[]> => {
+  const messages: EmailListItem[] = [];
   for (const block of blocks) {
     const parsed = await new PostalMime().parse(block.header);
     if (!parsed.messageId) continue;
@@ -24,8 +23,5 @@ export const buildMessagesFromHeaders = async (
   return messages;
 };
 
-export const sortByDateDesc = <T extends { date?: string }>(
-  items: T[],
-): T[] => {
-  return items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-};
+export const sortByDateDesc = <T extends { date?: string }>(items: T[]): T[] =>
+  sortEmailListItemsByDateDesc(items);

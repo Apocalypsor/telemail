@@ -1,6 +1,7 @@
 export interface GraphMessage {
   id: string;
   subject?: string;
+  receivedDateTime?: string;
   parentFolderId?: string;
   flag?: { flagStatus: string };
   from?: { emailAddress?: { name?: string; address?: string } };

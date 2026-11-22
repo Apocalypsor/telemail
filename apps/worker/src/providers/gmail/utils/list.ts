@@ -9,6 +9,8 @@ import type {
   EmailListItem,
   EmailListPage,
 } from "@worker/providers/types";
+import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
+import { parseEmailDate } from "@worker/utils/mail/body";
 
 const GMAIL_COUNT_PAGE_SIZE = 100;
 
@@ -33,17 +35,21 @@ export const hydrateGmailListItems = async (
     "Subject",
     "From",
     "To",
+    "Date",
   ]);
-  return ids.map((id) => {
-    const msg = metaMap.get(id);
-    if (!msg) return { id };
-    return {
-      id,
-      subject: getHeader(msg, "subject"),
-      from: getHeader(msg, "from"),
-      to: getHeader(msg, "to"),
-    };
-  });
+  return sortEmailListItemsByDateDesc(
+    ids.map((id) => {
+      const msg = metaMap.get(id);
+      if (!msg) return { id };
+      return {
+        id,
+        subject: getHeader(msg, "subject"),
+        from: getHeader(msg, "from"),
+        to: getHeader(msg, "to"),
+        date: getGmailMessageDate(msg),
+      };
+    }),
+  );
 };
 
 export const listGmailMessagesByQuery = async (
@@ -148,4 +154,13 @@ export const listGmailMessagesByLabelPage = async (
     items: await hydrateGmailListItems(token, data.messages),
     nextCursor: data.nextPageToken ?? null,
   };
+};
+
+const getGmailMessageDate = (message: GmailMessage): string | undefined => {
+  const internalDate = Number(message.internalDate);
+  if (Number.isFinite(internalDate) && internalDate > 0) {
+    return new Date(internalDate).toISOString();
+  }
+
+  return parseEmailDate(getHeader(message, "date"))?.toISOString();
 };
