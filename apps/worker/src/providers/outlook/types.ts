@@ -2,6 +2,8 @@ export interface GraphMessage {
   id: string;
   subject?: string;
   receivedDateTime?: string;
+  hasAttachments?: boolean;
+  isRead?: boolean;
   parentFolderId?: string;
   flag?: { flagStatus: string };
   from?: { emailAddress?: { name?: string; address?: string } };

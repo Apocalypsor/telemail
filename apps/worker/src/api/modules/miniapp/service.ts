@@ -4,6 +4,7 @@ import { getMappingsByEmailIds } from "@worker/db/message-map";
 import { getEmailProvider } from "@worker/providers";
 import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
 import type { Env } from "@worker/types";
+import { parseGmailSearchQuery } from "@worker/utils/mail/search";
 import { generateMailTokenById } from "@worker/utils/mail/token";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import type { MailListItem, MailListType } from "./model";
@@ -134,7 +135,8 @@ export abstract class MiniappService {
     query: string,
     options?: MailListPageOptions,
   ): Promise<MailSearchResult> {
-    const trimmed = query.trim();
+    const searchQuery = parseGmailSearchQuery(query);
+    const trimmed = searchQuery.raw;
     const paginated = !!options;
     const limit = normalizePageLimit(options?.limit);
     const cursorByAccount = options?.cursorByAccount;
@@ -151,12 +153,15 @@ export abstract class MiniappService {
           const provider = getEmailProvider(account, env);
           const page = paginated
             ? await provider.searchMessagesPage(
-                trimmed,
+                searchQuery,
                 limit,
                 cursorByAccount?.get(account.id),
               )
             : {
-                items: await provider.searchMessages(trimmed, MAX_PER_ACCOUNT),
+                items: await provider.searchMessages(
+                  searchQuery,
+                  MAX_PER_ACCOUNT,
+                ),
                 nextCursor: null,
               };
           const pageMsgs = sortEmailListItemsByDateDesc(page.items);

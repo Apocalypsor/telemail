@@ -3,15 +3,23 @@ import type {
   GraphMessageList,
 } from "@worker/providers/outlook/types";
 import { graphGet } from "@worker/providers/outlook/utils/api";
+import {
+  buildOutlookSearchQuery,
+  getOutlookSearchFolder,
+} from "@worker/providers/outlook/utils/search";
 import type {
   EmailCount,
   EmailListItem,
   EmailListPage,
 } from "@worker/providers/types";
 import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
-import { escapeBackslashAndDoubleQuote } from "@worker/utils/string";
+import {
+  type ParsedGmailSearchQuery,
+  parseGmailSearchQuery,
+} from "@worker/utils/mail/search";
 
-const OUTLOOK_LIST_SELECT = "id,subject,from,toRecipients,receivedDateTime";
+const OUTLOOK_LIST_SELECT =
+  "id,subject,from,toRecipients,receivedDateTime,hasAttachments,isRead,flag";
 const OUTLOOK_COUNT_PAGE_SIZE = 100;
 
 type GraphEmailAddress = { name?: string; address?: string };
@@ -57,24 +65,44 @@ export const buildOutlookArchivedListPath = (maxResults: number): string =>
   `/me/mailFolders('archive')/messages?$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
 
 export const buildOutlookSearchListPath = (
-  query: string,
+  query: ParsedGmailSearchQuery | string,
   maxResults: number,
 ): string => {
-  const escaped = escapeBackslashAndDoubleQuote(query);
-  return `/me/messages?$search=${encodeURIComponent(`"${escaped}"`)}&$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
+  const parsed =
+    typeof query === "string" ? parseGmailSearchQuery(query) : query;
+  const search = buildOutlookSearchQuery(parsed);
+  const folder = getOutlookSearchFolder(parsed);
+  const base = folder
+    ? `/me/mailFolders('${folder}')/messages`
+    : "/me/messages";
+  const searchParam = search
+    ? `?$search=${encodeURIComponent(`"${search}"`)}&`
+    : "?";
+  return `${base}${searchParam}$select=${OUTLOOK_LIST_SELECT}&$top=${maxResults}`;
 };
 
 export const listOutlookMessagesPage = async (
   token: string,
   path: string,
   cursor: string | undefined,
+  filter?: (message: GraphMessage) => boolean,
 ): Promise<EmailListPage> => {
-  const data = await graphGet<GraphMessageList>(token, cursor ?? path);
+  let requestPath = cursor ?? path;
+  let messages: GraphMessage[] = [];
+  let nextCursor: string | null = null;
+  do {
+    const data = await graphGet<GraphMessageList>(token, requestPath);
+    messages = messages.concat(
+      (data.value ?? []).filter((message) => !filter || filter(message)),
+    );
+    nextCursor = data["@odata.nextLink"] ?? null;
+    if (!filter || messages.length > 0 || !nextCursor) break;
+    requestPath = nextCursor;
+  } while (nextCursor);
+
   return {
-    items: sortEmailListItemsByDateDesc(
-      (data.value ?? []).map(toEmailListItem),
-    ),
-    nextCursor: data["@odata.nextLink"] ?? null,
+    items: sortEmailListItemsByDateDesc(messages.map(toEmailListItem)),
+    nextCursor,
   };
 };
 

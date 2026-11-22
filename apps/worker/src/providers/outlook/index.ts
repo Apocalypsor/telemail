@@ -46,12 +46,17 @@ import {
   listOutlookMessagesPage,
 } from "@worker/providers/outlook/utils/list";
 import { fetchRawMime } from "@worker/providers/outlook/utils/mime";
+import { getOutlookSearchFilter } from "@worker/providers/outlook/utils/search";
 import type {
   EmailListPage,
   MessageState,
   PreviewContent,
 } from "@worker/providers/types";
 import type { Env, MailAttachmentDownload, WaitUntil } from "@worker/types";
+import {
+  type ParsedGmailSearchQuery,
+  parseGmailSearchQuery,
+} from "@worker/utils/mail/search";
 import {
   type EmailDeliveryRequest,
   scheduleEmailDeliveries,
@@ -483,12 +488,15 @@ export class OutlookProvider extends EmailProvider {
     );
   }
 
-  async searchMessages(query: string, maxResults: number = 20) {
+  async searchMessages(
+    query: ParsedGmailSearchQuery | string,
+    maxResults: number = 20,
+  ) {
     return (await this.searchMessagesPage(query, maxResults)).items;
   }
 
   async searchMessagesPage(
-    query: string,
+    query: ParsedGmailSearchQuery | string,
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
@@ -498,6 +506,9 @@ export class OutlookProvider extends EmailProvider {
       await this.token(),
       buildOutlookSearchListPath(query, maxResults),
       cursor,
+      getOutlookSearchFilter(
+        typeof query === "string" ? parseGmailSearchQuery(query) : query,
+      ),
     );
   }
 

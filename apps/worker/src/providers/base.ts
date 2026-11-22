@@ -40,6 +40,7 @@ import {
   buildCidMapFromAttachments,
   visibleMailAttachments,
 } from "@worker/utils/mail/mime";
+import type { ParsedGmailSearchQuery } from "@worker/utils/mail/search";
 import { reportErrorToObservability } from "@worker/utils/observability";
 import { HTTPError } from "ky";
 import PostalMime from "postal-mime";
@@ -88,7 +89,7 @@ export abstract class EmailProvider {
   abstract listArchived(maxResults?: number): Promise<EmailListItem[]>;
 
   abstract searchMessages(
-    query: string,
+    query: ParsedGmailSearchQuery | string,
     maxResults?: number,
   ): Promise<EmailListItem[]>;
 
@@ -151,7 +152,7 @@ export abstract class EmailProvider {
   }
 
   async searchMessagesPage(
-    query: string,
+    query: ParsedGmailSearchQuery | string,
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {

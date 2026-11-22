@@ -14,6 +14,10 @@ import {
   resolveFolderForHint,
 } from "@worker/providers/imap/utils/mailboxes";
 import { buildMessagesFromHeaders } from "@worker/providers/imap/utils/messages";
+import {
+  buildImapSearchCriteria,
+  getImapSearchFolders,
+} from "@worker/providers/imap/utils/search";
 import type {
   EmailCount,
   EmailListItem,
@@ -23,6 +27,10 @@ import type {
 } from "@worker/providers/types";
 import { sortEmailListItemsByDateDesc } from "@worker/providers/utils";
 import type { Env, WaitUntil } from "@worker/types";
+import {
+  type ParsedGmailSearchQuery,
+  parseGmailSearchQuery,
+} from "@worker/utils/mail/search";
 import { scheduleEmailDeliveries } from "@worker/utils/mail-delivery/dispatch";
 
 /**
@@ -267,19 +275,24 @@ export class ImapProvider extends EmailProvider {
   }
 
   async searchMessages(
-    query: string,
+    query: ParsedGmailSearchQuery | string,
     maxResults: number = 20,
   ): Promise<EmailListItem[]> {
-    return this.searchMessagesWithOffset(query, maxResults, 0);
+    return this.searchMessagesWithOffset(
+      normalizeSearchQuery(query),
+      maxResults,
+      0,
+    );
   }
 
   async searchMessagesPage(
-    query: string,
+    query: ParsedGmailSearchQuery | string,
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
+    const parsedQuery = normalizeSearchQuery(query);
     return listImapPage(maxResults, cursor, (limit, offset) =>
-      this.searchMessagesWithOffset(query, limit, offset),
+      this.searchMessagesWithOffset(parsedQuery, limit, offset),
     );
   }
 
@@ -526,21 +539,29 @@ export class ImapProvider extends EmailProvider {
   }
 
   private async searchMessagesWithOffset(
-    query: string,
+    query: ParsedGmailSearchQuery,
     maxResults: number,
     offset: number,
   ): Promise<EmailListItem[]> {
-    const trimmed = query.trim();
-    if (!trimmed) return [];
+    if (!query.raw) return [];
 
     return this.withClient(async (client) => {
-      const [junkPath, archivePath] = await Promise.all([
+      const [junkPath, archivePath, trashPath] = await Promise.all([
         findJunkFolder(this.env, client, this.account.id),
         findArchiveFolder(this.env, client, this.account.id),
+        findTrashFolder(this.env, client, this.account.id),
       ]);
-      const folders = ["INBOX", junkPath, archivePath]
+      const folderPaths = new Map([
+        ["inbox", "INBOX"],
+        ["junk", junkPath],
+        ["archive", archivePath],
+        ["trash", trashPath],
+      ] as const);
+      const folders = [...getImapSearchFolders(query)]
+        .map((kind) => folderPaths.get(kind))
         .filter((folder): folder is string => !!folder)
         .filter((folder, index, all) => all.indexOf(folder) === index);
+      const criteria = buildImapSearchCriteria(query);
 
       const all: EmailListItem[] = [];
       for (const folder of folders) {
@@ -548,7 +569,7 @@ export class ImapProvider extends EmailProvider {
           ...(await this.searchAndFetchWithClient(
             client,
             folder,
-            `TEXT ${quoteImapString(trimmed)}`,
+            criteria,
             offset + maxResults,
             0,
           )),
@@ -611,3 +632,8 @@ export class ImapProvider extends EmailProvider {
     }
   }
 }
+
+const normalizeSearchQuery = (
+  query: ParsedGmailSearchQuery | string,
+): ParsedGmailSearchQuery =>
+  typeof query === "string" ? parseGmailSearchQuery(query) : query;
