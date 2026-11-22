@@ -71,7 +71,7 @@ export abstract class McpService {
       {
         title: "Search mail",
         description:
-          "Search mail across the current user's enabled accounts. Use provider-native search syntax where supported.",
+          "Search mail across all enabled accounts with Gmail search syntax. Supports keywords and operators such as from:, to:, subject:, after:, before:, newer_than:, older_than:, has:attachment, is:unread, is:starred, in:spam, and in:trash.",
         inputSchema: SearchMailToolInputSchema,
       },
       async ({ query, limit }: SearchMailToolInput) => {

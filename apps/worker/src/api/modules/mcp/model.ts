@@ -26,7 +26,14 @@ export const ListMailToolInputSchema = asMcpInputSchema(
 export type ListMailToolInput = z.infer<typeof ListMailToolInputObjectSchema>;
 
 const SearchMailToolInputObjectSchema = z.object({
-  query: z.string().trim().min(1).max(200),
+  query: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .describe(
+      "Gmail search syntax, for example from:, to:, subject:, after:, before:, newer_than:, older_than:, has:attachment, is:unread, is:starred, in:spam, or in:trash",
+    ),
   limit: LimitSchema,
 });
 export const SearchMailToolInputSchema = asMcpInputSchema(

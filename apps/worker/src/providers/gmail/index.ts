@@ -56,6 +56,7 @@ import {
   base64urlToByteStream,
 } from "@worker/utils/base64url";
 import { parseEmailDate, wrapPlainText } from "@worker/utils/mail/body";
+import type { ParsedGmailSearchQuery } from "@worker/utils/mail/search";
 import {
   createEmailDeliveryScheduleContext,
   scheduleEmailDeliveries,
@@ -509,20 +510,27 @@ export class GmailProvider extends EmailProvider {
     );
   }
 
-  async searchMessages(query: string, maxResults: number = 20) {
+  async searchMessages(
+    query: ParsedGmailSearchQuery | string,
+    maxResults: number = 20,
+  ) {
     // Gmail `q=` 直接吃用户原文（from:/subject:/has: 等高级语法都支持）。
-    return listGmailMessagesByQuery(await this.token(), query, maxResults);
+    return listGmailMessagesByQuery(
+      await this.token(),
+      getRawSearchQuery(query),
+      maxResults,
+    );
   }
 
   async searchMessagesPage(
-    query: string,
+    query: ParsedGmailSearchQuery | string,
     maxResults: number = 20,
     cursor?: string,
   ): Promise<EmailListPage> {
     // Gmail `q=` 直接吃用户原文（from:/subject:/has: 等高级语法都支持）。
     return listGmailMessagesByQueryPage(
       await this.token(),
-      query,
+      getRawSearchQuery(query),
       maxResults,
       cursor,
     );
@@ -653,3 +661,6 @@ export class GmailProvider extends EmailProvider {
     return ids.length;
   }
 }
+
+const getRawSearchQuery = (query: ParsedGmailSearchQuery | string): string =>
+  typeof query === "string" ? query : query.raw;

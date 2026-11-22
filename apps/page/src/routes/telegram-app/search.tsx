@@ -23,6 +23,18 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 
+interface AdvancedSearchFields {
+  from: string;
+  to: string;
+  subject: string;
+  after: string;
+  before: string;
+  location: "" | "inbox" | "spam" | "trash" | "archive";
+  hasAttachment: boolean;
+  isUnread: boolean;
+  isStarred: boolean;
+}
+
 const SearchPage = () => {
   const { q: urlQ } = Route.useSearch();
   const navigate = useNavigate();
@@ -33,6 +45,10 @@ const SearchPage = () => {
 
   // input 是 URL 的可编辑镜像。URL 变化时同步过来（含从 mail 页回退到这里的场景）。
   const [input, setInput] = useState(urlQ ?? "");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advanced, setAdvanced] = useState<AdvancedSearchFields>(
+    EMPTY_ADVANCED_SEARCH,
+  );
   useEffect(() => {
     setInput(urlQ ?? "");
   }, [urlQ]);
@@ -63,7 +79,7 @@ const SearchPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const next = input.trim();
+    const next = buildGmailSearchQuery(input, advanced);
     if (!next || next === q) return;
     navigate({ to: "/telegram-app/search", search: { q: next } });
   };
@@ -107,23 +123,180 @@ const SearchPage = () => {
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
       <h1 className="text-xl font-semibold text-zinc-100">🔍 搜索邮件</h1>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="search"
-          enterKeyHint="search"
-          placeholder="关键词或 Gmail 语法（from:、subject:、after:）…"
-          maxLength={200}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          className={`flex-1 min-w-0 text-[15px] ${INPUT_CLASS}`}
-        />
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="flex gap-2">
+          <input
+            type="search"
+            enterKeyHint="search"
+            placeholder="搜索关键词…"
+            maxLength={200}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className={`flex-1 min-w-0 text-[15px] ${INPUT_CLASS}`}
+          />
+          <button
+            type="submit"
+            disabled={
+              searchQuery.isFetching || !buildGmailSearchQuery(input, advanced)
+            }
+            className="px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-[colors,transform] duration-100 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center min-w-17"
+          >
+            {searchQuery.isFetching ? <Spinner size="sm" /> : "搜索"}
+          </button>
+        </div>
+
         <button
-          type="submit"
-          disabled={searchQuery.isFetching || !input.trim()}
-          className="px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold transition-[colors,transform] duration-100 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center min-w-17"
+          type="button"
+          onClick={() => setAdvancedOpen((open) => !open)}
+          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
         >
-          {searchQuery.isFetching ? <Spinner size="sm" /> : "搜索"}
+          {advancedOpen ? "收起高级搜索" : "高级搜索"}
         </button>
+
+        {advancedOpen && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-xs text-zinc-400">
+                发件人
+                <input
+                  type="text"
+                  value={advanced.from}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      from: e.target.value,
+                    }))
+                  }
+                  placeholder="from@example.com"
+                  className={`w-full text-sm ${INPUT_CLASS}`}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-zinc-400">
+                收件人
+                <input
+                  type="text"
+                  value={advanced.to}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      to: e.target.value,
+                    }))
+                  }
+                  placeholder="to@example.com"
+                  className={`w-full text-sm ${INPUT_CLASS}`}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-zinc-400">
+                主题
+                <input
+                  type="text"
+                  value={advanced.subject}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      subject: e.target.value,
+                    }))
+                  }
+                  placeholder="邮件主题"
+                  className={`w-full text-sm ${INPUT_CLASS}`}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-zinc-400">
+                所在位置
+                <select
+                  value={advanced.location}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      location: e.target
+                        .value as AdvancedSearchFields["location"],
+                    }))
+                  }
+                  className={`w-full text-sm ${INPUT_CLASS}`}
+                >
+                  <option value="">所有位置</option>
+                  <option value="inbox">收件箱</option>
+                  <option value="spam">垃圾邮件</option>
+                  <option value="trash">回收站</option>
+                  <option value="archive">归档</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-zinc-400">
+                晚于
+                <input
+                  type="date"
+                  value={advanced.after}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      after: e.target.value,
+                    }))
+                  }
+                  className={`w-full text-sm ${INPUT_CLASS}`}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-zinc-400">
+                早于
+                <input
+                  type="date"
+                  value={advanced.before}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      before: e.target.value,
+                    }))
+                  }
+                  className={`w-full text-sm ${INPUT_CLASS}`}
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-zinc-300">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={advanced.hasAttachment}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      hasAttachment: e.target.checked,
+                    }))
+                  }
+                />
+                有附件
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={advanced.isUnread}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      isUnread: e.target.checked,
+                    }))
+                  }
+                />
+                未读
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={advanced.isStarred}
+                  onChange={(e) =>
+                    setAdvanced((current) => ({
+                      ...current,
+                      isStarred: e.target.checked,
+                    }))
+                  }
+                />
+                已加星标
+              </label>
+            </div>
+            <p className="text-xs text-zinc-500">
+              条件会组合成 Gmail 搜索语法，MCP 和 Agent 也可以直接传入同样的
+              query。
+            </p>
+          </div>
+        )}
       </form>
 
       <div
@@ -134,7 +307,7 @@ const SearchPage = () => {
         {errMsg ??
           (firstPage
             ? `已载入 ${items.length} 封匹配 “${firstPage.query}”`
-            : "支持 Gmail 搜索语法（from:、subject:、after: 等）")}
+            : "默认按关键词搜索，也可以打开高级搜索")}
       </div>
 
       {!q ? null : searchQuery.isLoading ? (
@@ -180,6 +353,46 @@ const SearchPage = () => {
       )}
     </div>
   );
+};
+
+const EMPTY_ADVANCED_SEARCH: AdvancedSearchFields = {
+  from: "",
+  to: "",
+  subject: "",
+  after: "",
+  before: "",
+  location: "",
+  hasAttachment: false,
+  isUnread: false,
+  isStarred: false,
+};
+
+const buildGmailSearchQuery = (
+  keyword: string,
+  fields: AdvancedSearchFields,
+): string => {
+  const terms = [keyword.trim()];
+  addGmailField(terms, "from", fields.from);
+  addGmailField(terms, "to", fields.to);
+  addGmailField(terms, "subject", fields.subject);
+  addGmailField(terms, "after", fields.after.replaceAll("-", "/"));
+  addGmailField(terms, "before", fields.before.replaceAll("-", "/"));
+  if (fields.location) terms.push(`in:${fields.location}`);
+  if (fields.hasAttachment) terms.push("has:attachment");
+  if (fields.isUnread) terms.push("is:unread");
+  if (fields.isStarred) terms.push("is:starred");
+  return terms.filter(Boolean).join(" ");
+};
+
+const addGmailField = (terms: string[], field: string, value: string): void => {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  terms.push(`${field}:${formatGmailValue(trimmed)}`);
+};
+
+const formatGmailValue = (value: string): string => {
+  const escaped = value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  return /\s/.test(value) ? `"${escaped}"` : escaped;
 };
 
 const Search = t.Object({ q: t.Optional(t.String()) });
